@@ -54,9 +54,7 @@
         </el-button>
       </div>
       
-      <div class="login-tips">
-        <p>默认管理员: admin / admin123</p>
-      </div>
+
     </div>
     
     <!-- 注册卡片 -->
