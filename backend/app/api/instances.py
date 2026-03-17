@@ -310,3 +310,134 @@ async def get_instance_variables(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取参数失败: {str(e)}"
         )
+
+
+# ============ 数据库列表相关 ============
+
+@router.get("/{instance_id}/databases", response_model=List[dict])
+async def get_instance_databases(
+    instance_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取实例数据库列表"""
+    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    password = decrypt_instance_password(instance.password_encrypted)
+    
+    try:
+        conn = pymysql.connect(
+            host=instance.host,
+            port=instance.port,
+            user=instance.username,
+            password=password,
+            connect_timeout=10
+        )
+        databases = []
+        with conn.cursor() as cursor:
+            # 获取数据库列表
+            cursor.execute("SHOW DATABASES")
+            db_list = cursor.fetchall()
+            
+            for db_row in db_list:
+                db_name = db_row[0]
+                # 过滤系统库
+                if db_name in ('information_schema', 'mysql', 'performance_schema', 'sys'):
+                    continue
+                
+                # 获取数据库大小和表数量
+                try:
+                    cursor.execute(f"""
+                        SELECT COUNT(*), 
+                               COALESCE(SUM(data_length + index_length) / 1024 / 1024, 0) as size_mb
+                        FROM information_schema.tables 
+                        WHERE table_schema = %s
+                    """, (db_name,))
+                    result = cursor.fetchone()
+                    databases.append({
+                        "name": db_name,
+                        "tables": result[0] if result else 0,
+                        "size_mb": round(result[1], 2) if result else 0
+                    })
+                except Exception:
+                    databases.append({
+                        "name": db_name,
+                        "tables": 0,
+                        "size_mb": 0
+                    })
+        
+        conn.close()
+        
+        # 按名称排序
+        databases.sort(key=lambda x: x["name"])
+        return databases
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取数据库列表失败: {str(e)}"
+        )
+
+
+@router.get("/{instance_id}/databases/{database_name}/tables", response_model=List[dict])
+async def get_database_tables(
+    instance_id: int,
+    database_name: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取数据库表列表"""
+    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    password = decrypt_instance_password(instance.password_encrypted)
+    
+    try:
+        conn = pymysql.connect(
+            host=instance.host,
+            port=instance.port,
+            user=instance.username,
+            password=password,
+            database=database_name,
+            connect_timeout=10
+        )
+        tables = []
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    table_name,
+                    table_type,
+                    table_rows,
+                    COALESCE((data_length + index_length) / 1024 / 1024, 0) as size_mb,
+                    table_comment
+                FROM information_schema.tables 
+                WHERE table_schema = %s
+                ORDER BY table_name
+            """, (database_name,))
+            
+            for row in cursor.fetchall():
+                tables.append({
+                    "name": row[0],
+                    "type": row[1],
+                    "rows": row[2] or 0,
+                    "size_mb": round(row[3], 2),
+                    "comment": row[4] or ""
+                })
+        
+        conn.close()
+        return tables
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取表列表失败: {str(e)}"
+        )

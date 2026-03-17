@@ -41,6 +41,16 @@ export const instancesApi = {
     return request.get(`/instances/${id}/variables`)
   },
 
+  // 获取数据库列表
+  getDatabases(id) {
+    return request.get(`/instances/${id}/databases`)
+  },
+
+  // 获取表列表
+  getTables(id, database) {
+    return request.get(`/instances/${id}/databases/${database}/tables`)
+  },
+
   // 获取分组列表
   getGroups() {
     return request.get('/instances/groups/')

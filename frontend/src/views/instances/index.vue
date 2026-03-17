@@ -113,7 +113,7 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="端口" prop="port">
-              <el-input-number v-model="dialog.form.port" :min="1" :max="65535" style="width: 100%;" />
+              <el-input v-model="dialog.form.port" placeholder="3306" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -308,18 +308,24 @@ const handleSubmit = async () => {
     
     dialog.loading = true
     try {
+      // 处理端口数据，确保是数字
+      const formData = {
+        ...dialog.form,
+        port: parseInt(dialog.form.port) || 3306
+      }
+      
       if (dialog.isEdit) {
-        await instancesApi.update(dialog.form.id, dialog.form)
+        await instancesApi.update(formData.id, formData)
         ElMessage.success('更新成功')
       } else {
         // 先测试连接
-        const testResult = await instancesApi.testConnection(dialog.form)
+        const testResult = await instancesApi.testConnection(formData)
         if (!testResult.success) {
           ElMessage.error(`连接测试失败: ${testResult.message}`)
           return
         }
         
-        await instancesApi.create(dialog.form)
+        await instancesApi.create(formData)
         ElMessage.success('添加成功')
       }
       
