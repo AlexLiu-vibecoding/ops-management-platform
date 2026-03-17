@@ -81,7 +81,7 @@ async def init_default_data():
                 status=True
             )
             db.add(admin)
-            logger.info("创建默认超级管理员: admin / admin123")
+            logger.info("创建默认超级管理员: admin")
         
         # 检查是否存在环境
         if not db.query(Environment).first():
