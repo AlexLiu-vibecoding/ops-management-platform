@@ -1,7 +1,7 @@
 """
 菜单配置API
 """
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -15,36 +15,55 @@ from app.deps import get_super_admin, get_current_user
 router = APIRouter(prefix="/menu", tags=["菜单配置"])
 
 
-def build_menu_tree(menus: List[MenuConfig], parent_id: Optional[int] = None) -> List[dict]:
+def menu_to_dict(menu: MenuConfig) -> Dict[str, Any]:
+    """将菜单模型转换为字典"""
+    return {
+        "id": menu.id,
+        "parent_id": menu.parent_id,
+        "name": menu.name,
+        "path": menu.path,
+        "icon": menu.icon,
+        "component": menu.component,
+        "sort_order": menu.sort_order,
+        "is_visible": menu.is_visible,
+        "is_enabled": menu.is_enabled,
+        "roles": menu.roles,
+        "meta": menu.meta,
+        "created_at": menu.created_at,
+        "children": []
+    }
+
+
+def build_menu_tree(menus: List[MenuConfig], parent_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """构建菜单树"""
     result = []
     for menu in menus:
         if menu.parent_id == parent_id:
-            item = MenuConfigResponse.from_orm(menu)
+            item = menu_to_dict(menu)
             children = build_menu_tree(menus, menu.id)
             if children:
-                item.children = children
+                item["children"] = children
             result.append(item)
     return result
 
 
-def filter_menu_by_role(menus: List[dict], user_role: UserRole) -> List[dict]:
+def filter_menu_by_role(menus: List[Dict[str, Any]], user_role: UserRole) -> List[Dict[str, Any]]:
     """根据角色过滤菜单"""
     result = []
     for menu in menus:
         # 检查菜单是否启用
-        if not menu.is_enabled:
+        if not menu.get("is_enabled", True):
             continue
         
         # 检查角色权限
-        if menu.roles:
-            allowed_roles = [r.strip() for r in menu.roles.split(',')]
+        if menu.get("roles"):
+            allowed_roles = [r.strip() for r in menu["roles"].split(',')]
             if user_role.value not in allowed_roles and user_role != UserRole.SUPER_ADMIN:
                 continue
         
         # 递归处理子菜单
-        if menu.children:
-            menu.children = filter_menu_by_role(menu.children, user_role)
+        if menu.get("children"):
+            menu["children"] = filter_menu_by_role(menu["children"], user_role)
         
         result.append(menu)
     
@@ -79,17 +98,17 @@ async def get_user_menu(
     filtered_menus = filter_menu_by_role(menu_tree, current_user.role)
     
     # 转换为前端需要的格式
-    def to_menu_item(menus: List[dict]) -> List[dict]:
+    def to_menu_item(menus: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         result = []
         for menu in menus:
             item = {
-                "id": menu.id,
-                "name": menu.name,
-                "path": menu.path or "",
-                "icon": menu.icon
+                "id": menu["id"],
+                "name": menu["name"],
+                "path": menu.get("path") or "",
+                "icon": menu.get("icon")
             }
-            if menu.children:
-                item["children"] = to_menu_item(menu.children)
+            if menu.get("children"):
+                item["children"] = to_menu_item(menu["children"])
             result.append(item)
         return result
     
@@ -128,7 +147,7 @@ async def create_menu(
     db.commit()
     db.refresh(menu)
     
-    return MenuConfigResponse.from_orm(menu)
+    return menu_to_dict(menu)
 
 
 @router.put("/{menu_id}", response_model=MenuConfigResponse)
@@ -169,7 +188,7 @@ async def update_menu(
     db.commit()
     db.refresh(menu)
     
-    return MenuConfigResponse.from_orm(menu)
+    return menu_to_dict(menu)
 
 
 @router.delete("/{menu_id}", response_model=MessageResponse)
@@ -214,17 +233,14 @@ async def init_default_menus(
             detail="菜单已存在，无法重复初始化"
         )
     
-    # 默认菜单配置
-    default_menus = [
+    # 默认菜单配置（一级菜单）
+    parent_menus = [
         {"name": "仪表盘", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
         {"name": "实例管理", "path": "/instances", "icon": "Server", "sort_order": 2, "roles": "super_admin,approval_admin,operator"},
         {"name": "环境管理", "path": "/environments", "icon": "Collection", "sort_order": 3, "roles": "super_admin,approval_admin,operator"},
         {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
         {"name": "变更审批", "path": "/approvals", "icon": "Stamp", "sort_order": 5},
-        {"name": "监控中心", "path": "/monitor", "icon": "Monitor", "sort_order": 6, "meta": {"type": "parent"}},
-        {"name": "性能监控", "path": "/monitor/performance", "icon": "TrendCharts", "sort_order": 1, "parent_path": "/monitor"},
-        {"name": "慢查询监控", "path": "/monitor/slow-query", "icon": "Timer", "sort_order": 2, "parent_path": "/monitor"},
-        {"name": "监控配置", "path": "/monitor/settings", "icon": "Setting", "sort_order": 3, "parent_path": "/monitor"},
+        {"name": "监控中心", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
         {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 7, "roles": "super_admin"},
         {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 8, "roles": "super_admin"},
         {"name": "钉钉通道", "path": "/dingtalk", "icon": "ChatDotRound", "sort_order": 9, "roles": "super_admin"},
@@ -232,19 +248,28 @@ async def init_default_menus(
         {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 11, "roles": "super_admin"},
     ]
     
-    # 创建菜单
-    parent_map = {}
-    for menu_data in default_menus:
+    # 子菜单配置
+    child_menus = [
+        {"name": "性能监控", "path": "/monitor/performance", "icon": "TrendCharts", "sort_order": 1, "parent_path": "/monitor"},
+        {"name": "慢查询监控", "path": "/monitor/slow-query", "icon": "Timer", "sort_order": 2, "parent_path": "/monitor"},
+        {"name": "监控配置", "path": "/monitor/settings", "icon": "Setting", "sort_order": 3, "parent_path": "/monitor"},
+    ]
+    
+    # 创建一级菜单并记录路径到ID的映射
+    path_to_id = {}
+    for menu_data in parent_menus:
+        menu = MenuConfig(**menu_data)
+        db.add(menu)
+        db.flush()  # 获取ID
+        path_to_id[menu_data["path"]] = menu.id
+    
+    # 创建子菜单
+    for menu_data in child_menus:
         parent_path = menu_data.pop("parent_path", None)
-        parent_id = parent_map.get(parent_path) if parent_path else None
-        
+        parent_id = path_to_id.get(parent_path)
         menu = MenuConfig(**menu_data, parent_id=parent_id)
         db.add(menu)
-        db.flush()
-        
-        if not parent_path:
-            parent_map[menu_data["path"]] = menu.id
     
     db.commit()
     
-    return MessageResponse(message=f"成功初始化 {len(default_menus)} 个菜单")
+    return MessageResponse(message=f"成功初始化 {len(parent_menus) + len(child_menus)} 个菜单")
