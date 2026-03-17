@@ -2,9 +2,9 @@
 数据库连接和会话管理
 """
 import os
-from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+import logging
+
+logger = logging.getLogger(__name__)
 
 # 获取数据库URL
 def get_database_url():
@@ -12,17 +12,45 @@ def get_database_url():
     # 优先使用平台注入的 DATABASE_URL
     database_url = os.getenv("DATABASE_URL")
     if database_url:
+        logger.info(f"使用环境变量 DATABASE_URL: {database_url[:30]}...")
         return database_url
     
-    # 构建MySQL连接URL
-    from app.config import settings
-    return settings.DATABASE_URL
+    # 检查其他可能的数据库环境变量
+    db_host = os.getenv("DB_HOST")
+    if db_host:
+        db_user = os.getenv("DB_USER", "postgres")
+        db_password = os.getenv("DB_PASSWORD", "")
+        db_port = os.getenv("DB_PORT", "5432")
+        db_name = os.getenv("DB_NAME", "postgres")
+        url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        logger.info(f"构建数据库URL from DB_*: {url[:30]}...")
+        return url
+    
+    # 使用 MySQL 配置
+    mysql_host = os.getenv("MYSQL_HOST", "localhost")
+    mysql_port = os.getenv("MYSQL_PORT", "3306")
+    mysql_user = os.getenv("MYSQL_USER", "root")
+    mysql_password = os.getenv("MYSQL_PASSWORD", "")
+    mysql_database = os.getenv("MYSQL_DATABASE", "mysql_platform")
+    url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_database}"
+    logger.info(f"使用 MySQL 配置: {url[:30]}...")
+    return url
 
 DATABASE_URL = get_database_url()
 
-# 判断数据库类型
+# 判断数据库类型并选择合适的驱动
 is_postgres = DATABASE_URL.startswith("postgresql")
 is_mysql = DATABASE_URL.startswith("mysql")
+
+# 如果是 PostgreSQL 但 URL 中没有指定驱动，添加 psycopg2 驱动
+if is_postgres and "postgresql://" in DATABASE_URL and "postgresql+psycopg2://" not in DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://")
+
+logger.info(f"最终数据库URL: {DATABASE_URL[:50]}... (PostgreSQL: {is_postgres}, MySQL: {is_mysql})")
+
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 # 创建数据库引擎
 engine_kwargs = {
