@@ -7,6 +7,66 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 
+def get_database_config():
+    """从环境变量解析数据库配置，支持多种格式"""
+    # 优先使用 DATABASE_URL（平台标准格式）
+    database_url = os.getenv("DATABASE_URL")
+    if database_url:
+        # 解析 DATABASE_URL: postgresql://user:pass@host:port/dbname
+        # 或 mysql://user:pass@host:port/dbname
+        import re
+        match = re.match(r"(?:mysql|postgresql)://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)", database_url)
+        if match:
+            return {
+                "user": match.group(1),
+                "password": match.group(2),
+                "host": match.group(3),
+                "port": int(match.group(4)),
+                "database": match.group(5)
+            }
+    
+    # 使用 DB_* 格式环境变量
+    if os.getenv("DB_HOST"):
+        return {
+            "user": os.getenv("DB_USER", "postgres"),
+            "password": os.getenv("DB_PASSWORD", ""),
+            "host": os.getenv("DB_HOST", "localhost"),
+            "port": int(os.getenv("DB_PORT", "5432")),
+            "database": os.getenv("DB_NAME", "postgres")
+        }
+    
+    # 使用 MYSQL_* 格式环境变量
+    return {
+        "user": os.getenv("MYSQL_USER", "root"),
+        "password": os.getenv("MYSQL_PASSWORD", ""),
+        "host": os.getenv("MYSQL_HOST", "localhost"),
+        "port": int(os.getenv("MYSQL_PORT", "3306")),
+        "database": os.getenv("MYSQL_DATABASE", "mysql_platform")
+    }
+
+
+def get_redis_config():
+    """从环境变量解析Redis配置"""
+    redis_url = os.getenv("REDIS_URL")
+    if redis_url:
+        import re
+        match = re.match(r"redis://(?::([^@]+)@)?([^:]+):(\d+)(?:/(\d+))?", redis_url)
+        if match:
+            return {
+                "password": match.group(1) or "",
+                "host": match.group(2),
+                "port": int(match.group(3)),
+                "db": int(match.group(4)) if match.group(4) else 0
+            }
+    
+    return {
+        "host": os.getenv("REDIS_HOST", "localhost"),
+        "port": int(os.getenv("REDIS_PORT", "6379")),
+        "password": os.getenv("REDIS_PASSWORD", ""),
+        "db": int(os.getenv("REDIS_DB", "0"))
+    }
+
+
 class Settings(BaseSettings):
     """应用配置"""
     # 应用基础配置
@@ -23,21 +83,23 @@ class Settings(BaseSettings):
     PASSWORD_SALT: str = os.getenv("PASSWORD_SALT", "mysql-platform-salt")
     AES_KEY: str = os.getenv("AES_KEY", "this-is-aes-key-32-bytes-long!!")
     
-    # MySQL配置（平台自身数据库）
-    MYSQL_HOST: str = os.getenv("MYSQL_HOST", "localhost")
-    MYSQL_PORT: int = int(os.getenv("MYSQL_PORT", "3306"))
-    MYSQL_USER: str = os.getenv("MYSQL_USER", "root")
-    MYSQL_PASSWORD: str = os.getenv("MYSQL_PASSWORD", "password")
-    MYSQL_DATABASE: str = os.getenv("MYSQL_DATABASE", "mysql_platform")
+    # 数据库配置（自动从环境变量解析）
+    _db_config = get_database_config()
+    MYSQL_HOST: str = _db_config["host"]
+    MYSQL_PORT: int = _db_config["port"]
+    MYSQL_USER: str = _db_config["user"]
+    MYSQL_PASSWORD: str = _db_config["password"]
+    MYSQL_DATABASE: str = _db_config["database"]
     
-    # Redis配置
-    REDIS_HOST: str = os.getenv("REDIS_HOST", "localhost")
-    REDIS_PORT: int = int(os.getenv("REDIS_PORT", "6379"))
-    REDIS_PASSWORD: str = os.getenv("REDIS_PASSWORD", "")
-    REDIS_DB: int = int(os.getenv("REDIS_DB", "0"))
+    # Redis配置（自动从环境变量解析）
+    _redis_config = get_redis_config()
+    REDIS_HOST: str = _redis_config["host"]
+    REDIS_PORT: int = _redis_config["port"]
+    REDIS_PASSWORD: str = _redis_config["password"]
+    REDIS_DB: int = _redis_config["db"]
     
     # CORS配置
-    CORS_ORIGINS: List[str] = ["http://localhost:5000", "http://localhost:3000", "http://127.0.0.1:5000"]
+    CORS_ORIGINS: List[str] = ["*"]
     
     # 分页配置
     DEFAULT_PAGE_SIZE: int = 20

@@ -196,6 +196,9 @@ class NotificationBinding(Base):
     environment_id = Column(Integer, ForeignKey("environments.id", ondelete="CASCADE"), comment="环境ID（可选）")
     instance_id = Column(Integer, ForeignKey("instances.id", ondelete="CASCADE"), comment="实例ID（可选）")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    
+    # 关联
+    channel = relationship("DingTalkChannel", back_populates="notification_bindings")
 
 
 class ApprovalRecord(Base):
