@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # MySQL服务（平台自身数据库）
+  mysql:
+    image: mysql:8.0
+    container_name: mysql-platform-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123}
+      MYSQL_DATABASE: mysql_platform
+      MYSQL_USER: mysql_admin
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-admin123}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init/init.sql:/docker-entrypoint-initdb.d/init.sql
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - mysql-platform-network
+
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: mysql-platform-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mysql-platform-network
+
+  # 后端API服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: mysql-platform-backend
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=mysql_admin
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-admin123}
+      - MYSQL_DATABASE=mysql_platform
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SECRET_KEY=${SECRET_KEY:-your-secret-key-change-in-production-min-32-chars}
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mysql
+      - redis
+    volumes:
+      - ./backend:/app
+    networks:
+      - mysql-platform-network
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: mysql-platform-frontend
+    ports:
+      - "5000:80"
+    depends_on:
+      - backend
+    networks:
+      - mysql-platform-network
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  mysql-platform-network:
+    driver: bridge

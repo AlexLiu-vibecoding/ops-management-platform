@@ -1,0 +1,105 @@
+// 全局样式
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+// 环境标签颜色
+.env-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #fff;
+  
+  &.development {
+    background-color: #52C41A;
+  }
+  
+  &.testing {
+    background-color: #1890FF;
+  }
+  
+  &.staging {
+    background-color: #FA8C16;
+  }
+  
+  &.production {
+    background-color: #FF4D4F;
+  }
+}
+
+// 风险等级标签
+.risk-tag {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  
+  &.low {
+    background-color: #f6ffed;
+    color: #52c41a;
+    border: 1px solid #b7eb8f;
+  }
+  
+  &.medium {
+    background-color: #fffbe6;
+    color: #faad14;
+    border: 1px solid #ffe58f;
+  }
+  
+  &.high {
+    background-color: #fff2e8;
+    color: #fa8c16;
+    border: 1px solid #ffbb96;
+  }
+  
+  &.critical {
+    background-color: #fff1f0;
+    color: #ff4d4f;
+    border: 1px solid #ffa39e;
+  }
+}
+
+// 监控指标卡片
+.metric-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  
+  &.warning {
+    border-left: 4px solid #faad14;
+  }
+  
+  &.danger {
+    border-left: 4px solid #ff4d4f;
+  }
+  
+  &.success {
+    border-left: 4px solid #52c41a;
+  }
+}
+
+// SQL编辑器样式
+.sql-editor {
+  .CodeMirror {
+    height: 300px;
+    border: 1px solid #d9d9d9;
+    border-radius: 4px;
+  }
+}
+
+// 响应式调整
+@media (max-width: 768px) {
+  .el-menu {
+    .el-menu-item {
+      padding: 0 10px !important;
+    }
+  }
+}
