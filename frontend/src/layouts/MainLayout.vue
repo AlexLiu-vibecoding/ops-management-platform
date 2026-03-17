@@ -12,9 +12,9 @@
         :collapse="isCollapse"
         :router="true"
         class="aside-menu"
-        background-color="#001529"
-        text-color="#rgba(255, 255, 255, 0.65)"
-        active-text-color="#1890ff"
+        background-color="#1d1e1f"
+        text-color="rgba(255, 255, 255, 0.85)"
+        active-text-color="#409eff"
       >
         <template v-for="route in menuRoutes" :key="route.path">
           <!-- 有子菜单 -->
@@ -225,7 +225,7 @@ const changePassword = async () => {
 }
 
 .aside {
-  background-color: #001529;
+  background-color: #1d1e1f;
   transition: width 0.3s;
   overflow: hidden;
   
@@ -247,6 +247,29 @@ const changePassword = async () => {
   
   .aside-menu {
     border-right: none;
+    
+    // 确保菜单文字清晰可见
+    :deep(.el-menu-item),
+    :deep(.el-sub-menu__title) {
+      color: rgba(255, 255, 255, 0.85) !important;
+      
+      &:hover {
+        background-color: rgba(255, 255, 255, 0.08) !important;
+      }
+    }
+    
+    :deep(.el-menu-item.is-active) {
+      color: #409eff !important;
+      background-color: rgba(64, 158, 255, 0.1) !important;
+    }
+    
+    :deep(.el-sub-menu.is-active > .el-sub-menu__title) {
+      color: #409eff !important;
+    }
+    
+    :deep(.el-icon) {
+      color: rgba(255, 255, 255, 0.85);
+    }
   }
 }
 
