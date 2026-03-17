@@ -223,7 +223,9 @@ class ApprovalCreate(BaseModel):
     instance_id: int
     database_name: Optional[str] = None
     sql_content: str
+    sql_line_count: Optional[int] = Field(None, description="SQL行数")
     scheduled_time: Optional[datetime] = None
+    remark: Optional[str] = Field(None, max_length=500, description="备注")
 
 
 class ApprovalAction(BaseModel):
@@ -239,15 +241,20 @@ class ApprovalResponse(BaseModel):
     change_type: str
     instance_id: int
     database_name: Optional[str]
-    sql_content: str
+    sql_content: Optional[str] = Field(None, description="SQL内容（详情时返回）")
+    sql_content_preview: Optional[str] = Field(None, description="SQL预览（前100行）")
+    sql_line_count: Optional[int] = Field(None, description="SQL总行数")
     sql_risk_level: Optional[str]
     status: ApprovalStatus
     requester_id: int
+    requester_name: Optional[str] = Field(None, description="申请人姓名")
     approver_id: Optional[int]
+    approver_name: Optional[str] = Field(None, description="审批人姓名")
     approve_comment: Optional[str]
     scheduled_time: Optional[datetime]
     created_at: datetime
-    instance: Optional[InstanceResponse] = None
+    approved_at: Optional[datetime] = Field(None, description="审批时间")
+    instance_name: Optional[str] = Field(None, description="实例名称")
     
     class Config:
         from_attributes = True

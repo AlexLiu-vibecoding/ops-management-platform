@@ -18,6 +18,19 @@ from app.deps import get_approval_admin, get_current_user
 
 router = APIRouter(prefix="/approvals", tags=["变更审批"])
 
+# 大文件预览行数限制
+PREVIEW_LINES = 100
+
+
+def get_sql_preview(sql_content: str, max_lines: int = PREVIEW_LINES) -> str:
+    """
+    获取SQL预览内容（截取前N行）
+    """
+    lines = sql_content.split('\n')
+    if len(lines) <= max_lines:
+        return sql_content
+    return '\n'.join(lines[:max_lines])
+
 
 def analyze_sql_risk(sql: str, environment_id: int, db: Session) -> str:
     """
@@ -75,6 +88,39 @@ def analyze_sql_risk(sql: str, environment_id: int, db: Session) -> str:
     return "low"
 
 
+def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = False) -> dict:
+    """
+    格式化审批响应，处理大SQL文件的预览
+    """
+    # 获取SQL预览
+    sql_preview = get_sql_preview(approval.sql_content)
+    total_lines = approval.sql_line_count or len(approval.sql_content.split('\n'))
+    
+    response = {
+        "id": approval.id,
+        "title": approval.title,
+        "change_type": approval.change_type,
+        "instance_id": approval.instance_id,
+        "database_name": approval.database_name,
+        "sql_content": approval.sql_content if include_full_sql else None,
+        "sql_content_preview": sql_preview if total_lines > PREVIEW_LINES else None,
+        "sql_line_count": total_lines,
+        "sql_risk_level": approval.sql_risk_level,
+        "status": approval.status,
+        "requester_id": approval.requester_id,
+        "requester_name": approval.requester.real_name if approval.requester else None,
+        "approver_id": approval.approver_id,
+        "approver_name": approval.approver.real_name if approval.approver else None,
+        "approve_comment": approval.approve_comment,
+        "scheduled_time": approval.scheduled_time,
+        "created_at": approval.created_at,
+        "approved_at": approval.approve_time,
+        "instance_name": approval.instance.name if approval.instance else None
+    }
+    
+    return response
+
+
 @router.get("", response_model=List[ApprovalResponse])
 async def list_approvals(
     status_filter: Optional[ApprovalStatus] = None,
@@ -100,7 +146,7 @@ async def list_approvals(
         query = query.filter(ApprovalRecord.requester_id == current_user.id)
     
     approvals = query.order_by(ApprovalRecord.created_at.desc()).offset(skip).limit(limit).all()
-    return [ApprovalResponse.from_orm(a) for a in approvals]
+    return [format_approval_response(a) for a in approvals]
 
 
 @router.get("/{approval_id}", response_model=ApprovalResponse)
@@ -125,7 +171,8 @@ async def get_approval(
             detail="无权查看此审批"
         )
     
-    return ApprovalResponse.from_orm(approval)
+    # 详情返回完整SQL内容
+    return format_approval_response(approval, include_full_sql=True)
 
 
 @router.post("", response_model=ApprovalResponse)
@@ -153,6 +200,11 @@ async def create_approval(
             detail="检测到极高风险SQL，禁止提交审批"
         )
     
+    # 计算SQL行数（如果前端没传）
+    sql_line_count = approval_data.sql_line_count
+    if not sql_line_count:
+        sql_line_count = len(approval_data.sql_content.split('\n'))
+    
     # 创建审批记录
     approval = ApprovalRecord(
         title=approval_data.title,
@@ -160,6 +212,7 @@ async def create_approval(
         instance_id=approval_data.instance_id,
         database_name=approval_data.database_name,
         sql_content=approval_data.sql_content,
+        sql_line_count=sql_line_count,
         sql_risk_level=risk_level,
         environment_id=instance.environment_id,
         requester_id=current_user.id,
@@ -177,7 +230,7 @@ async def create_approval(
         instance_name=instance.name,
         environment_id=instance.environment_id,
         operation_type="submit_approval",
-        operation_detail=f"提交审批: {approval_data.title}",
+        operation_detail=f"提交审批: {approval_data.title} ({sql_line_count}行SQL)",
         request_ip="",
         request_method="POST",
         request_path=f"/api/approvals",
@@ -188,7 +241,7 @@ async def create_approval(
     
     # TODO: 发送钉钉通知
     
-    return ApprovalResponse.from_orm(approval)
+    return format_approval_response(approval, include_full_sql=True)
 
 
 @router.post("/{approval_id}/approve", response_model=ApprovalResponse)
@@ -240,7 +293,7 @@ async def approve_or_reject(
     
     # TODO: 发送钉钉通知给申请人
     
-    return ApprovalResponse.from_orm(approval)
+    return format_approval_response(approval, include_full_sql=True)
 
 
 @router.post("/{approval_id}/execute", response_model=MessageResponse)
@@ -289,7 +342,7 @@ async def execute_approval(
         instance_name=approval.instance.name if approval.instance else None,
         environment_id=approval.environment_id,
         operation_type="execute_approval",
-        operation_detail=f"执行审批: {approval.title}\nSQL: {approval.sql_content}",
+        operation_detail=f"执行审批: {approval.title}\nSQL: {get_sql_preview(approval.sql_content, 20)}...",
         request_ip="",
         request_method="POST",
         request_path=f"/api/approvals/{approval_id}/execute",

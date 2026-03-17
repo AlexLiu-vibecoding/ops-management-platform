@@ -214,6 +214,7 @@ class ApprovalRecord(Base):
     instance_id = Column(Integer, ForeignKey("instances.id"), comment="实例ID")
     database_name = Column(String(100), comment="数据库名")
     sql_content = Column(Text, nullable=False, comment="SQL内容")
+    sql_line_count = Column(Integer, default=0, comment="SQL行数")
     sql_risk_level = Column(String(20), comment="风险等级：low/medium/high/critical")
     environment_id = Column(Integer, ForeignKey("environments.id"), comment="环境ID")
     requester_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="申请人ID")
