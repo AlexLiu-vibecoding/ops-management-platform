@@ -1,11 +1,14 @@
 """
 MySQL管理平台 - FastAPI主应用
 """
+import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
 import time
 import logging
 
@@ -134,7 +137,7 @@ app = FastAPI(
 # CORS中间件
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -190,7 +193,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# 注册路由
+# 注册API路由
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(environments.router, prefix="/api")
@@ -211,9 +214,10 @@ async def health_check():
     return {"status": "healthy", "version": settings.APP_VERSION}
 
 
-@app.get("/")
-async def root():
-    """根路径"""
+# API根路径
+@app.get("/api")
+async def api_root():
+    """API根路径"""
     return {
         "name": settings.APP_NAME,
         "version": settings.APP_VERSION,
@@ -221,6 +225,40 @@ async def root():
     }
 
 
+# 挂载前端静态文件（如果存在）
+static_dir = Path(__file__).parent.parent.parent / "frontend" / "dist"
+if static_dir.exists():
+    app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+    logger.info(f"前端静态文件已挂载: {static_dir}")
+
+
+# 前端页面路由（必须在最后）
+@app.get("/{full_path:path}")
+async def serve_frontend(full_path: str):
+    """服务前端页面（SPA路由支持）"""
+    # 排除API路由
+    if full_path.startswith("api/") or full_path in ["docs", "redoc", "openapi.json", "health"]:
+        return JSONResponse(status_code=404, content={"detail": "Not found"})
+    
+    # 检查静态文件目录是否存在
+    static_dir = Path(__file__).parent.parent.parent / "frontend" / "dist"
+    
+    if not static_dir.exists():
+        return {"message": "MySQL管理平台 API服务", "docs": "/docs", "version": settings.APP_VERSION}
+    
+    # 检查是否是静态文件请求
+    file_path = static_dir / full_path
+    if file_path.exists() and file_path.is_file():
+        return FileResponse(file_path)
+    
+    # 返回index.html（SPA路由）
+    index_path = static_dir / "index.html"
+    if index_path.exists():
+        return FileResponse(index_path)
+    
+    return {"message": "MySQL管理平台 API服务", "docs": "/docs", "version": settings.APP_VERSION}
+
+
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=5000, reload=True)
