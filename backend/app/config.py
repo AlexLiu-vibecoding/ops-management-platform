@@ -117,6 +117,22 @@ class Settings(BaseSettings):
     @property
     def DATABASE_URL(self) -> str:
         """数据库连接URL"""
+        import os
+        # 优先使用环境变量中的 DATABASE_URL
+        database_url = os.getenv("DATABASE_URL")
+        if database_url:
+            # 支持 postgres:// 和 postgresql://
+            if database_url.startswith("postgres://"):
+                database_url = database_url.replace("postgres://", "postgresql://")
+            if database_url.startswith("postgresql://") and "postgresql+psycopg2://" not in database_url:
+                database_url = database_url.replace("postgresql://", "postgresql+psycopg2://")
+            return database_url
+        
+        # 检查是否使用 DB_* 环境变量（PostgreSQL）
+        if os.getenv("DB_HOST"):
+            return f"postgresql+psycopg2://{os.getenv('DB_USER', 'postgres')}:{os.getenv('DB_PASSWORD', '')}@{os.getenv('DB_HOST')}:{os.getenv('DB_PORT', '5432')}/{os.getenv('DB_NAME', 'postgres')}"
+        
+        # 默认使用 MySQL 配置
         return f"mysql+pymysql://{self.MYSQL_USER}:{self.MYSQL_PASSWORD}@{self.MYSQL_HOST}:{self.MYSQL_PORT}/{self.MYSQL_DATABASE}"
     
     @property
