@@ -137,23 +137,33 @@ class AESCipher:
         Returns:
             解密后的明文
         """
-        # Base64解码
-        encrypted_data = base64.b64decode(encrypted_text)
+        if not encrypted_text:
+            raise ValueError("加密文本不能为空")
         
-        # 提取IV和密文
-        iv = encrypted_data[:16]
-        ciphertext = encrypted_data[16:]
-        
-        # 解密
-        cipher = Cipher(algorithms.AES(self.key), modes.CBC(iv), backend=default_backend())
-        decryptor = cipher.decryptor()
-        padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-        
-        # 去除填充
-        padding_length = padded_plaintext[-1]
-        plaintext = padded_plaintext[:-padding_length]
-        
-        return plaintext.decode('utf-8')
+        try:
+            # Base64解码
+            encrypted_data = base64.b64decode(encrypted_text)
+            
+            # 检查数据长度是否足够
+            if len(encrypted_data) < 17:  # 至少需要 16 字节 IV + 1 字节密文
+                raise ValueError(f"加密数据长度不足: {len(encrypted_data)} 字节")
+            
+            # 提取IV和密文
+            iv = encrypted_data[:16]
+            ciphertext = encrypted_data[16:]
+            
+            # 解密
+            cipher = Cipher(algorithms.AES(self.key), modes.CBC(iv), backend=default_backend())
+            decryptor = cipher.decryptor()
+            padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+            
+            # 去除填充
+            padding_length = padded_plaintext[-1]
+            plaintext = padded_plaintext[:-padding_length]
+            
+            return plaintext.decode('utf-8')
+        except Exception as e:
+            raise ValueError(f"解密失败: {str(e)}")
 
 
 # 创建全局AES加密实例

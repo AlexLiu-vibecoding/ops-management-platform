@@ -59,7 +59,13 @@ def check_sql_risk(sql: str) -> Dict[str, Any]:
 
 def get_mysql_connection(instance: Instance, database: str = None):
     """获取MySQL连接"""
-    password = decrypt_instance_password(instance.password_encrypted)
+    try:
+        password = decrypt_instance_password(instance.password_encrypted)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+        )
     
     conn = pymysql.connect(
         host=instance.host,

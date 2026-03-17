@@ -224,7 +224,15 @@ async def check_instance_status(
             detail="实例不存在"
         )
     
-    password = decrypt_instance_password(instance.password_encrypted)
+    # 尝试解密密码
+    try:
+        password = decrypt_instance_password(instance.password_encrypted)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+        )
+    
     result = await test_mysql_connection(
         instance.host,
         instance.port,
@@ -290,7 +298,13 @@ async def get_instance_variables(
             detail="实例不存在"
         )
     
-    password = decrypt_instance_password(instance.password_encrypted)
+    try:
+        password = decrypt_instance_password(instance.password_encrypted)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+        )
     
     try:
         conn = pymysql.connect(
@@ -328,7 +342,13 @@ async def get_instance_databases(
             detail="实例不存在"
         )
     
-    password = decrypt_instance_password(instance.password_encrypted)
+    try:
+        password = decrypt_instance_password(instance.password_encrypted)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+        )
     
     try:
         conn = pymysql.connect(
@@ -399,7 +419,13 @@ async def get_database_tables(
             detail="实例不存在"
         )
     
-    password = decrypt_instance_password(instance.password_encrypted)
+    try:
+        password = decrypt_instance_password(instance.password_encrypted)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+        )
     
     try:
         conn = pymysql.connect(
