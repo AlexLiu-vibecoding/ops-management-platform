@@ -83,6 +83,12 @@ const routes = [
         meta: { title: '用户管理', icon: 'User', roles: ['super_admin'] }
       },
       {
+        path: 'registrations',
+        name: 'Registrations',
+        component: () => import('@/views/registrations/index.vue'),
+        meta: { title: '注册审批', icon: 'UserFilled', roles: ['super_admin'] }
+      },
+      {
         path: 'dingtalk',
         name: 'DingTalk',
         component: () => import('@/views/dingtalk/index.vue'),

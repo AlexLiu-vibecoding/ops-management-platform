@@ -379,3 +379,32 @@ class IndexAnalysis(Base):
     risk_level = Column(String(20), comment="风险等级：high/medium/low")
     suggestion = Column(Text, comment="优化建议")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+
+class RegistrationStatus(str, enum.Enum):
+    """注册申请状态枚举"""
+    PENDING = "pending"  # 待审批
+    APPROVED = "approved"  # 已通过
+    REJECTED = "rejected"  # 已拒绝
+
+
+class UserRegistrationRequest(Base):
+    """用户注册申请表"""
+    __tablename__ = "user_registration_requests"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    username = Column(String(50), unique=True, index=True, nullable=False, comment="用户名")
+    password_hash = Column(String(255), nullable=False, comment="密码哈希")
+    real_name = Column(String(50), comment="真实姓名")
+    email = Column(String(100), comment="邮箱")
+    phone = Column(String(20), comment="手机号")
+    reason = Column(Text, comment="申请理由")
+    status = Column(SQLEnum(RegistrationStatus), default=RegistrationStatus.PENDING, comment="审批状态")
+    reviewer_id = Column(Integer, ForeignKey("users.id"), comment="审批人ID")
+    review_time = Column(DateTime, comment="审批时间")
+    review_comment = Column(String(500), comment="审批意见")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    # 关联
+    reviewer = relationship("User", foreign_keys=[reviewer_id])

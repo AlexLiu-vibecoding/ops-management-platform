@@ -4,7 +4,7 @@ Pydantic模型（请求/响应模型）
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, EmailStr, Field
-from app.models import UserRole, EnvironmentType, ApprovalStatus, MonitorType
+from app.models import UserRole, EnvironmentType, ApprovalStatus, MonitorType, RegistrationStatus
 
 
 # ============ 用户相关 ============
@@ -57,6 +57,42 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     expires_in: int
     user: UserResponse
+
+
+# ============ 注册相关 ============
+class UserRegister(BaseModel):
+    """用户注册请求"""
+    username: str = Field(..., min_length=3, max_length=50, description="用户名")
+    password: str = Field(..., min_length=6, max_length=50, description="密码")
+    real_name: str = Field(..., max_length=50, description="真实姓名")
+    email: EmailStr = Field(..., description="邮箱")
+    phone: Optional[str] = Field(None, max_length=20, description="手机号")
+    reason: Optional[str] = Field(None, max_length=500, description="申请理由")
+
+
+class RegistrationAction(BaseModel):
+    """注册审批操作请求"""
+    approved: bool
+    comment: Optional[str] = Field(None, max_length=500, description="审批意见")
+
+
+class RegistrationResponse(BaseModel):
+    """注册申请响应"""
+    id: int
+    username: str
+    real_name: Optional[str]
+    email: Optional[str]
+    phone: Optional[str]
+    reason: Optional[str]
+    status: RegistrationStatus
+    reviewer_id: Optional[int]
+    reviewer_name: Optional[str] = Field(None, description="审批人姓名")
+    review_time: Optional[datetime]
+    review_comment: Optional[str]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
 
 
 # ============ 环境相关 ============

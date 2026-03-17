@@ -7,12 +7,15 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User, LoginLog
-from app.schemas import UserLogin, UserCreate, UserUpdate, UserResponse, TokenResponse
+from app.models import User, LoginLog, UserRegistrationRequest, RegistrationStatus, UserRole
+from app.schemas import (
+    UserLogin, UserCreate, UserUpdate, UserResponse, TokenResponse,
+    UserRegister, RegistrationAction, RegistrationResponse
+)
 from app.utils.auth import (
     hash_password, verify_password, create_access_token
 )
-from app.deps import get_current_user
+from app.deps import get_current_user, get_super_admin
 from app.config import settings
 import httpx
 
@@ -158,3 +161,206 @@ async def change_password(
     db.commit()
     
     return {"message": "密码修改成功"}
+
+
+# ============ 注册相关API ============
+
+@router.post("/register", response_model=RegistrationResponse)
+async def register(
+    register_data: UserRegister,
+    db: Session = Depends(get_db)
+):
+    """
+    用户注册申请
+    
+    - 检查用户名是否已存在
+    - 检查是否有待审批的注册申请
+    - 创建注册申请记录
+    """
+    # 检查用户名是否已存在
+    existing_user = db.query(User).filter(User.username == register_data.username).first()
+    if existing_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="用户名已存在"
+        )
+    
+    # 检查是否有待审批的注册申请
+    existing_request = db.query(UserRegistrationRequest).filter(
+        UserRegistrationRequest.username == register_data.username,
+        UserRegistrationRequest.status == RegistrationStatus.PENDING
+    ).first()
+    if existing_request:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="已有待审批的注册申请，请等待管理员审核"
+        )
+    
+    # 创建注册申请
+    registration = UserRegistrationRequest(
+        username=register_data.username,
+        password_hash=hash_password(register_data.password),
+        real_name=register_data.real_name,
+        email=register_data.email,
+        phone=register_data.phone,
+        reason=register_data.reason,
+        status=RegistrationStatus.PENDING
+    )
+    db.add(registration)
+    db.commit()
+    db.refresh(registration)
+    
+    return RegistrationResponse(
+        id=registration.id,
+        username=registration.username,
+        real_name=registration.real_name,
+        email=registration.email,
+        phone=registration.phone,
+        reason=registration.reason,
+        status=registration.status,
+        reviewer_id=registration.reviewer_id,
+        reviewer_name=None,
+        review_time=registration.review_time,
+        review_comment=registration.review_comment,
+        created_at=registration.created_at
+    )
+
+
+@router.get("/register/status/{username}", response_model=RegistrationResponse)
+async def check_registration_status(
+    username: str,
+    db: Session = Depends(get_db)
+):
+    """查询注册申请状态"""
+    registration = db.query(UserRegistrationRequest).filter(
+        UserRegistrationRequest.username == username
+    ).order_by(UserRegistrationRequest.created_at.desc()).first()
+    
+    if not registration:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="未找到注册申请记录"
+        )
+    
+    return RegistrationResponse(
+        id=registration.id,
+        username=registration.username,
+        real_name=registration.real_name,
+        email=registration.email,
+        phone=registration.phone,
+        reason=registration.reason,
+        status=registration.status,
+        reviewer_id=registration.reviewer_id,
+        reviewer_name=registration.reviewer.real_name if registration.reviewer else None,
+        review_time=registration.review_time,
+        review_comment=registration.review_comment,
+        created_at=registration.created_at
+    )
+
+
+@router.get("/registrations", response_model=list[RegistrationResponse])
+async def list_registrations(
+    status_filter: RegistrationStatus = None,
+    current_user: User = Depends(get_super_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    获取注册申请列表（仅超级管理员）
+    """
+    query = db.query(UserRegistrationRequest)
+    
+    if status_filter:
+        query = query.filter(UserRegistrationRequest.status == status_filter)
+    
+    registrations = query.order_by(UserRegistrationRequest.created_at.desc()).all()
+    
+    return [
+        RegistrationResponse(
+            id=r.id,
+            username=r.username,
+            real_name=r.real_name,
+            email=r.email,
+            phone=r.phone,
+            reason=r.reason,
+            status=r.status,
+            reviewer_id=r.reviewer_id,
+            reviewer_name=r.reviewer.real_name if r.reviewer else None,
+            review_time=r.review_time,
+            review_comment=r.review_comment,
+            created_at=r.created_at
+        )
+        for r in registrations
+    ]
+
+
+@router.post("/registrations/{registration_id}/review", response_model=RegistrationResponse)
+async def review_registration(
+    registration_id: int,
+    action_data: RegistrationAction,
+    current_user: User = Depends(get_super_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    审批注册申请（仅超级管理员）
+    """
+    registration = db.query(UserRegistrationRequest).filter(
+        UserRegistrationRequest.id == registration_id
+    ).first()
+    
+    if not registration:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="注册申请不存在"
+        )
+    
+    if registration.status != RegistrationStatus.PENDING:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该申请已被处理"
+        )
+    
+    # 更新申请状态
+    registration.status = RegistrationStatus.APPROVED if action_data.approved else RegistrationStatus.REJECTED
+    registration.reviewer_id = current_user.id
+    registration.review_time = datetime.now()
+    registration.review_comment = action_data.comment
+    
+    # 如果通过，创建用户
+    if action_data.approved:
+        # 再次检查用户名是否已被占用
+        existing_user = db.query(User).filter(User.username == registration.username).first()
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="用户名已被占用"
+            )
+        
+        # 创建用户
+        new_user = User(
+            username=registration.username,
+            password_hash=registration.password_hash,
+            real_name=registration.real_name,
+            email=registration.email,
+            phone=registration.phone,
+            role=UserRole.READONLY,
+            status=True
+        )
+        db.add(new_user)
+    
+    db.commit()
+    db.refresh(registration)
+    
+    return RegistrationResponse(
+        id=registration.id,
+        username=registration.username,
+        real_name=registration.real_name,
+        email=registration.email,
+        phone=registration.phone,
+        reason=registration.reason,
+        status=registration.status,
+        reviewer_id=registration.reviewer_id,
+        reviewer_name=registration.reviewer.real_name if registration.reviewer else None,
+        review_time=registration.review_time,
+        review_comment=registration.review_comment,
+        created_at=registration.created_at
+    )
