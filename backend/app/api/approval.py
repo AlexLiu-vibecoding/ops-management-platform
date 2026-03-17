@@ -22,7 +22,108 @@ router = APIRouter(prefix="/approvals", tags=["变更审批"])
 PREVIEW_LINES = 100
 
 
-def get_sql_preview(sql_content: str, max_lines: int = PREVIEW_LINES) -> str:
+@router.get("/preview-databases/{instance_id}")
+async def preview_matched_databases(
+    instance_id: int,
+    pattern: Optional[str] = None,
+    mode: str = "pattern",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    预览匹配的数据库列表
+    
+    - mode=pattern: 通配符匹配
+    - mode=all: 返回所有数据库
+    """
+    # 检查实例是否存在
+    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    # TODO: 实际连接数据库获取数据库列表
+    # 这里模拟返回一些数据库用于演示
+    # 实际实现需要使用 pymysql 连接到目标实例
+    
+    # 模拟数据库列表（实际应从实例查询）
+    mock_databases = [
+        "db_users", "db_orders", "db_products", "db_payments",
+        "user_db_master", "user_db_slave1", "user_db_slave2",
+        "order_db_2023", "order_db_2024", "order_db_2025",
+        "information_schema", "mysql", "performance_schema", "sys"
+    ]
+    
+    if mode == "all":
+        # 返回所有数据库（排除系统库）
+        filtered = [db for db in mock_databases if db not in ["information_schema", "mysql", "performance_schema", "sys"]]
+        return {
+            "mode": "all",
+            "databases": filtered,
+            "total": len(filtered)
+        }
+    
+    if mode == "pattern" and pattern:
+        # 通配符匹配
+        import fnmatch
+        # 将 SQL LIKE 模式转换为 fnmatch 模式
+        # % -> *, _ -> ?
+        fnmatch_pattern = pattern.replace("%", "*").replace("_", "?")
+        matched = [db for db in mock_databases if fnmatch.fnmatch(db, fnmatch_pattern)]
+        return {
+            "mode": "pattern",
+            "pattern": pattern,
+            "databases": matched,
+            "total": len(matched)
+        }
+    
+    return {
+        "mode": mode,
+        "databases": [],
+        "total": 0
+    }
+
+
+@router.post("/parse-sql-databases")
+async def parse_sql_databases(
+    sql_content: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    从SQL中解析数据库引用
+    
+    支持的格式：
+    - db.table
+    - `db`.table
+    - db.`table`
+    - `db`.`table`
+    """
+    # 正则匹配 db.table 格式
+    # 支持反引号包裹的数据库名和表名
+    patterns = [
+        r'`?(\w+)`?\.`?(\w+)`?',  # db.table 或 `db`.`table`
+        r'FROM\s+`?(\w+)`?\.`?(\w+)`?',  # FROM db.table
+        r'JOIN\s+`?(\w+)`?\.`?(\w+)`?',  # JOIN db.table
+        r'INTO\s+`?(\w+)`?\.`?(\w+)`?',  # INTO db.table
+        r'UPDATE\s+`?(\w+)`?\.`?(\w+)`?',  # UPDATE db.table
+    ]
+    
+    databases = set()
+    for pattern in patterns:
+        matches = re.findall(pattern, sql_content, re.IGNORECASE)
+        for match in matches:
+            db_name = match[0] if isinstance(match, tuple) else match
+            # 排除一些常见的非数据库名
+            if db_name.lower() not in ['select', 'from', 'where', 'and', 'or', 'join', 'left', 'right', 'inner', 'outer']:
+                databases.add(db_name)
+    
+    return {
+        "databases": list(databases),
+        "total": len(databases)
+    }
     """
     获取SQL预览内容（截取前N行）
     """
@@ -96,12 +197,30 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
     sql_preview = get_sql_preview(approval.sql_content)
     total_lines = approval.sql_line_count or len(approval.sql_content.split('\n'))
     
+    # 构建数据库目标描述
+    database_target = ""
+    if approval.database_mode == "all":
+        database_target = "全部数据库"
+    elif approval.database_mode == "pattern":
+        database_target = approval.database_pattern
+    elif approval.database_mode == "multiple":
+        database_target = f"{len(approval.database_list or [])} 个数据库"
+    elif approval.database_mode == "auto":
+        database_target = "SQL自动解析"
+    else:
+        database_target = approval.database_name
+    
     response = {
         "id": approval.id,
         "title": approval.title,
         "change_type": approval.change_type,
         "instance_id": approval.instance_id,
+        "database_mode": approval.database_mode,
         "database_name": approval.database_name,
+        "database_list": approval.database_list,
+        "database_pattern": approval.database_pattern,
+        "matched_database_count": approval.matched_database_count,
+        "database_target": database_target,
         "sql_content": approval.sql_content if include_full_sql else None,
         "sql_content_preview": sql_preview if total_lines > PREVIEW_LINES else None,
         "sql_line_count": total_lines,
@@ -210,7 +329,11 @@ async def create_approval(
         title=approval_data.title,
         change_type=approval_data.change_type,
         instance_id=approval_data.instance_id,
+        database_mode=approval_data.database_mode,
         database_name=approval_data.database_name,
+        database_list=approval_data.database_list,
+        database_pattern=approval_data.database_pattern,
+        matched_database_count=approval_data.matched_database_count,
         sql_content=approval_data.sql_content,
         sql_line_count=sql_line_count,
         sql_risk_level=risk_level,
@@ -222,6 +345,19 @@ async def create_approval(
     db.commit()
     db.refresh(approval)
     
+    # 构建数据库目标描述
+    db_target_desc = ""
+    if approval_data.database_mode == "all":
+        db_target_desc = "全部数据库"
+    elif approval_data.database_mode == "pattern":
+        db_target_desc = f"通配符模式: {approval_data.database_pattern}"
+    elif approval_data.database_mode == "multiple":
+        db_target_desc = f"{len(approval_data.database_list or [])} 个数据库"
+    elif approval_data.database_mode == "auto":
+        db_target_desc = "SQL自动解析"
+    else:
+        db_target_desc = approval_data.database_name
+    
     # 记录审计日志
     audit_log = AuditLog(
         user_id=current_user.id,
@@ -230,7 +366,7 @@ async def create_approval(
         instance_name=instance.name,
         environment_id=instance.environment_id,
         operation_type="submit_approval",
-        operation_detail=f"提交审批: {approval_data.title} ({sql_line_count}行SQL)",
+        operation_detail=f"提交审批: {approval_data.title}\n数据库: {db_target_desc}\nSQL行数: {sql_line_count}行",
         request_ip="",
         request_method="POST",
         request_path=f"/api/approvals",

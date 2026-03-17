@@ -257,7 +257,12 @@ class ApprovalCreate(BaseModel):
     title: str = Field(..., max_length=200)
     change_type: str  # DDL/DML/OPERATION/CUSTOM
     instance_id: int
-    database_name: Optional[str] = None
+    database_mode: Optional[str] = Field("single", description="数据库选择模式: single/multiple/pattern/all/auto")
+    database_name: Optional[str] = Field(None, description="单库模式时的数据库名")
+    database_list: Optional[List[str]] = Field(None, description="多库模式时的数据库列表")
+    database_pattern: Optional[str] = Field(None, description="通配符模式")
+    matched_database_count: Optional[int] = Field(None, description="通配符匹配的数据库数量")
+    parsed_databases: Optional[List[str]] = Field(None, description="SQL解析出的数据库列表")
     sql_content: str
     sql_line_count: Optional[int] = Field(None, description="SQL行数")
     scheduled_time: Optional[datetime] = None
@@ -276,7 +281,12 @@ class ApprovalResponse(BaseModel):
     title: str
     change_type: str
     instance_id: int
+    database_mode: Optional[str] = Field(None, description="数据库选择模式")
     database_name: Optional[str]
+    database_list: Optional[List[str]] = Field(None, description="多库列表")
+    database_pattern: Optional[str] = Field(None, description="通配符模式")
+    matched_database_count: Optional[int] = Field(None, description="匹配数量")
+    database_target: Optional[str] = Field(None, description="目标数据库描述")
     sql_content: Optional[str] = Field(None, description="SQL内容（详情时返回）")
     sql_content_preview: Optional[str] = Field(None, description="SQL预览（前100行）")
     sql_line_count: Optional[int] = Field(None, description="SQL总行数")

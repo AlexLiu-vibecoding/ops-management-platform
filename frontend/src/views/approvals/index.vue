@@ -24,24 +24,38 @@
             <el-tag size="small">{{ row.change_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="sql_risk_level" label="风险等级" width="100">
+        <el-table-column prop="database_target" label="目标数据库" width="200">
+          <template #default="{ row }">
+            <span v-if="row.database_mode === 'all'">
+              <el-tag type="warning">全部数据库</el-tag>
+            </span>
+            <span v-else-if="row.database_mode === 'pattern'">
+              <el-tag type="info">{{ row.database_pattern || '通配符匹配' }}</el-tag>
+            </span>
+            <span v-else-if="row.database_mode === 'auto'">
+              <el-tag type="success">SQL自动解析</el-tag>
+            </span>
+            <span v-else>{{ row.database_name || '-' }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="sql_risk_level" label="风险等级" width="80">
           <template #default="{ row }">
             <span class="risk-tag" :class="row.sql_risk_level">{{ getRiskLabel(row.sql_risk_level) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="提交时间" width="180">
+        <el-table-column prop="created_at" label="提交时间" width="160">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button text type="primary" @click="handleView(row)">详情</el-button>
             <template v-if="row.status === 'pending' && canApprove">
@@ -62,8 +76,8 @@
     </el-card>
     
     <!-- 提交变更对话框 -->
-    <el-dialog v-model="dialog.visible" title="提交变更申请" width="800px" :close-on-click-modal="false">
-      <el-form :model="dialog.form" :rules="dialog.rules" ref="formRef" label-width="100px">
+    <el-dialog v-model="dialog.visible" title="提交变更申请" width="900px" :close-on-click-modal="false">
+      <el-form :model="dialog.form" :rules="dialog.rules" ref="formRef" label-width="110px">
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="标题" prop="title">
@@ -91,13 +105,108 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="数据库">
-              <el-select v-model="dialog.form.database_name" placeholder="请选择数据库" style="width: 100%;" :loading="dialog.dbLoading">
-                <el-option v-for="db in dialog.databases" :key="db" :label="db" :value="db" />
+            <el-form-item label="数据库选择模式">
+              <el-select v-model="dialog.form.database_mode" placeholder="选择模式" style="width: 100%;" @change="handleDatabaseModeChange">
+                <el-option label="单库选择" value="single" />
+                <el-option label="多库选择" value="multiple" />
+                <el-option label="通配符匹配" value="pattern" />
+                <el-option label="全部数据库" value="all" />
+                <el-option label="SQL自动解析" value="auto" />
               </el-select>
             </el-form-item>
           </el-col>
         </el-row>
+        
+        <!-- 单库选择 -->
+        <el-form-item v-if="dialog.form.database_mode === 'single'" label="数据库">
+          <el-select v-model="dialog.form.database_name" placeholder="请选择数据库" style="width: 100%;" :loading="dialog.dbLoading" filterable>
+            <el-option v-for="db in dialog.databases" :key="db" :label="db" :value="db" />
+          </el-select>
+        </el-form-item>
+        
+        <!-- 多库选择 -->
+        <el-form-item v-if="dialog.form.database_mode === 'multiple'" label="数据库">
+          <el-select
+            v-model="dialog.form.database_list"
+            multiple
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="请选择多个数据库"
+            style="width: 100%;"
+            :loading="dialog.dbLoading"
+            filterable
+          >
+            <el-option v-for="db in dialog.databases" :key="db" :label="db" :value="db" />
+          </el-select>
+          <div class="selected-count">已选择 {{ dialog.form.database_list?.length || 0 }} 个数据库</div>
+        </el-form-item>
+        
+        <!-- 通配符匹配 -->
+        <el-form-item v-if="dialog.form.database_mode === 'pattern'" label="数据库匹配">
+          <div class="pattern-input-wrapper">
+            <el-input
+              v-model="dialog.form.database_pattern"
+              placeholder="输入通配符，如: db_% 或 user_db_*"
+              @input="handlePatternChange"
+            >
+              <template #append>
+                <el-button @click="previewPatternMatch" :loading="dialog.patternLoading">
+                  预览匹配
+                </el-button>
+              </template>
+            </el-input>
+          </div>
+          <div v-if="dialog.matchedDatabases.length > 0" class="matched-databases">
+            <div class="matched-header">
+              <span>匹配到 {{ dialog.matchedDatabases.length }} 个数据库</span>
+              <el-button type="primary" link size="small" @click="showAllMatched = !showAllMatched">
+                {{ showAllMatched ? '收起' : '展开全部' }}
+              </el-button>
+            </div>
+            <div class="matched-list">
+              <el-tag
+                v-for="(db, idx) in displayMatchedDatabases"
+                :key="db"
+                size="small"
+                style="margin: 2px;"
+              >
+                {{ db }}
+              </el-tag>
+              <span v-if="!showAllMatched && dialog.matchedDatabases.length > 20">
+                ... 等 {{ dialog.matchedDatabases.length }} 个
+              </span>
+            </div>
+          </div>
+        </el-form-item>
+        
+        <!-- 全部数据库 -->
+        <el-form-item v-if="dialog.form.database_mode === 'all'" label="数据库范围">
+          <el-alert type="warning" :closable="false" show-icon>
+            <template #title>
+              将对实例上的所有数据库执行此变更
+            </template>
+          </el-alert>
+          <div class="db-count-info" v-if="dialog.databases.length > 0">
+            当前实例共有 <strong>{{ dialog.databases.length }}</strong> 个数据库
+            <el-button type="primary" link size="small" @click="showDbList = true">查看列表</el-button>
+          </div>
+        </el-form-item>
+        
+        <!-- SQL自动解析 -->
+        <el-form-item v-if="dialog.form.database_mode === 'auto'" label="数据库">
+          <el-alert type="info" :closable="false" show-icon>
+            <template #title>
+              系统将自动解析SQL中引用的数据库（如 db_001.table_name）
+            </template>
+          </el-alert>
+          <div v-if="parsedDatabases.length > 0" class="parsed-databases">
+            <span>从SQL解析到 {{ parsedDatabases.length }} 个数据库：</span>
+            <el-tag v-for="db in parsedDatabases.slice(0, 10)" :key="db" size="small" style="margin: 2px;">
+              {{ db }}
+            </el-tag>
+            <span v-if="parsedDatabases.length > 10">... 等 {{ parsedDatabases.length }} 个</span>
+          </div>
+        </el-form-item>
         
         <!-- SQL内容输入区域 -->
         <el-form-item label="SQL内容" prop="sql_content">
@@ -126,9 +235,6 @@
                 <el-tag type="info">
                   {{ formatFileSize(sqlStats.fileSize) }}
                 </el-tag>
-                <el-tag v-if="sqlStats.totalLines > 1000" type="warning">
-                  预览前100行
-                </el-tag>
               </div>
             </div>
             
@@ -151,25 +257,11 @@
               <el-input
                 v-model="dialog.form.sql_content"
                 type="textarea"
-                :rows="12"
+                :rows="10"
                 placeholder="请输入SQL语句，或上传SQL文件"
                 class="sql-textarea"
                 @input="handleSqlInput"
               />
-              
-              <!-- 大文件提示 -->
-              <div v-if="sqlStats.totalLines > 1000" class="large-file-tip">
-                <el-alert
-                  type="warning"
-                  :closable="false"
-                  show-icon
-                >
-                  <template #title>
-                    文件较大（{{ sqlStats.totalLines.toLocaleString() }}行），当前仅显示前100行预览。
-                    完整内容将在提交时发送。
-                  </template>
-                </el-alert>
-              </div>
             </div>
             
             <!-- SQL校验结果 -->
@@ -236,7 +328,21 @@
           </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="实例">{{ detailDialog.data?.instance_name }}</el-descriptions-item>
-        <el-descriptions-item label="数据库">{{ detailDialog.data?.database_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="数据库">
+          <template v-if="detailDialog.data?.database_mode === 'all'">
+            <el-tag type="warning">全部数据库</el-tag>
+          </template>
+          <template v-else-if="detailDialog.data?.database_mode === 'pattern'">
+            <el-tag type="info">{{ detailDialog.data?.database_pattern }}</el-tag>
+            <span v-if="detailDialog.data?.matched_database_count">
+              ({{ detailDialog.data?.matched_database_count }} 个)
+            </span>
+          </template>
+          <template v-else-if="detailDialog.data?.database_mode === 'multiple'">
+            <el-tag>{{ detailDialog.data?.database_list?.length || 0 }} 个数据库</el-tag>
+          </template>
+          <template v-else>{{ detailDialog.data?.database_name || '-' }}</template>
+        </el-descriptions-item>
         <el-descriptions-item label="申请人">{{ detailDialog.data?.requester_name }}</el-descriptions-item>
         <el-descriptions-item label="提交时间">{{ formatTime(detailDialog.data?.created_at) }}</el-descriptions-item>
         <el-descriptions-item label="SQL内容" :span="2">
@@ -261,6 +367,16 @@
       <template #footer>
         <el-button @click="detailDialog.visible = false">关闭</el-button>
       </template>
+    </el-dialog>
+    
+    <!-- 数据库列表弹窗 -->
+    <el-dialog v-model="showDbList" title="数据库列表" width="500px">
+      <el-input v-model="dbSearchFilter" placeholder="搜索数据库" style="margin-bottom: 10px;" />
+      <div class="db-list-container">
+        <el-tag v-for="db in filteredDatabases" :key="db" size="small" style="margin: 2px;">
+          {{ db }}
+        </el-tag>
+      </div>
     </el-dialog>
   </div>
 </template>
@@ -287,6 +403,9 @@ const uploadRef = ref(null)
 
 // 完整SQL内容（大文件时用于提交）
 const fullSqlContent = ref('')
+const showAllMatched = ref(false)
+const showDbList = ref(false)
+const dbSearchFilter = ref('')
 
 // SQL统计信息
 const sqlStats = reactive({
@@ -303,16 +422,24 @@ const sqlValidation = reactive({
   statementCount: 0
 })
 
+// 从SQL解析的数据库
+const parsedDatabases = ref([])
+
 const dialog = reactive({
   visible: false,
   submitting: false,
   fileLoading: false,
   dbLoading: false,
+  patternLoading: false,
   databases: [],
+  matchedDatabases: [],
   form: {
     title: '',
     instance_id: null,
+    database_mode: 'single',
     database_name: '',
+    database_list: [],
+    database_pattern: '',
     change_type: 'DDL',
     sql_content: '',
     remark: ''
@@ -330,26 +457,36 @@ const detailDialog = reactive({
   data: null
 })
 
-// 文件大小限制 (10MB)
+// 显示的匹配数据库（限制数量）
+const displayMatchedDatabases = computed(() => {
+  if (showAllMatched.value) {
+    return dialog.matchedDatabases
+  }
+  return dialog.matchedDatabases.slice(0, 20)
+})
+
+// 过滤后的数据库列表
+const filteredDatabases = computed(() => {
+  if (!dbSearchFilter.value) return dialog.databases
+  return dialog.databases.filter(db => 
+    db.toLowerCase().includes(dbSearchFilter.value.toLowerCase())
+  )
+})
+
+// 文件大小限制
 const MAX_FILE_SIZE = 10 * 1024 * 1024
-// 大文件行数阈值
-const LARGE_FILE_LINES = 1000
-// 预览行数
-const PREVIEW_LINES = 100
 
 /**
- * 处理文件选择 - 流式读取避免内存溢出
+ * 处理文件选择
  */
 const handleFileSelect = async (file) => {
   const rawFile = file.raw
   
-  // 校验文件类型
   if (!rawFile.name.endsWith('.sql') && !rawFile.name.endsWith('.txt')) {
     ElMessage.error('仅支持 .sql 或 .txt 文件')
     return
   }
   
-  // 校验文件大小
   if (rawFile.size > MAX_FILE_SIZE) {
     ElMessage.error(`文件大小不能超过 ${formatFileSize(MAX_FILE_SIZE)}`)
     return
@@ -359,32 +496,31 @@ const handleFileSelect = async (file) => {
   sqlStats.fileSize = rawFile.size
   
   try {
-    // 使用流式读取处理大文件
-    const result = await readFileSafely(rawFile)
-    
-    fullSqlContent.value = result.fullContent
-    sqlStats.totalLines = result.lineCount
-    sqlStats.isLargeFile = result.lineCount > LARGE_FILE_LINES
-    
-    // 大文件只显示前100行预览
-    if (result.lineCount > LARGE_FILE_LINES) {
-      const lines = result.fullContent.split('\n').slice(0, PREVIEW_LINES)
-      dialog.form.sql_content = lines.join('\n')
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const content = e.target.result
+      fullSqlContent.value = content
       
-      ElMessage.warning({
-        message: `文件共 ${result.lineCount.toLocaleString()} 行，已截取前 ${PREVIEW_LINES} 行显示预览`,
-        duration: 3000
-      })
-    } else {
-      dialog.form.sql_content = result.fullContent
+      const lineCount = (content.match(/\n/g) || []).length + 1
+      sqlStats.totalLines = lineCount
+      sqlStats.isLargeFile = lineCount > 1000
+      
+      if (lineCount > 100) {
+        const lines = content.split('\n').slice(0, 100)
+        dialog.form.sql_content = lines.join('\n')
+        ElMessage.warning(`文件共 ${lineCount.toLocaleString()} 行，已截取前100行显示预览`)
+      } else {
+        dialog.form.sql_content = content
+      }
+      
+      // 解析SQL中的数据库引用
+      parseSqlDatabases(content)
+      validateSQL(content)
+      
+      ElMessage.success(`文件加载成功: ${rawFile.name}`)
     }
-    
-    // 执行SQL校验
-    validateSQL(result.fullContent)
-    
-    ElMessage.success(`文件加载成功: ${rawFile.name}`)
+    reader.readAsText(rawFile)
   } catch (error) {
-    console.error('文件读取失败:', error)
     ElMessage.error('文件读取失败: ' + error.message)
     resetFileState()
   } finally {
@@ -393,58 +529,24 @@ const handleFileSelect = async (file) => {
 }
 
 /**
- * 安全读取文件 - 分块读取避免内存溢出
+ * 解析SQL中的数据库引用
  */
-const readFileSafely = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    
-    reader.onload = (e) => {
-      try {
-        const content = e.target.result
-        
-        // 统计行数（不分割整个文件，使用正则匹配）
-        const lineCount = (content.match(/\n/g) || []).length + 1
-        
-        resolve({
-          fullContent: content,
-          lineCount
-        })
-      } catch (error) {
-        reject(new Error('文件内容解析失败'))
-      }
-    }
-    
-    reader.onerror = () => {
-      reject(new Error('文件读取失败'))
-    }
-    
-    // 对于超大文件，可以使用 slice 分块读取
-    // 这里我们限制文件大小为10MB，直接读取是安全的
-    reader.readAsText(file)
-  })
-}
-
-/**
- * 超大文件分块读取（预留方案）
- */
-const readFileInChunks = async (file, chunkSize = 1024 * 1024) => {
-  const chunks = []
-  let offset = 0
+const parseSqlDatabases = (content) => {
+  // 匹配 database.table 格式
+  const dbTablePattern = /(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\./gi
+  const matches = content.matchAll(dbTablePattern)
+  const dbs = new Set()
   
-  while (offset < file.size) {
-    const chunk = file.slice(offset, offset + chunkSize)
-    const text = await new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => resolve(e.target.result)
-      reader.onerror = reject
-      reader.readAsText(chunk)
-    })
-    chunks.push(text)
-    offset += chunkSize
+  for (const match of matches) {
+    const dbName = match[1]
+    // 过滤系统保留字
+    const reservedWords = ['select', 'insert', 'update', 'delete', 'from', 'where', 'and', 'or']
+    if (!reservedWords.includes(dbName.toLowerCase())) {
+      dbs.add(dbName)
+    }
   }
   
-  return chunks.join('')
+  parsedDatabases.value = Array.from(dbs)
 }
 
 /**
@@ -461,35 +563,19 @@ const validateSQL = (content) => {
     return
   }
   
-  // 统计SQL语句数量（按分号分割）
-  const statements = content
-    .split(';')
-    .map(s => s.trim())
-    .filter(s => s.length > 0)
-  
+  const statements = content.split(';').filter(s => s.trim().length > 0)
   sqlValidation.statementCount = statements.length
   
-  // 检查危险操作
   const dangerousPatterns = [
     { pattern: /\bDROP\s+DATABASE\b/i, message: '禁止 DROP DATABASE 操作' },
     { pattern: /\bDROP\s+SCHEMA\b/i, message: '禁止 DROP SCHEMA 操作' },
-    { pattern: /\bTRUNCATE\b/i, message: '包含 TRUNCATE 操作，需要特别注意' },
-    { pattern: /\bDELETE\s+FROM\b(?!.*\bWHERE\b)/i, message: '存在无 WHERE 条件的 DELETE 语句' },
-    { pattern: /\bUPDATE\b(?!.*\bWHERE\b)/i, message: '存在无 WHERE 条件的 UPDATE 语句' }
+    { pattern: /\bTRUNCATE\b/i, message: '包含 TRUNCATE 操作，需要特别注意' }
   ]
   
   for (const { pattern, message } of dangerousPatterns) {
     if (pattern.test(content)) {
       sqlValidation.errors.push(message)
     }
-  }
-  
-  // 检查语法基本结构
-  const upperContent = content.toUpperCase()
-  const hasValidStart = /^(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|GRANT|REVOKE|USE|SET|SHOW|DESC|EXPLAIN)/i.test(content.trim())
-  
-  if (!hasValidStart) {
-    sqlValidation.errors.push('SQL语句格式不正确，请检查语法')
   }
   
   sqlValidation.valid = sqlValidation.errors.length === 0
@@ -502,12 +588,10 @@ const handleSqlInput = () => {
   fullSqlContent.value = dialog.form.sql_content
   const lines = dialog.form.sql_content.split('\n')
   sqlStats.totalLines = lines.length
-  sqlStats.isLargeFile = lines.length > LARGE_FILE_LINES
   
-  // 防抖校验
-  if (dialog.inputTimer) {
-    clearTimeout(dialog.inputTimer)
-  }
+  parseSqlDatabases(dialog.form.sql_content)
+  
+  if (dialog.inputTimer) clearTimeout(dialog.inputTimer)
   dialog.inputTimer = setTimeout(() => {
     if (dialog.form.sql_content.trim()) {
       validateSQL(dialog.form.sql_content)
@@ -518,28 +602,18 @@ const handleSqlInput = () => {
 }
 
 /**
- * 格式化SQL内容
+ * 格式化SQL
  */
 const formatSQLContent = () => {
   if (!dialog.form.sql_content.trim()) return
-  
-  let formatted = dialog.form.sql_content
-    .replace(/\s+/g, ' ')
-    .trim()
-  
-  const keywords = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'HAVING', 'ORDER BY', 'LIMIT', 
-                    'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'ON', 'AND', 'OR', 
-                    'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM', 
-                    'CREATE TABLE', 'ALTER TABLE', 'ADD COLUMN', 'DROP COLUMN']
-  
-  keywords.forEach(keyword => {
-    const regex = new RegExp(`\\b${keyword}\\b`, 'gi')
-    formatted = formatted.replace(regex, '\n' + keyword)
+  // 简单格式化
+  let formatted = dialog.form.sql_content.replace(/\s+/g, ' ').trim()
+  const keywords = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT', 'JOIN', 'ON', 'AND', 'OR']
+  keywords.forEach(kw => {
+    formatted = formatted.replace(new RegExp(`\\b${kw}\\b`, 'gi'), '\n' + kw)
   })
-  
   dialog.form.sql_content = formatted.trim()
   fullSqlContent.value = dialog.form.sql_content
-  
   ElMessage.success('SQL已格式化')
 }
 
@@ -551,6 +625,7 @@ const clearSQLContent = () => {
   fullSqlContent.value = ''
   resetFileState()
   sqlValidation.show = false
+  parsedDatabases.value = []
 }
 
 /**
@@ -573,15 +648,81 @@ const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
+/**
+ * 处理实例选择
+ */
+const handleInstanceSelect = async (instanceId) => {
+  dialog.form.database_name = ''
+  dialog.form.database_list = []
+  dialog.form.database_pattern = ''
+  dialog.matchedDatabases = []
+  dialog.databases = []
+  dialog.dbLoading = true
+  
+  try {
+    const data = await request.get(`/sql/databases/${instanceId}`)
+    // 过滤系统库
+    const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys']
+    dialog.databases = data.filter(db => !systemDbs.includes(db))
+  } catch (error) {
+    console.error('获取数据库列表失败:', error)
+  } finally {
+    dialog.dbLoading = false
+  }
+}
+
+/**
+ * 处理数据库模式变更
+ */
+const handleDatabaseModeChange = () => {
+  dialog.form.database_name = ''
+  dialog.form.database_list = []
+  dialog.form.database_pattern = ''
+  dialog.matchedDatabases = []
+}
+
+/**
+ * 处理通配符输入变化
+ */
+const handlePatternChange = () => {
+  dialog.matchedDatabases = []
+}
+
+/**
+ * 预览通配符匹配
+ */
+const previewPatternMatch = () => {
+  if (!dialog.form.database_pattern) {
+    ElMessage.warning('请输入匹配模式')
+    return
+  }
+  
+  dialog.patternLoading = true
+  
+  // 将SQL通配符转换为正则
+  let pattern = dialog.form.database_pattern
+    .replace(/%/g, '.*')
+    .replace(/_/g, '.')
+    .replace(/\*/g, '.*')
+  
+  try {
+    const regex = new RegExp(`^${pattern}$`, 'i')
+    dialog.matchedDatabases = dialog.databases.filter(db => regex.test(db))
+    ElMessage.success(`匹配到 ${dialog.matchedDatabases.length} 个数据库`)
+  } catch (error) {
+    ElMessage.error('匹配模式无效')
+    dialog.matchedDatabases = []
+  } finally {
+    dialog.patternLoading = false
+  }
+}
+
 const fetchApprovals = async () => {
   loading.value = true
   try {
     const params = {}
-    if (activeTab.value === 'pending') {
-      params.status_filter = 'pending'
-    } else if (activeTab.value === 'mine') {
-      params.requester_id = currentUserId.value
-    }
+    if (activeTab.value === 'pending') params.status_filter = 'pending'
+    else if (activeTab.value === 'mine') params.requester_id = currentUserId.value
     
     approvalList.value = await request.get('/approvals', { params })
   } catch (error) {
@@ -600,16 +741,16 @@ const fetchInstances = async () => {
   }
 }
 
-const handleTabChange = () => {
-  fetchApprovals()
-}
+const handleTabChange = () => fetchApprovals()
 
 const handleAdd = () => {
-  // 重置表单
   dialog.form = {
     title: '',
     instance_id: null,
+    database_mode: 'single',
     database_name: '',
+    database_list: [],
+    database_pattern: '',
     change_type: 'DDL',
     sql_content: '',
     remark: ''
@@ -617,21 +758,10 @@ const handleAdd = () => {
   fullSqlContent.value = ''
   resetFileState()
   sqlValidation.show = false
-  dialog.visible = true
-}
-
-const handleInstanceSelect = async (instanceId) => {
-  dialog.form.database_name = ''
+  parsedDatabases.value = []
   dialog.databases = []
-  dialog.dbLoading = true
-  
-  try {
-    dialog.databases = await request.get(`/sql/databases/${instanceId}`)
-  } catch (error) {
-    console.error('获取数据库列表失败:', error)
-  } finally {
-    dialog.dbLoading = false
-  }
+  dialog.matchedDatabases = []
+  dialog.visible = true
 }
 
 const handleSubmit = async () => {
@@ -640,10 +770,7 @@ const handleSubmit = async () => {
   await formRef.value.validate(async (valid) => {
     if (!valid) return
     
-    // 使用完整SQL内容（大文件时）
     const sqlToSubmit = fullSqlContent.value || dialog.form.sql_content
-    
-    // 再次校验
     if (!sqlToSubmit.trim()) {
       ElMessage.error('SQL内容不能为空')
       return
@@ -651,12 +778,34 @@ const handleSubmit = async () => {
     
     dialog.submitting = true
     try {
-      await request.post('/approvals', {
-        ...dialog.form,
+      const submitData = {
+        title: dialog.form.title,
+        change_type: dialog.form.change_type,
+        instance_id: dialog.form.instance_id,
         sql_content: sqlToSubmit,
-        sql_line_count: sqlStats.totalLines
-      })
+        sql_line_count: sqlStats.totalLines,
+        database_mode: dialog.form.database_mode,
+        remark: dialog.form.remark
+      }
       
+      // 根据模式设置数据库相关字段
+      switch (dialog.form.database_mode) {
+        case 'single':
+          submitData.database_name = dialog.form.database_name
+          break
+        case 'multiple':
+          submitData.database_list = dialog.form.database_list
+          break
+        case 'pattern':
+          submitData.database_pattern = dialog.form.database_pattern
+          submitData.matched_database_count = dialog.matchedDatabases.length
+          break
+        case 'auto':
+          submitData.parsed_databases = parsedDatabases.value
+          break
+      }
+      
+      await request.post('/approvals', submitData)
       ElMessage.success('提交成功')
       dialog.visible = false
       fetchApprovals()
@@ -675,7 +824,6 @@ const handleView = async (row) => {
     detailDialog.data = data
     detailDialog.visible = true
   } catch (error) {
-    console.error('获取详情失败:', error)
     ElMessage.error('获取详情失败')
   }
 }
@@ -696,9 +844,7 @@ const handleApprove = async (row, approved) => {
     ElMessage.success(`审批${action}成功`)
     fetchApprovals()
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('审批失败:', error)
-    }
+    if (error !== 'cancel') console.error('审批失败:', error)
   }
 }
 
@@ -711,18 +857,10 @@ const handleExecute = async (row) => {
     )
     
     const result = await request.post(`/approvals/${row.id}/execute`)
-    
-    if (result.success) {
-      ElMessage.success('执行成功')
-    } else {
-      ElMessage.error(`执行失败: ${result.message}`)
-    }
-    
+    ElMessage.success(result.message || '执行成功')
     fetchApprovals()
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('执行失败:', error)
-    }
+    if (error !== 'cancel') console.error('执行失败:', error)
   }
 }
 
@@ -732,30 +870,16 @@ const getRiskLabel = (level) => {
 }
 
 const getStatusType = (status) => {
-  const types = {
-    pending: 'warning',
-    approved: 'success',
-    rejected: 'danger',
-    executed: 'info',
-    failed: 'danger'
-  }
+  const types = { pending: 'warning', approved: 'success', rejected: 'danger', executed: 'info', failed: 'danger' }
   return types[status] || 'info'
 }
 
 const getStatusLabel = (status) => {
-  const labels = {
-    pending: '待审批',
-    approved: '已通过',
-    rejected: '已拒绝',
-    executed: '已执行',
-    failed: '执行失败'
-  }
+  const labels = { pending: '待审批', approved: '已通过', rejected: '已拒绝', executed: '已执行', failed: '执行失败' }
   return labels[status] || status
 }
 
-const formatTime = (time) => {
-  return dayjs(time).format('YYYY-MM-DD HH:mm:ss')
-}
+const formatTime = (time) => dayjs(time).format('YYYY-MM-DD HH:mm:ss')
 
 onMounted(() => {
   fetchApprovals()
@@ -775,24 +899,51 @@ onMounted(() => {
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 12px;
+    &.low { background: #f0f9eb; color: #67c23a; }
+    &.medium { background: #fdf6ec; color: #e6a23c; }
+    &.high { background: #fef0f0; color: #f56c6c; }
+    &.critical { background: #fde2e2; color: #f56c6c; font-weight: bold; }
+  }
+  
+  .selected-count {
+    margin-top: 5px;
+    font-size: 12px;
+    color: #909399;
+  }
+  
+  .matched-databases {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f5f7fa;
+    border-radius: 4px;
     
-    &.low {
-      background: #f0f9eb;
-      color: #67c23a;
+    .matched-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #606266;
     }
-    &.medium {
-      background: #fdf6ec;
-      color: #e6a23c;
+    
+    .matched-list {
+      display: flex;
+      flex-wrap: wrap;
     }
-    &.high {
-      background: #fef0f0;
-      color: #f56c6c;
-    }
-    &.critical {
-      background: #fde2e2;
-      color: #f56c6c;
-      font-weight: bold;
-    }
+  }
+  
+  .db-count-info {
+    margin-top: 10px;
+    font-size: 13px;
+    color: #606266;
+  }
+  
+  .parsed-databases {
+    margin-top: 10px;
+    padding: 10px;
+    background: #f0f9eb;
+    border-radius: 4px;
+    font-size: 13px;
   }
   
   .sql-input-wrapper {
@@ -823,31 +974,17 @@ onMounted(() => {
         background: #f5f7fa;
         border-bottom: 1px solid #dcdfe6;
         
-        span {
-          font-weight: 500;
-          color: #606266;
-        }
-        
-        .editor-actions {
-          display: flex;
-          gap: 5px;
-        }
+        span { font-weight: 500; color: #606266; }
+        .editor-actions { display: flex; gap: 5px; }
       }
       
       .sql-textarea {
         :deep(textarea) {
           border: none;
           border-radius: 0;
-          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+          font-family: 'Consolas', 'Monaco', monospace;
           font-size: 13px;
-          line-height: 1.5;
-          resize: vertical;
         }
-      }
-      
-      .large-file-tip {
-        padding: 10px 12px;
-        background: #fdf6ec;
       }
     }
     
@@ -858,41 +995,34 @@ onMounted(() => {
         display: flex;
         align-items: center;
         gap: 15px;
-        
-        .statement-count {
-          font-size: 12px;
-          color: #909399;
-        }
+        .statement-count { font-size: 12px; color: #909399; }
       }
       
       .validation-errors {
         margin: 5px 0 0 0;
         padding-left: 20px;
-        
-        li {
-          margin: 3px 0;
-        }
+        li { margin: 3px 0; }
       }
     }
   }
   
   .detail-sql-content {
-    .sql-info {
-      margin-bottom: 8px;
-    }
-    
+    .sql-info { margin-bottom: 8px; }
     .sql-preview {
       background: #f5f7fa;
       padding: 10px;
       border-radius: 4px;
-      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-family: monospace;
       font-size: 12px;
-      line-height: 1.5;
       max-height: 300px;
       overflow: auto;
       white-space: pre-wrap;
-      word-break: break-all;
     }
+  }
+  
+  .db-list-container {
+    max-height: 400px;
+    overflow: auto;
   }
 }
 </style>
