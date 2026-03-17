@@ -16,26 +16,26 @@
         text-color="rgba(255, 255, 255, 0.85)"
         active-text-color="#409eff"
       >
-        <template v-for="route in menuRoutes" :key="route.path">
+        <template v-for="item in menuItems" :key="item.path || item.id">
           <!-- 有子菜单 -->
-          <el-sub-menu v-if="route.children && route.children.length > 1" :index="route.path">
+          <el-sub-menu v-if="item.children && item.children.length > 0" :index="item.path || `menu-${item.id}`">
             <template #title>
-              <el-icon><component :is="route.meta?.icon" /></el-icon>
-              <span>{{ route.meta?.title }}</span>
+              <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
+              <span>{{ item.name }}</span>
             </template>
             <el-menu-item
-              v-for="child in route.children"
+              v-for="child in item.children"
               :key="child.path"
-              :index="`${route.path}/${child.path}`"
+              :index="child.path"
             >
-              {{ child.meta?.title }}
+              {{ child.name }}
             </el-menu-item>
           </el-sub-menu>
           
           <!-- 无子菜单 -->
-          <el-menu-item v-else :index="route.path">
-            <el-icon><component :is="route.meta?.icon" /></el-icon>
-            <template #title>{{ route.meta?.title }}</template>
+          <el-menu-item v-else :index="item.path || `menu-${item.id}`">
+            <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
+            <template #title>{{ item.name }}</template>
           </el-menu-item>
         </template>
       </el-menu>
@@ -127,6 +127,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { authApi } from '@/api/auth'
+import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UserFilled, Fold, Expand, ArrowDown } from '@element-plus/icons-vue'
 
@@ -135,6 +136,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const isCollapse = ref(false)
+const dynamicMenus = ref([])
 
 // 活动菜单
 const activeMenu = computed(() => route.path)
@@ -148,22 +150,46 @@ const breadcrumbs = computed(() => {
   }))
 })
 
-// 菜单路由（过滤掉hidden和没有权限的）
-const menuRoutes = computed(() => {
+// 菜单项（优先使用后端配置，兜底使用路由配置）
+const menuItems = computed(() => {
+  if (dynamicMenus.value.length > 0) {
+    return dynamicMenus.value
+  }
+  
+  // 兜底：使用路由配置
   const routes = router.options.routes.find(r => r.path === '/')?.children || []
   
   return routes.filter(route => {
-    // 过滤隐藏的路由
     if (route.meta?.hidden) return false
-    
-    // 权限检查
     if (route.meta?.roles) {
       return route.meta.roles.includes(userStore.user?.role)
     }
-    
     return true
-  })
+  }).map(route => ({
+    id: route.path,
+    name: route.meta?.title,
+    path: route.path,
+    icon: route.meta?.icon,
+    children: route.children?.filter(child => !child.meta?.hidden).map(child => ({
+      id: `${route.path}/${child.path}`,
+      name: child.meta?.title,
+      path: `${route.path}/${child.path}`,
+      icon: child.meta?.icon
+    }))
+  }))
 })
+
+// 获取动态菜单
+const fetchUserMenu = async () => {
+  try {
+    const menus = await request.get('/menu/user-menu')
+    dynamicMenus.value = menus
+  } catch (error) {
+    // 如果获取失败，使用路由配置兜底
+    console.warn('获取动态菜单失败，使用默认配置:', error)
+    dynamicMenus.value = []
+  }
+}
 
 // 修改密码对话框
 const passwordDialog = ref({
@@ -217,6 +243,10 @@ const changePassword = async () => {
     // 错误已在拦截器中处理
   }
 }
+
+onMounted(() => {
+  fetchUserMenu()
+})
 </script>
 
 <style lang="scss" scoped>

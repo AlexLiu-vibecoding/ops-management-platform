@@ -408,3 +408,25 @@ class UserRegistrationRequest(Base):
     
     # 关联
     reviewer = relationship("User", foreign_keys=[reviewer_id])
+
+
+class MenuConfig(Base):
+    """菜单配置表"""
+    __tablename__ = "menu_configs"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    parent_id = Column(Integer, ForeignKey("menu_configs.id", ondelete="SET NULL"), comment="父菜单ID")
+    name = Column(String(50), nullable=False, comment="菜单名称")
+    path = Column(String(200), comment="路由路径")
+    icon = Column(String(50), comment="图标名称")
+    component = Column(String(200), comment="组件路径")
+    sort_order = Column(Integer, default=0, comment="排序")
+    is_visible = Column(Boolean, default=True, comment="是否显示")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    roles = Column(String(200), comment="可见角色，逗号分隔")
+    meta = Column(JSON, comment="其他配置")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    # 关联
+    children = relationship("MenuConfig", backref="parent", remote_side=[id])

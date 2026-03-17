@@ -452,3 +452,61 @@ class PaginatedResponse(BaseModel):
     page: int
     page_size: int
     data: List[Any]
+
+
+# ============ 菜单配置相关 ============
+class MenuConfigCreate(BaseModel):
+    """创建菜单配置请求"""
+    parent_id: Optional[int] = Field(None, description="父菜单ID")
+    name: str = Field(..., max_length=50, description="菜单名称")
+    path: Optional[str] = Field(None, max_length=200, description="路由路径")
+    icon: Optional[str] = Field(None, max_length=50, description="图标名称")
+    component: Optional[str] = Field(None, max_length=200, description="组件路径")
+    sort_order: int = Field(0, description="排序")
+    is_visible: bool = Field(True, description="是否显示")
+    is_enabled: bool = Field(True, description="是否启用")
+    roles: Optional[str] = Field(None, max_length=200, description="可见角色，逗号分隔")
+    meta: Optional[Dict[str, Any]] = Field(None, description="其他配置")
+
+
+class MenuConfigUpdate(BaseModel):
+    """更新菜单配置请求"""
+    parent_id: Optional[int] = None
+    name: Optional[str] = Field(None, max_length=50)
+    path: Optional[str] = Field(None, max_length=200)
+    icon: Optional[str] = Field(None, max_length=50)
+    component: Optional[str] = Field(None, max_length=200)
+    sort_order: Optional[int] = None
+    is_visible: Optional[bool] = None
+    is_enabled: Optional[bool] = None
+    roles: Optional[str] = Field(None, max_length=200)
+    meta: Optional[Dict[str, Any]] = None
+
+
+class MenuConfigResponse(BaseModel):
+    """菜单配置响应"""
+    id: int
+    parent_id: Optional[int]
+    name: str
+    path: Optional[str]
+    icon: Optional[str]
+    component: Optional[str]
+    sort_order: int
+    is_visible: bool
+    is_enabled: bool
+    roles: Optional[str]
+    meta: Optional[Dict[str, Any]]
+    created_at: datetime
+    children: Optional[List['MenuConfigResponse']] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class MenuItemResponse(BaseModel):
+    """前端菜单项响应"""
+    id: int
+    name: str
+    path: str
+    icon: Optional[str]
+    children: Optional[List['MenuItemResponse']] = None

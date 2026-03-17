@@ -17,7 +17,7 @@ from app.database import engine, Base
 from app.utils.redis_client import redis_client
 
 # 导入路由
-from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit
+from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu
 
 # 配置日志
 logging.basicConfig(
@@ -205,6 +205,7 @@ app.include_router(sql.router, prefix="/api")
 app.include_router(performance.router, prefix="/api")
 app.include_router(slow_query.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
+app.include_router(menu.router, prefix="/api")
 
 
 # 健康检查

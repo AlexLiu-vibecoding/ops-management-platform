@@ -89,6 +89,12 @@ const routes = [
         meta: { title: '注册审批', icon: 'UserFilled', roles: ['super_admin'] }
       },
       {
+        path: 'menu-config',
+        name: 'MenuConfig',
+        component: () => import('@/views/menu-config/index.vue'),
+        meta: { title: '菜单配置', icon: 'Menu', roles: ['super_admin'] }
+      },
+      {
         path: 'dingtalk',
         name: 'DingTalk',
         component: () => import('@/views/dingtalk/index.vue'),
