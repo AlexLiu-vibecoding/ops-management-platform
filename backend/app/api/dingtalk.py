@@ -2,6 +2,11 @@
 钉钉通道管理API
 """
 import httpx
+import hmac
+import hashlib
+import base64
+import time
+import urllib.parse
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -16,6 +21,56 @@ from app.utils.auth import encrypt_dingtalk_webhook, decrypt_dingtalk_webhook
 from app.deps import get_super_admin, get_current_user
 
 router = APIRouter(prefix="/dingtalk", tags=["钉钉通道"])
+
+
+def encrypt_secret(secret: str) -> str:
+    """加密密钥"""
+    from app.utils.auth import aes_cipher
+    return aes_cipher.encrypt(secret)
+
+
+def decrypt_secret(encrypted_secret: str) -> str:
+    """解密密钥"""
+    from app.utils.auth import aes_cipher
+    return aes_cipher.decrypt(encrypted_secret)
+
+
+def generate_sign(secret: str) -> tuple:
+    """
+    生成钉钉加签
+    返回 (timestamp, sign)
+    """
+    timestamp = str(round(time.time() * 1000))
+    string_to_sign = f"{timestamp}\n{secret}"
+    hmac_code = hmac.new(
+        secret.encode('utf-8'),
+        string_to_sign.encode('utf-8'),
+        digestmod=hashlib.sha256
+    ).digest()
+    sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+    return timestamp, sign
+
+
+def build_webhook_url(base_webhook: str, auth_type: str, secret: str = None, keywords: List[str] = None) -> str:
+    """
+    根据验证类型构建完整的webhook URL
+    """
+    if auth_type == "sign" and secret:
+        timestamp, sign = generate_sign(secret)
+        separator = "&" if "?" in base_webhook else "?"
+        return f"{base_webhook}{separator}timestamp={timestamp}&sign={sign}"
+    return base_webhook
+
+
+def build_message_content(message: str, auth_type: str, keywords: List[str] = None) -> str:
+    """
+    根据验证类型构建消息内容
+    """
+    if auth_type == "keyword" and keywords:
+        # 在消息末尾添加第一个关键词
+        keyword = keywords[0] if keywords else ""
+        return f"{message} {keyword}"
+    return message
 
 
 @router.get("/channels", response_model=List[DingTalkChannelResponse])
@@ -58,9 +113,25 @@ async def create_dingtalk_channel(
             detail="通道名称已存在"
         )
     
+    # 验证验证类型
+    if channel_data.auth_type == "sign" and not channel_data.secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="加签验证必须提供密钥"
+        )
+    
+    if channel_data.auth_type == "keyword" and not channel_data.keywords:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="关键词验证必须提供至少一个关键词"
+        )
+    
     channel = DingTalkChannel(
         name=channel_data.name,
         webhook_encrypted=encrypt_dingtalk_webhook(channel_data.webhook),
+        auth_type=channel_data.auth_type,
+        secret_encrypted=encrypt_secret(channel_data.secret) if channel_data.secret else None,
+        keywords=channel_data.keywords,
         description=channel_data.description
     )
     db.add(channel)
@@ -90,6 +161,12 @@ async def update_dingtalk_channel(
         channel.name = channel_data.name
     if channel_data.webhook is not None:
         channel.webhook_encrypted = encrypt_dingtalk_webhook(channel_data.webhook)
+    if channel_data.auth_type is not None:
+        channel.auth_type = channel_data.auth_type
+    if channel_data.secret is not None:
+        channel.secret_encrypted = encrypt_secret(channel_data.secret)
+    if channel_data.keywords is not None:
+        channel.keywords = channel_data.keywords
     if channel_data.description is not None:
         channel.description = channel_data.description
     if channel_data.is_enabled is not None:
@@ -141,16 +218,32 @@ async def test_dingtalk_channel(
             detail="钉钉通道不存在"
         )
     
+    # 解密webhook
     webhook = decrypt_dingtalk_webhook(channel.webhook_encrypted)
+    
+    # 获取密钥（如果需要）
+    secret = None
+    if channel.auth_type == "sign" and channel.secret_encrypted:
+        secret = decrypt_secret(channel.secret_encrypted)
+    
+    # 构建完整的webhook URL
+    full_webhook = build_webhook_url(webhook, channel.auth_type, secret)
+    
+    # 构建消息内容
+    message_content = build_message_content(
+        f"[MySQL管理平台测试] {test_message}",
+        channel.auth_type,
+        channel.keywords
+    )
     
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(
-                webhook,
+                full_webhook,
                 json={
                     "msgtype": "text",
                     "text": {
-                        "content": f"[MySQL管理平台测试] {test_message}"
+                        "content": message_content
                     }
                 },
                 timeout=10

@@ -13,21 +13,34 @@
       </template>
       
       <el-table :data="channels" style="width: 100%" v-loading="channelLoading">
-        <el-table-column prop="name" label="通道名称" width="180" />
+        <el-table-column prop="name" label="通道名称" width="150" />
+        <el-table-column prop="auth_type" label="验证方式" width="120">
+          <template #default="{ row }">
+            <el-tag :type="getAuthTypeTag(row.auth_type)" size="small">
+              {{ getAuthTypeName(row.auth_type) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="keywords" label="关键词" width="150">
+          <template #default="{ row }">
+            <span v-if="row.keywords && row.keywords.length">{{ row.keywords.join(', ') }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
-        <el-table-column prop="is_enabled" label="状态" width="100">
+        <el-table-column prop="is_enabled" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
               {{ row.is_enabled ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
+        <el-table-column prop="created_at" label="创建时间" width="160">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="260" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button text type="primary" @click="handleTestChannel(row)">测试</el-button>
             <el-button text type="primary" @click="handleEditChannel(row)">编辑</el-button>
@@ -70,7 +83,7 @@
             <span v-else>全部实例</span>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
+        <el-table-column prop="created_at" label="创建时间" width="160">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
@@ -87,18 +100,27 @@
     <el-dialog
       v-model="channelDialog.visible"
       :title="channelDialog.isEdit ? '编辑通道' : '添加通道'"
-      width="500px"
+      width="600px"
       @close="resetChannelForm"
     >
       <el-form
         ref="channelFormRef"
         :model="channelDialog.form"
         :rules="channelDialog.rules"
-        label-width="80px"
+        label-width="100px"
       >
         <el-form-item label="名称" prop="name">
           <el-input v-model="channelDialog.form.name" placeholder="请输入通道名称" />
         </el-form-item>
+        
+        <el-form-item label="验证方式" prop="auth_type">
+          <el-radio-group v-model="channelDialog.form.auth_type" @change="handleAuthTypeChange">
+            <el-radio value="none">无验证</el-radio>
+            <el-radio value="keyword">关键词验证</el-radio>
+            <el-radio value="sign">加签验证</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        
         <el-form-item label="Webhook" prop="webhook">
           <el-input
             v-model="channelDialog.form.webhook"
@@ -106,7 +128,52 @@
             :rows="3"
             placeholder="请输入钉钉机器人Webhook地址"
           />
+          <div class="form-tip">
+            在钉钉群设置中添加自定义机器人，获取Webhook地址
+          </div>
         </el-form-item>
+        
+        <!-- 关键词验证 -->
+        <template v-if="channelDialog.form.auth_type === 'keyword'">
+          <el-form-item label="关键词" prop="keywords">
+            <div class="keywords-input">
+              <el-tag
+                v-for="(keyword, index) in channelDialog.form.keywords"
+                :key="index"
+                closable
+                @close="removeKeyword(index)"
+                class="keyword-tag"
+              >
+                {{ keyword }}
+              </el-tag>
+              <el-input
+                v-model="keywordInput"
+                size="small"
+                placeholder="输入关键词后回车"
+                @keyup.enter="addKeyword"
+                style="width: 150px;"
+              />
+            </div>
+            <div class="form-tip">
+              消息内容必须包含其中一个关键词才能发送成功
+            </div>
+          </el-form-item>
+        </template>
+        
+        <!-- 加签验证 -->
+        <template v-if="channelDialog.form.auth_type === 'sign'">
+          <el-form-item label="密钥" prop="secret">
+            <el-input
+              v-model="channelDialog.form.secret"
+              placeholder="请输入加签密钥"
+              show-password
+            />
+            <div class="form-tip">
+              在钉钉机器人设置中选择"加签"，复制SEC开头的密钥
+            </div>
+          </el-form-item>
+        </template>
+        
         <el-form-item label="描述">
           <el-input
             v-model="channelDialog.form.description"
@@ -115,6 +182,7 @@
             placeholder="请输入描述"
           />
         </el-form-item>
+        
         <el-form-item v-if="channelDialog.isEdit" label="状态">
           <el-switch v-model="channelDialog.form.is_enabled" active-text="启用" inactive-text="禁用" />
         </el-form-item>
@@ -193,6 +261,11 @@
         <el-form-item label="通道">
           <el-input :value="testDialog.channelName" disabled />
         </el-form-item>
+        <el-form-item label="验证方式">
+          <el-tag :type="getAuthTypeTag(testDialog.authType)" size="small">
+            {{ getAuthTypeName(testDialog.authType) }}
+          </el-tag>
+        </el-form-item>
         <el-form-item label="测试消息">
           <el-input
             v-model="testDialog.message"
@@ -230,6 +303,9 @@ const bindings = ref([])
 const environments = ref([])
 const instances = ref([])
 
+// 关键词输入
+const keywordInput = ref('')
+
 // 通道对话框
 const channelDialog = reactive({
   visible: false,
@@ -238,12 +314,29 @@ const channelDialog = reactive({
   form: {
     name: '',
     webhook: '',
+    auth_type: 'none',
+    secret: '',
+    keywords: [],
     description: '',
     is_enabled: true
   },
   rules: {
     name: [{ required: true, message: '请输入通道名称', trigger: 'blur' }],
-    webhook: [{ required: true, message: '请输入Webhook地址', trigger: 'blur' }]
+    webhook: [{ required: true, message: '请输入Webhook地址', trigger: 'blur' }],
+    auth_type: [{ required: true, message: '请选择验证方式', trigger: 'change' }],
+    secret: [
+      { 
+        required: false, 
+        validator: (rule, value, callback) => {
+          if (channelDialog.form.auth_type === 'sign' && !value && !channelDialog.isEdit) {
+            callback(new Error('加签验证必须提供密钥'))
+          } else {
+            callback()
+          }
+        },
+        trigger: 'blur'
+      }
+    ]
   }
 })
 
@@ -269,6 +362,7 @@ const testDialog = reactive({
   loading: false,
   channelId: null,
   channelName: '',
+  authType: 'none',
   message: '这是一条来自MySQL管理平台的测试消息'
 })
 
@@ -321,6 +415,31 @@ const fetchBindings = async () => {
   }
 }
 
+// 验证方式变更
+const handleAuthTypeChange = () => {
+  // 切换验证方式时清空相关字段
+  if (channelDialog.form.auth_type !== 'keyword') {
+    channelDialog.form.keywords = []
+  }
+  if (channelDialog.form.auth_type !== 'sign') {
+    channelDialog.form.secret = ''
+  }
+}
+
+// 添加关键词
+const addKeyword = () => {
+  const keyword = keywordInput.value.trim()
+  if (keyword && !channelDialog.form.keywords.includes(keyword)) {
+    channelDialog.form.keywords.push(keyword)
+    keywordInput.value = ''
+  }
+}
+
+// 移除关键词
+const removeKeyword = (index) => {
+  channelDialog.form.keywords.splice(index, 1)
+}
+
 // 添加通道
 const handleAddChannel = () => {
   channelDialog.isEdit = false
@@ -335,6 +454,9 @@ const handleEditChannel = (row) => {
     id: row.id,
     name: row.name,
     webhook: '', // 安全考虑，不回显webhook
+    auth_type: row.auth_type || 'none',
+    secret: '', // 安全考虑，不回显密钥
+    keywords: row.keywords || [],
     description: row.description,
     is_enabled: row.is_enabled
   }
@@ -361,6 +483,7 @@ const handleDeleteChannel = async (row) => {
 const handleTestChannel = (row) => {
   testDialog.channelId = row.id
   testDialog.channelName = row.name
+  testDialog.authType = row.auth_type || 'none'
   testDialog.message = '这是一条来自MySQL管理平台的测试消息'
   testDialog.visible = true
 }
@@ -391,10 +514,20 @@ const submitChannel = async () => {
   await channelFormRef.value.validate(async (valid) => {
     if (!valid) return
     
+    // 关键词验证检查
+    if (channelDialog.form.auth_type === 'keyword' && channelDialog.form.keywords.length === 0) {
+      ElMessage.warning('关键词验证必须添加至少一个关键词')
+      return
+    }
+    
     channelDialog.loading = true
     try {
       if (channelDialog.isEdit) {
-        await dingtalkApi.updateChannel(channelDialog.form.id, channelDialog.form)
+        // 编辑时只传非空字段
+        const updateData = { ...channelDialog.form }
+        if (!updateData.webhook) delete updateData.webhook
+        if (!updateData.secret) delete updateData.secret
+        await dingtalkApi.updateChannel(channelDialog.form.id, updateData)
         ElMessage.success('更新成功')
       } else {
         await dingtalkApi.createChannel(channelDialog.form)
@@ -458,9 +591,13 @@ const resetChannelForm = () => {
   channelDialog.form = {
     name: '',
     webhook: '',
+    auth_type: 'none',
+    secret: '',
+    keywords: [],
     description: '',
     is_enabled: true
   }
+  keywordInput.value = ''
 }
 
 // 重置绑定表单
@@ -482,6 +619,26 @@ const formatTime = (time) => {
 const getEnvName = (envId) => {
   const env = environments.value.find(e => e.id === envId)
   return env ? env.name : '-'
+}
+
+// 获取验证类型名称
+const getAuthTypeName = (type) => {
+  const typeMap = {
+    none: '无验证',
+    keyword: '关键词',
+    sign: '加签'
+  }
+  return typeMap[type] || type
+}
+
+// 获取验证类型标签
+const getAuthTypeTag = (type) => {
+  const tagMap = {
+    none: 'info',
+    keyword: 'warning',
+    sign: 'success'
+  }
+  return tagMap[type] || 'info'
 }
 
 // 获取通知类型名称
@@ -521,6 +678,23 @@ onMounted(() => {
       display: flex;
       justify-content: space-between;
       align-items: center;
+    }
+  }
+  
+  .form-tip {
+    font-size: 12px;
+    color: #909399;
+    margin-top: 4px;
+  }
+  
+  .keywords-input {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    
+    .keyword-tag {
+      margin: 0;
     }
   }
 }

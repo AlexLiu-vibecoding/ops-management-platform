@@ -176,6 +176,9 @@ class DingTalkChannelCreate(BaseModel):
     """创建钉钉通道请求"""
     name: str = Field(..., max_length=100)
     webhook: str = Field(..., max_length=500)
+    auth_type: str = Field("none", description="验证类型：none/keyword/sign")
+    secret: Optional[str] = Field(None, max_length=100, description="加签密钥")
+    keywords: Optional[List[str]] = Field(None, description="关键词列表")
     description: Optional[str] = Field(None, max_length=200)
 
 
@@ -183,6 +186,9 @@ class DingTalkChannelUpdate(BaseModel):
     """更新钉钉通道请求"""
     name: Optional[str] = Field(None, max_length=100)
     webhook: Optional[str] = Field(None, max_length=500)
+    auth_type: Optional[str] = Field(None, description="验证类型：none/keyword/sign")
+    secret: Optional[str] = Field(None, max_length=100, description="加签密钥")
+    keywords: Optional[List[str]] = Field(None, description="关键词列表")
     description: Optional[str] = Field(None, max_length=200)
     is_enabled: Optional[bool] = None
 
@@ -192,6 +198,8 @@ class DingTalkChannelResponse(BaseModel):
     id: int
     name: str
     description: Optional[str]
+    auth_type: str
+    keywords: Optional[List[str]]
     is_enabled: bool
     created_at: datetime
     

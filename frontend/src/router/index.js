@@ -24,19 +24,19 @@ const routes = [
         path: 'instances',
         name: 'Instances',
         component: () => import('@/views/instances/index.vue'),
-        meta: { title: '实例管理', icon: 'Server' }
+        meta: { title: '实例管理', icon: 'Server', roles: ['super_admin', 'approval_admin', 'operator'] }
       },
       {
         path: 'instances/:id',
         name: 'InstanceDetail',
         component: () => import('@/views/instances/detail.vue'),
-        meta: { title: '实例详情', hidden: true }
+        meta: { title: '实例详情', hidden: true, roles: ['super_admin', 'approval_admin', 'operator'] }
       },
       {
         path: 'environments',
         name: 'Environments',
         component: () => import('@/views/environments/index.vue'),
-        meta: { title: '环境管理', icon: 'Collection' }
+        meta: { title: '环境管理', icon: 'Collection', roles: ['super_admin', 'approval_admin', 'operator'] }
       },
       {
         path: 'sql-editor',
