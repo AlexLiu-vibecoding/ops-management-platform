@@ -459,3 +459,113 @@ class SystemInitState(Base):
     error_message = Column(Text, comment="错误信息")
     completed_at = Column(DateTime, comment="完成时间")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+
+# ==================== 运维管理平台 - 脚本执行与定时任务 ====================
+
+class ScriptType(str, enum.Enum):
+    """脚本类型枚举"""
+    PYTHON = "python"
+    BASH = "bash"
+    SQL = "sql"
+
+
+class ExecutionStatus(str, enum.Enum):
+    """执行状态枚举"""
+    PENDING = "pending"  # 待执行
+    RUNNING = "running"  # 执行中
+    SUCCESS = "success"  # 成功
+    FAILED = "failed"    # 失败
+    TIMEOUT = "timeout"  # 超时
+    CANCELLED = "cancelled"  # 已取消
+
+
+class TriggerType(str, enum.Enum):
+    """触发类型枚举"""
+    MANUAL = "manual"      # 手动触发
+    SCHEDULED = "scheduled"  # 定时触发
+    API = "api"            # API调用
+
+
+class Script(Base):
+    """脚本管理表"""
+    __tablename__ = "scripts"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False, comment="脚本名称")
+    script_type = Column(SQLEnum(ScriptType), default=ScriptType.PYTHON, comment="脚本类型")
+    content = Column(Text, nullable=False, comment="脚本内容")
+    description = Column(String(500), comment="描述")
+    params_schema = Column(JSON, comment="参数定义JSON Schema")
+    timeout = Column(Integer, default=300, comment="超时时间（秒）")
+    max_retries = Column(Integer, default=0, comment="最大重试次数")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    is_public = Column(Boolean, default=False, comment="是否公开（所有用户可见）")
+    allowed_roles = Column(String(200), comment="允许执行的角色，逗号分隔")
+    tags = Column(String(200), comment="标签，逗号分隔")
+    version = Column(Integer, default=1, comment="版本号")
+    created_by = Column(Integer, ForeignKey("users.id"), comment="创建人ID")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    # 关联
+    creator = relationship("User", foreign_keys=[created_by])
+    executions = relationship("ScriptExecution", back_populates="script")
+    scheduled_tasks = relationship("ScheduledTask", back_populates="script")
+
+
+class ScriptExecution(Base):
+    """脚本执行记录表"""
+    __tablename__ = "script_executions"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    script_id = Column(Integer, ForeignKey("scripts.id", ondelete="CASCADE"), comment="脚本ID")
+    script_version = Column(Integer, comment="执行时的脚本版本")
+    trigger_type = Column(SQLEnum(TriggerType), default=TriggerType.MANUAL, comment="触发类型")
+    scheduled_task_id = Column(Integer, ForeignKey("scheduled_tasks.id"), comment="定时任务ID")
+    params = Column(JSON, comment="执行参数")
+    status = Column(SQLEnum(ExecutionStatus), default=ExecutionStatus.PENDING, comment="执行状态")
+    output = Column(Text, comment="标准输出")
+    error_output = Column(Text, comment="错误输出")
+    exit_code = Column(Integer, comment="退出码")
+    start_time = Column(DateTime, comment="开始时间")
+    end_time = Column(DateTime, comment="结束时间")
+    duration = Column(Float, comment="执行时长（秒）")
+    triggered_by = Column(Integer, ForeignKey("users.id"), comment="触发人ID")
+    trigger_ip = Column(String(50), comment="触发IP")
+    retry_count = Column(Integer, default=0, comment="重试次数")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    
+    # 关联
+    script = relationship("Script", back_populates="executions")
+    trigger_user = relationship("User", foreign_keys=[triggered_by])
+
+
+class ScheduledTask(Base):
+    """定时任务表"""
+    __tablename__ = "scheduled_tasks"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False, comment="任务名称")
+    script_id = Column(Integer, ForeignKey("scripts.id", ondelete="CASCADE"), comment="脚本ID")
+    cron_expression = Column(String(100), nullable=False, comment="Cron表达式")
+    params = Column(JSON, comment="执行参数")
+    status = Column(String(20), default="enabled", comment="状态：enabled/disabled")
+    timezone = Column(String(50), default="Asia/Shanghai", comment="时区")
+    last_run_time = Column(DateTime, comment="上次执行时间")
+    last_run_status = Column(String(20), comment="上次执行状态")
+    next_run_time = Column(DateTime, comment="下次执行时间")
+    run_count = Column(Integer, default=0, comment="执行次数")
+    success_count = Column(Integer, default=0, comment="成功次数")
+    fail_count = Column(Integer, default=0, comment="失败次数")
+    max_history = Column(Integer, default=100, comment="保留历史记录数")
+    notify_on_success = Column(Boolean, default=False, comment="成功时通知")
+    notify_on_fail = Column(Boolean, default=True, comment="失败时通知")
+    notify_channels = Column(String(200), comment="通知通道ID，逗号分隔")
+    created_by = Column(Integer, ForeignKey("users.id"), comment="创建人ID")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    # 关联
+    script = relationship("Script", back_populates="scheduled_tasks")
+    creator = relationship("User", foreign_keys=[created_by])

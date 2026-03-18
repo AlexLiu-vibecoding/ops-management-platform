@@ -5,7 +5,7 @@
       <div class="steps-header">
         <div class="logo">
           <el-icon :size="40"><Coin /></el-icon>
-          <h1>MySQL管理平台</h1>
+          <h1>运维管理平台</h1>
         </div>
         <el-steps :active="currentStep" align-center finish-status="success">
           <el-step title="数据库配置" description="配置数据库连接" />
@@ -208,6 +208,12 @@
         </el-button>
         <el-button
           v-if="currentStep === 0"
+          @click="skipAll"
+        >
+          跳过配置
+        </el-button>
+        <el-button
+          v-if="currentStep === 0"
           type="primary"
           @click="nextStep"
           :disabled="!dbTestResult?.success"
@@ -237,12 +243,18 @@
           完成初始化
         </el-button>
       </div>
+      
+      <!-- 跳过提示 -->
+      <div class="skip-tip">
+        <p>提示：您可以跳过配置，系统将使用默认配置运行</p>
+        <p>后续可在"系统设置"中修改配置</p>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Coin, Link, CircleCheckFilled, ArrowRight } from '@element-plus/icons-vue'
@@ -256,12 +268,23 @@ const dbFormRef = ref(null)
 const testingDb = ref(false)
 const dbTestResult = ref(null)
 const dbConfig = reactive({
-  db_type: 'postgresql',
+  db_type: 'mysql',
   host: 'localhost',
-  port: 5432,
-  database: 'mysql_platform',
-  username: 'postgres',
+  port: 3306,
+  database: 'ops_platform',
+  username: 'root',
   password: ''
+})
+
+// 监听数据库类型变化，自动切换默认端口
+watch(() => dbConfig.db_type, (newType) => {
+  if (newType === 'mysql') {
+    dbConfig.port = 3306
+    dbConfig.username = 'root'
+  } else {
+    dbConfig.port = 5432
+    dbConfig.username = 'postgres'
+  }
 })
 
 const dbRules = {
@@ -384,6 +407,23 @@ const skipRedis = () => {
   redisConfig.host = ''
   redisConfig.port = 6379
   saveConfig()
+}
+
+// 跳过所有配置，使用默认配置
+const skipAll = async () => {
+  try {
+    // 标记系统初始化完成（使用默认配置）
+    const result = await request.post('/init/skip-config')
+    
+    if (result.success) {
+      ElMessage.success('使用默认配置启动')
+      currentStep.value = 3
+    } else {
+      ElMessage.error(result.message)
+    }
+  } catch (error) {
+    ElMessage.error('跳过配置失败')
+  }
 }
 
 // 保存配置
@@ -580,6 +620,19 @@ onMounted(async () => {
         font-weight: 500;
       }
     }
+  }
+}
+
+.skip-tip {
+  text-align: center;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
+  
+  p {
+    font-size: 12px;
+    color: #909399;
+    margin: 5px 0;
   }
 }
 </style>

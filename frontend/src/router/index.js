@@ -112,6 +112,18 @@ const routes = [
         name: 'Audit',
         component: () => import('@/views/audit/index.vue'),
         meta: { title: '审计日志', icon: 'Tickets' }
+      },
+      {
+        path: 'scripts',
+        name: 'Scripts',
+        component: () => import('@/views/scripts/index.vue'),
+        meta: { title: '脚本管理', icon: 'DocumentCopy', roles: ['super_admin', 'approval_admin', 'operator'] }
+      },
+      {
+        path: 'scheduled-tasks',
+        name: 'ScheduledTasks',
+        component: () => import('@/views/scheduled-tasks/index.vue'),
+        meta: { title: '定时任务', icon: 'Timer', roles: ['super_admin', 'approval_admin', 'operator'] }
       }
     ]
   }

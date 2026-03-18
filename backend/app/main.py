@@ -16,9 +16,10 @@ from app.config import settings
 from app.database import engine, Base
 from app.utils.redis_client import redis_client
 from app.services.scheduler import approval_scheduler
+from app.services.task_scheduler import task_scheduler
 
 # 导入路由
-from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init
+from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks
 
 # 配置日志
 logging.basicConfig(
@@ -51,22 +52,30 @@ async def lifespan(app: FastAPI):
     # 启动定时任务调度器
     try:
         approval_scheduler.start()
-        logger.info("定时任务调度器启动成功")
+        logger.info("审批定时调度器启动成功")
     except Exception as e:
-        logger.error(f"定时任务调度器启动失败: {e}")
+        logger.error(f"审批定时调度器启动失败: {e}")
+    
+    # 启动任务调度器
+    try:
+        task_scheduler.start()
+        logger.info("任务调度器启动成功")
+    except Exception as e:
+        logger.error(f"任务调度器启动失败: {e}")
     
     # 初始化默认数据
     await init_default_data()
     
-    logger.info("MySQL管理平台启动完成")
+    logger.info("运维管理平台启动完成")
     
     yield
     
     # 关闭时
-    logger.info("正在关闭MySQL管理平台...")
+    logger.info("正在关闭运维管理平台...")
     approval_scheduler.stop()
+    task_scheduler.stop()
     await redis_client.disconnect()
-    logger.info("MySQL管理平台已关闭")
+    logger.info("运维管理平台已关闭")
 
 
 async def init_default_data():
@@ -239,6 +248,8 @@ app.include_router(performance.router, prefix="/api")
 app.include_router(slow_query.router, prefix="/api")
 app.include_router(audit.router, prefix="/api")
 app.include_router(menu.router, prefix="/api")
+app.include_router(scripts.router, prefix="/api")  # 脚本管理
+app.include_router(scheduled_tasks.router, prefix="/api")  # 定时任务
 
 
 # 健康检查
