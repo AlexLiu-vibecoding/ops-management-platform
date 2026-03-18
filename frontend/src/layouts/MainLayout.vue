@@ -4,7 +4,7 @@
     <el-aside :width="isCollapse ? '64px' : '220px'" class="aside">
       <div class="logo">
         <el-icon :size="24"><Coin /></el-icon>
-        <span v-if="!isCollapse" class="logo-text">MySQL管理平台</span>
+        <span v-if="!isCollapse" class="logo-text">运维管理平台</span>
       </div>
       
       <el-menu

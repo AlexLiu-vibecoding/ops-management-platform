@@ -241,11 +241,13 @@ async def init_default_menus(
         {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
         {"name": "变更审批", "path": "/approvals", "icon": "Stamp", "sort_order": 5},
         {"name": "监控中心", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
-        {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 7, "roles": "super_admin"},
-        {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 8, "roles": "super_admin"},
-        {"name": "钉钉通道", "path": "/dingtalk", "icon": "ChatDotRound", "sort_order": 9, "roles": "super_admin"},
-        {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 10},
-        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 11, "roles": "super_admin"},
+        {"name": "脚本管理", "path": "/scripts", "icon": "DocumentCopy", "sort_order": 7, "roles": "super_admin,approval_admin,operator"},
+        {"name": "定时任务", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
+        {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
+        {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
+        {"name": "钉钉通道", "path": "/dingtalk", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
+        {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
+        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
     ]
     
     # 子菜单配置
@@ -273,3 +275,56 @@ async def init_default_menus(
     db.commit()
     
     return MessageResponse(message=f"成功初始化 {len(parent_menus) + len(child_menus)} 个菜单")
+
+
+@router.post("/add-missing", response_model=MessageResponse)
+async def add_missing_menus(
+    current_user: User = Depends(get_super_admin),
+    db: Session = Depends(get_db)
+):
+    """添加缺失的菜单（用于版本升级时补充新菜单）"""
+    # 需要确保存在的菜单
+    required_menus = [
+        {"name": "仪表盘", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
+        {"name": "实例管理", "path": "/instances", "icon": "Server", "sort_order": 2, "roles": "super_admin,approval_admin,operator"},
+        {"name": "环境管理", "path": "/environments", "icon": "Collection", "sort_order": 3, "roles": "super_admin,approval_admin,operator"},
+        {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
+        {"name": "变更审批", "path": "/approvals", "icon": "Stamp", "sort_order": 5},
+        {"name": "监控中心", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
+        {"name": "脚本管理", "path": "/scripts", "icon": "DocumentCopy", "sort_order": 7, "roles": "super_admin,approval_admin,operator"},
+        {"name": "定时任务", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
+        {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
+        {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
+        {"name": "钉钉通道", "path": "/dingtalk", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
+        {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
+        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
+    ]
+    
+    added_count = 0
+    for menu_data in required_menus:
+        # 检查菜单是否已存在
+        existing = db.query(MenuConfig).filter(MenuConfig.path == menu_data["path"]).first()
+        if not existing:
+            menu = MenuConfig(**menu_data)
+            db.add(menu)
+            added_count += 1
+    
+    # 检查监控中心子菜单
+    monitor_parent = db.query(MenuConfig).filter(MenuConfig.path == "/monitor").first()
+    if monitor_parent:
+        child_menus = [
+            {"name": "性能监控", "path": "/monitor/performance", "icon": "TrendCharts", "sort_order": 1},
+            {"name": "慢查询监控", "path": "/monitor/slow-query", "icon": "Timer", "sort_order": 2},
+            {"name": "监控配置", "path": "/monitor/settings", "icon": "Setting", "sort_order": 3},
+        ]
+        
+        for menu_data in child_menus:
+            existing = db.query(MenuConfig).filter(MenuConfig.path == menu_data["path"]).first()
+            if not existing:
+                menu = MenuConfig(**menu_data, parent_id=monitor_parent.id)
+                db.add(menu)
+                added_count += 1
+    
+    db.commit()
+    
+    return MessageResponse(message=f"成功添加 {added_count} 个缺失的菜单")
