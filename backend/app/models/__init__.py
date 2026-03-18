@@ -434,3 +434,28 @@ class MenuConfig(Base):
     
     # 关联
     children = relationship("MenuConfig", backref="parent", remote_side=[id])
+
+
+class SystemConfig(Base):
+    """系统配置表 - 存储数据库连接、Redis等配置"""
+    __tablename__ = "system_configs"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    config_key = Column(String(100), unique=True, nullable=False, comment="配置键")
+    config_value = Column(Text, comment="配置值（加密存储敏感信息）")
+    is_encrypted = Column(Boolean, default=False, comment="是否加密存储")
+    description = Column(String(200), comment="描述")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class SystemInitState(Base):
+    """系统初始化状态表"""
+    __tablename__ = "system_init_state"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    step = Column(String(50), unique=True, nullable=False, comment="初始化步骤")
+    status = Column(String(20), default="pending", comment="状态: pending/completed/failed")
+    error_message = Column(Text, comment="错误信息")
+    completed_at = Column(DateTime, comment="完成时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")

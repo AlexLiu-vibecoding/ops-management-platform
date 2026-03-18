@@ -1,7 +1,14 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import request from '@/api/index'
 
 const routes = [
+  {
+    path: '/init',
+    name: 'Init',
+    component: () => import('@/views/init/index.vue'),
+    meta: { requiresAuth: false }
+  },
   {
     path: '/login',
     name: 'Login',
@@ -115,9 +122,47 @@ const router = createRouter({
   routes
 })
 
+// 检查系统初始化状态
+let initChecked = false
+let isInitialized = null
+
+async function checkInitStatus() {
+  if (initChecked) return isInitialized
+  
+  try {
+    const status = await request.get('/init/status')
+    isInitialized = status.is_initialized
+  } catch (error) {
+    // 如果检查失败，假设已初始化（避免阻塞）
+    isInitialized = true
+  }
+  
+  initChecked = true
+  return isInitialized
+}
+
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore()
+  
+  // 检查初始化状态（仅首次）
+  if (!initChecked && to.path !== '/init') {
+    const initialized = await checkInitStatus()
+    if (!initialized) {
+      next('/init')
+      return
+    }
+  }
+  
+  // 初始化页面
+  if (to.path === '/init') {
+    if (isInitialized) {
+      next('/login')
+    } else {
+      next()
+    }
+    return
+  }
   
   // 不需要认证的页面
   if (to.meta.requiresAuth === false) {

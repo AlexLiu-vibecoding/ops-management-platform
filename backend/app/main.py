@@ -18,7 +18,7 @@ from app.utils.redis_client import redis_client
 from app.services.scheduler import approval_scheduler
 
 # 导入路由
-from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu
+from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init
 
 # 配置日志
 logging.basicConfig(
@@ -73,11 +73,34 @@ async def init_default_data():
     """初始化默认数据"""
     from sqlalchemy.orm import Session
     from app.database import SessionLocal
-    from app.models import User, Environment, UserRole, GlobalConfig, DingTalkChannel
+    from app.models import User, Environment, UserRole, GlobalConfig, DingTalkChannel, SystemInitState
     from app.utils.auth import hash_password
     
     db: Session = SessionLocal()
     try:
+        # 检查是否已完成初始化
+        init_state = db.query(SystemInitState).filter(
+            SystemInitState.step == "system_init",
+            SystemInitState.status == "completed"
+        ).first()
+        
+        # 如果系统未初始化，跳过管理员创建（等待配置向导）
+        if not init_state:
+            logger.info("系统未初始化，请通过配置向导完成初始化")
+            # 只创建默认环境配置
+            if not db.query(Environment).first():
+                environments = [
+                    Environment(name="开发环境", code="development", color="#52C41A", require_approval=False),
+                    Environment(name="测试环境", code="testing", color="#1890FF", require_approval=False),
+                    Environment(name="预发环境", code="staging", color="#FA8C16", require_approval=True),
+                    Environment(name="生产环境", code="production", color="#FF4D4F", require_approval=True),
+                ]
+                for env in environments:
+                    db.add(env)
+                logger.info("创建默认环境配置")
+            db.commit()
+            return
+        
         # 检查是否存在超级管理员
         if not db.query(User).filter(User.role == UserRole.SUPER_ADMIN).first():
             # 创建默认超级管理员
@@ -203,6 +226,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 # 注册API路由
+app.include_router(init.router, prefix="/api")  # 初始化API放在最前面
 app.include_router(auth.router, prefix="/api")
 app.include_router(users.router, prefix="/api")
 app.include_router(environments.router, prefix="/api")
