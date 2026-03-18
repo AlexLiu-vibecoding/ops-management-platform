@@ -3,11 +3,60 @@ import { ref, computed } from 'vue'
 import { authApi } from '@/api/auth'
 import router from '@/router'
 
+/**
+ * 解析 JWT Token
+ */
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1]
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    }).join(''))
+    return JSON.parse(jsonPayload)
+  } catch (e) {
+    return null
+  }
+}
+
+/**
+ * 检查 Token 是否过期
+ */
+function isTokenExpired(token) {
+  if (!token) return true
+  const payload = parseJwt(token)
+  if (!payload || !payload.exp) return true
+  // exp 是秒级时间戳，需要乘以 1000 转换为毫秒
+  return Date.now() >= payload.exp * 1000
+}
+
+/**
+ * 清除过期的登录状态
+ */
+function clearExpiredAuth() {
+  const token = localStorage.getItem('token')
+  if (token && isTokenExpired(token)) {
+    console.log('[Auth] Token 已过期，清除登录状态')
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    return true
+  }
+  return false
+}
+
+// 页面加载时检查并清除过期 token
+clearExpiredAuth()
+
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
   const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
 
-  const isLoggedIn = computed(() => !!token.value)
+  const isLoggedIn = computed(() => {
+    // 不仅检查 token 是否存在，还要检查是否过期
+    if (!token.value) return false
+    return !isTokenExpired(token.value)
+  })
+  
   const isAdmin = computed(() => user.value?.role === 'super_admin')
 
   async function login(username, password) {
@@ -32,6 +81,12 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function checkAuth() {
+    // 先检查 token 是否过期
+    if (isTokenExpired(token.value)) {
+      logout()
+      return
+    }
+    
     if (token.value && !user.value) {
       // 有token但没有用户信息，尝试获取
       authApi.getCurrentUser()
