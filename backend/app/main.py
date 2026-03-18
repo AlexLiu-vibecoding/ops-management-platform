@@ -15,6 +15,7 @@ import logging
 from app.config import settings
 from app.database import engine, Base
 from app.utils.redis_client import redis_client
+from app.services.scheduler import approval_scheduler
 
 # 导入路由
 from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu
@@ -47,6 +48,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"Redis连接失败，部分功能可能不可用: {e}")
     
+    # 启动定时任务调度器
+    try:
+        approval_scheduler.start()
+        logger.info("定时任务调度器启动成功")
+    except Exception as e:
+        logger.error(f"定时任务调度器启动失败: {e}")
+    
     # 初始化默认数据
     await init_default_data()
     
@@ -56,6 +64,7 @@ async def lifespan(app: FastAPI):
     
     # 关闭时
     logger.info("正在关闭MySQL管理平台...")
+    approval_scheduler.stop()
     await redis_client.disconnect()
     logger.info("MySQL管理平台已关闭")
 

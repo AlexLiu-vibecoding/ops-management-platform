@@ -74,6 +74,9 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
     
+    # 项目域名（用于生成审批链接）
+    PROJECT_DOMAIN: str = os.getenv("COZE_PROJECT_DOMAIN_DEFAULT", "http://localhost:5000")
+    
     # 安全配置
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-min-32-chars")
     ALGORITHM: str = "HS256"

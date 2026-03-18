@@ -300,6 +300,36 @@
             show-word-limit
           />
         </el-form-item>
+        
+        <!-- 定时执行 -->
+        <el-form-item label="定时执行">
+          <div class="scheduled-execution-wrapper">
+            <el-switch
+              v-model="dialog.form.enable_scheduled"
+              active-text="启用"
+              inactive-text="不启用"
+            />
+            <el-date-picker
+              v-if="dialog.form.enable_scheduled"
+              v-model="dialog.form.scheduled_time"
+              type="datetime"
+              placeholder="选择执行时间"
+              :disabled-date="disabledDate"
+              :disabled-hours="disabledHours"
+              :disabled-minutes="disabledMinutes"
+              style="margin-left: 10px;"
+            />
+            <div v-if="dialog.form.enable_scheduled && dialog.form.scheduled_time" class="scheduled-info">
+              <el-tag type="warning" size="small">
+                将在 {{ formatTime(dialog.form.scheduled_time) }} 自动执行
+              </el-tag>
+            </div>
+          </div>
+          <div class="form-tip">
+            <el-icon><InfoFilled /></el-icon>
+            启用后，审批通过将在指定时间自动执行SQL变更
+          </div>
+        </el-form-item>
       </el-form>
       
       <template #footer>
@@ -387,7 +417,7 @@ import request from '@/api/index'
 import { instancesApi } from '@/api/instances'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Upload, MagicStick, Delete } from '@element-plus/icons-vue'
+import { Plus, Upload, MagicStick, Delete, InfoFilled } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 
 const userStore = useUserStore()
@@ -743,6 +773,33 @@ const fetchInstances = async () => {
 
 const handleTabChange = () => fetchApprovals()
 
+// 禁用过去的日期
+const disabledDate = (time) => {
+  return time.getTime() < Date.now() - 24 * 60 * 60 * 1000
+}
+
+// 禁用过去的小时
+const disabledHours = () => {
+  if (!dialog.form.scheduled_time) return []
+  const now = new Date()
+  const selected = new Date(dialog.form.scheduled_time)
+  if (selected.toDateString() === now.toDateString()) {
+    return Array.from({ length: now.getHours() }, (_, i) => i)
+  }
+  return []
+}
+
+// 禁用过去的分钟
+const disabledMinutes = (hour) => {
+  if (!dialog.form.scheduled_time) return []
+  const now = new Date()
+  const selected = new Date(dialog.form.scheduled_time)
+  if (selected.toDateString() === now.toDateString() && hour === now.getHours()) {
+    return Array.from({ length: now.getMinutes() }, (_, i) => i)
+  }
+  return []
+}
+
 const handleAdd = () => {
   dialog.form = {
     title: '',
@@ -753,7 +810,9 @@ const handleAdd = () => {
     database_pattern: '',
     change_type: 'DDL',
     sql_content: '',
-    remark: ''
+    remark: '',
+    enable_scheduled: false,
+    scheduled_time: null
   }
   fullSqlContent.value = ''
   resetFileState()
@@ -803,6 +862,11 @@ const handleSubmit = async () => {
         case 'auto':
           submitData.parsed_databases = parsedDatabases.value
           break
+      }
+      
+      // 添加定时执行时间
+      if (dialog.form.enable_scheduled && dialog.form.scheduled_time) {
+        submitData.scheduled_time = dayjs(dialog.form.scheduled_time).toISOString()
       }
       
       await request.post('/approvals', submitData)
@@ -1023,6 +1087,26 @@ onMounted(() => {
   .db-list-container {
     max-height: 400px;
     overflow: auto;
+  }
+  
+  .scheduled-execution-wrapper {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    
+    .scheduled-info {
+      margin-top: 5px;
+      width: 100%;
+    }
+  }
+  
+  .form-tip {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #909399;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
 }
 </style>

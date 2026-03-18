@@ -2,9 +2,11 @@
 变更审批API
 """
 import re
+import logging
 from typing import List, Optional
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
@@ -15,6 +17,10 @@ from app.schemas import (
     MessageResponse
 )
 from app.deps import get_approval_admin, get_current_user
+from app.services.notification import notification_service
+from app.services.scheduler import approval_scheduler
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/approvals", tags=["变更审批"])
 
@@ -375,7 +381,12 @@ async def create_approval(
     db.add(audit_log)
     db.commit()
     
-    # TODO: 发送钉钉通知
+    # 发送钉钉通知
+    try:
+        await notification_service.send_approval_notification(db, approval, "pending")
+    except Exception as e:
+        # 通知失败不影响创建，记录日志即可
+        logger.warning(f"发送审批通知失败: {e}")
     
     return format_approval_response(approval, include_full_sql=True)
 
@@ -427,7 +438,22 @@ async def approve_or_reject(
     db.add(audit_log)
     db.commit()
     
-    # TODO: 发送钉钉通知给申请人
+    # 发送钉钉通知给申请人
+    try:
+        await notification_service.send_approval_notification(db, approval, "approved" if action_data.approved else "rejected")
+    except Exception as e:
+        logger.warning(f"发送审批结果通知失败: {e}")
+    
+    # 如果通过且设置了定时执行时间，添加到调度器
+    if action_data.approved and approval.scheduled_time:
+        try:
+            approval_scheduler.schedule_approval_execution(
+                approval.id, 
+                approval.scheduled_time
+            )
+            logger.info(f"已添加定时执行任务: 审批ID={approval.id}, 执行时间={approval.scheduled_time}")
+        except Exception as e:
+            logger.error(f"添加定时执行任务失败: {e}")
     
     return format_approval_response(approval, include_full_sql=True)
 
@@ -488,3 +514,122 @@ async def execute_approval(
     db.commit()
     
     return MessageResponse(message="审批执行成功")
+
+
+@router.get("/dingtalk-action", response_class=HTMLResponse)
+async def dingtalk_approval_action(
+    token: str,
+    db: Session = Depends(get_db)
+):
+    """
+    钉钉审批链接处理
+    
+    通过 token 验证并执行审批操作
+    """
+    # 验证 token
+    token_data = notification_service.verify_approval_token(token)
+    
+    if not token_data:
+        return HTMLResponse(content="""
+        <html>
+        <head><title>审批失败</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1 style="color: #f56c6c;">❌ 操作失败</h1>
+            <p>链接无效或已过期，请登录系统进行审批</p>
+        </body>
+        </html>
+        """)
+    
+    approval_id = token_data["approval_id"]
+    action = token_data["action"]
+    
+    # 获取审批记录
+    approval = db.query(ApprovalRecord).filter(ApprovalRecord.id == approval_id).first()
+    
+    if not approval:
+        return HTMLResponse(content="""
+        <html>
+        <head><title>审批失败</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1 style="color: #f56c6c;">❌ 审批记录不存在</h1>
+        </body>
+        </html>
+        """)
+    
+    if approval.status != ApprovalStatus.PENDING:
+        status_text = {
+            ApprovalStatus.APPROVED: "已通过",
+            ApprovalStatus.REJECTED: "已拒绝",
+            ApprovalStatus.EXECUTED: "已执行",
+            ApprovalStatus.FAILED: "执行失败"
+        }.get(approval.status, "未知状态")
+        
+        return HTMLResponse(content=f"""
+        <html>
+        <head><title>审批已处理</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1 style="color: #e6a23c;">⚠️ 该审批已处理</h1>
+            <p>当前状态: {status_text}</p>
+        </body>
+        </html>
+        """)
+    
+    # 执行审批操作
+    if action == "approve":
+        approval.status = ApprovalStatus.APPROVED
+        approval.approver_id = 0  # 钉钉审批，标记为系统
+        approval.approve_time = datetime.now()
+        approval.approve_comment = "通过钉钉链接审批"
+        
+        # 如果有定时执行时间，添加到调度器
+        if approval.scheduled_time:
+            approval_scheduler.schedule_approval_execution(
+                approval.id, 
+                approval.scheduled_time
+            )
+        
+        db.commit()
+        
+        # 发送通知
+        await notification_service.send_approval_notification(db, approval, "approved")
+        
+        return HTMLResponse(content="""
+        <html>
+        <head><title>审批通过</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1 style="color: #67c23a;">✅ 审批已通过</h1>
+            <p>审批人: 钉钉审批</p>
+        </body>
+        </html>
+        """)
+    
+    elif action == "reject":
+        approval.status = ApprovalStatus.REJECTED
+        approval.approver_id = 0
+        approval.approve_time = datetime.now()
+        approval.approve_comment = "通过钉钉链接拒绝"
+        
+        db.commit()
+        
+        # 发送通知
+        await notification_service.send_approval_notification(db, approval, "rejected")
+        
+        return HTMLResponse(content="""
+        <html>
+        <head><title>审批拒绝</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1 style="color: #f56c6c;">❌ 审批已拒绝</h1>
+            <p>审批人: 钉钉审批</p>
+        </body>
+        </html>
+        """)
+    
+    else:
+        return HTMLResponse(content="""
+        <html>
+        <head><title>操作无效</title></head>
+        <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+            <h1 style="color: #f56c6c;">❌ 无效的操作</h1>
+        </body>
+        </html>
+        """)
