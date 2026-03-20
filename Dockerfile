@@ -65,10 +65,8 @@ COPY backend/ ./backend/
 # 复制前端构建产物到 Nginx 目录
 COPY --from=frontend-builder /app/frontend/dist /var/www/html
 
-# 复制 Nginx 配置
-COPY docker/nginx.conf /etc/nginx/sites-available/default
-RUN rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true \
-    && ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+# 复制 Nginx 配置 - 直接放到 nginx.conf
+COPY docker/nginx.conf /etc/nginx/nginx.conf
 
 # 复制启动脚本
 COPY docker/entrypoint.sh /entrypoint.sh
