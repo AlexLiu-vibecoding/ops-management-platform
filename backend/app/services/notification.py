@@ -157,6 +157,9 @@ class NotificationService:
         Returns:
             是否发送成功
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # 构建完整 webhook URL
         full_webhook = webhook
         if auth_type == "sign" and secret:
@@ -170,16 +173,21 @@ class NotificationService:
                 message["text"]["content"] += f" {keywords[0]}"
             elif message.get("msgtype") == "markdown":
                 message["markdown"]["text"] += f"\n\n{keywords[0]}"
+                logger.info(f"添加关键词到消息: {keywords[0]}")
+        
+        logger.info(f"发送钉钉消息: webhook={webhook[:50]}..., auth_type={auth_type}")
         
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(full_webhook, json=message)
+                logger.info(f"钉钉响应: status={response.status_code}")
                 if response.status_code == 200:
                     result = response.json()
+                    logger.info(f"钉钉返回: {result}")
                     return result.get("errcode") == 0
                 return False
         except Exception as e:
-            print(f"发送钉钉消息失败: {e}")
+            logger.error(f"发送钉钉消息失败: {e}")
             return False
     
     @staticmethod
@@ -346,10 +354,15 @@ class NotificationService:
             execution: 执行记录
             success: 是否执行成功
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         # 检查是否需要通知
         if success and not task.notify_on_success:
+            logger.info(f"任务 {task.id} 成功但未配置成功通知，跳过")
             return
         if not success and not task.notify_on_fail:
+            logger.info(f"任务 {task.id} 失败但未配置失败通知，跳过")
             return
         
         # 构建通知内容
@@ -396,23 +409,32 @@ class NotificationService:
             NotificationBinding.notification_type == "scheduled_task"
         ).all()
         
+        logger.info(f"找到 {len(bindings)} 个定时任务通知绑定")
+        
         if not bindings:
+            logger.warning("没有找到定时任务通知绑定")
             return
         
         # 发送通知
         for binding in bindings:
+            logger.info(f"处理绑定: channel_id={binding.channel_id}, scheduled_task_id={binding.scheduled_task_id}")
+            
             channel = db.query(DingTalkChannel).filter(
                 DingTalkChannel.id == binding.channel_id,
                 DingTalkChannel.is_enabled == True
             ).first()
             
             if not channel:
+                logger.warning(f"通道 {binding.channel_id} 不存在或未启用")
                 continue
             
             # 如果绑定指定了特定任务，只发送给该任务
-            if hasattr(binding, 'scheduled_task_id') and binding.scheduled_task_id:
+            if binding.scheduled_task_id:
                 if binding.scheduled_task_id != task.id:
+                    logger.info(f"绑定指定任务 {binding.scheduled_task_id}，当前任务 {task.id}，跳过")
                     continue
+            
+            logger.info(f"准备发送通知到通道: {channel.name}")
             
             webhook = NotificationService.decrypt_webhook(channel.webhook_encrypted)
             secret = None
@@ -427,9 +449,10 @@ class NotificationService:
                 }
             }
             
-            await NotificationService.send_dingtalk_message(
+            result = await NotificationService.send_dingtalk_message(
                 webhook, message, channel.auth_type, secret, channel.keywords
             )
+            logger.info(f"通知发送结果: {result}")
 
 
 # 全局通知服务实例
