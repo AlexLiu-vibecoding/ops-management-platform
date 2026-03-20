@@ -26,6 +26,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/scheduled-tasks", tags=["定时任务"])
 
 
+def get_local_timezone() -> str:
+    """获取服务器本地时区"""
+    try:
+        return datetime.now().astimezone().tzinfo.key or "Asia/Shanghai"
+    except Exception:
+        return "Asia/Shanghai"
+
+
 # ==================== Schemas ====================
 
 class ScheduledTaskCreate(BaseModel):
@@ -34,7 +42,7 @@ class ScheduledTaskCreate(BaseModel):
     script_id: int
     cron_expression: str = Field(..., description="Cron表达式，如: 0 0 * * * (每天0点)")
     params: Optional[Dict[str, Any]] = Field(default={}, description="执行参数")
-    timezone: str = Field("Asia/Shanghai", description="时区")
+    timezone: str = Field(default_factory=get_local_timezone, description="时区，默认使用服务器本地时区")
     max_history: int = Field(100, ge=1, le=1000, description="保留历史记录数")
     notify_on_success: bool = Field(False, description="成功时通知")
     notify_on_fail: bool = Field(True, description="失败时通知")
@@ -492,3 +500,16 @@ async def validate_cron_expression(
             "valid": False,
             "error": str(e)
         }
+
+
+@router.get("/server-info/timezone")
+async def get_server_timezone():
+    """获取服务器时区信息"""
+    local_tz = get_local_timezone()
+    now = datetime.now()
+    
+    return {
+        "timezone": local_tz,
+        "current_time": now.isoformat(),
+        "utc_offset": now.astimezone().strftime("%z")
+    }

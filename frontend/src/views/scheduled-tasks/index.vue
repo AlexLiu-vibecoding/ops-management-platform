@@ -120,9 +120,20 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="时区">
-              <el-select v-model="dialog.form.timezone" style="width: 100%;">
-                <el-option label="Asia/Shanghai" value="Asia/Shanghai" />
-                <el-option label="UTC" value="UTC" />
+              <el-select v-model="dialog.form.timezone" style="width: 100%;" placeholder="选择时区">
+                <el-option-group label="服务器时区">
+                  <el-option :label="`自动检测 (${serverTimezone})`" :value="serverTimezone" />
+                </el-option-group>
+                <el-option-group label="常用时区">
+                  <el-option label="Asia/Shanghai (北京时间)" value="Asia/Shanghai" />
+                  <el-option label="Asia/Hong_Kong (香港时间)" value="Asia/Hong_Kong" />
+                  <el-option label="Asia/Tokyo (东京时间)" value="Asia/Tokyo" />
+                  <el-option label="Asia/Singapore (新加坡时间)" value="Asia/Singapore" />
+                  <el-option label="America/New_York (纽约时间)" value="America/New_York" />
+                  <el-option label="America/Los_Angeles (洛杉矶时间)" value="America/Los_Angeles" />
+                  <el-option label="Europe/London (伦敦时间)" value="Europe/London" />
+                  <el-option label="UTC (协调世界时)" value="UTC" />
+                </el-option-group>
               </el-select>
             </el-form-item>
           </el-col>
@@ -194,6 +205,16 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import request from '@/api/index'
 import dayjs from 'dayjs'
+
+// 获取浏览器本地时区作为服务器时区的默认显示
+const getBrowserTimezone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai'
+  } catch {
+    return 'Asia/Shanghai'
+  }
+}
+const serverTimezone = ref(getBrowserTimezone())
 
 const loading = ref(false)
 const tasks = ref([])
@@ -300,7 +321,7 @@ const handleAdd = () => {
     script_id: null,
     cron_expression: '',
     params_str: '{}',
-    timezone: 'Asia/Shanghai',
+    timezone: serverTimezone.value,
     max_history: 100,
     notify_on_fail: true,
     notify_on_success: false
@@ -443,9 +464,20 @@ const getStatusType = (status) => {
 
 const formatTime = (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-'
 
+// 获取服务器时区
+const fetchServerTimezone = async () => {
+  try {
+    const result = await request.get('/scheduled-tasks/server-info/timezone')
+    serverTimezone.value = result.timezone
+  } catch (error) {
+    console.error('获取服务器时区失败:', error)
+  }
+}
+
 onMounted(() => {
   fetchTasks()
   fetchAvailableScripts()
+  fetchServerTimezone()
 })
 </script>
 

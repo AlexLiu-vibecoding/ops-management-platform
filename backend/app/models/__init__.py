@@ -8,6 +8,14 @@ from app.database import Base
 import enum
 
 
+def get_local_timezone():
+    """获取服务器本地时区"""
+    try:
+        return datetime.now().astimezone().tzinfo.key or "Asia/Shanghai"
+    except Exception:
+        return "Asia/Shanghai"
+
+
 class UserRole(str, enum.Enum):
     """用户角色枚举"""
     SUPER_ADMIN = "super_admin"  # 超级管理员
@@ -552,7 +560,7 @@ class ScheduledTask(Base):
     cron_expression = Column(String(100), nullable=False, comment="Cron表达式")
     params = Column(JSON, comment="执行参数")
     status = Column(String(20), default="enabled", comment="状态：enabled/disabled")
-    timezone = Column(String(50), default="Asia/Shanghai", comment="时区")
+    timezone = Column(String(50), default=get_local_timezone, comment="时区")
     last_run_time = Column(DateTime, comment="上次执行时间")
     last_run_status = Column(String(20), comment="上次执行状态")
     next_run_time = Column(DateTime, comment="下次执行时间")
