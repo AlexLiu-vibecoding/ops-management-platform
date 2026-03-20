@@ -1,17 +1,51 @@
-# MySQL管理平台
+# 运维管理平台
 
-企业级MySQL数据库管理平台，支持多实例管理、监控告警、变更审批等功能。
+企业级数据库运维管理平台，支持 MySQL/PostgreSQL 多实例管理、监控告警、变更审批、脚本执行、定时任务等功能。
+
+## ⚡ 快速开始
+
+### Linux 一键部署
+
+```bash
+# 克隆项目
+git clone https://github.com/AlexLiu-vibecoding/ops-management-platform.git
+cd ops-management-platform
+
+# 一键安装
+chmod +x install.sh && ./install.sh
+
+# 启动服务
+./start.sh
+
+# 访问系统 http://localhost:5000
+# 默认账号: admin / admin123
+```
+
+### 管理命令
+
+```bash
+./start.sh          # 启动服务
+./start.sh stop     # 停止服务
+./start.sh restart  # 重启服务
+./start.sh status   # 查看状态
+./start.sh logs     # 查看日志
+./start.sh help     # 查看帮助
+```
+
+---
 
 ## 功能特性
 
 ### 核心功能
 - 🔐 **认证与权限**：JWT Token认证、RBAC权限模型、多角色支持
 - 🌍 **多环境管理**：开发/测试/预发/生产环境隔离、颜色标记
-- 🗄️ **实例管理**：MySQL实例CRUD、连接测试、参数查看
+- 🗄️ **实例管理**：MySQL/PostgreSQL 实例管理、连接测试、参数查看
 - 📝 **SQL编辑器**：语法高亮、执行、风险检测、快照回滚
 - 📋 **变更审批**：DDL/DML变更审批、风险分析、分库分表支持
 - 📊 **全维度监控**：性能监控、慢查询分析、高CPU SQL监控、实例巡检
 - 🔔 **钉钉通知**：审批通知、告警通知、操作通知
+- 📜 **脚本管理**：SQL脚本管理、批量执行
+- ⏰ **定时任务**：定时执行SQL、审批定时执行
 - 📒 **审计日志**：操作记录、查询导出、追溯分析
 
 ### 分库分表变更审批
@@ -20,11 +54,6 @@
 - ✅ 通配符匹配：输入 `db_%` 或 `user_db_*` 等模式匹配分库
 - ✅ 全部数据库：对实例上所有数据库执行
 - ✅ SQL自动解析：从SQL中解析 `db.table` 格式的数据库引用
-
-### 监控开关配置
-- ✅ 全局监控开关：统一控制所有实例的监控功能
-- ✅ 实例级开关：单独控制每个实例的监控类型
-- ✅ 即时生效：配置修改后无需重启服务
 
 ### 安全特性
 - 密码加密存储（加盐哈希 + AES加密）
@@ -39,16 +68,15 @@
 - Element Plus
 - Pinia状态管理
 - Vue Router
-- Axios
 - ECharts（图表）
 
 ### 后端
 - Python 3.11
 - FastAPI
 - SQLAlchemy
-- PyMySQL
+- PyMySQL / psycopg2
 - Redis
-- JWT认证
+- APScheduler（定时任务）
 
 ### 数据库
 - PostgreSQL / MySQL（平台自身数据）
@@ -56,7 +84,9 @@
 
 ---
 
-## 部署指南
+## 详细部署
+
+详细部署文档请参考 [deploy.md](deploy.md)
 
 ### 方式一：Docker Compose 部署（推荐）
 
