@@ -396,64 +396,70 @@ async def skip_initialization(db: Session = Depends(get_db)):
     
     使用默认配置启动系统，创建默认管理员账户
     """
-    # 检查是否已有管理员
-    existing_admin = db.query(User).filter(
-        User.role == UserRole.SUPER_ADMIN
-    ).first()
-    
-    if not existing_admin:
-        # 创建默认管理员
-        admin = User(
-            username="admin",
-            password_hash=hash_password("admin123"),
-            real_name="超级管理员",
-            email="admin@example.com",
-            role=UserRole.SUPER_ADMIN,
-            status=True
-        )
-        db.add(admin)
-    
-    # 标记所有步骤完成
-    steps = ["database_config", "redis_config", "admin_config", "system_init"]
-    for step_name in steps:
-        step = db.query(SystemInitState).filter(
-            SystemInitState.step == step_name
+    try:
+        # 检查是否已有管理员
+        existing_admin = db.query(User).filter(
+            User.role == UserRole.SUPER_ADMIN
         ).first()
         
-        if not step:
-            step = SystemInitState(
-                step=step_name,
-                status="completed",
-                completed_at=datetime.now()
+        if not existing_admin:
+            # 创建默认管理员
+            admin = User(
+                username="admin",
+                password_hash=hash_password("admin123"),
+                real_name="超级管理员",
+                email="admin@example.com",
+                role=UserRole.SUPER_ADMIN,
+                status=True
             )
-            db.add(step)
-        else:
-            step.status = "completed"
-            step.completed_at = datetime.now()
-    
-    # 保存默认配置标记
-    config_items = [
-        ("use_default_config", "true", False, "使用默认配置"),
-    ]
-    
-    for key, value, encrypted, desc in config_items:
-        existing = db.query(SystemConfig).filter(
-            SystemConfig.config_key == key
-        ).first()
+            db.add(admin)
         
-        if not existing:
-            db.add(SystemConfig(
-                config_key=key,
-                config_value=value,
-                is_encrypted=encrypted,
-                description=desc
-            ))
-    
-    db.commit()
-    
-    return {
-        "success": True,
-        "message": "跳过配置，使用默认设置启动",
-        "default_admin": "admin",
-        "default_password": "admin123"
-    }
+        # 标记所有步骤完成
+        steps = ["database_config", "redis_config", "admin_config", "system_init"]
+        for step_name in steps:
+            step = db.query(SystemInitState).filter(
+                SystemInitState.step == step_name
+            ).first()
+            
+            if not step:
+                step = SystemInitState(
+                    step=step_name,
+                    status="completed",
+                    completed_at=datetime.now()
+                )
+                db.add(step)
+            else:
+                step.status = "completed"
+                step.completed_at = datetime.now()
+        
+        # 保存默认配置标记
+        config_items = [
+            ("use_default_config", "true", False, "使用默认配置"),
+        ]
+        
+        for key, value, encrypted, desc in config_items:
+            existing = db.query(SystemConfig).filter(
+                SystemConfig.config_key == key
+            ).first()
+            
+            if not existing:
+                db.add(SystemConfig(
+                    config_key=key,
+                    config_value=value,
+                    is_encrypted=encrypted,
+                    description=desc
+                ))
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "message": "跳过配置，使用默认设置启动",
+            "default_admin": "admin",
+            "default_password": "admin123"
+        }
+    except Exception as e:
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        return {"success": False, "message": f"跳过配置失败: {str(e)}"}
