@@ -15,7 +15,7 @@ RUN npm install -g pnpm
 COPY frontend/package*.json frontend/pnpm-lock.yaml ./
 
 # 安装依赖
-RUN pnpm install --frozen-lockfile
+RUN pnpm install
 
 # 复制前端源码
 COPY frontend/ ./
@@ -67,7 +67,7 @@ COPY --from=frontend-builder /app/frontend/dist /var/www/html
 
 # 复制 Nginx 配置
 COPY docker/nginx.conf /etc/nginx/sites-available/default
-RUN rm -f /etc/nginx/sites-enabled/default \
+RUN rm -f /etc/nginx/sites-enabled/default 2>/dev/null || true \
     && ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
 
 # 复制启动脚本
