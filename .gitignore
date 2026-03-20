@@ -24,7 +24,7 @@ coverage
 storybook-static
 
 # Package manager artifacts
-pnpm-lock.yaml
+# pnpm-lock.yaml - 应该提交到仓库以便 CI 构建一致
 package-lock.json
 yarn.lock
 .pnp*
