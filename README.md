@@ -88,7 +88,7 @@ chmod +x start.sh
 # 服务端口
 PORT=5000
 
-# 数据库 (PostgreSQL 推荐)
+# 数据库 (必填，PostgreSQL 推荐)
 DATABASE_URL=postgresql://user:password@host:5432/dbname
 
 # 或 MySQL
@@ -98,40 +98,42 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 # MYSQL_PASSWORD=your-password
 # MYSQL_DATABASE=ops_platform
 
-# ---------- 安全配置（必须修改！） ----------
-# JWT_SECRET_KEY: 签名用户登录令牌，防止被伪造
-#   生成命令: openssl rand -hex 32
-JWT_SECRET_KEY=your-super-secret-jwt-key-at-least-32-chars
-
-# AES_KEY: 加密存储数据库密码等敏感信息，必须 32 个字符
-#   生成命令: openssl rand -base64 24 | head -c 32 && echo
-AES_KEY=your-aes-key-must-be-32-chars!!
-
-# PASSWORD_SALT: 用户密码加密盐值，防止彩虹表攻击
-#   生成命令: openssl rand -hex 16
-PASSWORD_SALT=your-password-salt
+# 安全配置（可选，首次启动自动生成）
+# JWT_SECRET_KEY=your-jwt-key
+# AES_KEY=your-32-char-aes-key-here!!!!
+# PASSWORD_SALT=your-password-salt
 ```
 
 ---
 
-## 🔒 安全配置详解
+## 🔒 安全配置说明
 
-| 配置项 | 用途 | 要求 | 泄露风险 |
-|--------|------|------|----------|
-| `JWT_SECRET_KEY` | 签名用户登录 Token | ≥32 字符 | 可伪造 Token 冒充任何用户 |
-| `AES_KEY` | 加密存储的数据库密码 | **必须 32 字符** | 可解密所有存储的密码 |
-| `PASSWORD_SALT` | 用户密码加密盐值 | 任意字符串 | 更容易破解用户密码 |
+**好消息：安全密钥会在首次启动时自动生成，无需手动配置！**
 
-### 快速生成（Linux/Mac）
+| 配置项 | 用途 | 说明 |
+|--------|------|------|
+| `JWT_SECRET_KEY` | 签名用户登录 Token | 自动生成 64 位随机字符串 |
+| `AES_KEY` | 加密存储的数据库密码 | 自动生成 32 位随机字符串 |
+| `PASSWORD_SALT` | 用户密码加密盐值 | 自动生成 32 位随机字符串 |
+
+### 工作原理
+
+1. 首次启动时，系统检测到没有设置安全密钥
+2. 自动生成随机密钥，并保存到 `.env` 文件
+3. 重启后会读取已保存的密钥，保持数据一致性
+
+### 生产环境建议
+
+如果需要手动指定密钥（如多实例部署需要共享密钥）：
 
 ```bash
-# 一次性生成所有密钥
-echo "JWT_SECRET_KEY=$(openssl rand -hex 32)"
-echo "AES_KEY=$(openssl rand -base64 24 | head -c 32)"
-echo "PASSWORD_SALT=$(openssl rand -hex 16)"
+# 在 .env 文件中添加
+JWT_SECRET_KEY=your-specified-key-here
+AES_KEY=your-32-character-aes-key!!
+PASSWORD_SALT=your-salt-value
 ```
 
-⚠️ **生产环境务必修改默认值！密钥泄露会导致严重安全问题。**
+⚠️ **密钥泄露会导致严重安全问题，请妥善保管 `.env` 文件，不要提交到公开仓库！**
 
 ---
 
