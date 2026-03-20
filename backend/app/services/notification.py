@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import (
     DingTalkChannel, NotificationBinding, ApprovalRecord, 
-    ApprovalStatus, Instance, User
+    ApprovalStatus, Instance, User, ScheduledTask, ScriptExecution
 )
 from app.utils.auth import aes_cipher
 
@@ -312,6 +312,107 @@ class NotificationService:
             # 检查环境过滤
             if binding.environment_id and approval.environment_id != binding.environment_id:
                 continue
+            
+            webhook = NotificationService.decrypt_webhook(channel.webhook_encrypted)
+            secret = None
+            if channel.auth_type == "sign" and channel.secret_encrypted:
+                secret = NotificationService.decrypt_secret(channel.secret_encrypted)
+            
+            message = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "title": title,
+                    "text": content
+                }
+            }
+            
+            await NotificationService.send_dingtalk_message(
+                webhook, message, channel.auth_type, secret, channel.keywords
+            )
+
+    @staticmethod
+    async def send_scheduled_task_notification(
+        db: Session,
+        task: ScheduledTask,
+        execution: ScriptExecution,
+        success: bool
+    ):
+        """
+        发送定时任务执行通知
+        
+        Args:
+            db: 数据库会话
+            task: 定时任务
+            execution: 执行记录
+            success: 是否执行成功
+        """
+        # 检查是否需要通知
+        if success and not task.notify_on_success:
+            return
+        if not success and not task.notify_on_fail:
+            return
+        
+        # 构建通知内容
+        if success:
+            title = "✅ 定时任务执行成功"
+            status_text = "成功"
+        else:
+            title = "❌ 定时任务执行失败"
+            status_text = "失败"
+        
+        content = f"""
+## {title}
+
+**任务名称**: {task.name}
+
+**脚本**: {execution.script.name if execution.script else '未知脚本'}
+
+**执行状态**: {status_text}
+
+**开始时间**: {execution.start_time.strftime('%Y-%m-%d %H:%M:%S') if execution.start_time else '未知'}
+
+**结束时间**: {execution.end_time.strftime('%Y-%m-%d %H:%M:%S') if execution.end_time else '未知'}
+
+**执行耗时**: {f'{execution.duration:.2f}秒' if execution.duration else '未知'}
+
+**退出码**: {execution.exit_code if execution.exit_code is not None else 'N/A'}
+"""
+        
+        if not success and execution.error_output:
+            # 截取错误信息前500字符
+            error_preview = execution.error_output[:500]
+            if len(execution.error_output) > 500:
+                error_preview += "..."
+            content += f"""
+
+**错误信息**:
+```
+{error_preview}
+```
+"""
+        
+        # 获取通知绑定 - 定时任务类型
+        bindings = db.query(NotificationBinding).filter(
+            NotificationBinding.notification_type == "scheduled_task"
+        ).all()
+        
+        if not bindings:
+            return
+        
+        # 发送通知
+        for binding in bindings:
+            channel = db.query(DingTalkChannel).filter(
+                DingTalkChannel.id == binding.channel_id,
+                DingTalkChannel.is_enabled == True
+            ).first()
+            
+            if not channel:
+                continue
+            
+            # 如果绑定指定了特定任务，只发送给该任务
+            if hasattr(binding, 'scheduled_task_id') and binding.scheduled_task_id:
+                if binding.scheduled_task_id != task.id:
+                    continue
             
             webhook = NotificationService.decrypt_webhook(channel.webhook_encrypted)
             secret = None

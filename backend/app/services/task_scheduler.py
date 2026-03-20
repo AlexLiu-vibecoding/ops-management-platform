@@ -20,6 +20,7 @@ from app.models import (
     ScheduledTask, Script, ScriptExecution,
     ExecutionStatus, TriggerType
 )
+from app.services.notification import notification_service
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +223,14 @@ class TaskScheduler:
                 task.next_run_time = trigger.get_next_fire_time(None, datetime.now())
             
             db.commit()
+            
+            # 发送通知
+            try:
+                await notification_service.send_scheduled_task_notification(
+                    db, task, execution, success
+                )
+            except Exception as notify_error:
+                logger.error(f"发送任务通知失败: {notify_error}")
             
             logger.info(f"定时任务执行完成: {task_id}, 状态: {execution.status}")
             

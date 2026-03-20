@@ -341,6 +341,7 @@ async def list_bindings(
             "notification_type_label": NOTIFICATION_TYPE_LABELS.get(b.notification_type, b.notification_type),
             "environment_id": b.environment_id,
             "instance_id": b.instance_id,
+            "scheduled_task_id": b.scheduled_task_id,
             "created_at": b.created_at.isoformat() if b.created_at else None
         })
     
@@ -364,7 +365,8 @@ async def create_binding(
         NotificationBinding.channel_id == data.channel_id,
         NotificationBinding.notification_type == data.notification_type,
         NotificationBinding.environment_id == data.environment_id,
-        NotificationBinding.instance_id == data.instance_id
+        NotificationBinding.instance_id == data.instance_id,
+        NotificationBinding.scheduled_task_id == data.scheduled_task_id
     ).first()
     
     if existing:
@@ -374,7 +376,8 @@ async def create_binding(
         channel_id=data.channel_id,
         notification_type=data.notification_type,
         environment_id=data.environment_id,
-        instance_id=data.instance_id
+        instance_id=data.instance_id,
+        scheduled_task_id=data.scheduled_task_id
     )
     db.add(binding)
     db.commit()

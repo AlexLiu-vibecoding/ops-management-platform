@@ -70,6 +70,12 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="scheduled_task_id" label="定时任务" width="150">
+          <template #default="{ row }">
+            <span v-if="row.scheduled_task_id">{{ getScheduledTaskName(row.scheduled_task_id) }}</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="160">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
@@ -167,6 +173,18 @@
             />
           </el-select>
         </el-form-item>
+        
+        <el-form-item v-if="bindingDialog.form.notification_type === 'scheduled_task'" label="定时任务">
+          <el-select v-model="bindingDialog.form.scheduled_task_id" placeholder="选择定时任务（可选，不选则通知所有任务）" clearable style="width: 100%">
+            <el-option
+              v-for="task in scheduledTasks"
+              :key="task.id"
+              :label="task.name"
+              :value="task.id"
+            />
+          </el-select>
+          <div class="form-tip">不选择特定任务时，所有定时任务执行都会发送通知</div>
+        </el-form-item>
       </el-form>
       
       <template #footer>
@@ -213,9 +231,13 @@ const bindingDialog = reactive({
   saving: false,
   form: {
     channel_id: null,
-    notification_type: ''
+    notification_type: '',
+    scheduled_task_id: null
   }
 })
+
+// 获取定时任务列表
+const scheduledTasks = ref([])
 
 // 获取通道列表
 const fetchChannels = async () => {
@@ -247,6 +269,16 @@ const fetchNotificationTypes = async () => {
     notificationTypes.value = await request.get('/notification/notification-types')
   } catch (error) {
     console.error('获取通知类型失败:', error)
+  }
+}
+
+// 获取定时任务列表
+const fetchScheduledTasks = async () => {
+  try {
+    const res = await request.get('/scheduled-tasks', { params: { limit: 100 } })
+    scheduledTasks.value = res.items || []
+  } catch (error) {
+    console.error('获取定时任务失败:', error)
   }
 }
 
@@ -349,7 +381,8 @@ const handleTestChannel = async (row) => {
 const handleAddBinding = () => {
   bindingDialog.form = {
     channel_id: null,
-    notification_type: ''
+    notification_type: '',
+    scheduled_task_id: null
   }
   bindingDialog.visible = true
 }
@@ -409,6 +442,11 @@ const getNotificationTypeTag = (type) => {
   return map[type] || 'info'
 }
 
+const getScheduledTaskName = (taskId) => {
+  const task = scheduledTasks.value.find(t => t.id === taskId)
+  return task ? task.name : `任务 #${taskId}`
+}
+
 const formatTime = (time) => {
   if (!time) return '-'
   return new Date(time).toLocaleString()
@@ -418,6 +456,7 @@ onMounted(() => {
   fetchNotificationTypes()
   fetchChannels()
   fetchBindings()
+  fetchScheduledTasks()
 })
 </script>
 
@@ -431,6 +470,12 @@ onMounted(() => {
       justify-content: space-between;
       align-items: center;
     }
+  }
+  
+  .form-tip {
+    font-size: 12px;
+    color: #909399;
+    margin-top: 4px;
   }
 }
 </style>

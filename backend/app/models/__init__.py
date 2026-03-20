@@ -195,9 +195,10 @@ class NotificationBinding(Base):
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     channel_id = Column(Integer, ForeignKey("dingtalk_channels.id", ondelete="CASCADE"), nullable=False, comment="通道ID")
-    notification_type = Column(String(50), nullable=False, comment="通知类型：approval/alert/operation")
+    notification_type = Column(String(50), nullable=False, comment="通知类型：approval/alert/scheduled_task/operation")
     environment_id = Column(Integer, ForeignKey("environments.id", ondelete="CASCADE"), comment="环境ID（可选）")
     instance_id = Column(Integer, ForeignKey("instances.id", ondelete="CASCADE"), comment="实例ID（可选）")
+    scheduled_task_id = Column(Integer, ForeignKey("scheduled_tasks.id", ondelete="CASCADE"), comment="定时任务ID（可选）")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     
     # 关联
