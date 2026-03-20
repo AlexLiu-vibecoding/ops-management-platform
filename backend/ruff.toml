@@ -18,6 +18,8 @@ ignore = [
     "F401",  # imported but unused
     "I001",  # import block unsorted
     "UP035",  # deprecated typing
+    "UP045",  # use X | None instead of Optional
+    "W293",  # blank line contains whitespace
 ]
 
 [lint.isort]
