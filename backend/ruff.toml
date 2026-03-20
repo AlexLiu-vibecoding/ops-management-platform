@@ -15,6 +15,9 @@ select = [
 ignore = [
     "E501",  # line too long (handled by formatter)
     "B008",  # do not perform function call in argument defaults
+    "F401",  # imported but unused
+    "I001",  # import block unsorted
+    "UP035",  # deprecated typing
 ]
 
 [lint.isort]
