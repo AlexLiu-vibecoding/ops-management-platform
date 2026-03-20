@@ -234,22 +234,22 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-# 注册API路由
-app.include_router(init.router, prefix="/api")  # 初始化API放在最前面
-app.include_router(auth.router, prefix="/api")
-app.include_router(users.router, prefix="/api")
-app.include_router(environments.router, prefix="/api")
-app.include_router(instances.router, prefix="/api")
-app.include_router(monitor.router, prefix="/api")
-app.include_router(dingtalk.router, prefix="/api")
-app.include_router(approval.router, prefix="/api")
-app.include_router(sql.router, prefix="/api")
-app.include_router(performance.router, prefix="/api")
-app.include_router(slow_query.router, prefix="/api")
-app.include_router(audit.router, prefix="/api")
-app.include_router(menu.router, prefix="/api")
-app.include_router(scripts.router, prefix="/api")  # 脚本管理
-app.include_router(scheduled_tasks.router, prefix="/api")  # 定时任务
+# 注册API路由 (v1版本)
+app.include_router(init.router, prefix="/api/v1")  # 初始化API放在最前面
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+app.include_router(environments.router, prefix="/api/v1")
+app.include_router(instances.router, prefix="/api/v1")
+app.include_router(monitor.router, prefix="/api/v1")
+app.include_router(dingtalk.router, prefix="/api/v1")
+app.include_router(approval.router, prefix="/api/v1")
+app.include_router(sql.router, prefix="/api/v1")
+app.include_router(performance.router, prefix="/api/v1")
+app.include_router(slow_query.router, prefix="/api/v1")
+app.include_router(audit.router, prefix="/api/v1")
+app.include_router(menu.router, prefix="/api/v1")
+app.include_router(scripts.router, prefix="/api/v1")  # 脚本管理
+app.include_router(scheduled_tasks.router, prefix="/api/v1")  # 定时任务
 
 
 # 健康检查
