@@ -98,11 +98,40 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 # MYSQL_PASSWORD=your-password
 # MYSQL_DATABASE=ops_platform
 
-# 安全配置 (必须修改)
+# ---------- 安全配置（必须修改！） ----------
+# JWT_SECRET_KEY: 签名用户登录令牌，防止被伪造
+#   生成命令: openssl rand -hex 32
 JWT_SECRET_KEY=your-super-secret-jwt-key-at-least-32-chars
+
+# AES_KEY: 加密存储数据库密码等敏感信息，必须 32 个字符
+#   生成命令: openssl rand -base64 24 | head -c 32 && echo
 AES_KEY=your-aes-key-must-be-32-chars!!
+
+# PASSWORD_SALT: 用户密码加密盐值，防止彩虹表攻击
+#   生成命令: openssl rand -hex 16
 PASSWORD_SALT=your-password-salt
 ```
+
+---
+
+## 🔒 安全配置详解
+
+| 配置项 | 用途 | 要求 | 泄露风险 |
+|--------|------|------|----------|
+| `JWT_SECRET_KEY` | 签名用户登录 Token | ≥32 字符 | 可伪造 Token 冒充任何用户 |
+| `AES_KEY` | 加密存储的数据库密码 | **必须 32 字符** | 可解密所有存储的密码 |
+| `PASSWORD_SALT` | 用户密码加密盐值 | 任意字符串 | 更容易破解用户密码 |
+
+### 快速生成（Linux/Mac）
+
+```bash
+# 一次性生成所有密钥
+echo "JWT_SECRET_KEY=$(openssl rand -hex 32)"
+echo "AES_KEY=$(openssl rand -base64 24 | head -c 32)"
+echo "PASSWORD_SALT=$(openssl rand -hex 16)"
+```
+
+⚠️ **生产环境务必修改默认值！密钥泄露会导致严重安全问题。**
 
 ---
 
