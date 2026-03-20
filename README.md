@@ -98,36 +98,35 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 # MYSQL_PASSWORD=your-password
 # MYSQL_DATABASE=ops_platform
 
-# 安全配置（可选，首次启动自动生成）
-# JWT_SECRET_KEY=your-jwt-key
-# AES_KEY=your-32-char-aes-key-here!!!!
-# PASSWORD_SALT=your-password-salt
+# 安全配置（可选，已有默认值）
+# JWT_SECRET_KEY=your-custom-key
+# AES_KEY=your-custom-32-char-aes-key!
+# PASSWORD_SALT=your-custom-salt
 ```
 
 ---
 
 ## 🔒 安全配置说明
 
-**好消息：安全密钥会在首次启动时自动生成，无需手动配置！**
+**开箱即用：系统已内置默认密钥，无需配置即可使用！**
 
 | 配置项 | 用途 | 说明 |
 |--------|------|------|
-| `JWT_SECRET_KEY` | 签名用户登录 Token | 自动生成 64 位随机字符串 |
-| `AES_KEY` | 加密存储的数据库密码 | 自动生成 32 位随机字符串 |
-| `PASSWORD_SALT` | 用户密码加密盐值 | 自动生成 32 位随机字符串 |
-
-### 工作原理
-
-1. 首次启动时，系统检测到没有设置安全密钥
-2. 自动生成随机密钥，并保存到 `.env` 文件
-3. 重启后会读取已保存的密钥，保持数据一致性
+| `JWT_SECRET_KEY` | 签名用户登录 Token | 内置默认值，可自定义 |
+| `AES_KEY` | 加密存储的数据库密码 | 内置默认值（32字符），可自定义 |
+| `PASSWORD_SALT` | 用户密码加密盐值 | 内置默认值，可自定义 |
 
 ### 生产环境建议
 
-如果需要手动指定密钥（如多实例部署需要共享密钥）：
+默认密钥是公开的，如果对安全有高要求，请在 `.env` 中自定义：
 
 ```bash
-# 在 .env 文件中添加
+JWT_SECRET_KEY=your-custom-secret-key-at-least-32-chars
+AES_KEY=your-custom-32-character-aes-key!
+PASSWORD_SALT=your-custom-salt
+```
+
+⚠️ **自定义密钥后需重置用户密码**
 JWT_SECRET_KEY=your-specified-key-here
 AES_KEY=your-32-character-aes-key!!
 PASSWORD_SALT=your-salt-value
