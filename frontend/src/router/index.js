@@ -102,10 +102,10 @@ const routes = [
         meta: { title: '菜单配置', icon: 'Menu', roles: ['super_admin'] }
       },
       {
-        path: 'dingtalk',
-        name: 'DingTalk',
-        component: () => import('@/views/dingtalk/index.vue'),
-        meta: { title: '钉钉通道', icon: 'ChatDotRound', roles: ['super_admin'] }
+        path: 'notification',
+        name: 'Notification',
+        component: () => import('@/views/notification/index.vue'),
+        meta: { title: '通知管理', icon: 'ChatDotRound', roles: ['super_admin'] }
       },
       {
         path: 'audit',

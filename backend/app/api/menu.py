@@ -245,7 +245,7 @@ async def init_default_menus(
         {"name": "定时任务", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
         {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
         {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
-        {"name": "钉钉通道", "path": "/dingtalk", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
+        {"name": "通知管理", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
         {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
         {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
     ]
@@ -295,7 +295,7 @@ async def add_missing_menus(
         {"name": "定时任务", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
         {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
         {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
-        {"name": "钉钉通道", "path": "/dingtalk", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
+        {"name": "通知管理", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
         {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
         {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
     ]
