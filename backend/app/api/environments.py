@@ -37,7 +37,7 @@ async def get_environment(
     if not env:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="环境不存在"
+            detail="Environment not found"
         )
     return EnvironmentResponse.from_orm(env)
 
@@ -53,14 +53,14 @@ async def create_environment(
     if db.query(Environment).filter(Environment.name == env_data.name).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="环境名称已存在"
+            detail="Environment name already exists"
         )
     
     # 检查编码是否已存在
     if db.query(Environment).filter(Environment.code == env_data.code).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="环境编码已存在"
+            detail="Environment code already exists"
         )
     
     env = Environment(**env_data.dict())
@@ -83,7 +83,7 @@ async def update_environment(
     if not env:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="环境不存在"
+            detail="Environment not found"
         )
     
     # 更新字段
@@ -108,14 +108,14 @@ async def delete_environment(
     if not env:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="环境不存在"
+            detail="Environment not found"
         )
     
     # 检查是否有关联的实例
     if env.instances:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="该环境下还有实例，无法删除"
+            detail="Cannot delete environment with instances"
         )
     
     db.delete(env)

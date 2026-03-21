@@ -192,7 +192,7 @@ async def create_channel(
     """创建通知通道"""
     # 检查名称是否已存在
     if db.query(DingTalkChannel).filter(DingTalkChannel.name == data.name).first():
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="通道名称已存在")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Channel name already exists")
     
     # 验证配置
     if data.channel_type in ["dingtalk", "wechat", "feishu", "webhook"]:
@@ -200,7 +200,7 @@ async def create_channel(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook地址不能为空")
     
     if data.auth_type == "sign" and not data.secret:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="加签验证必须提供密钥")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Secret key required for signature verification")
     
     if data.auth_type == "keyword" and not data.keywords:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="关键词验证必须提供关键词")
@@ -310,7 +310,7 @@ async def test_channel(
         
         return {"success": True, "message": "测试消息发送成功"}
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"发送失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Send failed: {str(e)}")
 
 
 # ==================== Binding Management ====================
@@ -373,7 +373,7 @@ async def create_binding(
     ).first()
     
     if existing:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该通知绑定已存在")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Notification binding already exists")
     
     binding = NotificationBinding(
         channel_id=data.channel_id,
@@ -397,7 +397,7 @@ async def delete_binding(
     """删除通知绑定"""
     binding = db.query(NotificationBinding).filter(NotificationBinding.id == binding_id).first()
     if not binding:
-        raise HTTPException(status_code=404, detail="通知绑定不存在")
+        raise HTTPException(status_code=404, detail="Notification binding not found")
     
     db.delete(binding)
     db.commit()

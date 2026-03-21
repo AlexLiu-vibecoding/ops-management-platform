@@ -97,7 +97,7 @@ async def get_dingtalk_channel(
     if not channel:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="钉钉通道不存在"
+            detail="DingTalk channel not found"
         )
     return DingTalkChannelResponse.from_orm(channel)
 
@@ -113,20 +113,20 @@ async def create_dingtalk_channel(
     if db.query(DingTalkChannel).filter(DingTalkChannel.name == channel_data.name).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="通道名称已存在"
+            detail="Channel name already exists"
         )
     
     # 验证验证类型
     if channel_data.auth_type == "sign" and not channel_data.secret:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="加签验证必须提供密钥"
+            detail="Secret key required for signature verification"
         )
     
     if channel_data.auth_type == "keyword" and not channel_data.keywords:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="关键词验证必须提供至少一个关键词"
+            detail="At least one keyword required for keyword verification"
         )
     
     channel = DingTalkChannel(
@@ -156,7 +156,7 @@ async def update_dingtalk_channel(
     if not channel:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="钉钉通道不存在"
+            detail="DingTalk channel not found"
         )
     
     # 更新字段
@@ -192,7 +192,7 @@ async def delete_dingtalk_channel(
     if not channel:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="钉钉通道不存在"
+            detail="DingTalk channel not found"
         )
     
     # 删除关联的通知绑定
@@ -218,7 +218,7 @@ async def test_dingtalk_channel(
     if not channel:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="钉钉通道不存在"
+            detail="DingTalk channel not found"
         )
     
     # 解密webhook
@@ -259,17 +259,17 @@ async def test_dingtalk_channel(
                 else:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"发送失败: {result.get('errmsg', '未知错误')}"
+                        detail=f"Send failed: {result.get('errmsg', '未知错误')}"
                     )
             else:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"请求失败: HTTP {response.status_code}"
+                    detail=f"Request failed: HTTP {response.status_code}"
                 )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"发送测试消息失败: {str(e)}"
+            detail=f"Failed to send test message: {str(e)}"
         )
 
 
@@ -309,7 +309,7 @@ async def create_notification_binding(
     if not channel:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="钉钉通道不存在"
+            detail="DingTalk channel not found"
         )
     
     # 检查是否已存在相同绑定
@@ -323,7 +323,7 @@ async def create_notification_binding(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="该通知绑定已存在"
+            detail="Notification binding already exists"
         )
     
     binding = NotificationBinding(**binding_data.dict())
@@ -344,7 +344,7 @@ async def delete_notification_binding(
     if not binding:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="通知绑定不存在"
+            detail="Notification binding not found"
         )
     
     db.delete(binding)

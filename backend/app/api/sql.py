@@ -79,7 +79,7 @@ def get_mysql_connection(instance: Instance, database: str = None):
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
         )
     
     conn = pymysql.connect(
@@ -101,7 +101,7 @@ def get_postgresql_connection(instance: Instance, database: str = None):
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
         )
     
     conn = psycopg2.connect(
@@ -135,7 +135,7 @@ async def execute_sql(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # 风险检测
@@ -232,7 +232,7 @@ async def execute_sql(
             
             result = SQLExecuteResponse(
                 success=True,
-                message=f"执行成功，影响{affected_rows}行",
+                message=f"执行成功，影响{affected_rows}lines",
                 affected_rows=affected_rows,
                 execution_time=(datetime.now() - start_time).total_seconds(),
                 snapshot_id=snapshot_id
@@ -256,7 +256,7 @@ async def execute_sql(
         instance_name=instance.name,
         environment_id=instance.environment_id,
         operation_type="execute_sql",
-        operation_detail=f"执行SQL: {request.sql[:500]}...",
+        operation_detail=f"Execute SQL: {request.sql[:500]}...",
         request_ip="",
         request_method="POST",
         request_path="/api/sql/execute",
@@ -280,7 +280,7 @@ async def list_databases(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     try:
@@ -301,7 +301,7 @@ async def list_databases(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取数据库列表失败: {str(e)}"
+            detail=f"Failed to get database list: {str(e)}"
         )
 
 
@@ -317,7 +317,7 @@ async def list_tables(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     try:
@@ -343,5 +343,5 @@ async def list_tables(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取表列表失败: {str(e)}"
+            detail=f"Failed to get table list: {str(e)}"
         )

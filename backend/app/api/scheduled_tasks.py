@@ -79,7 +79,7 @@ async def list_scheduled_tasks(
     if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.APPROVAL_ADMIN, UserRole.OPERATOR]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权查看定时任务"
+            detail="No permission to view scheduled tasks"
         )
     
     query = db.query(ScheduledTask)
@@ -133,7 +133,7 @@ async def create_scheduled_task(
     if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.APPROVAL_ADMIN, UserRole.OPERATOR]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权创建定时任务"
+            detail="No permission to create scheduled tasks"
         )
     
     # 检查脚本是否存在
@@ -141,13 +141,13 @@ async def create_scheduled_task(
     if not script:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="脚本不存在"
+            detail="Script not found"
         )
     
     if not script.is_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="脚本已禁用"
+            detail="Script is disabled"
         )
     
     # 验证 Cron 表达式
@@ -157,7 +157,7 @@ async def create_scheduled_task(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cron表达式无效: {str(e)}"
+            detail=f"Invalid Cron expression: {str(e)}"
         )
     
     # 创建任务
@@ -197,14 +197,14 @@ async def get_scheduled_task(
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="定时任务不存在"
+            detail="Scheduled task not found"
         )
     
     # 权限检查
     if current_user.role != UserRole.SUPER_ADMIN and task.created_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权访问此任务"
+            detail="No permission to access this task"
         )
     
     return {
@@ -245,7 +245,7 @@ async def update_scheduled_task(
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="定时任务不存在"
+            detail="Scheduled task not found"
         )
     
     # 权限检查
@@ -272,7 +272,7 @@ async def update_scheduled_task(
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Cron表达式无效: {str(e)}"
+                detail=f"Invalid Cron expression: {str(e)}"
             )
     
     if task_data.params is not None:
@@ -319,7 +319,7 @@ async def delete_scheduled_task(
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="定时任务不存在"
+            detail="Scheduled task not found"
         )
     
     # 权限检查
@@ -351,7 +351,7 @@ async def trigger_task_manually(
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="定时任务不存在"
+            detail="Scheduled task not found"
         )
     
     # 权限检查
@@ -379,7 +379,7 @@ async def pause_task(
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="定时任务不存在"
+            detail="Scheduled task not found"
         )
     
     # 权限检查
@@ -409,7 +409,7 @@ async def resume_task(
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="定时任务不存在"
+            detail="Scheduled task not found"
         )
     
     # 权限检查
@@ -441,7 +441,7 @@ async def get_task_history(
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="定时任务不存在"
+            detail="Scheduled task not found"
         )
     
     # 权限检查

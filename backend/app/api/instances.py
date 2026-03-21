@@ -86,7 +86,7 @@ async def get_instance(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     return InstanceResponse.from_orm(instance)
 
@@ -118,7 +118,7 @@ async def create_instance(
     if db.query(Instance).filter(Instance.name == instance_data.name).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="实例名称已存在"
+            detail="Instance name already exists"
         )
     
     # 测试连接
@@ -132,7 +132,7 @@ async def create_instance(
     if not conn_result["success"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"连接测试失败: {conn_result['message']}"
+            detail=f"Connection test failed: {conn_result['message']}"
         )
     
     # 创建实例
@@ -176,7 +176,7 @@ async def update_instance(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # 更新字段
@@ -206,7 +206,7 @@ async def delete_instance(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     db.delete(instance)
@@ -226,7 +226,7 @@ async def check_instance_status(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # 尝试解密密码
@@ -235,7 +235,7 @@ async def check_instance_status(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
         )
     
     result = await test_mysql_connection(
@@ -277,7 +277,7 @@ async def create_instance_group(
     if db.query(InstanceGroup).filter(InstanceGroup.name == name).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="分组名称已存在"
+            detail="Group name already exists"
         )
     
     group = InstanceGroup(name=name, description=description)
@@ -300,7 +300,7 @@ async def get_instance_variables(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     try:
@@ -308,7 +308,7 @@ async def get_instance_variables(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
         )
     
     try:
@@ -327,7 +327,7 @@ async def get_instance_variables(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取参数失败: {str(e)}"
+            detail=f"Failed to get parameters: {str(e)}"
         )
 
 
@@ -344,7 +344,7 @@ async def get_instance_databases(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     try:
@@ -352,7 +352,7 @@ async def get_instance_databases(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
         )
     
     try:
@@ -405,7 +405,7 @@ async def get_instance_databases(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取数据库列表失败: {str(e)}"
+            detail=f"Failed to get database list: {str(e)}"
         )
 
 
@@ -421,7 +421,7 @@ async def get_database_tables(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     try:
@@ -429,7 +429,7 @@ async def get_database_tables(
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
         )
     
     try:
@@ -470,5 +470,5 @@ async def get_database_tables(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取表列表失败: {str(e)}"
+            detail=f"Failed to get table list: {str(e)}"
         )

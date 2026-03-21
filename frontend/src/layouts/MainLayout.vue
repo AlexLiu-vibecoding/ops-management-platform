@@ -183,8 +183,9 @@ const userStore = useUserStore()
 const isCollapse = ref(false)
 const dynamicMenus = ref([])
 
-// 菜单名称翻译映射
+// Menu name translation mapping
 const menuNameMap = {
+  // Chinese menu names (for backward compatibility)
   '仪表盘': 'nav.dashboard',
   '实例管理': 'nav.instances',
   'SQL编辑器': 'nav.sqlEditor',
@@ -199,6 +200,12 @@ const menuNameMap = {
   '审计日志': 'nav.audit',
   '菜单配置': 'nav.menuConfig',
   '系统设置': 'nav.settings',
+  '监控中心': 'nav.monitor',
+  '监控配置': 'nav.monitorSettings',
+  '注册审批': 'nav.registrations',
+  '通知管理': 'nav.notification',
+  '实例详情': 'nav.instanceDetail',
+  // English menu names
   'Dashboard': 'nav.dashboard',
   'Instances': 'nav.instances',
   'SQL Editor': 'nav.sqlEditor',
@@ -213,6 +220,11 @@ const menuNameMap = {
   'Audit Logs': 'nav.audit',
   'Menu Config': 'nav.menuConfig',
   'Settings': 'nav.settings',
+  'Monitor': 'nav.monitor',
+  'Monitor Settings': 'nav.monitorSettings',
+  'Registrations': 'nav.registrations',
+  'Notification': 'nav.notification',
+  'Instance Detail': 'nav.instanceDetail',
 }
 
 // 翻译菜单名称

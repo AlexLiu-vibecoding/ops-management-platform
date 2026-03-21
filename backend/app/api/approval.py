@@ -47,7 +47,7 @@ async def preview_matched_databases(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # TODO: 实际连接数据库获取数据库列表
@@ -298,7 +298,7 @@ async def get_approval(
     if not approval:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="审批记录不存在"
+            detail="Approval record not found"
         )
     
     # 权限检查：只能查看自己的申请或作为审批人查看
@@ -306,7 +306,7 @@ async def get_approval(
         current_user.role.value not in ["super_admin", "approval_admin"]):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权查看此审批"
+            detail="No permission to view this approval"
         )
     
     # 详情返回完整SQL内容
@@ -325,7 +325,7 @@ async def create_approval(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # 分析SQL风险等级
@@ -335,7 +335,7 @@ async def create_approval(
     if risk_level == "critical":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="检测到极高风险SQL，禁止提交审批"
+            detail="Critical risk SQL detected, submission rejected"
         )
     
     # 计算SQL行数（如果前端没传）
@@ -387,7 +387,7 @@ async def create_approval(
         instance_name=instance.name,
         environment_id=instance.environment_id,
         operation_type="submit_approval",
-        operation_detail=f"提交审批: {approval_data.title}\n数据库: {db_target_desc}\nSQL行数: {sql_line_count}行",
+        operation_detail=f"Submit approval: {approval_data.title}\nDatabase: {db_target_desc}\nSQL lines: {sql_line_count}lines",
         request_ip="",
         request_method="POST",
         request_path=f"/api/approvals",
@@ -418,13 +418,13 @@ async def approve_or_reject(
     if not approval:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="审批记录不存在"
+            detail="Approval record not found"
         )
     
     if approval.status != ApprovalStatus.PENDING:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="该审批已被处理"
+            detail="This approval has already been processed"
         )
     
     # 更新审批状态
@@ -444,7 +444,7 @@ async def approve_or_reject(
         instance_name=approval.instance.name if approval.instance else None,
         environment_id=approval.environment_id,
         operation_type="approve" if action_data.approved else "reject",
-        operation_detail=f"{'通过' if action_data.approved else '拒绝'}审批: {approval.title}",
+        operation_detail=f"{'Approved' if action_data.approved else 'Rejected'} approval: {approval.title}",
         request_ip="",
         request_method="POST",
         request_path=f"/api/approvals/{approval_id}/approve",
@@ -493,20 +493,20 @@ async def execute_approval(
     if not approval:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="审批记录不存在"
+            detail="Approval record not found"
         )
     
     if approval.status != ApprovalStatus.APPROVED:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="该审批未被通过，无法执行"
+            detail="This approval was not approved, cannot execute"
         )
     
     # 只有申请人可以执行
     if approval.requester_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="只有申请人可以执行此审批"
+            detail="Only the applicant can execute this approval"
         )
     
     # TODO: 实际执行SQL
@@ -528,7 +528,7 @@ async def execute_approval(
         instance_name=approval.instance.name if approval.instance else None,
         environment_id=approval.environment_id,
         operation_type="execute_approval",
-        operation_detail=f"执行审批: {approval.title}\nSQL: {get_sql_preview(approval.sql_content, 20)}...",
+        operation_detail=f"Execute approval: {approval.title}\nSQL: {get_sql_preview(approval.sql_content, 20)}...",
         request_ip="",
         request_method="POST",
         request_path=f"/api/approvals/{approval_id}/execute",
@@ -584,7 +584,7 @@ async def dingtalk_approval_action(
         status_text = {
             ApprovalStatus.APPROVED: "已通过",
             ApprovalStatus.REJECTED: "已拒绝",
-            ApprovalStatus.EXECUTED: "已执行",
+            ApprovalStatus.EXECUTED: "已执lines",
             ApprovalStatus.FAILED: "执行失败"
         }.get(approval.status, "未知状态")
         

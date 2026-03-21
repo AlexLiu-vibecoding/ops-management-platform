@@ -83,7 +83,7 @@ async def get_current_performance(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # 检查监控开关
@@ -130,7 +130,7 @@ async def get_performance_history(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # 计算时间范围
@@ -168,7 +168,7 @@ async def get_performance_statistics(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     end_time = datetime.now()

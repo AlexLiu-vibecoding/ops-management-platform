@@ -142,7 +142,7 @@ async def get_instance_monitor_switches(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # 获取所有开关配置

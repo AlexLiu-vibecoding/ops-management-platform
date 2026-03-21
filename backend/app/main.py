@@ -33,49 +33,49 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时
-    logger.info("正在启动MySQL管理平台...")
+    logger.info("Starting MySQL Management Platform...")
     
     # 创建数据库表
     try:
         Base.metadata.create_all(bind=engine)
-        logger.info("数据库表创建/检查完成")
+        logger.info("Database tables created/checked")
     except Exception as e:
-        logger.error(f"数据库表创建失败: {e}")
+        logger.error(f"Database table creation failed: {e}")
     
     # 连接Redis
     try:
         await redis_client.connect()
-        logger.info("Redis连接成功")
+        logger.info("Redis connected successfully")
     except Exception as e:
-        logger.warning(f"Redis连接失败，部分功能可能不可用: {e}")
+        logger.warning(f"Redis connection failed, some features may not be available: {e}")
     
     # 启动定时任务调度器
     try:
         approval_scheduler.start()
-        logger.info("审批定时调度器启动成功")
+        logger.info("Approval scheduler started successfully")
     except Exception as e:
-        logger.error(f"审批定时调度器启动失败: {e}")
+        logger.error(f"Approval scheduler startup failed: {e}")
     
     # 启动任务调度器
     try:
         task_scheduler.start()
-        logger.info("任务调度器启动成功")
+        logger.info("Task scheduler started successfully")
     except Exception as e:
-        logger.error(f"任务调度器启动失败: {e}")
+        logger.error(f"Task scheduler startup failed: {e}")
     
     # 初始化默认数据
     await init_default_data()
     
-    logger.info("运维管理平台启动完成")
+    logger.info("Ops Management Platform started successfully")
     
     yield
     
     # 关闭时
-    logger.info("正在关闭运维管理平台...")
+    logger.info("Shutting down Ops Management Platform...")
     approval_scheduler.stop()
     task_scheduler.stop()
     await redis_client.disconnect()
-    logger.info("运维管理平台已关闭")
+    logger.info("Ops Management Platform shutdown complete")
 
 
 async def init_dev_instance(db):
@@ -92,13 +92,13 @@ async def init_dev_instance(db):
     # 检查是否已存在开发测试实例
     existing = db.query(Instance).filter(Instance.name == "开发测试实例(PostgreSQL)").first()
     if existing:
-        logger.info("开发测试实例已存在，跳过创建")
+        logger.info("Dev test instance already exists, skipping creation")
         return
     
     # 从环境变量获取 PostgreSQL 连接信息
     pg_url = os.getenv("PGDATABASE_URL") or os.getenv("DATABASE_URL")
     if not pg_url:
-        logger.info("未找到 PostgreSQL 连接信息，跳过创建开发实例")
+        logger.info("PostgreSQL connection info not found, skipping dev instance creation")
         return
     
     try:
@@ -124,9 +124,9 @@ async def init_dev_instance(db):
             status=True
         )
         db.add(instance)
-        logger.info(f"开发环境：自动创建 PostgreSQL 测试实例 - {host}:{port}")
+        logger.info(f"Dev environment: auto-creating PostgreSQL test instance - {host}:{port}")
     except Exception as e:
-        logger.warning(f"创建开发测试实例失败: {e}")
+        logger.warning(f"Failed to create dev test instance: {e}")
 
 
 async def init_default_data():
@@ -146,7 +146,7 @@ async def init_default_data():
         
         # 如果系统未初始化，跳过管理员创建（等待配置向导）
         if not init_state:
-            logger.info("系统未初始化，请通过配置向导完成初始化")
+            logger.info("System not initialized, please complete initialization via setup wizard")
             # 只创建默认环境配置
             if not db.query(Environment).first():
                 environments = [
@@ -157,7 +157,7 @@ async def init_default_data():
                 ]
                 for env in environments:
                     db.add(env)
-                logger.info("创建默认环境配置")
+                logger.info("Creating default environment configuration")
             db.commit()
             return
         
@@ -173,7 +173,7 @@ async def init_default_data():
                 status=True
             )
             db.add(admin)
-            logger.info("创建默认超级管理员: admin")
+            logger.info("Creating default super admin: admin")
         
         # 检查是否存在环境
         if not db.query(Environment).first():
@@ -186,7 +186,7 @@ async def init_default_data():
             ]
             for env in environments:
                 db.add(env)
-            logger.info("创建默认环境配置")
+            logger.info("Creating default environment configuration")
         
         # 创建默认全局配置
         default_configs = [
@@ -211,10 +211,10 @@ async def init_default_data():
         await init_dev_instance(db)
         
         db.commit()
-        logger.info("默认数据初始化完成")
+        logger.info("Default data initialization complete")
         
     except Exception as e:
-        logger.error(f"默认数据初始化失败: {e}")
+        logger.error(f"Default data initialization failed: {e}")
         db.rollback()
     finally:
         db.close()
@@ -242,34 +242,34 @@ app.add_middleware(
 # 请求日志中间件
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    """记录请求日志"""
+    """Log request middleware"""
     start_time = time.time()
     
-    # 处理请求
+    # Process request
     response = await call_next(request)
     
-    # 计算处理时间
+    # Calculate processing time
     process_time = (time.time() - start_time) * 1000
     
-    # 记录日志（排除健康检查等频繁请求）
+    # Log (exclude frequent requests like health check)
     if request.url.path not in ["/health", "/"]:
         logger.info(
             f"{request.method} {request.url.path} - "
-            f"状态码: {response.status_code} - "
-            f"耗时: {process_time:.2f}ms"
+            f"Status: {response.status_code} - "
+            f"Duration: {process_time:.2f}ms"
         )
     
     return response
 
 
-# 异常处理
+# Exception handling
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """参数验证错误处理"""
+    """Parameter validation error handler"""
     return JSONResponse(
         status_code=422,
         content={
-            "detail": "参数验证失败",
+            "detail": "Parameter validation failed",
             "errors": exc.errors()
         }
     )

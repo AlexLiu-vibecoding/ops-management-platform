@@ -426,7 +426,7 @@ async def create_script(
     if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.APPROVAL_ADMIN, UserRole.OPERATOR]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权创建脚本"
+            detail="No permission to create script"
         )
     
     try:
@@ -434,7 +434,7 @@ async def create_script(
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"不支持的脚本类型: {script_data.script_type}"
+            detail=f"Unsupported script type: {script_data.script_type}"
         )
     
     script = Script(
@@ -473,14 +473,14 @@ async def get_script(
     if not script:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="脚本不存在"
+            detail="Script not found"
         )
     
     # 检查权限
     if not check_script_permission(script, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权访问此脚本"
+            detail="No permission to access this script"
         )
     
     return {
@@ -519,14 +519,14 @@ async def update_script(
     if not script:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="脚本不存在"
+            detail="Script not found"
         )
     
     # 只有创建者和管理员可以修改
     if script.created_by != current_user.id and current_user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权修改此脚本"
+            detail="No permission to modify this script"
         )
     
     # 更新字段
@@ -576,14 +576,14 @@ async def delete_script(
     if not script:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="脚本不存在"
+            detail="Script not found"
         )
     
     # 只有创建者和管理员可以删除
     if script.created_by != current_user.id and current_user.role != UserRole.SUPER_ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权删除此脚本"
+            detail="No permission to delete this script"
         )
     
     db.delete(script)
@@ -607,20 +607,20 @@ async def execute_script(
     if not script:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="脚本不存在"
+            detail="Script not found"
         )
     
     if not script.is_enabled:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="脚本已禁用"
+            detail="Script is disabled"
         )
     
     # 检查权限
     if not check_script_permission(script, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权执行此脚本"
+            detail="No permission to execute this script"
         )
     
     # 确定超时时间
@@ -691,7 +691,7 @@ async def get_execution(
     if not execution:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="执行记录不存在"
+            detail="Execution record not found"
         )
     
     return {
@@ -783,13 +783,13 @@ async def cancel_execution(
     if not execution:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="执行记录不存在"
+            detail="Execution record not found"
         )
     
     if execution.status != ExecutionStatus.RUNNING:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="只能取消执行中的任务"
+            detail="Can only cancel running tasks"
         )
     
     # 更新状态
@@ -816,14 +816,14 @@ async def duplicate_script(
     if not script:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="脚本不存在"
+            detail="Script not found"
         )
     
     # 检查权限
     if not check_script_permission(script, current_user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权复制此脚本"
+            detail="No permission to copy this script"
         )
     
     # 创建副本

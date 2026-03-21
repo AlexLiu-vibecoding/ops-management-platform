@@ -159,7 +159,7 @@ async def save_init_config(
     if init_state:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="系统已完成初始化，无法重复配置"
+            detail="System already initialized, cannot reconfigure"
         )
     
     try:
@@ -265,7 +265,7 @@ async def create_admin_account(
     if not step_db:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="请先完成数据库配置"
+            detail="Please complete database configuration first"
         )
     
     # 检查是否已有管理员
@@ -276,21 +276,21 @@ async def create_admin_account(
     if existing_admin:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="管理员账户已存在"
+            detail="Admin account already exists"
         )
     
     # 检查用户名是否已存在
     if db.query(User).filter(User.username == admin_config.username).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="用户名已存在"
+            detail="Username already exists"
         )
     
     # 检查邮箱是否已存在
     if db.query(User).filter(User.email == admin_config.email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="邮箱已存在"
+            detail="Email already exists"
         )
     
     try:
@@ -365,7 +365,7 @@ async def complete_initialization(db: Session = Depends(get_db)):
         if not step:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"请先完成 {step_name} 步骤"
+                detail=f"Please complete {step_name} 步骤"
             )
     
     # 标记系统初始化完成

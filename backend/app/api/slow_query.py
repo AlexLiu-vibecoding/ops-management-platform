@@ -188,7 +188,7 @@ async def list_slow_queries(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # 检查监控开关
@@ -225,7 +225,7 @@ async def get_top_slow_queries(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     end_time = datetime.now()
@@ -252,7 +252,7 @@ async def get_slow_query_statistics(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     end_time = datetime.now()
@@ -308,7 +308,7 @@ async def analyze_slow_query(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     # 执行 EXPLAIN 分析
@@ -591,7 +591,7 @@ async def run_explain(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     explain_result = await execute_explain(instance, sql, database_name)
@@ -939,7 +939,7 @@ async def get_performance_schema_status(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     status = await check_performance_schema_enabled(instance)
@@ -967,7 +967,7 @@ async def fetch_slow_queries(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     if instance.db_type != "mysql":
@@ -1032,7 +1032,7 @@ async def sync_slow_queries_to_db(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     if instance.db_type != "mysql":
@@ -1130,7 +1130,7 @@ async def get_instance_databases(
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="实例不存在"
+            detail="Instance not found"
         )
     
     engine = None
@@ -1155,7 +1155,7 @@ async def get_instance_databases(
         logger.error(f"获取数据库列表失败: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取数据库列表失败: {str(e)}"
+            detail=f"Failed to get database list: {str(e)}"
         )
     finally:
         if engine:

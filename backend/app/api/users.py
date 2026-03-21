@@ -40,7 +40,7 @@ async def get_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="用户不存在"
+            detail="User not found"
         )
     return UserResponse.from_orm(user)
 
@@ -56,14 +56,14 @@ async def create_user(
     if db.query(User).filter(User.username == user_data.username).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="用户名已存在"
+            detail="Username already exists"
         )
     
     # 检查邮箱是否已存在
     if user_data.email and db.query(User).filter(User.email == user_data.email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="邮箱已被使用"
+            detail="Email already in use"
         )
     
     # 创建用户
@@ -94,7 +94,7 @@ async def update_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="用户不存在"
+            detail="User not found"
         )
     
     # 更新字段
@@ -104,7 +104,7 @@ async def update_user(
         if db.query(User).filter(User.email == user_data.email, User.id != user_id).first():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="邮箱已被使用"
+                detail="Email already in use"
             )
         user.email = user_data.email
     if user_data.phone is not None:
@@ -130,14 +130,14 @@ async def delete_user(
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="不能删除自己的账户"
+            detail="Cannot delete your own account"
         )
     
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="用户不存在"
+            detail="User not found"
         )
     
     db.delete(user)
@@ -158,7 +158,7 @@ async def reset_user_password(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="用户不存在"
+            detail="User not found"
         )
     
     user.password_hash = hash_password(new_password)
@@ -179,7 +179,7 @@ async def bind_user_environments(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="用户不存在"
+            detail="User not found"
         )
     
     # 删除原有绑定

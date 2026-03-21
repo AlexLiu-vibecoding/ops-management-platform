@@ -25,7 +25,7 @@ OPERATION_TYPE_MAP: Dict[str, Dict[str, str]] = {
     "approve": {"zh": "审批通过", "en": "Approve"},
     "reject": {"zh": "审批拒绝", "en": "Reject"},
     "execute_approval": {"zh": "执行变更", "en": "Execute Change"},
-    "scheduled_execute": {"zh": "定时执行", "en": "Scheduled Execute"},
+    "scheduled_execute": {"zh": "定时执lines", "en": "Scheduled Execute"},
     "create_script": {"zh": "创建脚本", "en": "Create Script"},
     "update_script": {"zh": "更新脚本", "en": "Update Script"},
     "delete_script": {"zh": "删除脚本", "en": "Delete Script"},
@@ -109,14 +109,14 @@ async def get_audit_log(
     if not log:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="审计日志不存在"
+            detail="Audit log not found"
         )
     
     # 权限检查
     if current_user.role.value == "readonly" and log.user_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="无权查看此日志"
+            detail="No permission to view this log"
         )
     
     return format_log_response(log)
