@@ -27,21 +27,21 @@
             <el-sub-menu v-if="item.children && item.children.length > 0" :index="item.path || `menu-${item.id}`">
               <template #title>
                 <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-                <span>{{ item.name }}</span>
+                <span>{{ translateMenu(item.name) }}</span>
               </template>
               <el-menu-item
                 v-for="child in item.children"
                 :key="child.path"
                 :index="child.path"
               >
-                {{ child.name }}
+                {{ translateMenu(child.name) }}
               </el-menu-item>
             </el-sub-menu>
             
             <!-- 无子菜单 -->
             <el-menu-item v-else :index="item.path || `menu-${item.id}`">
               <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-              <template #title>{{ item.name }}</template>
+              <template #title>{{ translateMenu(item.name) }}</template>
             </el-menu-item>
           </template>
         </el-menu>
@@ -62,7 +62,7 @@
         <div class="header-left">
           <el-breadcrumb separator="/">
             <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path">
-              {{ item.title }}
+              {{ translateMenu(item.title) }}
             </el-breadcrumb-item>
           </el-breadcrumb>
         </div>
@@ -84,7 +84,7 @@
               <el-dropdown-menu>
                 <el-dropdown-item command="password">
                   <el-icon><Key /></el-icon>
-                  {{ $t('settings.language') === 'Language' ? 'Change Password' : '修改密码' }}
+                  {{ $t('user.password') || '修改密码' }}
                 </el-dropdown-item>
                 <el-dropdown-item divided command="logout">
                   <el-icon><SwitchButton /></el-icon>
@@ -107,36 +107,36 @@
     </el-container>
     
     <!-- 修改密码对话框 -->
-    <el-dialog v-model="passwordDialog.visible" title="修改密码" width="420px">
-      <el-form :model="passwordDialog.form" label-width="80px">
-        <el-form-item label="原密码">
+    <el-dialog v-model="passwordDialog.visible" :title="$t('user.password') || '修改密码'" width="420px">
+      <el-form :model="passwordDialog.form" label-width="100px">
+        <el-form-item :label="$t('user.password')">
           <el-input
             v-model="passwordDialog.form.oldPassword"
             type="password"
             show-password
-            placeholder="请输入原密码"
+            :placeholder="$t('common.pleaseInput')"
           />
         </el-form-item>
-        <el-form-item label="新密码">
+        <el-form-item :label="$t('user.password')">
           <el-input
             v-model="passwordDialog.form.newPassword"
             type="password"
             show-password
-            placeholder="请输入新密码"
+            :placeholder="$t('common.pleaseInput')"
           />
         </el-form-item>
-        <el-form-item label="确认密码">
+        <el-form-item :label="$t('user.password')">
           <el-input
             v-model="passwordDialog.form.confirmPassword"
             type="password"
             show-password
-            placeholder="请再次输入新密码"
+            :placeholder="$t('common.pleaseInput')"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="passwordDialog.visible = false">取消</el-button>
-        <el-button type="primary" @click="changePassword">确定</el-button>
+        <el-button @click="passwordDialog.visible = false">{{ $t('common.cancel') }}</el-button>
+        <el-button type="primary" @click="changePassword">{{ $t('common.confirm') }}</el-button>
       </template>
     </el-dialog>
   </el-container>
@@ -163,6 +163,48 @@ const userStore = useUserStore()
 
 const isCollapse = ref(false)
 const dynamicMenus = ref([])
+
+// 菜单名称翻译映射
+const menuNameMap = {
+  '仪表盘': 'nav.dashboard',
+  '实例管理': 'nav.instances',
+  'SQL编辑器': 'nav.sqlEditor',
+  '变更审批': 'nav.approvals',
+  '慢查询监控': 'nav.slowQuery',
+  '性能监控': 'nav.performance',
+  '脚本管理': 'nav.scripts',
+  '定时任务': 'nav.scheduledTasks',
+  '钉钉通知': 'nav.dingtalk',
+  '用户管理': 'nav.users',
+  '环境管理': 'nav.environments',
+  '审计日志': 'nav.audit',
+  '菜单配置': 'nav.menuConfig',
+  '系统设置': 'nav.settings',
+  'Dashboard': 'nav.dashboard',
+  'Instances': 'nav.instances',
+  'SQL Editor': 'nav.sqlEditor',
+  'Approvals': 'nav.approvals',
+  'Slow Query': 'nav.slowQuery',
+  'Performance': 'nav.performance',
+  'Scripts': 'nav.scripts',
+  'Scheduled Tasks': 'nav.scheduledTasks',
+  'DingTalk': 'nav.dingtalk',
+  'Users': 'nav.users',
+  'Environments': 'nav.environments',
+  'Audit Logs': 'nav.audit',
+  'Menu Config': 'nav.menuConfig',
+  'Settings': 'nav.settings',
+}
+
+// 翻译菜单名称
+const translateMenu = (name) => {
+  if (!name) return ''
+  const key = menuNameMap[name]
+  if (key) {
+    return t(key)
+  }
+  return name
+}
 
 // 活动菜单
 const activeMenu = computed(() => route.path)
@@ -232,7 +274,7 @@ const handleCommand = (command) => {
       passwordDialog.value.visible = true
       break
     case 'logout':
-      ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+      ElMessageBox.confirm(t('login.logout') + '?', t('common.tip'), {
         type: 'warning'
       }).then(() => {
         userStore.logout()
@@ -246,23 +288,23 @@ const changePassword = async () => {
   const { oldPassword, newPassword, confirmPassword } = passwordDialog.value.form
   
   if (!oldPassword || !newPassword || !confirmPassword) {
-    ElMessage.warning('请填写完整信息')
+    ElMessage.warning(t('common.pleaseInput'))
     return
   }
   
   if (newPassword !== confirmPassword) {
-    ElMessage.warning('两次输入的密码不一致')
+    ElMessage.warning(t('common.pleaseInput'))
     return
   }
   
   if (newPassword.length < 6) {
-    ElMessage.warning('密码长度至少6位')
+    ElMessage.warning(t('common.pleaseInput'))
     return
   }
   
   try {
     await authApi.changePassword(oldPassword, newPassword)
-    ElMessage.success('密码修改成功，请重新登录')
+    ElMessage.success(t('common.success'))
     passwordDialog.value.visible = false
     userStore.logout()
   } catch (error) {

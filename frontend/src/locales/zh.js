@@ -32,6 +32,7 @@ export default {
     error: '错误',
     pleaseInput: '请输入',
     pleaseSelect: '请选择',
+    optional: '可选',
   },
   
   nav: {
@@ -209,6 +210,10 @@ export default {
     admin: '管理员',
     operator: '运维人员',
     readonly: '只读用户',
+    oldPassword: '原密码',
+    newPassword: '新密码',
+    confirmPassword: '确认密码',
+    changePassword: '修改密码',
   },
   
   environment: {
@@ -234,13 +239,33 @@ export default {
   
   login: {
     title: '登录',
+    subtitle: '企业级数据库运维管理平台',
     username: '用户名',
     password: '密码',
     rememberMe: '记住我',
-    login: '登录',
+    login: '登 录',
     logout: '退出登录',
     loginSuccess: '登录成功',
     logoutSuccess: '退出成功',
+    noAccount: '没有账号？立即注册',
+    checkStatus: '查询注册状态',
+    register: '用户注册',
+    registerHint: '注册申请需超级管理员审批',
+    registerSuccess: '注册申请已提交，请等待管理员审批',
+    backToLogin: '返回登录',
+    submitRegister: '提交注册申请',
+    usernameHint: '用户名（3-50位字母数字）',
+    passwordHint: '密码（至少6位）',
+    passwordMin: '密码长度不能少于6位',
+    passwordMismatch: '两次输入的密码不一致',
+    usernameLength: '用户名长度为3-50位',
+    usernamePattern: '用户名只能包含字母、数字和下划线',
+    invalidEmail: '请输入有效的邮箱地址',
+    reason: '申请理由（可选）',
+    checkStatusHint: '输入用户名查询注册申请状态',
+    statusPending: '待审批',
+    statusApproved: '已通过',
+    statusRejected: '已拒绝',
   },
   
   settings: {

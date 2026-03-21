@@ -32,6 +32,7 @@ export default {
     error: 'Error',
     pleaseInput: 'Please input',
     pleaseSelect: 'Please select',
+    optional: 'Optional',
   },
   
   nav: {
@@ -209,6 +210,10 @@ export default {
     admin: 'Admin',
     operator: 'Operator',
     readonly: 'Read Only',
+    oldPassword: 'Old Password',
+    newPassword: 'New Password',
+    confirmPassword: 'Confirm Password',
+    changePassword: 'Change Password',
   },
   
   environment: {
@@ -234,6 +239,7 @@ export default {
   
   login: {
     title: 'Login',
+    subtitle: 'Enterprise Database Ops Platform',
     username: 'Username',
     password: 'Password',
     rememberMe: 'Remember Me',
@@ -241,6 +247,25 @@ export default {
     logout: 'Logout',
     loginSuccess: 'Login Success',
     logoutSuccess: 'Logout Success',
+    noAccount: "No account? Register now",
+    checkStatus: 'Check Status',
+    register: 'Register',
+    registerHint: 'Registration requires admin approval',
+    registerSuccess: 'Registration submitted, pending approval',
+    backToLogin: 'Back to Login',
+    submitRegister: 'Submit Registration',
+    usernameHint: 'Username (3-50 alphanumeric)',
+    passwordHint: 'Password (min 6 chars)',
+    passwordMin: 'Password must be at least 6 characters',
+    passwordMismatch: 'Passwords do not match',
+    usernameLength: 'Username must be 3-50 characters',
+    usernamePattern: 'Username can only contain letters, numbers and underscores',
+    invalidEmail: 'Please enter a valid email',
+    reason: 'Reason (optional)',
+    checkStatusHint: 'Enter username to check registration status',
+    statusPending: 'Pending',
+    statusApproved: 'Approved',
+    statusRejected: 'Rejected',
   },
   
   settings: {

@@ -2,8 +2,8 @@
   <div class="login-container">
     <!-- 登录卡片 -->
     <div class="login-box" v-if="!showRegister && !showStatus">
-      <h2 class="title">运维管理平台</h2>
-      <p class="subtitle">企业级数据库运维管理平台</p>
+      <h2 class="title">{{ $t('dashboard.title') }}</h2>
+      <p class="subtitle">{{ $t('login.subtitle') || '企业级数据库运维管理平台' }}</p>
       
       <el-form
         ref="loginFormRef"
@@ -14,7 +14,7 @@
         <el-form-item prop="username">
           <el-input
             v-model="loginForm.username"
-            placeholder="用户名"
+            :placeholder="$t('login.username')"
             prefix-icon="User"
             size="large"
           />
@@ -24,7 +24,7 @@
           <el-input
             v-model="loginForm.password"
             type="password"
-            placeholder="密码"
+            :placeholder="$t('login.password')"
             prefix-icon="Lock"
             size="large"
             show-password
@@ -40,27 +40,25 @@
             :loading="loading"
             @click="handleLogin"
           >
-            登 录
+            {{ $t('login.login') }}
           </el-button>
         </el-form-item>
       </el-form>
       
       <div class="login-footer">
         <el-button type="primary" link @click="showRegister = true">
-          没有账号？立即注册
+          {{ $t('login.noAccount') || '没有账号？立即注册' }}
         </el-button>
         <el-button type="info" link @click="showStatus = true">
-          查询注册状态
+          {{ $t('login.checkStatus') || '查询注册状态' }}
         </el-button>
       </div>
-      
-
     </div>
     
     <!-- 注册卡片 -->
     <div class="login-box register-box" v-if="showRegister">
-      <h2 class="title">用户注册</h2>
-      <p class="subtitle">注册申请需超级管理员审批</p>
+      <h2 class="title">{{ $t('login.register') || '用户注册' }}</h2>
+      <p class="subtitle">{{ $t('login.registerHint') || '注册申请需超级管理员审批' }}</p>
       
       <el-form
         ref="registerFormRef"
@@ -71,7 +69,7 @@
         <el-form-item prop="username">
           <el-input
             v-model="registerForm.username"
-            placeholder="用户名（3-50位字母数字）"
+            :placeholder="$t('login.usernameHint') || '用户名（3-50位字母数字）'"
             prefix-icon="User"
             size="large"
           />
@@ -81,7 +79,7 @@
           <el-input
             v-model="registerForm.password"
             type="password"
-            placeholder="密码（至少6位）"
+            :placeholder="$t('login.passwordHint') || '密码（至少6位）'"
             prefix-icon="Lock"
             size="large"
             show-password
@@ -92,7 +90,7 @@
           <el-input
             v-model="registerForm.confirmPassword"
             type="password"
-            placeholder="确认密码"
+            :placeholder="$t('user.confirmPassword')"
             prefix-icon="Lock"
             size="large"
             show-password
@@ -102,7 +100,7 @@
         <el-form-item prop="real_name">
           <el-input
             v-model="registerForm.real_name"
-            placeholder="真实姓名"
+            :placeholder="$t('user.realName')"
             prefix-icon="UserFilled"
             size="large"
           />
@@ -111,7 +109,7 @@
         <el-form-item prop="email">
           <el-input
             v-model="registerForm.email"
-            placeholder="邮箱地址"
+            :placeholder="$t('user.email')"
             prefix-icon="Message"
             size="large"
           />
@@ -120,7 +118,7 @@
         <el-form-item prop="phone">
           <el-input
             v-model="registerForm.phone"
-            placeholder="手机号（可选）"
+            :placeholder="$t('user.phone') + ' (' + ($t('common.optional') || '可选') + ')'"
             prefix-icon="Phone"
             size="large"
           />
@@ -131,7 +129,7 @@
             v-model="registerForm.reason"
             type="textarea"
             :rows="3"
-            placeholder="申请理由（可选）"
+            :placeholder="$t('login.reason') || '申请理由（可选）'"
           />
         </el-form-item>
         
@@ -143,22 +141,22 @@
             :loading="registerLoading"
             @click="handleRegister"
           >
-            提交注册申请
+            {{ $t('login.submitRegister') || '提交注册申请' }}
           </el-button>
         </el-form-item>
       </el-form>
       
       <div class="login-footer">
         <el-button type="primary" link @click="showRegister = false">
-          返回登录
+          {{ $t('login.backToLogin') || '返回登录' }}
         </el-button>
       </div>
     </div>
     
     <!-- 查询注册状态卡片 -->
     <div class="login-box" v-if="showStatus">
-      <h2 class="title">查询注册状态</h2>
-      <p class="subtitle">输入用户名查询注册申请状态</p>
+      <h2 class="title">{{ $t('login.checkStatus') || '查询注册状态' }}</h2>
+      <p class="subtitle">{{ $t('login.checkStatusHint') || '输入用户名查询注册申请状态' }}</p>
       
       <el-form
         ref="statusFormRef"
@@ -169,7 +167,7 @@
         <el-form-item prop="username">
           <el-input
             v-model="statusForm.username"
-            placeholder="请输入用户名"
+            :placeholder="$t('login.username')"
             prefix-icon="User"
             size="large"
           />
@@ -183,7 +181,7 @@
             :loading="statusLoading"
             @click="checkStatus"
           >
-            查询状态
+            {{ $t('login.checkStatus') || '查询状态' }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -198,14 +196,14 @@
         >
           <template #default>
             <div class="status-detail">
-              <p><strong>用户名：</strong>{{ registrationStatus.username }}</p>
-              <p><strong>真实姓名：</strong>{{ registrationStatus.real_name }}</p>
-              <p><strong>申请时间：</strong>{{ formatTime(registrationStatus.created_at) }}</p>
+              <p><strong>{{ $t('login.username') }}：</strong>{{ registrationStatus.username }}</p>
+              <p><strong>{{ $t('user.realName') }}：</strong>{{ registrationStatus.real_name }}</p>
+              <p><strong>{{ $t('common.createTime') }}：</strong>{{ formatTime(registrationStatus.created_at) }}</p>
               <p v-if="registrationStatus.review_time">
-                <strong>审批时间：</strong>{{ formatTime(registrationStatus.review_time) }}
+                <strong>{{ $t('approval.approvalTime') }}：</strong>{{ formatTime(registrationStatus.review_time) }}
               </p>
               <p v-if="registrationStatus.review_comment">
-                <strong>审批意见：</strong>{{ registrationStatus.review_comment }}
+                <strong>{{ $t('approval.approvalComment') }}：</strong>{{ registrationStatus.review_comment }}
               </p>
             </div>
           </template>
@@ -214,9 +212,14 @@
       
       <div class="login-footer">
         <el-button type="primary" link @click="showStatus = false; registrationStatus = null">
-          返回登录
+          {{ $t('login.backToLogin') || '返回登录' }}
         </el-button>
       </div>
+    </div>
+    
+    <!-- 语言切换 -->
+    <div class="lang-switch-wrapper">
+      <LangSwitch />
     </div>
   </div>
 </template>
@@ -224,11 +227,14 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import request from '@/api/index'
 import dayjs from 'dayjs'
+import LangSwitch from '@/components/LangSwitch.vue'
 
+const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -252,11 +258,11 @@ const loginForm = reactive({
 
 const loginRules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' }
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
+    { min: 6, message: t('login.passwordMin') || '密码长度不能少于6位', trigger: 'blur' }
   ]
 }
 
@@ -273,7 +279,7 @@ const registerForm = reactive({
 
 const validatePass = (rule, value, callback) => {
   if (value !== registerForm.password) {
-    callback(new Error('两次输入的密码不一致'))
+    callback(new Error(t('login.passwordMismatch') || '两次输入的密码不一致'))
   } else {
     callback()
   }
@@ -281,24 +287,24 @@ const validatePass = (rule, value, callback) => {
 
 const registerRules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 50, message: '用户名长度为3-50位', trigger: 'blur' },
-    { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线', trigger: 'blur' }
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
+    { min: 3, max: 50, message: t('login.usernameLength') || '用户名长度为3-50位', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]+$/, message: t('login.usernamePattern') || '用户名只能包含字母、数字和下划线', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
+    { min: 6, message: t('login.passwordMin') || '密码长度不能少于6位', trigger: 'blur' }
   ],
   confirmPassword: [
-    { required: true, message: '请再次输入密码', trigger: 'blur' },
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
     { validator: validatePass, trigger: 'blur' }
   ],
   real_name: [
-    { required: true, message: '请输入真实姓名', trigger: 'blur' }
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' }
   ],
   email: [
-    { required: true, message: '请输入邮箱地址', trigger: 'blur' },
-    { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' }
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
+    { type: 'email', message: t('login.invalidEmail') || '请输入有效的邮箱地址', trigger: 'blur' }
   ]
 }
 
@@ -309,7 +315,7 @@ const statusForm = reactive({
 
 const statusRules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' }
+    { required: true, message: t('common.pleaseInput'), trigger: 'blur' }
   ]
 }
 
@@ -325,7 +331,7 @@ const handleLogin = async () => {
       const result = await userStore.login(loginForm.username, loginForm.password)
       
       if (result.success) {
-        ElMessage.success('登录成功')
+        ElMessage.success(t('login.loginSuccess'))
         router.push('/dashboard')
       } else {
         ElMessage.error(result.message)
@@ -354,7 +360,7 @@ const handleRegister = async () => {
         reason: registerForm.reason || null
       })
       
-      ElMessage.success('注册申请已提交，请等待管理员审批')
+      ElMessage.success(t('login.registerSuccess') || '注册申请已提交，请等待管理员审批')
       
       // 显示成功提示后返回登录
       setTimeout(() => {
@@ -364,7 +370,7 @@ const handleRegister = async () => {
       }, 1500)
       
     } catch (error) {
-      const errorMsg = error.response?.data?.detail || '注册申请提交失败'
+      const errorMsg = error.response?.data?.detail || t('common.failed')
       ElMessage.error(errorMsg)
     } finally {
       registerLoading.value = false
@@ -383,7 +389,7 @@ const checkStatus = async () => {
     try {
       registrationStatus.value = await request.get(`/auth/register/status/${statusForm.username}`)
     } catch (error) {
-      const errorMsg = error.response?.data?.detail || '查询失败'
+      const errorMsg = error.response?.data?.detail || t('common.failed')
       ElMessage.error(errorMsg)
       registrationStatus.value = null
     } finally {
@@ -395,9 +401,9 @@ const checkStatus = async () => {
 // 状态相关方法
 const getStatusTitle = (status) => {
   const titles = {
-    pending: '待审批',
-    approved: '已通过',
-    rejected: '已拒绝'
+    pending: t('login.statusPending') || '待审批',
+    approved: t('login.statusApproved') || '已通过',
+    rejected: t('login.statusRejected') || '已拒绝'
   }
   return titles[status] || status
 }
@@ -465,13 +471,6 @@ const formatTime = (time) => {
       gap: 20px;
     }
     
-    .login-tips {
-      text-align: center;
-      margin-top: 15px;
-      color: #999;
-      font-size: 12px;
-    }
-    
     .status-result {
       margin-top: 20px;
       
@@ -484,6 +483,15 @@ const formatTime = (time) => {
         }
       }
     }
+  }
+  
+  .lang-switch-wrapper {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 6px;
+    padding: 8px 12px;
   }
 }
 </style>
