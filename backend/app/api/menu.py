@@ -235,26 +235,26 @@ async def init_default_menus(
     
     # Default menu configuration (top-level menus)
     parent_menus = [
-        {"name": "Dashboard", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
-        {"name": "Instances", "path": "/instances", "icon": "Server", "sort_order": 2, "roles": "super_admin,approval_admin,operator"},
-        {"name": "Environments", "path": "/environments", "icon": "Collection", "sort_order": 3, "roles": "super_admin,approval_admin,operator"},
-        {"name": "SQL Editor", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
-        {"name": "Approvals", "path": "/approvals", "icon": "Stamp", "sort_order": 5},
-        {"name": "Monitor", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
-        {"name": "Scripts", "path": "/scripts", "icon": "DocumentCopy", "sort_order": 7, "roles": "super_admin,approval_admin,operator"},
-        {"name": "Scheduled Tasks", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
-        {"name": "Users", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
-        {"name": "Registrations", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
-        {"name": "Notification", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
-        {"name": "Audit Logs", "path": "/audit", "icon": "Tickets", "sort_order": 12},
-        {"name": "Menu Config", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
+        {"name": "仪表盘", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
+        {"name": "实例管理", "path": "/instances", "icon": "Server", "sort_order": 2, "roles": "super_admin,approval_admin,operator"},
+        {"name": "环境管理", "path": "/environments", "icon": "Collection", "sort_order": 3, "roles": "super_admin,approval_admin,operator"},
+        {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
+        {"name": "变更审批", "path": "/approvals", "icon": "Stamp", "sort_order": 5},
+        {"name": "监控中心", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
+        {"name": "脚本管理", "path": "/scripts", "icon": "DocumentCopy", "sort_order": 7, "roles": "super_admin,approval_admin,operator"},
+        {"name": "定时任务", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
+        {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
+        {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
+        {"name": "通知管理", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
+        {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
+        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
     ]
     
     # Sub-menu configuration
     child_menus = [
-        {"name": "Performance", "path": "/monitor/performance", "icon": "TrendCharts", "sort_order": 1, "parent_path": "/monitor"},
-        {"name": "Slow Query", "path": "/monitor/slow-query", "icon": "Timer", "sort_order": 2, "parent_path": "/monitor"},
-        {"name": "Monitor Settings", "path": "/monitor/settings", "icon": "Setting", "sort_order": 3, "parent_path": "/monitor"},
+        {"name": "性能监控", "path": "/monitor/performance", "icon": "TrendCharts", "sort_order": 1, "parent_path": "/monitor"},
+        {"name": "慢查询监控", "path": "/monitor/slow-query", "icon": "Timer", "sort_order": 2, "parent_path": "/monitor"},
+        {"name": "监控配置", "path": "/monitor/settings", "icon": "Setting", "sort_order": 3, "parent_path": "/monitor"},
     ]
     
     # Create top-level menus and record path-to-ID mapping
@@ -285,19 +285,19 @@ async def add_missing_menus(
     """Add missing menus (used for version upgrades)"""
     # Required menus
     required_menus = [
-        {"name": "Dashboard", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
-        {"name": "Instances", "path": "/instances", "icon": "Server", "sort_order": 2, "roles": "super_admin,approval_admin,operator"},
-        {"name": "Environments", "path": "/environments", "icon": "Collection", "sort_order": 3, "roles": "super_admin,approval_admin,operator"},
-        {"name": "SQL Editor", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
-        {"name": "Approvals", "path": "/approvals", "icon": "Stamp", "sort_order": 5},
-        {"name": "Monitor", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
-        {"name": "Scripts", "path": "/scripts", "icon": "DocumentCopy", "sort_order": 7, "roles": "super_admin,approval_admin,operator"},
-        {"name": "Scheduled Tasks", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
-        {"name": "Users", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
-        {"name": "Registrations", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
-        {"name": "Notification", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
-        {"name": "Audit Logs", "path": "/audit", "icon": "Tickets", "sort_order": 12},
-        {"name": "Menu Config", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
+        {"name": "仪表盘", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
+        {"name": "实例管理", "path": "/instances", "icon": "Server", "sort_order": 2, "roles": "super_admin,approval_admin,operator"},
+        {"name": "环境管理", "path": "/environments", "icon": "Collection", "sort_order": 3, "roles": "super_admin,approval_admin,operator"},
+        {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
+        {"name": "变更审批", "path": "/approvals", "icon": "Stamp", "sort_order": 5},
+        {"name": "监控中心", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
+        {"name": "脚本管理", "path": "/scripts", "icon": "DocumentCopy", "sort_order": 7, "roles": "super_admin,approval_admin,operator"},
+        {"name": "定时任务", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
+        {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
+        {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
+        {"name": "通知管理", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
+        {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
+        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
     ]
     
     added_count = 0
@@ -313,9 +313,9 @@ async def add_missing_menus(
     monitor_parent = db.query(MenuConfig).filter(MenuConfig.path == "/monitor").first()
     if monitor_parent:
         child_menus = [
-            {"name": "Performance", "path": "/monitor/performance", "icon": "TrendCharts", "sort_order": 1},
-            {"name": "Slow Query", "path": "/monitor/slow-query", "icon": "Timer", "sort_order": 2},
-            {"name": "Monitor Settings", "path": "/monitor/settings", "icon": "Setting", "sort_order": 3},
+            {"name": "性能监控", "path": "/monitor/performance", "icon": "TrendCharts", "sort_order": 1},
+            {"name": "慢查询监控", "path": "/monitor/slow-query", "icon": "Timer", "sort_order": 2},
+            {"name": "监控配置", "path": "/monitor/settings", "icon": "Setting", "sort_order": 3},
         ]
         
         for menu_data in child_menus:

@@ -14,7 +14,7 @@
         <transition name="fade">
           <div v-if="!isCollapse" class="logo-text">
             <span class="title">OpsCenter</span>
-            <span class="subtitle">Database Platform</span>
+            <span class="subtitle">数据库运维平台</span>
           </div>
         </transition>
       </div>
@@ -32,21 +32,21 @@
             <el-sub-menu v-if="item.children && item.children.length > 0" :index="item.path || `menu-${item.id}`">
               <template #title>
                 <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-                <span>{{ translateMenu(item.name) }}</span>
+                <span>{{ item.name }}</span>
               </template>
               <el-menu-item
                 v-for="child in item.children"
                 :key="child.path"
                 :index="child.path"
               >
-                {{ translateMenu(child.name) }}
+                {{ child.name }}
               </el-menu-item>
             </el-sub-menu>
             
             <!-- 无子菜单 -->
             <el-menu-item v-else :index="item.path || `menu-${item.id}`">
               <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
-              <template #title>{{ translateMenu(item.name) }}</template>
+              <template #title>{{ item.name }}</template>
             </el-menu-item>
           </template>
         </el-menu>
@@ -72,15 +72,12 @@
         <div class="header-left">
           <el-breadcrumb separator="/">
             <el-breadcrumb-item v-for="item in breadcrumbs" :key="item.path">
-              {{ translateMenu(item.title) }}
+              {{ item.title }}
             </el-breadcrumb-item>
           </el-breadcrumb>
         </div>
         
         <div class="header-right">
-          <!-- 语言切换 -->
-          <LangSwitch class="header-lang" />
-          
           <!-- 用户信息 -->
           <el-dropdown @command="handleCommand" trigger="click">
             <div class="user-info">
@@ -102,7 +99,7 @@
                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
                     <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                   </svg>
-                  {{ $t('user.changePassword') || '修改密码' }}
+                  修改密码
                 </el-dropdown-item>
                 <el-dropdown-item divided command="logout">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -110,7 +107,7 @@
                     <polyline points="16 17 21 12 16 7"/>
                     <line x1="21" y1="12" x2="9" y2="12"/>
                   </svg>
-                  {{ $t('nav.logout') }}
+                  退出登录
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -129,36 +126,36 @@
     </el-container>
     
     <!-- 修改密码对话框 -->
-    <el-dialog v-model="passwordDialog.visible" :title="$t('user.changePassword') || '修改密码'" width="420px">
+    <el-dialog v-model="passwordDialog.visible" title="修改密码" width="420px">
       <el-form :model="passwordDialog.form" label-width="100px">
-        <el-form-item :label="$t('user.oldPassword')">
+        <el-form-item label="原密码">
           <el-input
             v-model="passwordDialog.form.oldPassword"
             type="password"
             show-password
-            :placeholder="$t('common.pleaseInput')"
+            placeholder="请输入原密码"
           />
         </el-form-item>
-        <el-form-item :label="$t('user.newPassword')">
+        <el-form-item label="新密码">
           <el-input
             v-model="passwordDialog.form.newPassword"
             type="password"
             show-password
-            :placeholder="$t('common.pleaseInput')"
+            placeholder="请输入新密码"
           />
         </el-form-item>
-        <el-form-item :label="$t('user.confirmPassword')">
+        <el-form-item label="确认密码">
           <el-input
             v-model="passwordDialog.form.confirmPassword"
             type="password"
             show-password
-            :placeholder="$t('common.pleaseInput')"
+            placeholder="请再次输入新密码"
           />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="passwordDialog.visible = false">{{ $t('common.cancel') }}</el-button>
-        <el-button type="primary" @click="changePassword">{{ $t('common.confirm') }}</el-button>
+        <el-button @click="passwordDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="changePassword">确认</el-button>
       </template>
     </el-dialog>
   </el-container>
@@ -167,14 +164,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { authApi } from '@/api/auth'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import LangSwitch from '@/components/LangSwitch.vue'
-
-const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -183,67 +176,13 @@ const userStore = useUserStore()
 const isCollapse = ref(false)
 const dynamicMenus = ref([])
 
-// Menu name translation mapping
-const menuNameMap = {
-  // Chinese menu names (for backward compatibility)
-  '仪表盘': 'nav.dashboard',
-  '实例管理': 'nav.instances',
-  'SQL编辑器': 'nav.sqlEditor',
-  '变更审批': 'nav.approvals',
-  '慢查询监控': 'nav.slowQuery',
-  '性能监控': 'nav.performance',
-  '脚本管理': 'nav.scripts',
-  '定时任务': 'nav.scheduledTasks',
-  '钉钉通知': 'nav.dingtalk',
-  '用户管理': 'nav.users',
-  '环境管理': 'nav.environments',
-  '审计日志': 'nav.audit',
-  '菜单配置': 'nav.menuConfig',
-  '系统设置': 'nav.settings',
-  '监控中心': 'nav.monitor',
-  '监控配置': 'nav.monitorSettings',
-  '注册审批': 'nav.registrations',
-  '通知管理': 'nav.notification',
-  '实例详情': 'nav.instanceDetail',
-  // English menu names
-  'Dashboard': 'nav.dashboard',
-  'Instances': 'nav.instances',
-  'SQL Editor': 'nav.sqlEditor',
-  'Approvals': 'nav.approvals',
-  'Slow Query': 'nav.slowQuery',
-  'Performance': 'nav.performance',
-  'Scripts': 'nav.scripts',
-  'Scheduled Tasks': 'nav.scheduledTasks',
-  'DingTalk': 'nav.dingtalk',
-  'Users': 'nav.users',
-  'Environments': 'nav.environments',
-  'Audit Logs': 'nav.audit',
-  'Menu Config': 'nav.menuConfig',
-  'Settings': 'nav.settings',
-  'Monitor': 'nav.monitor',
-  'Monitor Settings': 'nav.monitorSettings',
-  'Registrations': 'nav.registrations',
-  'Notification': 'nav.notification',
-  'Instance Detail': 'nav.instanceDetail',
-}
-
-// 翻译菜单名称
-const translateMenu = (name) => {
-  if (!name) return ''
-  const key = menuNameMap[name]
-  if (key) {
-    return t(key)
-  }
-  return name
-}
-
 // 角色名称
 const getRoleName = (role) => {
   const roles = {
-    'super_admin': t('user.superAdmin'),
-    'admin': t('user.admin'),
-    'operator': t('user.operator'),
-    'readonly': t('user.readonly')
+    'super_admin': '超级管理员',
+    'admin': '管理员',
+    'operator': '运维人员',
+    'readonly': '只读用户'
   }
   return roles[role] || role
 }
@@ -316,7 +255,7 @@ const handleCommand = (command) => {
       passwordDialog.value.visible = true
       break
     case 'logout':
-      ElMessageBox.confirm(t('login.logout') + '?', t('common.tip'), {
+      ElMessageBox.confirm('确定要退出登录吗？', '提示', {
         type: 'warning'
       }).then(() => {
         userStore.logout()
@@ -330,23 +269,23 @@ const changePassword = async () => {
   const { oldPassword, newPassword, confirmPassword } = passwordDialog.value.form
   
   if (!oldPassword || !newPassword || !confirmPassword) {
-    ElMessage.warning(t('common.pleaseInput'))
+    ElMessage.warning('请填写完整信息')
     return
   }
   
   if (newPassword !== confirmPassword) {
-    ElMessage.warning(t('common.pleaseInput'))
+    ElMessage.warning('两次输入的密码不一致')
     return
   }
   
   if (newPassword.length < 6) {
-    ElMessage.warning(t('common.pleaseInput'))
+    ElMessage.warning('密码长度不能少于6位')
     return
   }
   
   try {
     await authApi.changePassword(oldPassword, newPassword)
-    ElMessage.success(t('common.success'))
+    ElMessage.success('密码修改成功，请重新登录')
     passwordDialog.value.visible = false
     userStore.logout()
   } catch (error) {
@@ -578,10 +517,6 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 12px;
-    
-    .header-lang {
-      margin-right: 8px;
-    }
     
     .user-info {
       display: flex;

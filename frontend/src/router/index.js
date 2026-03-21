@@ -25,61 +25,61 @@ const routes = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: 'Dashboard', icon: 'DataAnalysis' }
+        meta: { title: '仪表盘', icon: 'DataAnalysis' }
       },
       {
         path: 'instances',
         name: 'Instances',
         component: () => import('@/views/instances/index.vue'),
-        meta: { title: 'Instances', icon: 'Server', roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '实例管理', icon: 'Server', roles: ['super_admin', 'approval_admin', 'operator'] }
       },
       {
         path: 'instances/:id',
         name: 'InstanceDetail',
         component: () => import('@/views/instances/detail.vue'),
-        meta: { title: 'Instance Detail', hidden: true, roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '实例详情', hidden: true, roles: ['super_admin', 'approval_admin', 'operator'] }
       },
       {
         path: 'environments',
         name: 'Environments',
         component: () => import('@/views/environments/index.vue'),
-        meta: { title: 'Environments', icon: 'Collection', roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '环境管理', icon: 'Collection', roles: ['super_admin', 'approval_admin', 'operator'] }
       },
       {
         path: 'sql-editor',
         name: 'SqlEditor',
         component: () => import('@/views/sql-editor/index.vue'),
-        meta: { title: 'SQL Editor', icon: 'Document' }
+        meta: { title: 'SQL编辑器', icon: 'Document' }
       },
       {
         path: 'approvals',
         name: 'Approvals',
         component: () => import('@/views/approvals/index.vue'),
-        meta: { title: 'Approvals', icon: 'Stamp' }
+        meta: { title: '变更审批', icon: 'Stamp' }
       },
       {
         path: 'monitor',
         name: 'Monitor',
         redirect: '/monitor/performance',
-        meta: { title: 'Monitor', icon: 'Monitor' },
+        meta: { title: '监控中心', icon: 'Monitor' },
         children: [
           {
             path: 'performance',
             name: 'Performance',
             component: () => import('@/views/monitor/performance.vue'),
-            meta: { title: 'Performance' }
+            meta: { title: '性能监控' }
           },
           {
             path: 'slow-query',
             name: 'SlowQuery',
             component: () => import('@/views/monitor/slow-query.vue'),
-            meta: { title: 'Slow Query' }
+            meta: { title: '慢查询监控' }
           },
           {
             path: 'settings',
             name: 'MonitorSettings',
             component: () => import('@/views/monitor/settings.vue'),
-            meta: { title: 'Monitor Settings' }
+            meta: { title: '监控配置' }
           }
         ]
       },
@@ -87,43 +87,43 @@ const routes = [
         path: 'users',
         name: 'Users',
         component: () => import('@/views/users/index.vue'),
-        meta: { title: 'Users', icon: 'User', roles: ['super_admin'] }
+        meta: { title: '用户管理', icon: 'User', roles: ['super_admin'] }
       },
       {
         path: 'registrations',
         name: 'Registrations',
         component: () => import('@/views/registrations/index.vue'),
-        meta: { title: 'Registrations', icon: 'UserFilled', roles: ['super_admin'] }
+        meta: { title: '注册审批', icon: 'UserFilled', roles: ['super_admin'] }
       },
       {
         path: 'menu-config',
         name: 'MenuConfig',
         component: () => import('@/views/menu-config/index.vue'),
-        meta: { title: 'Menu Config', icon: 'Menu', roles: ['super_admin'] }
+        meta: { title: '菜单配置', icon: 'Menu', roles: ['super_admin'] }
       },
       {
         path: 'notification',
         name: 'Notification',
         component: () => import('@/views/notification/index.vue'),
-        meta: { title: 'Notification', icon: 'ChatDotRound', roles: ['super_admin'] }
+        meta: { title: '通知管理', icon: 'ChatDotRound', roles: ['super_admin'] }
       },
       {
         path: 'audit',
         name: 'Audit',
         component: () => import('@/views/audit/index.vue'),
-        meta: { title: 'Audit Logs', icon: 'Tickets' }
+        meta: { title: '审计日志', icon: 'Tickets' }
       },
       {
         path: 'scripts',
         name: 'Scripts',
         component: () => import('@/views/scripts/index.vue'),
-        meta: { title: 'Scripts', icon: 'DocumentCopy', roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '脚本管理', icon: 'DocumentCopy', roles: ['super_admin', 'approval_admin', 'operator'] }
       },
       {
         path: 'scheduled-tasks',
         name: 'ScheduledTasks',
         component: () => import('@/views/scheduled-tasks/index.vue'),
-        meta: { title: 'Scheduled Tasks', icon: 'Timer', roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '定时任务', icon: 'Timer', roles: ['super_admin', 'approval_admin', 'operator'] }
       }
     ]
   }

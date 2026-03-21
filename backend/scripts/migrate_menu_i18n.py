@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Menu Internationalization Migration Script
-Migrate menu names from Chinese to English
+Migrate menu names from English to Chinese
 
 Usage:
     cd backend && python scripts/migrate_menu_i18n.py
@@ -15,27 +15,27 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from sqlalchemy import text
 from app.database import SessionLocal, engine
 
-# Menu name mappings: Chinese -> English
+# Menu name mappings: English -> Chinese
 MENU_MIGRATIONS = [
     # Parent menus
-    ("仪表盘", "Dashboard", "/dashboard"),
-    ("实例管理", "Instances", "/instances"),
-    ("环境管理", "Environments", "/environments"),
-    ("SQL编辑器", "SQL Editor", "/sql-editor"),
-    ("变更审批", "Approvals", "/approvals"),
-    ("监控中心", "Monitor", "/monitor"),
-    ("脚本管理", "Scripts", "/scripts"),
-    ("定时任务", "Scheduled Tasks", "/scheduled-tasks"),
-    ("用户管理", "Users", "/users"),
-    ("注册审批", "Registrations", "/registrations"),
-    ("通知管理", "Notification", "/notification"),
-    ("审计日志", "Audit Logs", "/audit"),
-    ("菜单配置", "Menu Config", "/menu-config"),
+    ("Dashboard", "仪表盘", "/dashboard"),
+    ("Instances", "实例管理", "/instances"),
+    ("Environments", "环境管理", "/environments"),
+    ("SQL Editor", "SQL编辑器", "/sql-editor"),
+    ("Approvals", "变更审批", "/approvals"),
+    ("Monitor", "监控中心", "/monitor"),
+    ("Scripts", "脚本管理", "/scripts"),
+    ("Scheduled Tasks", "定时任务", "/scheduled-tasks"),
+    ("Users", "用户管理", "/users"),
+    ("Registrations", "注册审批", "/registrations"),
+    ("Notification", "通知管理", "/notification"),
+    ("Audit Logs", "审计日志", "/audit"),
+    ("Menu Config", "菜单配置", "/menu-config"),
     
     # Child menus (Monitor sub-menus)
-    ("性能监控", "Performance", "/monitor/performance"),
-    ("慢查询监控", "Slow Query", "/monitor/slow-query"),
-    ("监控配置", "Monitor Settings", "/monitor/settings"),
+    ("Performance", "性能监控", "/monitor/performance"),
+    ("Slow Query", "慢查询监控", "/monitor/slow-query"),
+    ("Monitor Settings", "监控配置", "/monitor/settings"),
 ]
 
 
@@ -44,7 +44,7 @@ def run_migration():
     db = SessionLocal()
     try:
         print("=" * 50)
-        print("Menu i18n Migration Script")
+        print("Menu i18n Migration Script (English -> Chinese)")
         print("=" * 50)
         
         # Check if menu_configs table exists
@@ -67,15 +67,15 @@ def run_migration():
         
         # Migrate each menu
         migrated = 0
-        for chinese_name, english_name, path in MENU_MIGRATIONS:
+        for english_name, chinese_name, path in MENU_MIGRATIONS:
             result = db.execute(text("""
                 UPDATE menu_configs 
-                SET name = :english_name 
-                WHERE path = :path AND name = :chinese_name
-            """), {"english_name": english_name, "path": path, "chinese_name": chinese_name})
+                SET name = :chinese_name 
+                WHERE path = :path AND name = :english_name
+            """), {"chinese_name": chinese_name, "path": path, "english_name": english_name})
             
             if result.rowcount > 0:
-                print(f"  ✓ '{chinese_name}' -> '{english_name}' ({path})")
+                print(f"  ✓ '{english_name}' -> '{chinese_name}' ({path})")
                 migrated += result.rowcount
         
         # Commit changes

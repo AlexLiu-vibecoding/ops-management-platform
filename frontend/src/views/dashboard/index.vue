@@ -4,8 +4,8 @@
     <div class="page-header">
       <div class="header-content">
         <div class="header-left">
-          <h1 class="page-title">{{ $t('nav.dashboard') || 'Dashboard' }}</h1>
-          <p class="page-subtitle">Welcome back, {{ userName }}</p>
+          <h1 class="page-title">仪表盘</h1>
+          <p class="page-subtitle">欢迎回来，{{ userName }}</p>
         </div>
         <div class="header-right">
           <button class="refresh-btn" @click="refreshAll" :disabled="loading">
@@ -13,7 +13,7 @@
               <path d="M23 4v6h-6M1 20v-6h6"/>
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
             </svg>
-            <span>{{ $t('common.refresh') || 'Refresh' }}</span>
+            <span>刷新</span>
           </button>
         </div>
       </div>
@@ -32,7 +32,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-value">{{ animatedStats.instanceCount }}</div>
-            <div class="stat-label">{{ $t('dashboard.instances') || '数据库实例' }}</div>
+            <div class="stat-label">数据库实例</div>
           </div>
         </div>
         <div class="stat-decoration"></div>
@@ -48,7 +48,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-value">{{ animatedStats.onlineCount }}</div>
-            <div class="stat-label">{{ $t('dashboard.online') || '在线实例' }}</div>
+            <div class="stat-label">在线实例</div>
           </div>
         </div>
         <div class="stat-decoration"></div>
@@ -67,7 +67,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-value">{{ animatedStats.pendingApprovalCount }}</div>
-            <div class="stat-label">{{ $t('dashboard.pendingApprovals') || '待审批' }}</div>
+            <div class="stat-label">待审批</div>
           </div>
         </div>
         <div class="stat-decoration"></div>
@@ -84,7 +84,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-value">{{ animatedStats.alertCount }}</div>
-            <div class="stat-label">{{ $t('dashboard.alerts') || '告警' }}</div>
+            <div class="stat-label">告警</div>
           </div>
         </div>
         <div class="stat-decoration"></div>
@@ -94,7 +94,7 @@
     <!-- 性能概览卡片 -->
     <div class="performance-section">
       <div class="section-header">
-        <h2 class="section-title">{{ $t('dashboard.performanceOverview') || '实例性能概览' }}</h2>
+        <h2 class="section-title">实例性能概览</h2>
         <div class="section-actions">
           <span class="last-update">{{ lastUpdateTime }}</span>
         </div>
@@ -120,7 +120,7 @@
           <div class="card-status">
             <span class="status-dot" :class="{ active: item.monitor_enabled }"></span>
             <span class="status-text">
-              {{ item.monitor_enabled ? ($t('common.enabled') || '已启用') : ($t('common.disabled') || '已禁用') }}
+              {{ item.monitor_enabled ? '已启用' : '已禁用' }}
             </span>
           </div>
 
@@ -144,7 +144,7 @@
             </div>
 
             <div class="metric-item">
-              <div class="metric-label">{{ $t('dashboard.memory') || '内存' }}</div>
+              <div class="metric-label">内存</div>
               <div class="metric-value" v-if="item.current_memory !== null">
                 <span class="metric-number">{{ item.current_memory.toFixed(1) }}</span>
                 <span class="metric-unit">%</span>
@@ -164,7 +164,7 @@
 
           <div class="card-footer">
             <div class="footer-stat">
-              <span class="footer-label">{{ $t('dashboard.connections') || '连接' }}</span>
+              <span class="footer-label">连接</span>
               <span class="footer-value">{{ item.current_connections || '-' }}</span>
             </div>
             <div class="footer-stat">
@@ -172,7 +172,7 @@
               <span class="footer-value">{{ item.current_qps ? item.current_qps.toFixed(0) : '-' }}</span>
             </div>
             <div class="footer-stat">
-              <span class="footer-label">{{ $t('dashboard.collectTime') || '采集时间' }}</span>
+              <span class="footer-label">采集时间</span>
               <span class="footer-value">{{ formatTime(item.collect_time) }}</span>
             </div>
           </div>
@@ -185,7 +185,7 @@
             <line x1="8" y1="21" x2="16" y2="21"/>
             <line x1="12" y1="17" x2="12" y2="21"/>
           </svg>
-          <p>{{ $t('common.noData') || '暂无数据' }}</p>
+          <p>暂无数据</p>
         </div>
       </div>
     </div>
@@ -227,7 +227,7 @@ const animatedStats = reactive({
 const performanceData = ref([])
 
 const userName = computed(() => {
-  return userStore.user?.real_name || userStore.user?.username || 'User'
+  return userStore.user?.real_name || userStore.user?.username || '用户'
 })
 
 // 动画数字
@@ -256,7 +256,7 @@ const refreshAll = async () => {
   loading.value = true
   try {
     await refreshPerformance()
-    lastUpdateTime.value = `${dayjs().format('HH:mm:ss')} ${$t('dashboard.updated') || '已更新'}`
+    lastUpdateTime.value = `${dayjs().format('HH:mm:ss')} 已更新`
   } finally {
     loading.value = false
   }

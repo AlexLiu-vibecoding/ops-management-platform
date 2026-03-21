@@ -7,11 +7,6 @@
       <div class="blob blob-3"></div>
     </div>
 
-    <!-- 语言切换 -->
-    <div class="lang-switch-wrapper">
-      <LangSwitch />
-    </div>
-
     <!-- 主内容 -->
     <div class="login-container">
       <!-- 左侧品牌区 -->
@@ -25,7 +20,7 @@
             </svg>
           </div>
           <h1 class="brand-title">OpsCenter</h1>
-          <p class="brand-subtitle">{{ $t('login.subtitle') || '企业级数据库运维管理平台' }}</p>
+          <p class="brand-subtitle">企业级数据库运维管理平台</p>
           
           <div class="features">
             <div class="feature-item">
@@ -33,21 +28,21 @@
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
-              <span>{{ $t('feature.multiInstance') || '多实例管理' }}</span>
+              <span>多实例管理</span>
             </div>
             <div class="feature-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
-              <span>{{ $t('feature.realTime') || '实时监控' }}</span>
+              <span>实时监控</span>
             </div>
             <div class="feature-item">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
-              <span>{{ $t('feature.aiOptimize') || 'AI智能优化' }}</span>
+              <span>AI智能优化</span>
             </div>
           </div>
         </div>
@@ -58,8 +53,8 @@
         <div class="form-wrapper">
           <!-- 登录表单 -->
           <div v-if="!showRegister && !showStatus" class="form-container">
-            <h2 class="form-title">{{ $t('login.welcome') || '欢迎回来' }}</h2>
-            <p class="form-subtitle">{{ $t('login.loginHint') || '请登录您的账户' }}</p>
+            <h2 class="form-title">欢迎回来</h2>
+            <p class="form-subtitle">请登录您的账户</p>
             
             <el-form
               ref="loginFormRef"
@@ -69,10 +64,10 @@
             >
               <el-form-item prop="username">
                 <div class="input-wrapper">
-                  <label class="input-label">{{ $t('login.username') }}</label>
+                  <label class="input-label">用户名</label>
                   <el-input
                     v-model="loginForm.username"
-                    :placeholder="$t('login.usernamePlaceholder') || '请输入用户名'"
+                    placeholder="请输入用户名"
                     size="large"
                     class="ios-input"
                   >
@@ -88,11 +83,11 @@
               
               <el-form-item prop="password">
                 <div class="input-wrapper">
-                  <label class="input-label">{{ $t('login.password') }}</label>
+                  <label class="input-label">密码</label>
                   <el-input
                     v-model="loginForm.password"
                     type="password"
-                    :placeholder="$t('login.passwordPlaceholder') || '请输入密码'"
+                    placeholder="请输入密码"
                     size="large"
                     show-password
                     class="ios-input"
@@ -114,22 +109,22 @@
                 :disabled="loading"
                 @click="handleLogin"
               >
-                <span v-if="!loading">{{ $t('login.login') }}</span>
+                <span v-if="!loading">登 录</span>
                 <span v-else class="loading-content">
                   <svg class="spinner" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4" stroke-dashoffset="10"/>
                   </svg>
-                  {{ $t('login.logging') || '登录中...' }}
+                  登录中...
                 </span>
               </button>
             </el-form>
             
             <div class="form-footer">
               <button type="button" class="link-btn" @click="showRegister = true">
-                {{ $t('login.noAccount') || '没有账号？立即注册' }}
+                没有账号？立即注册
               </button>
               <button type="button" class="link-btn secondary" @click="showStatus = true">
-                {{ $t('login.checkStatus') || '查询注册状态' }}
+                查询注册状态
               </button>
             </div>
           </div>
@@ -142,8 +137,8 @@
               </svg>
             </button>
             
-            <h2 class="form-title">{{ $t('login.register') || '用户注册' }}</h2>
-            <p class="form-subtitle">{{ $t('login.registerHint') || '注册申请需超级管理员审批' }}</p>
+            <h2 class="form-title">用户注册</h2>
+            <p class="form-subtitle">注册申请需超级管理员审批</p>
             
             <el-form
               ref="registerFormRef"
@@ -154,20 +149,20 @@
             >
               <el-row :gutter="16">
                 <el-col :span="12">
-                  <el-form-item prop="username" :label="$t('login.username')">
+                  <el-form-item prop="username" label="用户名">
                     <el-input
                       v-model="registerForm.username"
-                      :placeholder="$t('login.usernameHint') || '3-50位字母数字'"
+                      placeholder="3-50位字母数字"
                       size="large"
                       class="ios-input"
                     />
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item prop="real_name" :label="$t('user.realName')">
+                  <el-form-item prop="real_name" label="真实姓名">
                     <el-input
                       v-model="registerForm.real_name"
-                      :placeholder="$t('common.pleaseInput')"
+                      placeholder="请输入真实姓名"
                       size="large"
                       class="ios-input"
                     />
@@ -177,11 +172,11 @@
               
               <el-row :gutter="16">
                 <el-col :span="12">
-                  <el-form-item prop="password" :label="$t('login.password')">
+                  <el-form-item prop="password" label="密码">
                     <el-input
                       v-model="registerForm.password"
                       type="password"
-                      :placeholder="$t('login.passwordHint') || '至少6位'"
+                      placeholder="至少6位"
                       size="large"
                       show-password
                       class="ios-input"
@@ -189,11 +184,11 @@
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item prop="confirmPassword" :label="$t('user.confirmPassword')">
+                  <el-form-item prop="confirmPassword" label="确认密码">
                     <el-input
                       v-model="registerForm.confirmPassword"
                       type="password"
-                      :placeholder="$t('common.pleaseInput')"
+                      placeholder="请再次输入密码"
                       size="large"
                       show-password
                       class="ios-input"
@@ -202,7 +197,7 @@
                 </el-col>
               </el-row>
               
-              <el-form-item prop="email" :label="$t('user.email')">
+              <el-form-item prop="email" label="邮箱">
                 <el-input
                   v-model="registerForm.email"
                   placeholder="example@company.com"
@@ -211,7 +206,7 @@
                 />
               </el-form-item>
               
-              <el-form-item prop="phone" :label="$t('user.phone') + ' (' + ($t('common.optional') || '可选') + ')'">
+              <el-form-item prop="phone" label="手机号 (可选)">
                 <el-input
                   v-model="registerForm.phone"
                   placeholder="138xxxxxxxx"
@@ -220,12 +215,12 @@
                 />
               </el-form-item>
               
-              <el-form-item prop="reason" :label="$t('login.reason') + ' (' + ($t('common.optional') || '可选') + ')'">
+              <el-form-item prop="reason" label="申请理由 (可选)">
                 <el-input
                   v-model="registerForm.reason"
                   type="textarea"
                   :rows="3"
-                  :placeholder="$t('login.reasonPlaceholder') || '请说明申请理由'"
+                  placeholder="请说明申请理由"
                   class="ios-textarea"
                 />
               </el-form-item>
@@ -236,12 +231,12 @@
                 :disabled="registerLoading"
                 @click="handleRegister"
               >
-                <span v-if="!registerLoading">{{ $t('login.submitRegister') || '提交注册申请' }}</span>
+                <span v-if="!registerLoading">提交注册申请</span>
                 <span v-else class="loading-content">
                   <svg class="spinner" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4" stroke-dashoffset="10"/>
                   </svg>
-                  {{ $t('common.submitting') || '提交中...' }}
+                  提交中...
                 </span>
               </button>
             </el-form>
@@ -255,8 +250,8 @@
               </svg>
             </button>
             
-            <h2 class="form-title">{{ $t('login.checkStatus') || '查询注册状态' }}</h2>
-            <p class="form-subtitle">{{ $t('login.checkStatusHint') || '输入用户名查询注册申请状态' }}</p>
+            <h2 class="form-title">查询注册状态</h2>
+            <p class="form-subtitle">输入用户名查询注册申请状态</p>
             
             <el-form
               ref="statusFormRef"
@@ -266,10 +261,10 @@
             >
               <el-form-item prop="username">
                 <div class="input-wrapper">
-                  <label class="input-label">{{ $t('login.username') }}</label>
+                  <label class="input-label">用户名</label>
                   <el-input
                     v-model="statusForm.username"
-                    :placeholder="$t('login.usernamePlaceholder') || '请输入用户名'"
+                    placeholder="请输入用户名"
                     size="large"
                     class="ios-input"
                   >
@@ -289,12 +284,12 @@
                 :disabled="statusLoading"
                 @click="checkStatus"
               >
-                <span v-if="!statusLoading">{{ $t('login.checkStatus') || '查询状态' }}</span>
+                <span v-if="!statusLoading">查询状态</span>
                 <span v-else class="loading-content">
                   <svg class="spinner" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" fill="none" stroke-dasharray="31.4" stroke-dashoffset="10"/>
                   </svg>
-                  {{ $t('common.querying') || '查询中...' }}
+                  查询中...
                 </span>
               </button>
             </el-form>
@@ -320,14 +315,14 @@
                 <div class="status-info">
                   <h3>{{ getStatusTitle(registrationStatus.status) }}</h3>
                   <div class="status-detail">
-                    <p><strong>{{ $t('login.username') }}：</strong>{{ registrationStatus.username }}</p>
-                    <p><strong>{{ $t('user.realName') }}：</strong>{{ registrationStatus.real_name }}</p>
-                    <p><strong>{{ $t('common.createTime') }}：</strong>{{ formatTime(registrationStatus.created_at) }}</p>
+                    <p><strong>用户名：</strong>{{ registrationStatus.username }}</p>
+                    <p><strong>真实姓名：</strong>{{ registrationStatus.real_name }}</p>
+                    <p><strong>申请时间：</strong>{{ formatTime(registrationStatus.created_at) }}</p>
                     <p v-if="registrationStatus.review_time">
-                      <strong>{{ $t('approval.approvalTime') }}：</strong>{{ formatTime(registrationStatus.review_time) }}
+                      <strong>审批时间：</strong>{{ formatTime(registrationStatus.review_time) }}
                     </p>
                     <p v-if="registrationStatus.review_comment" class="comment">
-                      <strong>{{ $t('approval.approvalComment') }}：</strong>{{ registrationStatus.review_comment }}
+                      <strong>审批意见：</strong>{{ registrationStatus.review_comment }}
                     </p>
                   </div>
                 </div>
@@ -343,14 +338,11 @@
 <script setup>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { ElMessage } from 'element-plus'
 import request from '@/api/index'
 import dayjs from 'dayjs'
-import LangSwitch from '@/components/LangSwitch.vue'
 
-const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -374,11 +366,11 @@ const loginForm = reactive({
 
 const loginRules = {
   username: [
-    { required: true, message: t('common.pleaseInput'), trigger: 'blur' }
+    { required: true, message: '请输入用户名', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
-    { min: 6, message: t('login.passwordMin') || '密码长度不能少于6位', trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
   ]
 }
 
@@ -395,7 +387,7 @@ const registerForm = reactive({
 
 const validatePass = (rule, value, callback) => {
   if (value !== registerForm.password) {
-    callback(new Error(t('login.passwordMismatch') || '两次输入的密码不一致'))
+    callback(new Error('两次输入的密码不一致'))
   } else {
     callback()
   }
@@ -403,24 +395,24 @@ const validatePass = (rule, value, callback) => {
 
 const registerRules = {
   username: [
-    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
-    { min: 3, max: 50, message: t('login.usernameLength') || '用户名长度为3-50位', trigger: 'blur' },
-    { pattern: /^[a-zA-Z0-9_]+$/, message: t('login.usernamePattern') || '用户名只能包含字母、数字和下划线', trigger: 'blur' }
+    { required: true, message: '请输入用户名', trigger: 'blur' },
+    { min: 3, max: 50, message: '用户名长度为3-50位', trigger: 'blur' },
+    { pattern: /^[a-zA-Z0-9_]+$/, message: '用户名只能包含字母、数字和下划线', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
-    { min: 6, message: t('login.passwordMin') || '密码长度不能少于6位', trigger: 'blur' }
+    { required: true, message: '请输入密码', trigger: 'blur' },
+    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
   ],
   confirmPassword: [
-    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
+    { required: true, message: '请确认密码', trigger: 'blur' },
     { validator: validatePass, trigger: 'blur' }
   ],
   real_name: [
-    { required: true, message: t('common.pleaseInput'), trigger: 'blur' }
+    { required: true, message: '请输入真实姓名', trigger: 'blur' }
   ],
   email: [
-    { required: true, message: t('common.pleaseInput'), trigger: 'blur' },
-    { type: 'email', message: t('login.invalidEmail') || '请输入有效的邮箱地址', trigger: 'blur' }
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' }
   ]
 }
 
@@ -431,7 +423,7 @@ const statusForm = reactive({
 
 const statusRules = {
   username: [
-    { required: true, message: t('common.pleaseInput'), trigger: 'blur' }
+    { required: true, message: '请输入用户名', trigger: 'blur' }
   ]
 }
 
@@ -447,7 +439,7 @@ const handleLogin = async () => {
       const result = await userStore.login(loginForm.username, loginForm.password)
       
       if (result.success) {
-        ElMessage.success(t('login.loginSuccess'))
+        ElMessage.success('登录成功')
         router.push('/dashboard')
       } else {
         ElMessage.error(result.message)
@@ -476,7 +468,7 @@ const handleRegister = async () => {
         reason: registerForm.reason || null
       })
       
-      ElMessage.success(t('login.registerSuccess') || '注册申请已提交，请等待管理员审批')
+      ElMessage.success('注册申请已提交，请等待管理员审批')
       
       setTimeout(() => {
         showRegister.value = false
@@ -484,7 +476,7 @@ const handleRegister = async () => {
       }, 1500)
       
     } catch (error) {
-      const errorMsg = error.response?.data?.detail || t('common.failed')
+      const errorMsg = error.response?.data?.detail || '操作失败'
       ElMessage.error(errorMsg)
     } finally {
       registerLoading.value = false
@@ -503,7 +495,7 @@ const checkStatus = async () => {
     try {
       registrationStatus.value = await request.get(`/auth/register/status/${statusForm.username}`)
     } catch (error) {
-      const errorMsg = error.response?.data?.detail || t('common.failed')
+      const errorMsg = error.response?.data?.detail || '查询失败'
       ElMessage.error(errorMsg)
       registrationStatus.value = null
     } finally {
@@ -515,9 +507,9 @@ const checkStatus = async () => {
 // 状态相关方法
 const getStatusTitle = (status) => {
   const titles = {
-    pending: t('login.statusPending') || '待审批',
-    approved: t('login.statusApproved') || '已通过',
-    rejected: t('login.statusRejected') || '已拒绝'
+    pending: '待审批',
+    approved: '已通过',
+    rejected: '已拒绝'
   }
   return titles[status] || status
 }
@@ -595,21 +587,6 @@ const formatTime = (time) => {
   66% {
     transform: translate(-20px, 20px) scale(0.95);
   }
-}
-
-// ========================================
-// Language Switch
-// ========================================
-.lang-switch-wrapper {
-  position: absolute;
-  top: 24px;
-  right: 24px;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: 8px 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 // ========================================
