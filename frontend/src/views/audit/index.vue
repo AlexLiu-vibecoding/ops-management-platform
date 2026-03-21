@@ -3,18 +3,18 @@
     <!-- 筛选区域 -->
     <el-card shadow="never" class="search-card">
       <el-form :inline="true" :model="searchForm">
-        <el-form-item label="操作类型">
-          <el-select v-model="searchForm.operation_type" placeholder="全部类型" clearable style="width: 150px;">
+        <el-form-item :label="$t('audit.operationType')">
+          <el-select v-model="searchForm.operation_type" :placeholder="$t('common.all')" clearable style="width: 150px;">
             <el-option
               v-for="type in operationTypes"
-              :key="type"
-              :label="getOperationLabel(type)"
-              :value="type"
+              :key="type.value"
+              :label="type.label"
+              :value="type.value"
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="操作用户">
-          <el-select v-model="searchForm.user_id" placeholder="全部用户" clearable style="width: 120px;">
+        <el-form-item :label="$t('audit.operationUser')">
+          <el-select v-model="searchForm.user_id" :placeholder="$t('common.all')" clearable style="width: 120px;">
             <el-option
               v-for="user in users"
               :key="user.id"
@@ -23,8 +23,8 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="实例">
-          <el-select v-model="searchForm.instance_id" placeholder="全部实例" clearable style="width: 150px;">
+        <el-form-item :label="$t('instances.title')">
+          <el-select v-model="searchForm.instance_id" :placeholder="$t('common.all')" clearable style="width: 150px;">
             <el-option
               v-for="inst in instances"
               :key="inst.id"
@@ -33,13 +33,13 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="时间范围">
+        <el-form-item :label="$t('audit.timeRange')">
           <el-date-picker
             v-model="timeRange"
             type="datetimerange"
             range-separator="至"
-            start-placeholder="开始时间"
-            end-placeholder="结束时间"
+            :start-placeholder="$t('common.pleaseInput')"
+            :end-placeholder="$t('common.pleaseInput')"
             value-format="YYYY-MM-DD HH:mm:ss"
             style="width: 340px;"
             :shortcuts="timeShortcuts"
@@ -48,12 +48,12 @@
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
             <el-icon><Search /></el-icon>
-            搜索
+            {{ $t('common.search') }}
           </el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button @click="handleReset">{{ $t('common.reset') }}</el-button>
           <el-button type="success" @click="handleExport" :loading="exporting">
             <el-icon><Download /></el-icon>
-            导出
+            {{ $t('common.export') }}
           </el-button>
         </el-form-item>
       </el-form>
@@ -63,49 +63,49 @@
     <el-card shadow="never" class="table-card">
       <el-table :data="logList" style="width: 100%" v-loading="loading">
         <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="username" label="操作用户" width="120">
+        <el-table-column prop="username" :label="$t('audit.operationUser')" width="120">
           <template #default="{ row }">
             <el-tag size="small">{{ row.username }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="operation_type" label="操作类型" width="140">
+        <el-table-column prop="operation_type_label" :label="$t('audit.operationType')" width="140">
           <template #default="{ row }">
             <el-tag :type="getOperationTagType(row.operation_type)" size="small">
-              {{ getOperationLabel(row.operation_type) }}
+              {{ row.operation_type_label || row.operation_type }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="operation_detail" label="操作详情" min-width="250" show-overflow-tooltip>
+        <el-table-column prop="operation_detail" :label="$t('audit.operationDetail')" min-width="250" show-overflow-tooltip>
           <template #default="{ row }">
             <span class="detail-text">{{ row.operation_detail }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="instance_name" label="实例" width="180">
+        <el-table-column prop="instance_name" :label="$t('instances.title')" width="180">
           <template #default="{ row }">
             {{ row.instance_name || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="request_path" label="请求路径" width="180" show-overflow-tooltip />
-        <el-table-column prop="response_code" label="状态码" width="90">
+        <el-table-column prop="request_path" :label="$t('audit.requestPath')" width="180" show-overflow-tooltip />
+        <el-table-column prop="response_code" :label="$t('audit.responseCode')" width="90">
           <template #default="{ row }">
             <el-tag :type="row.response_code === 200 ? 'success' : 'danger'" size="small">
               {{ row.response_code }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="request_ip" label="IP地址" width="130">
+        <el-table-column prop="request_ip" :label="$t('audit.requestIP')" width="130">
           <template #default="{ row }">
             {{ row.request_ip || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="操作时间" width="170">
+        <el-table-column prop="created_at" :label="$t('common.createTime')" width="170">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column :label="$t('common.action')" width="80" fixed="right">
           <template #default="{ row }">
-            <el-button text type="primary" @click="handleViewDetail(row)">详情</el-button>
+            <el-button text type="primary" @click="handleViewDetail(row)">{{ $t('common.detail') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -122,44 +122,47 @@
     </el-card>
     
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailVisible" title="审计日志详情" width="700px">
+    <el-dialog v-model="detailVisible" :title="$t('common.detail')" width="700px">
       <el-descriptions :column="2" border v-if="currentLog">
-        <el-descriptions-item label="日志ID">{{ currentLog.id }}</el-descriptions-item>
-        <el-descriptions-item label="操作用户">{{ currentLog.username }}</el-descriptions-item>
-        <el-descriptions-item label="操作类型">
+        <el-descriptions-item label="ID">{{ currentLog.id }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('audit.operationUser')">{{ currentLog.username }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('audit.operationType')">
           <el-tag :type="getOperationTagType(currentLog.operation_type)" size="small">
-            {{ getOperationLabel(currentLog.operation_type) }}
+            {{ currentLog.operation_type_label || currentLog.operation_type }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="响应状态">
+        <el-descriptions-item :label="$t('audit.responseCode')">
           <el-tag :type="currentLog.response_code === 200 ? 'success' : 'danger'" size="small">
             {{ currentLog.response_code }}
           </el-tag>
         </el-descriptions-item>
-        <el-descriptions-item label="目标实例">{{ currentLog.instance_name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="环境">{{ currentLog.environment_name || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="请求方法">{{ currentLog.request_method }}</el-descriptions-item>
-        <el-descriptions-item label="请求IP">{{ currentLog.request_ip || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="请求路径" :span="2">{{ currentLog.request_path }}</el-descriptions-item>
-        <el-descriptions-item label="操作详情" :span="2">
+        <el-descriptions-item :label="$t('instances.title')">{{ currentLog.instance_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('environment.title')">{{ currentLog.environment_name || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('audit.requestMethod')">{{ currentLog.request_method }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('audit.requestIP')">{{ currentLog.request_ip || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('audit.requestPath')" :span="2">{{ currentLog.request_path }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('audit.operationDetail')" :span="2">
           <div class="detail-content">{{ currentLog.operation_detail }}</div>
         </el-descriptions-item>
-        <el-descriptions-item label="响应消息" :span="2">{{ currentLog.response_message || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="执行耗时">{{ currentLog.execution_time ? `${currentLog.execution_time}ms` : '-' }}</el-descriptions-item>
-        <el-descriptions-item label="操作时间">{{ formatTime(currentLog.created_at) }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('audit.responseMsg')" :span="2">{{ currentLog.response_message || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('audit.executionTime')">{{ currentLog.execution_time ? `${currentLog.execution_time}ms` : '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="$t('common.createTime')">{{ formatTime(currentLog.created_at) }}</el-descriptions-item>
       </el-descriptions>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { auditApi } from '@/api/audit'
 import request from '@/api/index'
 import { instancesApi } from '@/api/instances'
 import { ElMessage } from 'element-plus'
 import { Search, Download } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+
+const { t } = useI18n()
 
 const loading = ref(false)
 const exporting = ref(false)
@@ -184,9 +187,9 @@ const pagination = reactive({
 })
 
 // 时间快捷选项
-const timeShortcuts = [
+const timeShortcuts = computed(() => [
   {
-    text: '最近1小时',
+    text: t('audit.lastHour'),
     value: () => {
       const end = new Date()
       const start = new Date()
@@ -195,7 +198,7 @@ const timeShortcuts = [
     }
   },
   {
-    text: '最近24小时',
+    text: t('audit.last24Hours'),
     value: () => {
       const end = new Date()
       const start = new Date()
@@ -204,7 +207,7 @@ const timeShortcuts = [
     }
   },
   {
-    text: '最近7天',
+    text: t('audit.last7Days'),
     value: () => {
       const end = new Date()
       const start = new Date()
@@ -213,7 +216,7 @@ const timeShortcuts = [
     }
   },
   {
-    text: '最近30天',
+    text: t('audit.last30Days'),
     value: () => {
       const end = new Date()
       const start = new Date()
@@ -221,35 +224,9 @@ const timeShortcuts = [
       return [start, end]
     }
   }
-]
+])
 
-// 操作类型映射
-const operationLabels = {
-  'login': '登录',
-  'logout': '登出',
-  'create_instance': '创建实例',
-  'update_instance': '更新实例',
-  'delete_instance': '删除实例',
-  'execute_sql': '执行SQL',
-  'create_approval': '创建审批',
-  'approve': '审批通过',
-  'reject': '审批拒绝',
-  'execute_approval': '执行变更',
-  'create_script': '创建脚本',
-  'update_script': '更新脚本',
-  'delete_script': '删除脚本',
-  'execute_script': '执行脚本',
-  'create_schedule': '创建定时任务',
-  'update_schedule': '更新定时任务',
-  'delete_schedule': '删除定时任务',
-  'export_data': '导出数据',
-  'import_data': '导入数据'
-}
-
-const getOperationLabel = (type) => {
-  return operationLabels[type] || type || '未知操作'
-}
-
+// 获取操作类型标签样式
 const getOperationTagType = (type) => {
   const typeMap = {
     'login': '',
@@ -258,10 +235,11 @@ const getOperationTagType = (type) => {
     'update_instance': 'warning',
     'delete_instance': 'danger',
     'execute_sql': 'warning',
-    'create_approval': '',
+    'submit_approval': '',
     'approve': 'success',
     'reject': 'danger',
-    'execute_approval': 'warning'
+    'execute_approval': 'warning',
+    'scheduled_execute': 'info'
   }
   return typeMap[type] || ''
 }
@@ -284,6 +262,7 @@ const fetchLogs = async () => {
     
     const data = await auditApi.getLogs(params)
     // API 返回格式: {total, page, page_size, data}
+    // data 中每条记录包含 operation_type_label 字段
     logList.value = data.data || []
     pagination.total = data.total || 0
   } catch (error) {
@@ -296,6 +275,7 @@ const fetchLogs = async () => {
 // 获取操作类型列表
 const fetchOperationTypes = async () => {
   try {
+    // API 返回格式: [{value, label}, ...]
     const data = await auditApi.getOperationTypes()
     operationTypes.value = data || []
   } catch (error) {
@@ -364,10 +344,10 @@ const handleExport = async () => {
     link.click()
     window.URL.revokeObjectURL(url)
     
-    ElMessage.success('导出成功')
+    ElMessage.success(t('common.success'))
   } catch (error) {
     console.error('导出失败:', error)
-    ElMessage.error('导出失败')
+    ElMessage.error(t('common.failed'))
   } finally {
     exporting.value = false
   }

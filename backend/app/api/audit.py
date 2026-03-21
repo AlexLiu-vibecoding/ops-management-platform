@@ -1,7 +1,7 @@
 """
 审计日志API
 """
-from typing import List, Optional
+from typing import List, Optional, Dict
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -11,6 +11,45 @@ from app.schemas import AuditLogResponse, PaginatedResponse
 from app.deps import get_current_user
 
 router = APIRouter(prefix="/audit", tags=["审计日志"])
+
+
+# 操作类型中英文映射
+OPERATION_TYPE_MAP: Dict[str, Dict[str, str]] = {
+    "login": {"zh": "登录", "en": "Login"},
+    "logout": {"zh": "登出", "en": "Logout"},
+    "create_instance": {"zh": "创建实例", "en": "Create Instance"},
+    "update_instance": {"zh": "更新实例", "en": "Update Instance"},
+    "delete_instance": {"zh": "删除实例", "en": "Delete Instance"},
+    "execute_sql": {"zh": "执行SQL", "en": "Execute SQL"},
+    "submit_approval": {"zh": "提交审批", "en": "Submit Approval"},
+    "approve": {"zh": "审批通过", "en": "Approve"},
+    "reject": {"zh": "审批拒绝", "en": "Reject"},
+    "execute_approval": {"zh": "执行变更", "en": "Execute Change"},
+    "scheduled_execute": {"zh": "定时执行", "en": "Scheduled Execute"},
+    "create_script": {"zh": "创建脚本", "en": "Create Script"},
+    "update_script": {"zh": "更新脚本", "en": "Update Script"},
+    "delete_script": {"zh": "删除脚本", "en": "Delete Script"},
+    "execute_script": {"zh": "执行脚本", "en": "Execute Script"},
+    "create_schedule": {"zh": "创建定时任务", "en": "Create Schedule"},
+    "update_schedule": {"zh": "更新定时任务", "en": "Update Schedule"},
+    "delete_schedule": {"zh": "删除定时任务", "en": "Delete Schedule"},
+    "export_data": {"zh": "导出数据", "en": "Export Data"},
+    "import_data": {"zh": "导入数据", "en": "Import Data"},
+}
+
+
+def get_operation_type_label(operation_type: str, lang: str = "zh") -> str:
+    """获取操作类型的显示标签"""
+    if operation_type in OPERATION_TYPE_MAP:
+        return OPERATION_TYPE_MAP[operation_type].get(lang, operation_type)
+    return operation_type
+
+
+def format_log_response(log: AuditLog, lang: str = "zh") -> dict:
+    """格式化日志响应，添加中文操作类型"""
+    data = AuditLogResponse.from_orm(log).dict()
+    data["operation_type_label"] = get_operation_type_label(log.operation_type, lang)
+    return data
 
 
 @router.get("/logs", response_model=PaginatedResponse)
@@ -55,11 +94,11 @@ async def list_audit_logs(
         total=total,
         page=page,
         page_size=page_size,
-        data=[AuditLogResponse.from_orm(log) for log in logs]
+        data=[format_log_response(log) for log in logs]
     )
 
 
-@router.get("/logs/{log_id}", response_model=AuditLogResponse)
+@router.get("/logs/{log_id}")
 async def get_audit_log(
     log_id: int,
     current_user: User = Depends(get_current_user),
@@ -80,17 +119,24 @@ async def get_audit_log(
             detail="无权查看此日志"
         )
     
-    return AuditLogResponse.from_orm(log)
+    return format_log_response(log)
 
 
-@router.get("/operation-types", response_model=List[str])
+@router.get("/operation-types")
 async def get_operation_types(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """获取所有操作类型"""
+    """获取所有操作类型（带中文标签）"""
     types = db.query(AuditLog.operation_type).distinct().all()
-    return [t[0] for t in types if t[0]]
+    result = []
+    for t in types:
+        if t[0]:
+            result.append({
+                "value": t[0],
+                "label": get_operation_type_label(t[0])
+            })
+    return result
 
 
 @router.get("/export")
@@ -144,7 +190,7 @@ async def export_audit_logs(
             log.username,
             log.instance_name,
             log.environment_name,
-            log.operation_type,
+            get_operation_type_label(log.operation_type),  # 使用中文操作类型
             log.operation_detail[:200] if log.operation_detail else '',
             log.request_ip,
             log.request_method,

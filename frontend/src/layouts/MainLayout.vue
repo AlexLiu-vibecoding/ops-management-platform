@@ -68,6 +68,9 @@
         </div>
         
         <div class="header-right">
+          <!-- 语言切换 -->
+          <LangSwitch class="header-lang" />
+          
           <!-- 用户信息 -->
           <el-dropdown @command="handleCommand" trigger="click">
             <div class="user-info">
@@ -81,11 +84,11 @@
               <el-dropdown-menu>
                 <el-dropdown-item command="password">
                   <el-icon><Key /></el-icon>
-                  修改密码
+                  {{ $t('settings.language') === 'Language' ? 'Change Password' : '修改密码' }}
                 </el-dropdown-item>
                 <el-dropdown-item divided command="logout">
                   <el-icon><SwitchButton /></el-icon>
-                  退出登录
+                  {{ $t('nav.logout') }}
                 </el-dropdown-item>
               </el-dropdown-menu>
             </template>
@@ -142,6 +145,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { authApi } from '@/api/auth'
 import request from '@/api/index'
@@ -149,6 +153,9 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Fold, Expand, ArrowDown, Coin, Key, SwitchButton
 } from '@element-plus/icons-vue'
+import LangSwitch from '@/components/LangSwitch.vue'
+
+const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
@@ -426,6 +433,14 @@ $sidebar-active-bg: #1890ff;
   }
   
   .header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .header-lang {
+      margin-right: 8px;
+    }
+    
     .user-info {
       display: flex;
       align-items: center;
