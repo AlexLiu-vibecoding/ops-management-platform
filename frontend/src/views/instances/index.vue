@@ -227,8 +227,9 @@ const fetchInstances = async () => {
       ...searchForm
     }
     const data = await instancesApi.getList(params)
-    instanceList.value = data
-    pagination.total = data.length
+    // API 返回格式: {total, items}
+    instanceList.value = data.items || []
+    pagination.total = data.total || 0
   } catch (error) {
     console.error('获取实例列表失败:', error)
   } finally {
