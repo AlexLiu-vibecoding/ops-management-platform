@@ -363,7 +363,7 @@ const testDialog = reactive({
   channelId: null,
   channelName: '',
   authType: 'none',
-  message: '这是一条来自MySQL管理平台的测试消息'
+  message: '这是一条来自运维管理平台的测试消息'
 })
 
 const channelFormRef = ref(null)
@@ -484,7 +484,7 @@ const handleTestChannel = (row) => {
   testDialog.channelId = row.id
   testDialog.channelName = row.name
   testDialog.authType = row.auth_type || 'none'
-  testDialog.message = '这是一条来自MySQL管理平台的测试消息'
+  testDialog.message = '这是一条来自运维管理平台的测试消息'
   testDialog.visible = true
 }
 

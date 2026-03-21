@@ -2,7 +2,7 @@
   <div class="login-container">
     <!-- 登录卡片 -->
     <div class="login-box" v-if="!showRegister && !showStatus">
-      <h2 class="title">MySQL管理平台</h2>
+      <h2 class="title">运维管理平台</h2>
       <p class="subtitle">企业级数据库运维管理平台</p>
       
       <el-form

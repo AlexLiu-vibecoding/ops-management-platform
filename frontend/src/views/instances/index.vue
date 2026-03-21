@@ -273,7 +273,7 @@ const handleTest = async (row) => {
     ElMessage.info('正在测试连接...')
     const result = await instancesApi.checkStatus(row.id)
     if (result.success) {
-      ElMessage.success(`连接成功，MySQL版本: ${result.version}`)
+      ElMessage.success(`连接成功，数据库版本: ${result.version}`)
     } else {
       ElMessage.error(result.message)
     }

@@ -9,7 +9,7 @@
           </div>
           <div class="stat-info">
             <div class="stat-value">{{ stats.instanceCount }}</div>
-            <div class="stat-label">MySQL实例</div>
+            <div class="stat-label">数据库实例</div>
           </div>
         </div>
       </el-col>
