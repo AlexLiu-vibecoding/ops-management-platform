@@ -13,7 +13,7 @@ from app.deps import get_super_admin, get_current_user
 router = APIRouter(prefix="/users", tags=["用户管理"])
 
 
-@router.get("", response_model=List[UserResponse])
+@router.get("")
 async def list_users(
     skip: int = 0,
     limit: int = 20,
@@ -21,8 +21,12 @@ async def list_users(
     db: Session = Depends(get_db)
 ):
     """获取用户列表（需要权限）"""
+    total = db.query(User).count()
     users = db.query(User).offset(skip).limit(limit).all()
-    return [UserResponse.from_orm(u) for u in users]
+    return {
+        "total": total,
+        "items": [UserResponse.from_orm(u) for u in users]
+    }
 
 
 @router.get("/{user_id}", response_model=UserResponse)

@@ -754,7 +754,8 @@ const fetchApprovals = async () => {
     if (activeTab.value === 'pending') params.status_filter = 'pending'
     else if (activeTab.value === 'mine') params.requester_id = currentUserId.value
     
-    approvalList.value = await request.get('/approvals', { params })
+    const data = await request.get('/approvals', { params })
+    approvalList.value = data.items || data
   } catch (error) {
     console.error('获取审批列表失败:', error)
   } finally {

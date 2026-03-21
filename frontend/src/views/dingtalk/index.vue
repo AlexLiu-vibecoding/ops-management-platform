@@ -373,7 +373,7 @@ const bindingFormRef = ref(null)
 const fetchEnvironments = async () => {
   try {
     const data = await request.get('/environments')
-    environments.value = data
+    environments.value = data.items || data
   } catch (error) {
     console.error('获取环境列表失败:', error)
   }
@@ -383,7 +383,7 @@ const fetchEnvironments = async () => {
 const fetchInstances = async () => {
   try {
     const data = await instancesApi.getList({ limit: 1000 })
-    instances.value = data
+    instances.value = data.items || data
   } catch (error) {
     console.error('获取实例列表失败:', error)
   }
@@ -394,7 +394,7 @@ const fetchChannels = async () => {
   channelLoading.value = true
   try {
     const data = await dingtalkApi.getChannels()
-    channels.value = data
+    channels.value = data.items || data
   } catch (error) {
     console.error('获取通道列表失败:', error)
   } finally {
@@ -407,7 +407,7 @@ const fetchBindings = async () => {
   bindingLoading.value = true
   try {
     const data = await dingtalkApi.getBindings()
-    bindings.value = data
+    bindings.value = data.items || data
   } catch (error) {
     console.error('获取绑定列表失败:', error)
   } finally {

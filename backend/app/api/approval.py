@@ -249,7 +249,7 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
     return response
 
 
-@router.get("", response_model=List[ApprovalResponse])
+@router.get("")
 async def list_approvals(
     status_filter: Optional[ApprovalStatus] = None,
     requester_id: Optional[int] = None,
@@ -273,8 +273,13 @@ async def list_approvals(
     if current_user.role.value == "readonly":
         query = query.filter(ApprovalRecord.requester_id == current_user.id)
     
+    total = query.count()
     approvals = query.order_by(ApprovalRecord.created_at.desc()).offset(skip).limit(limit).all()
-    return [format_approval_response(a) for a in approvals]
+    
+    return {
+        "total": total,
+        "items": [format_approval_response(a) for a in approvals]
+    }
 
 
 @router.get("/{approval_id}", response_model=ApprovalResponse)

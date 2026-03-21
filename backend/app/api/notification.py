@@ -345,7 +345,10 @@ async def list_bindings(
             "created_at": b.created_at.isoformat() if b.created_at else None
         })
     
-    return result
+    return {
+        "total": len(result),
+        "items": result
+    }
 
 
 @router.post("/bindings", response_model=MessageResponse)

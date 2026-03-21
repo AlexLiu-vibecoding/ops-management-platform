@@ -102,7 +102,8 @@ const dialog = reactive({
 
 const fetchEnvironments = async () => {
   try {
-    environments.value = await request.get('/environments')
+    const data = await request.get('/environments')
+    environments.value = data.items || data
   } catch (error) {
     console.error('获取环境列表失败:', error)
   }

@@ -13,14 +13,17 @@ from app.models import User
 router = APIRouter(prefix="/environments", tags=["环境管理"])
 
 
-@router.get("", response_model=List[EnvironmentResponse])
+@router.get("")
 async def list_environments(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """获取环境列表"""
     environments = db.query(Environment).all()
-    return [EnvironmentResponse.from_orm(e) for e in environments]
+    return {
+        "total": len(environments),
+        "items": [EnvironmentResponse.from_orm(e) for e in environments]
+    }
 
 
 @router.get("/{env_id}", response_model=EnvironmentResponse)

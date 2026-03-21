@@ -73,14 +73,17 @@ def build_message_content(message: str, auth_type: str, keywords: List[str] = No
     return message
 
 
-@router.get("/channels", response_model=List[DingTalkChannelResponse])
+@router.get("/channels")
 async def list_dingtalk_channels(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """获取钉钉通道列表"""
     channels = db.query(DingTalkChannel).all()
-    return [DingTalkChannelResponse.from_orm(c) for c in channels]
+    return {
+        "total": len(channels),
+        "items": [DingTalkChannelResponse.from_orm(c) for c in channels]
+    }
 
 
 @router.get("/channels/{channel_id}", response_model=DingTalkChannelResponse)

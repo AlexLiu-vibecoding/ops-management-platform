@@ -262,7 +262,7 @@ const userFormRef = ref(null)
 const fetchEnvironments = async () => {
   try {
     const data = await request.get('/environments')
-    environments.value = data
+    environments.value = data.items || data
   } catch (error) {
     console.error('获取环境列表失败:', error)
   }

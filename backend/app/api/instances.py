@@ -46,7 +46,7 @@ async def test_mysql_connection(host: str, port: int, username: str, password: s
         }
 
 
-@router.get("", response_model=List[InstanceResponse])
+@router.get("")
 async def list_instances(
     environment_id: Optional[int] = None,
     group_id: Optional[int] = None,
@@ -66,8 +66,13 @@ async def list_instances(
     if status is not None:
         query = query.filter(Instance.status == status)
     
+    total = query.count()
     instances = query.offset(skip).limit(limit).all()
-    return [InstanceResponse.from_orm(i) for i in instances]
+    
+    return {
+        "total": total,
+        "items": [InstanceResponse.from_orm(i) for i in instances]
+    }
 
 
 @router.get("/{instance_id}", response_model=InstanceResponse)
