@@ -405,7 +405,7 @@ const explainDialog = reactive({
 const fetchInstances = async () => {
   try {
     const data = await request.get('/instances', { params: { limit: 100 } })
-    instances.value = data.items || []
+    instances.value = Array.isArray(data) ? data : (data.items || [])
     if (instances.value.length > 0 && !selectedInstance.value) {
       selectedInstance.value = instances.value[0].id
       fetchSlowQueries()
