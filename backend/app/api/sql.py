@@ -8,6 +8,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import pymysql
+import psycopg2
+import psycopg2.extras
 from app.database import get_db
 from app.models import Instance, AuditLog, OperationSnapshot, User
 from app.schemas import (
@@ -17,6 +19,19 @@ from app.utils.auth import decrypt_instance_password, encrypt_instance_password
 from app.deps import get_operator, get_current_user
 
 router = APIRouter(prefix="/sql", tags=["SQL执行"])
+
+
+def get_instance_type(instance: Instance) -> str:
+    """判断实例类型：mysql 或 postgresql"""
+    # 通过端口判断：MySQL 默认 3306，PostgreSQL 默认 5432
+    if instance.port == 5432:
+        return "postgresql"
+    elif instance.port == 3306:
+        return "mysql"
+    # 通过 host 判断
+    if "pg" in instance.host.lower() or "postgres" in instance.host.lower():
+        return "postgresql"
+    return "mysql"
 
 
 def check_sql_risk(sql: str) -> Dict[str, Any]:
@@ -79,6 +94,35 @@ def get_mysql_connection(instance: Instance, database: str = None):
     return conn
 
 
+def get_postgresql_connection(instance: Instance, database: str = None):
+    """获取PostgreSQL连接"""
+    try:
+        password = decrypt_instance_password(instance.password_encrypted)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+        )
+    
+    conn = psycopg2.connect(
+        host=instance.host,
+        port=instance.port,
+        user=instance.username,
+        password=password,
+        database=database or 'postgres',
+        connect_timeout=10
+    )
+    return conn
+
+
+def get_db_connection(instance: Instance, database: str = None):
+    """根据实例类型获取数据库连接"""
+    db_type = get_instance_type(instance)
+    if db_type == "postgresql":
+        return get_postgresql_connection(instance, database), "postgresql"
+    return get_mysql_connection(instance, database), "mysql"
+
+
 @router.post("/execute", response_model=SQLExecuteResponse)
 async def execute_sql(
     request: SQLExecuteRequest,
@@ -116,7 +160,7 @@ async def execute_sql(
     start_time = datetime.now()
     
     try:
-        conn = get_mysql_connection(instance, request.database_name)
+        conn, db_type = get_db_connection(instance, request.database_name)
         cursor = conn.cursor()
         
         # 如果是DML操作且需要快照，先保存快照
@@ -240,9 +284,16 @@ async def list_databases(
         )
     
     try:
-        conn = get_mysql_connection(instance)
+        conn, db_type = get_db_connection(instance)
         cursor = conn.cursor()
-        cursor.execute("SHOW DATABASES")
+        
+        if db_type == "postgresql":
+            # PostgreSQL: 查询所有数据库
+            cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname")
+        else:
+            # MySQL: SHOW DATABASES
+            cursor.execute("SHOW DATABASES")
+        
         databases = [row[0] for row in cursor.fetchall()]
         cursor.close()
         conn.close()
@@ -270,9 +321,21 @@ async def list_tables(
         )
     
     try:
-        conn = get_mysql_connection(instance, database)
+        conn, db_type = get_db_connection(instance, database)
         cursor = conn.cursor()
-        cursor.execute("SHOW TABLES")
+        
+        if db_type == "postgresql":
+            # PostgreSQL: 查询 public schema 下的表
+            cursor.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                ORDER BY table_name
+            """)
+        else:
+            # MySQL: SHOW TABLES
+            cursor.execute("SHOW TABLES")
+        
         tables = [row[0] for row in cursor.fetchall()]
         cursor.close()
         conn.close()

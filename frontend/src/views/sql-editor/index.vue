@@ -265,7 +265,7 @@ const handleInstanceChange = async () => {
     databases.value = data
     
     // 过滤系统数据库
-    const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys']
+    const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys', 'template0', 'template1', '_supabase']
     const userDbs = data.filter(db => !systemDbs.includes(db))
     
     // 构建树形结构

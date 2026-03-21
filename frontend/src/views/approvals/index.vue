@@ -692,7 +692,7 @@ const handleInstanceSelect = async (instanceId) => {
   try {
     const data = await request.get(`/sql/databases/${instanceId}`)
     // 过滤系统库
-    const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys']
+    const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys', 'template0', 'template1', '_supabase']
     dialog.databases = data.filter(db => !systemDbs.includes(db))
   } catch (error) {
     console.error('获取数据库列表失败:', error)
