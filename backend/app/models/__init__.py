@@ -513,6 +513,10 @@ class Script(Base):
     allowed_roles = Column(String(200), comment="允许执行的角色，逗号分隔")
     tags = Column(String(200), comment="标签，逗号分隔")
     version = Column(Integer, default=1, comment="版本号")
+    # 通知配置
+    notify_on_success = Column(Boolean, default=False, comment="执行成功时发送通知")
+    notify_on_failure = Column(Boolean, default=True, comment="执行失败时发送通知")
+    notify_channels = Column(String(500), comment="通知通道ID列表，逗号分隔")
     created_by = Column(Integer, ForeignKey("users.id"), comment="创建人ID")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

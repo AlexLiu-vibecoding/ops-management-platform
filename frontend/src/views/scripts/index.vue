@@ -131,6 +131,40 @@
         <el-form-item label="标签">
           <el-input v-model="dialog.form.tags" placeholder="多个标签用逗号分隔" />
         </el-form-item>
+        
+        <!-- 通知配置 -->
+        <el-divider content-position="left">通知配置</el-divider>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="成功通知">
+              <el-switch v-model="dialog.form.notify_on_success" />
+              <span class="hint">执行成功时发送通知</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="失败通知">
+              <el-switch v-model="dialog.form.notify_on_failure" />
+              <span class="hint">执行失败时发送通知</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-form-item label="通知通道">
+          <el-select
+            v-model="dialog.form.notify_channels"
+            multiple
+            placeholder="选择通知通道"
+            style="width: 100%;"
+          >
+            <el-option
+              v-for="channel in notificationChannels"
+              :key="channel.id"
+              :label="channel.name"
+              :value="channel.id.toString()"
+            />
+          </el-select>
+          <div class="hint">执行完成后向选中的通道发送通知</div>
+        </el-form-item>
       </el-form>
       
       <template #footer>
@@ -232,7 +266,11 @@ const dialog = reactive({
     timeout: 300,
     max_retries: 0,
     is_public: false,
-    tags: ''
+    tags: '',
+    // 通知配置
+    notify_on_success: false,
+    notify_on_failure: true,
+    notify_channels: []
   },
   rules: {
     name: [{ required: true, message: '请输入脚本名称', trigger: 'blur' }],
@@ -254,6 +292,17 @@ const resultDialog = reactive({
   visible: false,
   data: null
 })
+
+const notificationChannels = ref([])
+
+const fetchNotificationChannels = async () => {
+  try {
+    const data = await request.get('/notification/channels')
+    notificationChannels.value = data
+  } catch (error) {
+    console.error('获取通知通道列表失败:', error)
+  }
+}
 
 const fetchScripts = async () => {
   loading.value = true
@@ -286,7 +335,10 @@ const handleAdd = () => {
     timeout: 300,
     max_retries: 0,
     is_public: false,
-    tags: ''
+    tags: '',
+    notify_on_success: false,
+    notify_on_failure: true,
+    notify_channels: []
   }
   dialog.visible = true
 }
@@ -304,7 +356,10 @@ const handleEdit = async (row) => {
       timeout: data.timeout,
       max_retries: data.max_retries,
       is_public: data.is_public,
-      tags: data.tags || ''
+      tags: data.tags || '',
+      notify_on_success: data.notify_on_success || false,
+      notify_on_failure: data.notify_on_failure ?? true,
+      notify_channels: data.notify_channels ? data.notify_channels.split(',') : []
     }
     dialog.visible = true
   } catch (error) {
@@ -318,11 +373,17 @@ const handleSubmit = async () => {
     
     dialog.submitting = true
     try {
+      // 处理通知通道数据：将数组转为逗号分隔的字符串
+      const submitData = {
+        ...dialog.form,
+        notify_channels: dialog.form.notify_channels.join(',')
+      }
+      
       if (dialog.isEdit) {
-        await request.put(`/scripts/${dialog.id}`, dialog.form)
+        await request.put(`/scripts/${dialog.id}`, submitData)
         ElMessage.success('更新成功')
       } else {
-        await request.post('/scripts', dialog.form)
+        await request.post('/scripts', submitData)
         ElMessage.success('创建成功')
       }
       dialog.visible = false
@@ -411,6 +472,7 @@ const formatTime = (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-'
 
 onMounted(() => {
   fetchScripts()
+  fetchNotificationChannels()
 })
 </script>
 
@@ -439,6 +501,12 @@ onMounted(() => {
       font-family: 'Consolas', 'Monaco', monospace;
       font-size: 13px;
     }
+  }
+  
+  .hint {
+    margin-left: 10px;
+    color: #909399;
+    font-size: 12px;
   }
   
   .output-section {

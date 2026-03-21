@@ -14,16 +14,18 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+import httpx
 
 from app.database import get_db
 from app.models import (
     Script, ScriptExecution, ScheduledTask,
     ScriptType, ExecutionStatus, TriggerType,
-    User, UserRole
+    User, UserRole, DingTalkChannel
 )
 from app.schemas import MessageResponse
 from app.deps import get_current_user
 from app.utils.redis_client import redis_client
+from app.utils.auth import aes_cipher
 import logging
 
 logger = logging.getLogger(__name__)
@@ -45,6 +47,10 @@ class ScriptCreate(BaseModel):
     is_public: bool = False
     allowed_roles: Optional[str] = None
     tags: Optional[str] = None
+    # 通知配置
+    notify_on_success: bool = Field(False, description="执行成功时发送通知")
+    notify_on_failure: bool = Field(True, description="执行失败时发送通知")
+    notify_channels: Optional[str] = Field(None, description="通知通道ID列表，逗号分隔")
 
 
 class ScriptUpdate(BaseModel):
@@ -59,6 +65,10 @@ class ScriptUpdate(BaseModel):
     is_public: Optional[bool] = None
     allowed_roles: Optional[str] = None
     tags: Optional[str] = None
+    # 通知配置
+    notify_on_success: Optional[bool] = None
+    notify_on_failure: Optional[bool] = None
+    notify_channels: Optional[str] = None
 
 
 class ScriptExecute(BaseModel):
@@ -100,6 +110,124 @@ def check_script_permission(script: Script, user: User) -> bool:
     return False
 
 
+async def send_script_notification(
+    db: Session,
+    script: Script,
+    execution: ScriptExecution,
+    trigger_user: User
+):
+    """
+    发送脚本执行通知
+    
+    Args:
+        db: 数据库会话
+        script: 脚本对象
+        execution: 执行记录
+        trigger_user: 触发用户
+    """
+    # 检查是否需要发送通知
+    is_success = execution.status == ExecutionStatus.SUCCESS
+    is_failure = execution.status in [ExecutionStatus.FAILED, ExecutionStatus.TIMEOUT]
+    
+    if is_success and not script.notify_on_success:
+        return
+    if is_failure and not script.notify_on_failure:
+        return
+    
+    # 获取通知通道
+    if not script.notify_channels:
+        return
+    
+    channel_ids = [int(cid.strip()) for cid in script.notify_channels.split(",") if cid.strip().isdigit()]
+    if not channel_ids:
+        return
+    
+    channels = db.query(DingTalkChannel).filter(
+        DingTalkChannel.id.in_(channel_ids),
+        DingTalkChannel.is_enabled == True
+    ).all()
+    
+    if not channels:
+        return
+    
+    # 构建通知内容
+    status_text = {
+        ExecutionStatus.SUCCESS: "✅ 成功",
+        ExecutionStatus.FAILED: "❌ 失败",
+        ExecutionStatus.TIMEOUT: "⏰ 超时",
+        ExecutionStatus.CANCELLED: "🚫 已取消"
+    }.get(execution.status, "❓ 未知")
+    
+    # 执行时长
+    duration_text = f"{execution.duration:.2f}秒" if execution.duration else "-"
+    
+    # 构建消息
+    content = f"""【脚本执行通知】
+脚本名称：{script.name}
+执行状态：{status_text}
+触发人：{trigger_user.username}
+触发时间：{execution.start_time.strftime('%Y-%m-%d %H:%M:%S') if execution.start_time else '-'}
+执行时长：{duration_text}
+"""
+    
+    if execution.error_output:
+        # 截取错误信息，避免消息过长
+        error_preview = execution.error_output[:500]
+        if len(execution.error_output) > 500:
+            error_preview += "..."
+        content += f"\n错误信息：\n{error_preview}"
+    
+    # 发送通知
+    for channel in channels:
+        try:
+            webhook = aes_cipher.decrypt(channel.webhook_encrypted) if channel.webhook_encrypted else None
+            if not webhook:
+                continue
+            
+            # 如果是加签验证，生成签名
+            if channel.auth_type == "sign" and channel.secret_encrypted:
+                import hmac
+                import hashlib
+                import base64
+                import time
+                import urllib.parse
+                
+                secret = aes_cipher.decrypt(channel.secret_encrypted)
+                timestamp = str(round(time.time() * 1000))
+                string_to_sign = f"{timestamp}\n{secret}"
+                hmac_code = hmac.new(
+                    secret.encode('utf-8'),
+                    string_to_sign.encode('utf-8'),
+                    digestmod=hashlib.sha256
+                ).digest()
+                sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+                separator = "&" if "?" in webhook else "?"
+                webhook = f"{webhook}{separator}timestamp={timestamp}&sign={sign}"
+            
+            # 关键词验证
+            message_content = content
+            if channel.auth_type == "keyword" and channel.keywords:
+                keywords = channel.keywords if isinstance(channel.keywords, list) else json.loads(channel.keywords)
+                if keywords:
+                    message_content = f"{content}\n{keywords[0]}"
+            
+            # 发送消息
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    webhook,
+                    json={"msgtype": "text", "text": {"content": message_content}},
+                    timeout=10
+                )
+                result = response.json()
+                if result.get("errcode", 0) != 0:
+                    logger.warning(f"通知发送失败: {result.get('errmsg')}")
+                else:
+                    logger.info(f"脚本执行通知发送成功: 脚本ID={script.id}, 通道ID={channel.id}")
+                    
+        except Exception as e:
+            logger.error(f"发送通知到通道 {channel.id} 失败: {e}")
+
+
 async def execute_script_async(
     execution_id: int,
     script: Script,
@@ -125,6 +253,9 @@ async def execute_script_async(
         
         if not execution:
             return
+        
+        # 获取触发用户
+        trigger_user = db.query(User).filter(User.id == execution.triggered_by).first()
         
         # 更新状态为执行中
         execution.status = ExecutionStatus.RUNNING
@@ -159,6 +290,9 @@ async def execute_script_async(
             execution.error_output = f"不支持的脚本类型: {script.script_type}"
             execution.end_time = datetime.now()
             db.commit()
+            # 发送通知
+            if trigger_user:
+                await send_script_notification(db, script, execution, trigger_user)
             return
         
         try:
@@ -207,6 +341,10 @@ async def execute_script_async(
         db.commit()
         
         logger.info(f"脚本执行完成: ID={execution_id}, 状态={execution.status}")
+        
+        # 发送通知
+        if trigger_user:
+            await send_script_notification(db, script, execution, trigger_user)
         
     except Exception as e:
         logger.error(f"脚本执行失败: {e}")
@@ -268,6 +406,9 @@ async def list_scripts(
             "is_public": s.is_public,
             "tags": s.tags,
             "version": s.version,
+            "notify_on_success": s.notify_on_success,
+            "notify_on_failure": s.notify_on_failure,
+            "notify_channels": s.notify_channels,
             "created_by": s.creator.username if s.creator else None,
             "created_at": s.created_at.isoformat() if s.created_at else None
         } for s in scripts]
@@ -307,6 +448,9 @@ async def create_script(
         is_public=script_data.is_public,
         allowed_roles=script_data.allowed_roles,
         tags=script_data.tags,
+        notify_on_success=script_data.notify_on_success,
+        notify_on_failure=script_data.notify_on_failure,
+        notify_channels=script_data.notify_channels,
         created_by=current_user.id
     )
     
@@ -353,6 +497,9 @@ async def get_script(
         "allowed_roles": script.allowed_roles,
         "tags": script.tags,
         "version": script.version,
+        "notify_on_success": script.notify_on_success,
+        "notify_on_failure": script.notify_on_failure,
+        "notify_channels": script.notify_channels,
         "created_by": script.creator.username if script.creator else None,
         "created_at": script.created_at.isoformat() if script.created_at else None,
         "updated_at": script.updated_at.isoformat() if script.updated_at else None
@@ -404,6 +551,13 @@ async def update_script(
         script.allowed_roles = script_data.allowed_roles
     if script_data.tags is not None:
         script.tags = script_data.tags
+    # 通知配置更新
+    if script_data.notify_on_success is not None:
+        script.notify_on_success = script_data.notify_on_success
+    if script_data.notify_on_failure is not None:
+        script.notify_on_failure = script_data.notify_on_failure
+    if script_data.notify_channels is not None:
+        script.notify_channels = script_data.notify_channels
     
     db.commit()
     
