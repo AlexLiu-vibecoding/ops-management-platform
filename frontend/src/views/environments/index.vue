@@ -16,7 +16,7 @@
         <el-table-column prop="code" label="环境编码" width="150" />
         <el-table-column label="颜色标记" width="120">
           <template #default="{ row }">
-            <span class="env-tag" :style="{ backgroundColor: row.color }">
+            <span class="env-tag" :style="{ backgroundColor: row.color, color: '#FFFFFF' }">
               {{ row.name }}
             </span>
           </template>

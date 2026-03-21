@@ -20,7 +20,7 @@
             <span
               v-if="instance?.environment"
               class="env-tag"
-              :style="{ backgroundColor: instance.environment.color }"
+              :style="{ backgroundColor: instance.environment.color, color: '#FFFFFF' }"
             >
               {{ instance.environment.name }}
             </span>

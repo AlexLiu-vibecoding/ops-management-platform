@@ -427,13 +427,14 @@ html, body {
   }
 }
 
-// Environment Tag - High Contrast
+// Environment Tag - White text on color background
 .env-tag {
   padding: 4px 12px;
-  border-radius: var(--radius-full);
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff !important;
+  border-radius: var(--radius-full) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: #FFFFFF !important;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
   
   &.development {
     background: #22C55E !important;

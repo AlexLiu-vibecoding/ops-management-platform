@@ -48,7 +48,7 @@
             <span
               v-if="row.environment"
               class="env-tag"
-              :style="{ backgroundColor: row.environment.color }"
+              :style="{ backgroundColor: row.environment.color, color: '#FFFFFF' }"
             >
               {{ row.environment.name }}
             </span>
