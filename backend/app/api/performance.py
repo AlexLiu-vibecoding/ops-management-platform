@@ -1,6 +1,7 @@
 """
 性能监控API
 """
+import random
 from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -15,6 +16,60 @@ from app.schemas import PerformanceMetricResponse, MessageResponse
 from app.deps import get_current_user
 
 router = APIRouter(prefix="/performance", tags=["性能监控"])
+
+
+def generate_mock_metrics(instance_id: int, hours: int = 1):
+    """生成模拟的性能数据用于演示"""
+    import os
+    
+    # 仅在开发环境生成模拟数据
+    if os.getenv("COZE_PROJECT_ENV", "DEV") != "DEV":
+        return []
+    
+    now = datetime.now()
+    metrics = []
+    
+    # 根据时间范围决定数据点间隔
+    if hours <= 1:
+        interval = 5  # 5分钟一个点
+        points = hours * 12
+    elif hours <= 6:
+        interval = 10  # 10分钟一个点
+        points = hours * 6
+    else:
+        interval = 30  # 30分钟一个点
+        points = hours * 2
+    
+    # 生成基础值（模拟真实负载）
+    base_cpu = random.uniform(20, 40)
+    base_memory = random.uniform(40, 60)
+    base_connections = random.randint(10, 30)
+    base_qps = random.uniform(100, 300)
+    
+    for i in range(points):
+        collect_time = now - timedelta(minutes=interval * (points - i - 1))
+        
+        # 添加随机波动
+        cpu_usage = max(5, min(95, base_cpu + random.uniform(-15, 15) + random.uniform(-5, 5) * (i % 10 / 10)))
+        memory_usage = max(20, min(90, base_memory + random.uniform(-10, 10)))
+        connections = max(5, int(base_connections + random.randint(-10, 15)))
+        qps = max(10, base_qps + random.uniform(-50, 80))
+        
+        metrics.append({
+            "id": -i,  # 负数表示模拟数据
+            "instance_id": instance_id,
+            "collect_time": collect_time.isoformat(),
+            "cpu_usage": round(cpu_usage, 2),
+            "memory_usage": round(memory_usage, 2),
+            "disk_io_read": round(random.uniform(0, 100), 2),
+            "disk_io_write": round(random.uniform(0, 50), 2),
+            "connections": connections,
+            "qps": round(qps, 2),
+            "tps": round(qps * random.uniform(0.1, 0.3), 2),
+            "lock_wait_count": random.randint(0, 5)
+        })
+    
+    return metrics
 
 
 @router.get("/{instance_id}/current", response_model=dict)
@@ -62,7 +117,7 @@ async def get_current_performance(
     }
 
 
-@router.get("/{instance_id}/history", response_model=List[PerformanceMetricResponse])
+@router.get("/{instance_id}/history")
 async def get_performance_history(
     instance_id: int,
     hours: int = 1,
@@ -90,7 +145,15 @@ async def get_performance_history(
     ).order_by(PerformanceMetric.collect_time)
     
     metrics = query.all()
-    return [PerformanceMetricResponse.from_orm(m) for m in metrics]
+    
+    # 如果没有数据，生成模拟数据用于演示
+    if not metrics:
+        metrics = generate_mock_metrics(instance_id, hours)
+    
+    return {
+        "total": len(metrics),
+        "items": [PerformanceMetricResponse.from_orm(m) if hasattr(m, 'id') else m for m in metrics]
+    }
 
 
 @router.get("/{instance_id}/statistics", response_model=dict)
@@ -129,6 +192,38 @@ async def get_performance_statistics(
         PerformanceMetric.instance_id == instance_id,
         PerformanceMetric.collect_time >= start_time
     ).first()
+    
+    # 如果没有真实数据，从模拟数据计算统计
+    if not stats or stats.max_cpu is None:
+        mock_data = generate_mock_metrics(instance_id, hours)
+        if mock_data:
+            cpu_values = [m['cpu_usage'] for m in mock_data]
+            memory_values = [m['memory_usage'] for m in mock_data]
+            conn_values = [m['connections'] for m in mock_data]
+            qps_values = [m['qps'] for m in mock_data]
+            
+            return {
+                "cpu_usage": {
+                    "max": max(cpu_values),
+                    "min": min(cpu_values),
+                    "avg": sum(cpu_values) / len(cpu_values)
+                },
+                "memory_usage": {
+                    "max": max(memory_values),
+                    "min": min(memory_values),
+                    "avg": sum(memory_values) / len(memory_values)
+                },
+                "connections": {
+                    "max": max(conn_values),
+                    "min": min(conn_values),
+                    "avg": sum(conn_values) / len(conn_values)
+                },
+                "qps": {
+                    "max": max(qps_values),
+                    "min": min(qps_values),
+                    "avg": sum(qps_values) / len(qps_values)
+                }
+            }
     
     return {
         "cpu_usage": {
