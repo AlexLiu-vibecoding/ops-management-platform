@@ -212,9 +212,52 @@ class NotificationService:
         requester = db.query(User).filter(User.id == approval.requester_id).first()
         requester_name = requester.real_name if requester else "未知用户"
         
+        # 构建数据库目标描述
+        if approval.database_mode == "all":
+            db_target = "全部数据库"
+        elif approval.database_mode == "pattern":
+            db_target = f"通配符: {approval.database_pattern}"
+        elif approval.database_mode == "multiple":
+            db_target = f"{len(approval.database_list or [])} 个数据库: {', '.join(approval.database_list or [])}"
+        elif approval.database_mode == "auto":
+            db_target = "SQL自动解析"
+        else:
+            db_target = approval.database_name or "未指定"
+        
+        # 风险等级颜色映射
+        risk_colors = {
+            "low": "🟢 低风险",
+            "medium": "🟡 中风险",
+            "high": "🟠 高风险",
+            "critical": "🔴 极高风险"
+        }
+        risk_display = risk_colors.get(approval.sql_risk_level, "⚪ 未评估")
+        
+        # 变更类型映射
+        change_type_names = {
+            "DDL": "📐 DDL (结构变更)",
+            "DML": "📝 DML (数据变更)",
+            "OPERATION": "⚙️ 运维操作",
+            "CUSTOM": "📋 自定义变更"
+        }
+        change_type_display = change_type_names.get(approval.change_type, approval.change_type)
+        
         # 构建通知内容
         if notification_type == "new":
             title = "📝 新的变更审批申请"
+            
+            # 构建影响行数显示
+            affected_rows_info = ""
+            if approval.affected_rows_estimate and approval.affected_rows_estimate > 0:
+                affected_rows_info = f"\n**预估影响行数**: {approval.affected_rows_estimate:,} 行"
+            
+            # 自动执行提示
+            auto_execute_info = ""
+            if approval.auto_execute:
+                auto_execute_info = "\n**执行方式**: ⚡ 审批通过后自动执行"
+            elif approval.scheduled_time:
+                auto_execute_info = f"\n**计划执行时间**: {approval.scheduled_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            
             content = f"""
 ## {title}
 
@@ -224,11 +267,13 @@ class NotificationService:
 
 **实例**: {instance_name}
 
-**变更类型**: {approval.change_type}
+**目标数据库**: {db_target}
 
-**风险等级**: {approval.sql_risk_level or '未评估'}
+**变更类型**: {change_type_display}
 
-**SQL行数**: {approval.sql_line_count or 0} 行
+**风险等级**: {risk_display}
+
+**SQL行数**: {approval.sql_line_count or 0} 行{affected_rows_info}{auto_execute_info}
 
 **提交时间**: {approval.created_at.strftime('%Y-%m-%d %H:%M:%S')}
 
@@ -250,6 +295,16 @@ class NotificationService:
             title = "✅ 审批已通过"
             approver = db.query(User).filter(User.id == approval.approver_id).first()
             approver_name = approver.real_name if approver else "未知"
+            
+            # 执行状态提示
+            execute_info = ""
+            if approval.auto_execute and not approval.scheduled_time:
+                execute_info = "\n\n⚡ 即将自动执行..."
+            elif approval.scheduled_time:
+                execute_info = f"\n\n⏰ 计划执行时间: {approval.scheduled_time.strftime('%Y-%m-%d %H:%M:%S')}"
+            else:
+                execute_info = "\n\n请申请人登录系统手动执行"
+            
             content = f"""
 ## {title}
 
@@ -259,12 +314,16 @@ class NotificationService:
 
 **审批人**: {approver_name}
 
+**目标数据库**: {db_target}
+
+**变更类型**: {change_type_display}
+
+**风险等级**: {risk_display}
+
 **审批时间**: {approval.approve_time.strftime('%Y-%m-%d %H:%M:%S') if approval.approve_time else '未知'}
 
-**审批意见**: {approval.approve_comment or '无'}
+**审批意见**: {approval.approve_comment or '无'}{execute_info}
 """
-            if approval.scheduled_time:
-                content += f"\n**计划执行时间**: {approval.scheduled_time.strftime('%Y-%m-%d %H:%M:%S')}\n"
         
         elif notification_type == "rejected":
             title = "❌ 审批已拒绝"
@@ -279,12 +338,24 @@ class NotificationService:
 
 **审批人**: {approver_name}
 
+**目标数据库**: {db_target}
+
+**变更类型**: {change_type_display}
+
+**风险等级**: {risk_display}
+
 **审批时间**: {approval.approve_time.strftime('%Y-%m-%d %H:%M:%S') if approval.approve_time else '未知'}
 
 **拒绝原因**: {approval.approve_comment or '无'}
 """
         elif notification_type == "executed":
             title = "🚀 变更已执行"
+            
+            # 实际影响行数
+            affected_info = ""
+            if approval.affected_rows_actual:
+                affected_info = f"\n**实际影响行数**: {approval.affected_rows_actual:,} 行"
+            
             content = f"""
 ## {title}
 
@@ -292,9 +363,13 @@ class NotificationService:
 
 **申请人**: {requester_name}
 
+**目标数据库**: {db_target}
+
+**变更类型**: {change_type_display}
+
 **执行时间**: {approval.execute_time.strftime('%Y-%m-%d %H:%M:%S') if approval.execute_time else '未知'}
 
-**执行结果**: {approval.execute_result or '执行完成'}
+**执行结果**: {approval.execute_result or '执行完成'}{affected_info}
 """
         else:
             return

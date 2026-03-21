@@ -43,6 +43,12 @@
             <span class="risk-tag" :class="row.sql_risk_level">{{ getRiskLabel(row.sql_risk_level) }}</span>
           </template>
         </el-table-column>
+        <el-table-column prop="affected_rows_estimate" label="预估影响" width="100">
+          <template #default="{ row }">
+            <span v-if="row.affected_rows_estimate">{{ row.affected_rows_estimate.toLocaleString() }} 行</span>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
@@ -301,33 +307,47 @@
           />
         </el-form-item>
         
-        <!-- 定时执行 -->
-        <el-form-item label="定时执行">
-          <div class="scheduled-execution-wrapper">
-            <el-switch
-              v-model="dialog.form.enable_scheduled"
-              active-text="启用"
-              inactive-text="不启用"
-            />
+        <!-- 预估影响行数 -->
+        <el-form-item label="预估影响行数">
+          <el-input-number
+            v-model="dialog.form.affected_rows_estimate"
+            :min="0"
+            :max="1000000000"
+            :step="100"
+            placeholder="预估影响的行数"
+            style="width: 200px;"
+          />
+          <span class="form-tip" style="margin-left: 10px;">
+            <el-icon><InfoFilled /></el-icon>
+            用于评估变更影响范围，会显示在通知中
+          </span>
+        </el-form-item>
+        
+        <!-- 执行方式 -->
+        <el-form-item label="执行方式">
+          <div class="execution-mode-wrapper">
+            <el-radio-group v-model="dialog.form.execution_mode" @change="handleExecutionModeChange">
+              <el-radio value="manual">手动执行</el-radio>
+              <el-radio value="auto">审批后自动执行</el-radio>
+              <el-radio value="scheduled">定时执行</el-radio>
+            </el-radio-group>
+          </div>
+          <div v-if="dialog.form.execution_mode === 'auto'" class="execution-tip">
+            <el-alert type="warning" :closable="false" show-icon>
+              审批通过后将立即自动执行SQL变更，请确认风险
+            </el-alert>
+          </div>
+          <div v-if="dialog.form.execution_mode === 'scheduled'" class="scheduled-time-picker">
             <el-date-picker
-              v-if="dialog.form.enable_scheduled"
               v-model="dialog.form.scheduled_time"
               type="datetime"
               placeholder="选择执行时间"
               :disabled-date="disabledDate"
-              :disabled-hours="disabledHours"
-              :disabled-minutes="disabledMinutes"
-              style="margin-left: 10px;"
+              style="width: 240px;"
             />
-            <div v-if="dialog.form.enable_scheduled && dialog.form.scheduled_time" class="scheduled-info">
-              <el-tag type="warning" size="small">
-                将在 {{ formatTime(dialog.form.scheduled_time) }} 自动执行
-              </el-tag>
-            </div>
-          </div>
-          <div class="form-tip">
-            <el-icon><InfoFilled /></el-icon>
-            启用后，审批通过将在指定时间自动执行SQL变更
+            <el-tag type="warning" size="small" style="margin-left: 10px;">
+              将在指定时间自动执行
+            </el-tag>
           </div>
         </el-form-item>
       </el-form>
@@ -351,6 +371,31 @@
           <span class="risk-tag" :class="detailDialog.data?.sql_risk_level">
             {{ getRiskLabel(detailDialog.data?.sql_risk_level) }}
           </span>
+        </el-descriptions-item>
+        <el-descriptions-item label="预估影响行数">
+          <span v-if="detailDialog.data?.affected_rows_estimate">
+            {{ detailDialog.data?.affected_rows_estimate.toLocaleString() }} 行
+          </span>
+          <span v-else>-</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="实际影响行数">
+          <span v-if="detailDialog.data?.affected_rows_actual">
+            {{ detailDialog.data?.affected_rows_actual.toLocaleString() }} 行
+          </span>
+          <span v-else>-</span>
+        </el-descriptions-item>
+        <el-descriptions-item label="执行方式">
+          <template v-if="detailDialog.data?.scheduled_time">
+            <el-tag type="warning" size="small">
+              定时执行: {{ formatTime(detailDialog.data?.scheduled_time) }}
+            </el-tag>
+          </template>
+          <template v-else-if="detailDialog.data?.auto_execute">
+            <el-tag type="success" size="small">⚡ 审批后自动执行</el-tag>
+          </template>
+          <template v-else>
+            <el-tag type="info" size="small">手动执行</el-tag>
+          </template>
         </el-descriptions-item>
         <el-descriptions-item label="状态">
           <el-tag :type="getStatusType(detailDialog.data?.status)" size="small">
@@ -472,7 +517,10 @@ const dialog = reactive({
     database_pattern: '',
     change_type: 'DDL',
     sql_content: '',
-    remark: ''
+    remark: '',
+    affected_rows_estimate: 0,
+    execution_mode: 'manual', // manual, auto, scheduled
+    scheduled_time: null
   },
   rules: {
     title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
@@ -774,6 +822,13 @@ const fetchInstances = async () => {
 
 const handleTabChange = () => fetchApprovals()
 
+// 执行方式变更
+const handleExecutionModeChange = (value) => {
+  if (value !== 'scheduled') {
+    dialog.form.scheduled_time = null
+  }
+}
+
 // 禁用过去的日期
 const disabledDate = (time) => {
   return time.getTime() < Date.now() - 24 * 60 * 60 * 1000
@@ -845,7 +900,9 @@ const handleSubmit = async () => {
         sql_content: sqlToSubmit,
         sql_line_count: sqlStats.totalLines,
         database_mode: dialog.form.database_mode,
-        remark: dialog.form.remark
+        remark: dialog.form.remark,
+        affected_rows_estimate: dialog.form.affected_rows_estimate || 0,
+        auto_execute: dialog.form.execution_mode === 'auto'
       }
       
       // 根据模式设置数据库相关字段
@@ -866,7 +923,7 @@ const handleSubmit = async () => {
       }
       
       // 添加定时执行时间
-      if (dialog.form.enable_scheduled && dialog.form.scheduled_time) {
+      if (dialog.form.execution_mode === 'scheduled' && dialog.form.scheduled_time) {
         submitData.scheduled_time = dayjs(dialog.form.scheduled_time).toISOString()
       }
       

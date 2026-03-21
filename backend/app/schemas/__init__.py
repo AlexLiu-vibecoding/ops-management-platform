@@ -268,6 +268,8 @@ class ApprovalCreate(BaseModel):
     parsed_databases: Optional[List[str]] = Field(None, description="SQL解析出的数据库列表")
     sql_content: str
     sql_line_count: Optional[int] = Field(None, description="SQL行数")
+    affected_rows_estimate: Optional[int] = Field(None, description="预估影响行数")
+    auto_execute: Optional[bool] = Field(False, description="审批通过后自动执行")
     scheduled_time: Optional[datetime] = None
     remark: Optional[str] = Field(None, max_length=500, description="备注")
 
@@ -294,6 +296,9 @@ class ApprovalResponse(BaseModel):
     sql_content_preview: Optional[str] = Field(None, description="SQL预览（前100行）")
     sql_line_count: Optional[int] = Field(None, description="SQL总行数")
     sql_risk_level: Optional[str]
+    affected_rows_estimate: Optional[int] = Field(None, description="预估影响行数")
+    affected_rows_actual: Optional[int] = Field(None, description="实际影响行数")
+    auto_execute: Optional[bool] = Field(False, description="审批通过后自动执行")
     status: ApprovalStatus
     requester_id: int
     requester_name: Optional[str] = Field(None, description="申请人姓名")
@@ -301,6 +306,8 @@ class ApprovalResponse(BaseModel):
     approver_name: Optional[str] = Field(None, description="审批人姓名")
     approve_comment: Optional[str]
     scheduled_time: Optional[datetime]
+    execute_time: Optional[datetime] = Field(None, description="执行时间")
+    execute_result: Optional[str] = Field(None, description="执行结果")
     created_at: datetime
     approved_at: Optional[datetime] = Field(None, description="审批时间")
     instance_name: Optional[str] = Field(None, description="实例名称")

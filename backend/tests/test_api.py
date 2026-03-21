@@ -222,6 +222,31 @@ def run_tests():
     log_test("获取菜单列表", status == 200 and isinstance(menus, list),
              f"返回 {len(menus) if isinstance(menus, list) else 'N/A'} 项")
     
+    # ========== 6. 审批流程测试 ==========
+    print("\n📋 [6] 审批流程测试")
+    print("-" * 40)
+    
+    # 获取审批列表
+    status, approvals = tester.get("/approvals", {"limit": 20})
+    log_test("获取审批列表", status == 200 and "items" in approvals,
+             f"共 {approvals.get('total', 0)} 条审批")
+    
+    # 检查审批数据格式
+    if approvals.get("items") and len(approvals["items"]) > 0:
+        first_approval = approvals["items"][0]
+        required_fields = ["change_type", "sql_risk_level", "database_target"]
+        missing = [f for f in required_fields if f not in first_approval]
+        log_test("审批数据格式验证", len(missing) == 0,
+                 f"字段完整: {', '.join(required_fields)}")
+        
+        # 检查新增字段
+        has_new_fields = "affected_rows_estimate" in first_approval and "auto_execute" in first_approval
+        log_test("审批新字段验证", has_new_fields,
+                 f"包含: affected_rows_estimate, auto_execute")
+    else:
+        log_test("审批数据格式验证", True, "暂无审批数据，跳过验证")
+        log_test("审批新字段验证", True, "暂无审批数据，跳过验证")
+    
     # ========== 6. 前端页面测试 ==========
     print("\n📋 [6] 前端页面访问测试")
     print("-" * 40)

@@ -234,6 +234,9 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
         "sql_content_preview": sql_preview if total_lines > PREVIEW_LINES else None,
         "sql_line_count": total_lines,
         "sql_risk_level": approval.sql_risk_level,
+        "affected_rows_estimate": approval.affected_rows_estimate,
+        "affected_rows_actual": approval.affected_rows_actual,
+        "auto_execute": approval.auto_execute,
         "status": approval.status,
         "requester_id": approval.requester_id,
         "requester_name": approval.requester.real_name if approval.requester else None,
@@ -241,6 +244,8 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
         "approver_name": approval.approver.real_name if approval.approver else None,
         "approve_comment": approval.approve_comment,
         "scheduled_time": approval.scheduled_time,
+        "execute_time": approval.execute_time,
+        "execute_result": approval.execute_result,
         "created_at": approval.created_at,
         "approved_at": approval.approve_time,
         "instance_name": approval.instance.name if approval.instance else None
@@ -351,6 +356,8 @@ async def create_approval(
         sql_content=approval_data.sql_content,
         sql_line_count=sql_line_count,
         sql_risk_level=risk_level,
+        affected_rows_estimate=approval_data.affected_rows_estimate or 0,
+        auto_execute=approval_data.auto_execute or False,
         environment_id=instance.environment_id,
         requester_id=current_user.id,
         scheduled_time=approval_data.scheduled_time
@@ -452,16 +459,25 @@ async def approve_or_reject(
     except Exception as e:
         logger.warning(f"发送审批结果通知失败: {e}")
     
-    # 如果通过且设置了定时执行时间，添加到调度器
-    if action_data.approved and approval.scheduled_time:
-        try:
-            approval_scheduler.schedule_approval_execution(
-                approval.id, 
-                approval.scheduled_time
-            )
-            logger.info(f"已添加定时执行任务: 审批ID={approval.id}, 执行时间={approval.scheduled_time}")
-        except Exception as e:
-            logger.error(f"添加定时执行任务失败: {e}")
+    # 如果通过，处理执行逻辑
+    if action_data.approved:
+        # 如果设置了定时执行时间，添加到调度器
+        if approval.scheduled_time:
+            try:
+                approval_scheduler.schedule_approval_execution(
+                    approval.id, 
+                    approval.scheduled_time
+                )
+                logger.info(f"已添加定时执行任务: 审批ID={approval.id}, 执行时间={approval.scheduled_time}")
+            except Exception as e:
+                logger.error(f"添加定时执行任务失败: {e}")
+        # 如果开启了自动执行且没有定时时间，立即执行
+        elif approval.auto_execute:
+            try:
+                logger.info(f"审批通过且启用自动执行，开始执行: 审批ID={approval.id}")
+                await approval_scheduler.execute_approval(approval.id, db)
+            except Exception as e:
+                logger.error(f"自动执行审批失败: {e}")
     
     return format_approval_response(approval, include_full_sql=True)
 
