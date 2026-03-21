@@ -41,6 +41,46 @@ export const monitorApi = {
     return request.put('/monitor/alert-rules', rules)
   },
 
+  // 慢查询监控配置
+  getSlowQueryConfig() {
+    return request.get('/monitor/slow-query/config')
+  },
+
+  updateSlowQueryConfig(data) {
+    return request.put('/monitor/slow-query/config', data)
+  },
+
+  getSlowQueryStatistics(hours = 24) {
+    return request.get('/monitor/slow-query/statistics', { params: { hours } })
+  },
+
+  // 高CPU SQL监控配置
+  getHighCpuConfig() {
+    return request.get('/monitor/high-cpu/config')
+  },
+
+  updateHighCpuConfig(data) {
+    return request.put('/monitor/high-cpu/config', data)
+  },
+
+  getHighCpuStatistics(hours = 24) {
+    return request.get('/monitor/high-cpu/statistics', { params: { hours } })
+  },
+
+  // 告警规则详细配置
+  getAlertRulesDetail() {
+    return request.get('/monitor/alert-rules/detail')
+  },
+
+  updateAlertRulesDetail(rules) {
+    return request.put('/monitor/alert-rules/detail', rules)
+  },
+
+  // 监控总览
+  getOverview() {
+    return request.get('/monitor/overview')
+  },
+
   // 性能监控
   performance: {
     getCurrent(instanceId) {
