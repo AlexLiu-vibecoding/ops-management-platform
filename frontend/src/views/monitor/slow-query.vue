@@ -62,7 +62,12 @@
           </el-select>
         </el-col>
         <el-col :span="4">
-          <el-input-number v-model="minTime" :min="0.1" :max="3600" :step="0.1" :precision="1" placeholder="最小耗时" style="width: 100%;" />
+          <div class="filter-item">
+            <span class="filter-label">耗时阈值</span>
+            <el-input-number v-model="minTime" :min="0.1" :max="3600" :step="0.1" :precision="1" style="width: 100%;">
+              <template #suffix>秒</template>
+            </el-input-number>
+          </div>
         </el-col>
         <el-col :span="4">
           <el-select v-model="timeRange" placeholder="时间范围" @change="fetchSlowQueries" style="width: 100%;">
@@ -628,6 +633,18 @@ onMounted(() => {
   
   .filter-card {
     margin-bottom: 20px;
+    
+    .filter-item {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      
+      .filter-label {
+        font-size: 12px;
+        color: #606266;
+        font-weight: 500;
+      }
+    }
   }
   
   .table-card {
