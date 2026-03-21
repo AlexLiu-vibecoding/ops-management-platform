@@ -215,36 +215,65 @@ html, body {
   }
 }
 
-// Tags
+// Tags - High Contrast
 .el-tag {
   border-radius: var(--radius-sm) !important;
   border: none !important;
-  font-weight: 500 !important;
-  padding: 2px 10px !important;
+  font-weight: 600 !important;
+  padding: 4px 12px !important;
+  font-size: 12px !important;
   
   &--success {
-    background: rgba(52, 199, 89, 0.15) !important;
-    color: #248A3D !important;
+    background: #D1F4E0 !important;
+    color: #0D6832 !important;
   }
   
   &--warning {
-    background: rgba(255, 149, 0, 0.15) !important;
-    color: #C93400 !important;
+    background: #FFF3CD !important;
+    color: #856404 !important;
   }
   
   &--danger {
-    background: rgba(255, 59, 48, 0.15) !important;
-    color: #D70015 !important;
+    background: #FFDEE2 !important;
+    color: #C41E3A !important;
   }
   
   &--info {
-    background: rgba(90, 200, 250, 0.15) !important;
-    color: #0077B5 !important;
+    background: #E3F2FD !important;
+    color: #0D47A1 !important;
   }
   
   &--primary {
-    background: var(--primary-light) !important;
-    color: var(--primary-color) !important;
+    background: #E3F2FD !important;
+    color: #1565C0 !important;
+  }
+  
+  // Dark theme support
+  @media (prefers-color-scheme: dark) {
+    &--success {
+      background: #0D6832 !important;
+      color: #D1F4E0 !important;
+    }
+    
+    &--warning {
+      background: #856404 !important;
+      color: #FFF3CD !important;
+    }
+    
+    &--danger {
+      background: #C41E3A !important;
+      color: #FFDEE2 !important;
+    }
+    
+    &--info {
+      background: #0D47A1 !important;
+      color: #E3F2FD !important;
+    }
+    
+    &--primary {
+      background: #1565C0 !important;
+      color: #E3F2FD !important;
+    }
   }
 }
 
@@ -398,32 +427,32 @@ html, body {
   }
 }
 
-// Environment Tag
+// Environment Tag - High Contrast
 .env-tag {
   padding: 4px 12px;
   border-radius: var(--radius-full);
   font-size: 12px;
   font-weight: 600;
-  color: #fff;
+  color: #fff !important;
   
   &.development {
-    background: linear-gradient(135deg, #34C759, #30D158);
+    background: #22C55E !important;
   }
   
   &.testing {
-    background: linear-gradient(135deg, #007AFF, #5AC8FA);
+    background: #3B82F6 !important;
   }
   
   &.staging {
-    background: linear-gradient(135deg, #FF9500, #FFCC00);
+    background: #F59E0B !important;
   }
   
   &.production {
-    background: linear-gradient(135deg, #FF3B30, #FF6B6B);
+    background: #EF4444 !important;
   }
 }
 
-// Risk Level Tags
+// Risk Level Tags - High Contrast
 .risk-tag {
   padding: 4px 12px;
   border-radius: var(--radius-full);
@@ -431,23 +460,23 @@ html, body {
   font-weight: 600;
   
   &.low {
-    background: rgba(52, 199, 89, 0.15);
-    color: #248A3D;
+    background: #D1F4E0 !important;
+    color: #0D6832 !important;
   }
   
   &.medium {
-    background: rgba(255, 149, 0, 0.15);
-    color: #C93400;
+    background: #FFF3CD !important;
+    color: #856404 !important;
   }
   
   &.high {
-    background: rgba(255, 59, 48, 0.15);
-    color: #D70015;
+    background: #FFDEE2 !important;
+    color: #C41E3A !important;
   }
   
   &.critical {
-    background: rgba(255, 59, 48, 0.25);
-    color: #D70015;
+    background: #C41E3A !important;
+    color: #fff !important;
   }
 }
 
@@ -477,24 +506,24 @@ html, body {
   }
 }
 
-// Status Indicator
+// Status Indicator - High Contrast
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: var(--radius-full);
   display: inline-block;
   
   &.online {
-    background: var(--success-color);
-    box-shadow: 0 0 8px rgba(52, 199, 89, 0.5);
+    background: #22C55E !important;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
   }
   
   &.offline {
-    background: var(--danger-color);
+    background: #EF4444 !important;
   }
   
   &.pending {
-    background: var(--warning-color);
+    background: #F59E0B !important;
     animation: pulse 2s infinite;
   }
 }
