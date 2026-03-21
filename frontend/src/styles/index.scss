@@ -4,16 +4,17 @@
 
 // CSS Variables - Design Tokens
 :root {
-  // Primary Colors
-  --primary-color: #007AFF;
-  --primary-hover: #0056CC;
-  --primary-light: rgba(0, 122, 255, 0.1);
+  // Primary Colors - 适中饱和度的蓝色
+  --primary-color: #3B82F6;
+  --primary-hover: #2563EB;
+  --primary-active: #1D4ED8;
+  --primary-light: rgba(59, 130, 246, 0.1);
   
   // Semantic Colors
-  --success-color: #34C759;
-  --warning-color: #FF9500;
-  --danger-color: #FF3B30;
-  --info-color: #5AC8FA;
+  --success-color: #22C55E;
+  --warning-color: #F59E0B;
+  --danger-color: #EF4444;
+  --info-color: #6366F1;
   
   // Neutral Colors
   --bg-primary: #F2F2F7;
@@ -42,17 +43,16 @@
   --glass-border: rgba(255, 255, 255, 0.5);
   
   // Radius
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
   --radius-full: 9999px;
   
   // Transitions
   --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-spring: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 // Global Reset
@@ -121,61 +121,250 @@ html, body {
   }
 }
 
-// Buttons
+// ========================================
+// Buttons - 蓝底白字 / 红底白字 风格
+// ========================================
 .el-button {
   border-radius: var(--radius-md) !important;
   font-weight: 500 !important;
-  transition: var(--transition-fast) !important;
+  transition: all var(--transition-fast) !important;
   border: none !important;
+  padding: 8px 16px !important;
   
+  // 主要按钮 - 蓝底白字
   &--primary {
     background: var(--primary-color) !important;
+    color: #FFFFFF !important;
     
-    &:hover {
+    &:hover, &:focus {
       background: var(--primary-hover) !important;
-      transform: scale(1.02);
+      color: #FFFFFF !important;
     }
     
     &:active {
-      transform: scale(0.98);
+      background: var(--primary-active) !important;
+    }
+    
+    // 禁用状态
+    &.is-disabled, &.is-disabled:hover {
+      background: #93C5FD !important;
+      color: #FFFFFF !important;
+      cursor: not-allowed;
     }
   }
   
+  // 默认按钮 - 灰底深字
   &--default {
     background: var(--bg-tertiary) !important;
     color: var(--text-primary) !important;
     
-    &:hover {
+    &:hover, &:focus {
       background: #D1D1D6 !important;
+      color: var(--text-primary) !important;
+    }
+    
+    &.is-disabled, &.is-disabled:hover {
+      background: #F3F4F6 !important;
+      color: #9CA3AF !important;
     }
   }
   
+  // 成功按钮 - 绿底白字
   &--success {
     background: var(--success-color) !important;
-  }
-  
-  &--warning {
-    background: var(--warning-color) !important;
-  }
-  
-  &--danger {
-    background: var(--danger-color) !important;
-  }
-  
-  &--text {
-    color: var(--primary-color) !important;
+    color: #FFFFFF !important;
     
-    &:hover {
-      background: var(--primary-light) !important;
+    &:hover, &:focus {
+      background: #16A34A !important;
+      color: #FFFFFF !important;
+    }
+    
+    &.is-disabled, &.is-disabled:hover {
+      background: #86EFAC !important;
+      color: #FFFFFF !important;
     }
   }
   
+  // 警告按钮 - 橙底白字
+  &--warning {
+    background: var(--warning-color) !important;
+    color: #FFFFFF !important;
+    
+    &:hover, &:focus {
+      background: #D97706 !important;
+      color: #FFFFFF !important;
+    }
+    
+    &.is-disabled, &.is-disabled:hover {
+      background: #FCD34D !important;
+      color: #FFFFFF !important;
+    }
+  }
+  
+  // 危险按钮 - 红底白字
+  &--danger {
+    background: var(--danger-color) !important;
+    color: #FFFFFF !important;
+    
+    &:hover, &:focus {
+      background: #DC2626 !important;
+      color: #FFFFFF !important;
+    }
+    
+    &:active {
+      background: #B91C1C !important;
+    }
+    
+    &.is-disabled, &.is-disabled:hover {
+      background: #FCA5A5 !important;
+      color: #FFFFFF !important;
+    }
+  }
+  
+  // 信息按钮 - 紫底白字
+  &--info {
+    background: var(--info-color) !important;
+    color: #FFFFFF !important;
+    
+    &:hover, &:focus {
+      background: #4F46E5 !important;
+      color: #FFFFFF !important;
+    }
+    
+    &.is-disabled, &.is-disabled:hover {
+      background: #A5B4FC !important;
+      color: #FFFFFF !important;
+    }
+  }
+  
+  // 文字按钮 - 统一实色背景
+  &--text {
+    border-radius: var(--radius-sm) !important;
+    padding: 4px 10px !important;
+    font-size: 13px !important;
+    
+    // 默认文字按钮 - 蓝底白字
+    color: #FFFFFF !important;
+    background: var(--primary-color) !important;
+    
+    &:hover, &:focus {
+      background: var(--primary-hover) !important;
+      color: #FFFFFF !important;
+    }
+    
+    // 主要文字按钮 - 蓝底白字
+    &.el-button--primary {
+      background: var(--primary-color) !important;
+      color: #FFFFFF !important;
+      
+      &:hover, &:focus {
+        background: var(--primary-hover) !important;
+        color: #FFFFFF !important;
+      }
+    }
+    
+    // 成功文字按钮 - 绿底白字
+    &.el-button--success {
+      background: var(--success-color) !important;
+      color: #FFFFFF !important;
+      
+      &:hover, &:focus {
+        background: #16A34A !important;
+        color: #FFFFFF !important;
+      }
+    }
+    
+    // 警告文字按钮 - 橙底白字
+    &.el-button--warning {
+      background: var(--warning-color) !important;
+      color: #FFFFFF !important;
+      
+      &:hover, &:focus {
+        background: #D97706 !important;
+        color: #FFFFFF !important;
+      }
+    }
+    
+    // 危险文字按钮 - 红底白字
+    &.el-button--danger {
+      background: var(--danger-color) !important;
+      color: #FFFFFF !important;
+      
+      &:hover, &:focus {
+        background: #DC2626 !important;
+        color: #FFFFFF !important;
+      }
+    }
+    
+    // 信息文字按钮 - 紫底白字
+    &.el-button--info {
+      background: var(--info-color) !important;
+      color: #FFFFFF !important;
+      
+      &:hover, &:focus {
+        background: #4F46E5 !important;
+        color: #FFFFFF !important;
+      }
+    }
+  }
+  
+  // 圆角按钮
   &.is-round {
     border-radius: var(--radius-full) !important;
   }
+  
+  // 小按钮
+  &--small {
+    padding: 6px 12px !important;
+    font-size: 12px !important;
+  }
+  
+  // 大按钮
+  &--large {
+    padding: 10px 20px !important;
+    font-size: 14px !important;
+  }
 }
 
+// ========================================
+// Tags - 高对比度标签
+// ========================================
+.el-tag {
+  border-radius: var(--radius-sm) !important;
+  border: none !important;
+  font-weight: 600 !important;
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+  
+  &--success {
+    background: #D1F4E0 !important;
+    color: #0D6832 !important;
+  }
+  
+  &--warning {
+    background: #FFF3CD !important;
+    color: #856404 !important;
+  }
+  
+  &--danger {
+    background: #FFDEE2 !important;
+    color: #C41E3A !important;
+  }
+  
+  &--info {
+    background: #E3F2FD !important;
+    color: #0D47A1 !important;
+  }
+  
+  &--primary {
+    background: #E3F2FD !important;
+    color: #1565C0 !important;
+  }
+}
+
+// ========================================
 // Form Elements
+// ========================================
 .el-input {
   --el-input-border-radius: var(--radius-md) !important;
   
@@ -215,68 +404,6 @@ html, body {
   }
 }
 
-// Tags - High Contrast
-.el-tag {
-  border-radius: var(--radius-sm) !important;
-  border: none !important;
-  font-weight: 600 !important;
-  padding: 4px 12px !important;
-  font-size: 12px !important;
-  
-  &--success {
-    background: #D1F4E0 !important;
-    color: #0D6832 !important;
-  }
-  
-  &--warning {
-    background: #FFF3CD !important;
-    color: #856404 !important;
-  }
-  
-  &--danger {
-    background: #FFDEE2 !important;
-    color: #C41E3A !important;
-  }
-  
-  &--info {
-    background: #E3F2FD !important;
-    color: #0D47A1 !important;
-  }
-  
-  &--primary {
-    background: #E3F2FD !important;
-    color: #1565C0 !important;
-  }
-  
-  // Dark theme support
-  @media (prefers-color-scheme: dark) {
-    &--success {
-      background: #0D6832 !important;
-      color: #D1F4E0 !important;
-    }
-    
-    &--warning {
-      background: #856404 !important;
-      color: #FFF3CD !important;
-    }
-    
-    &--danger {
-      background: #C41E3A !important;
-      color: #FFDEE2 !important;
-    }
-    
-    &--info {
-      background: #0D47A1 !important;
-      color: #E3F2FD !important;
-    }
-    
-    &--primary {
-      background: #1565C0 !important;
-      color: #E3F2FD !important;
-    }
-  }
-}
-
 // Tables
 .el-table {
   border-radius: var(--radius-lg) !important;
@@ -294,7 +421,7 @@ html, body {
   }
   
   tr:hover > td.el-table__cell {
-    background: rgba(0, 122, 255, 0.04) !important;
+    background: rgba(59, 130, 246, 0.04) !important;
   }
 }
 
@@ -430,11 +557,10 @@ html, body {
 // Environment Tag - White text on color background
 .env-tag {
   padding: 4px 12px;
-  border-radius: var(--radius-full) !important;
+  border-radius: var(--radius-sm) !important;
   font-size: 12px !important;
   font-weight: 600 !important;
   color: #FFFFFF !important;
-  text-shadow: 0 1px 1px rgba(0,0,0,0.2);
   
   &.development {
     background: #22C55E !important;
@@ -453,10 +579,10 @@ html, body {
   }
 }
 
-// Risk Level Tags - High Contrast
+// Risk Level Tags
 .risk-tag {
   padding: 4px 12px;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 600;
   
@@ -507,7 +633,7 @@ html, body {
   }
 }
 
-// Status Indicator - High Contrast
+// Status Indicator
 .status-dot {
   width: 10px;
   height: 10px;
