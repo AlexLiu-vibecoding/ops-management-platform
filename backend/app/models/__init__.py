@@ -244,6 +244,7 @@ class ApprovalRecord(Base):
     # 关联
     requester = relationship("User", back_populates="approval_requests", foreign_keys=[requester_id])
     approver = relationship("User", back_populates="approval_actions", foreign_keys=[approver_id])
+    instance = relationship("Instance")
 
 
 class PerformanceMetric(Base):
