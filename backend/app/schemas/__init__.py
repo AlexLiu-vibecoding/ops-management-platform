@@ -133,6 +133,7 @@ class EnvironmentResponse(BaseModel):
 class InstanceCreate(BaseModel):
     """创建实例请求"""
     name: str = Field(..., max_length=100)
+    db_type: str = Field("mysql", pattern="^(mysql|postgresql)$")
     host: str = Field(..., max_length=100)
     port: int = Field(3306, ge=1, le=65535)
     username: str = Field(..., max_length=50)
@@ -145,6 +146,7 @@ class InstanceCreate(BaseModel):
 class InstanceUpdate(BaseModel):
     """更新实例请求"""
     name: Optional[str] = Field(None, max_length=100)
+    db_type: Optional[str] = Field(None, pattern="^(mysql|postgresql)$")
     host: Optional[str] = Field(None, max_length=100)
     port: Optional[int] = Field(None, ge=1, le=65535)
     username: Optional[str] = Field(None, max_length=50)
@@ -159,6 +161,7 @@ class InstanceResponse(BaseModel):
     """实例响应"""
     id: int
     name: str
+    db_type: str = "mysql"
     host: str
     port: int
     username: str

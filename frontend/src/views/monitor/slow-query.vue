@@ -77,9 +77,13 @@
             <el-option label="最近7天" :value="168" />
           </el-select>
         </el-col>
-        <el-col :span="4">
+        <el-col :span="6">
           <el-button type="primary" @click="fetchSlowQueries" :loading="loading">查询</el-button>
           <el-button @click="resetFilters">重置</el-button>
+          <el-button type="success" @click="openFetchDialog" :disabled="!selectedInstance">
+            <el-icon><Download /></el-icon>
+            从 RDS 抓取
+          </el-button>
         </el-col>
       </el-row>
     </el-card>
@@ -366,13 +370,178 @@
         <el-button type="primary" @click="copySQL">复制 SQL</el-button>
       </template>
     </el-dialog>
+    
+    <!-- 从 RDS 抓取慢查询对话框 -->
+    <el-dialog 
+      v-model="fetchDialog.visible" 
+      title="从 AWS RDS 抓取慢查询" 
+      width="90%" 
+      top="5vh"
+      :close-on-click-modal="false"
+    >
+      <el-alert
+        type="info"
+        :closable="false"
+        style="margin-bottom: 20px;"
+      >
+        <template #title>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <el-icon><InfoFilled /></el-icon>
+            <span>通过 MySQL performance_schema 抓取慢查询，无需访问 slow.log 文件</span>
+          </div>
+        </template>
+      </el-alert>
+      
+      <!-- performance_schema 状态 -->
+      <el-card shadow="never" class="status-card" v-if="fetchDialog.psStatus">
+        <template #header>
+          <div class="card-header">
+            <span>Performance Schema 状态</span>
+            <el-tag :type="fetchDialog.psStatus.enabled ? 'success' : 'danger'">
+              {{ fetchDialog.psStatus.enabled ? '已启用' : '未启用' }}
+            </el-tag>
+          </div>
+        </template>
+        <div v-if="fetchDialog.psStatus.enabled">
+          <el-descriptions :column="3" border size="small">
+            <el-descriptions-item label="events_statements_current">
+              <el-tag :type="fetchDialog.psStatus.consumers?.events_statements_current === 'YES' ? 'success' : 'danger'" size="small">
+                {{ fetchDialog.psStatus.consumers?.events_statements_current === 'YES' ? '已启用' : '未启用' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="events_statements_history">
+              <el-tag :type="fetchDialog.psStatus.consumers?.events_statements_history === 'YES' ? 'success' : 'danger'" size="small">
+                {{ fetchDialog.psStatus.consumers?.events_statements_history === 'YES' ? '已启用' : '未启用' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="statement instruments">
+              {{ fetchDialog.psStatus.instruments?.enabled_count }} / {{ fetchDialog.psStatus.instruments?.total }} 已启用
+            </el-descriptions-item>
+          </el-descriptions>
+        </div>
+        <div v-else>
+          <el-alert type="error" :closable="false">
+            {{ fetchDialog.psStatus.message }}
+          </el-alert>
+        </div>
+      </el-card>
+      
+      <!-- 抓取配置 -->
+      <el-card shadow="never" class="config-card">
+        <template #header>
+          <span>抓取配置</span>
+        </template>
+        <el-form :model="fetchDialog.config" label-width="120px">
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item label="数据源">
+                <el-radio-group v-model="fetchDialog.config.useSysSchema">
+                  <el-radio-button :value="false">performance_schema</el-radio-button>
+                  <el-radio-button :value="true">sys.statement_analysis</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="最小执行时间">
+                <el-input-number v-model="fetchDialog.config.minExecTime" :min="0.1" :max="3600" :step="0.1" :precision="1" style="width: 100%;">
+                  <template #suffix>秒</template>
+                </el-input-number>
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="返回条数限制">
+                <el-input-number v-model="fetchDialog.config.limit" :min="10" :max="500" :step="10" style="width: 100%;" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="过滤数据库">
+                <el-select v-model="fetchDialog.config.database" placeholder="全部数据库" clearable style="width: 100%;" :loading="fetchDialog.loadingDbs">
+                  <el-option v-for="db in fetchDialog.databases" :key="db" :label="db" :value="db" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="同步到本地">
+                <el-switch v-model="fetchDialog.config.syncToLocal" />
+                <span style="margin-left: 10px; color: #909399; font-size: 12px;">
+                  将抓取的慢查询保存到本地数据库
+                </span>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
+      </el-card>
+      
+      <!-- 抓取结果 -->
+      <el-card shadow="never" class="result-card" v-if="fetchDialog.results.length > 0">
+        <template #header>
+          <div class="card-header">
+            <span>抓取结果 ({{ fetchDialog.results.length }} 条)</span>
+            <el-button type="primary" size="small" @click="syncSelectedToLocal" :loading="fetchDialog.syncing">
+              同步选中到本地
+            </el-button>
+          </div>
+        </template>
+        <el-table 
+          :data="fetchDialog.results" 
+          style="width: 100%" 
+          max-height="400"
+          @selection-change="handleSelectionChange"
+        >
+          <el-table-column type="selection" width="55" />
+          <el-table-column prop="schema_name" label="数据库" width="100" />
+          <el-table-column label="SQL 摘要" min-width="300">
+            <template #default="{ row }">
+              <div class="sql-digest">{{ row.digest_text || row.sample_query }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="exec_count" label="执行次数" width="90" sortable />
+          <el-table-column label="平均耗时" width="100" sortable>
+            <template #default="{ row }">
+              <el-tag :type="getQueryTimeType(row.avg_exec_time_sec || row.avg_latency_sec)">
+                {{ (row.avg_exec_time_sec || row.avg_latency_sec)?.toFixed(2) }}s
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="最大耗时" width="100" sortable>
+            <template #default="{ row }">
+              {{ (row.max_exec_time_sec || row.max_latency_sec)?.toFixed(2) }}s
+            </template>
+          </el-table-column>
+          <el-table-column prop="rows_examined" label="扫描行数" width="100">
+            <template #default="{ row }">
+              {{ formatNumber(row.rows_examined) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="last_seen" label="最后执行" width="140">
+            <template #default="{ row }">
+              {{ formatTime(row.last_seen) }}
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+      
+      <template #footer>
+        <el-button @click="fetchDialog.visible = false">关闭</el-button>
+        <el-button 
+          type="primary" 
+          @click="fetchFromPerformanceSchema" 
+          :loading="fetchDialog.fetching"
+          :disabled="!fetchDialog.psStatus?.enabled"
+        >
+          开始抓取
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Timer, DataAnalysis, Warning, TrendCharts, CircleClose, CircleCheck, InfoFilled } from '@element-plus/icons-vue'
+import { Timer, DataAnalysis, Warning, TrendCharts, CircleClose, CircleCheck, InfoFilled, Download } from '@element-plus/icons-vue'
 import request from '@/api/index'
 import dayjs from 'dayjs'
 
@@ -399,6 +568,25 @@ const explainDialog = reactive({
   visible: false,
   loading: false,
   data: null
+})
+
+// 从 RDS 抓取慢查询对话框
+const fetchDialog = reactive({
+  visible: false,
+  fetching: false,
+  syncing: false,
+  loadingDbs: false,
+  psStatus: null,
+  databases: [],
+  results: [],
+  selectedRows: [],
+  config: {
+    useSysSchema: false,
+    minExecTime: 1.0,
+    limit: 100,
+    database: null,
+    syncToLocal: true
+  }
 })
 
 // 获取实例列表
@@ -586,6 +774,129 @@ const copyIndexSQL = async () => {
       ElMessage.error('复制失败')
     }
   }
+}
+
+// ========== 从 RDS 抓取慢查询 ==========
+
+// 打开抓取对话框
+const openFetchDialog = async () => {
+  if (!selectedInstance.value) {
+    ElMessage.warning('请先选择实例')
+    return
+  }
+  
+  fetchDialog.visible = true
+  fetchDialog.results = []
+  fetchDialog.selectedRows = []
+  fetchDialog.psStatus = null
+  
+  // 检查 performance_schema 状态
+  await checkPerformanceSchemaStatus()
+  // 获取数据库列表
+  await fetchInstanceDatabases()
+}
+
+// 检查 performance_schema 状态
+const checkPerformanceSchemaStatus = async () => {
+  try {
+    const data = await request.get(`/slow-query/${selectedInstance.value}/performance-schema-status`)
+    fetchDialog.psStatus = data
+  } catch (error) {
+    console.error('检查 performance_schema 状态失败:', error)
+    fetchDialog.psStatus = { enabled: false, message: '检查失败' }
+  }
+}
+
+// 获取实例数据库列表
+const fetchInstanceDatabases = async () => {
+  fetchDialog.loadingDbs = true
+  try {
+    const data = await request.get(`/slow-query/${selectedInstance.value}/databases`)
+    fetchDialog.databases = data.databases || []
+  } catch (error) {
+    console.error('获取数据库列表失败:', error)
+    fetchDialog.databases = []
+  } finally {
+    fetchDialog.loadingDbs = false
+  }
+}
+
+// 从 performance_schema 抓取慢查询
+const fetchFromPerformanceSchema = async () => {
+  if (!fetchDialog.psStatus?.enabled) {
+    ElMessage.error('performance_schema 未启用')
+    return
+  }
+  
+  fetchDialog.fetching = true
+  fetchDialog.results = []
+  
+  try {
+    const params = {
+      limit: fetchDialog.config.limit,
+      min_exec_time: fetchDialog.config.minExecTime,
+      use_sys_schema: fetchDialog.config.useSysSchema
+    }
+    if (fetchDialog.config.database) {
+      params.database_name = fetchDialog.config.database
+    }
+    
+    const data = await request.get(`/slow-query/${selectedInstance.value}/fetch-slow-queries`, { params })
+    fetchDialog.results = data.items || []
+    
+    ElMessage.success(`成功抓取 ${fetchDialog.results.length} 条慢查询`)
+    
+    // 如果配置了自动同步到本地
+    if (fetchDialog.config.syncToLocal && fetchDialog.results.length > 0) {
+      await syncAllToLocal()
+    }
+  } catch (error) {
+    console.error('抓取慢查询失败:', error)
+    ElMessage.error(error.response?.data?.detail || '抓取慢查询失败')
+  } finally {
+    fetchDialog.fetching = false
+  }
+}
+
+// 同步所有抓取结果到本地
+const syncAllToLocal = async () => {
+  fetchDialog.syncing = true
+  try {
+    const params = {
+      limit: fetchDialog.config.limit,
+      min_exec_time: fetchDialog.config.minExecTime
+    }
+    if (fetchDialog.config.database) {
+      params.database_name = fetchDialog.config.database
+    }
+    
+    const data = await request.post(`/slow-query/${selectedInstance.value}/sync-slow-queries`, null, { params })
+    ElMessage.success(`同步完成: 新增 ${data.saved_count} 条, 更新 ${data.updated_count} 条`)
+    
+    // 刷新本地慢查询列表
+    await fetchSlowQueries()
+  } catch (error) {
+    console.error('同步慢查询失败:', error)
+    ElMessage.error(error.response?.data?.detail || '同步慢查询失败')
+  } finally {
+    fetchDialog.syncing = false
+  }
+}
+
+// 同步选中项到本地
+const syncSelectedToLocal = async () => {
+  if (fetchDialog.selectedRows.length === 0) {
+    ElMessage.warning('请选择要同步的慢查询')
+    return
+  }
+  
+  ElMessage.info('此功能将通过全量同步实现，会同时同步符合条件的所有慢查询')
+  await syncAllToLocal()
+}
+
+// 选择变更
+const handleSelectionChange = (selection) => {
+  fetchDialog.selectedRows = selection
 }
 
 onMounted(() => {
@@ -941,6 +1252,26 @@ onMounted(() => {
         }
       }
     }
+  }
+}
+
+// 抓取对话框样式
+.status-card {
+  margin-bottom: 20px;
+}
+
+.config-card {
+  margin-bottom: 20px;
+}
+
+.result-card {
+  .sql-digest {
+    font-family: monospace;
+    font-size: 12px;
+    color: #606266;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 </style>

@@ -122,11 +122,12 @@ class InstanceGroup(Base):
 
 
 class Instance(Base):
-    """MySQL实例表"""
+    """数据库实例表（支持MySQL和PostgreSQL）"""
     __tablename__ = "instances"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(100), unique=True, nullable=False, comment="实例名称")
+    db_type = Column(String(20), default="mysql", comment="数据库类型: mysql/postgresql")
     host = Column(String(100), nullable=False, comment="主机地址")
     port = Column(Integer, default=3306, comment="端口")
     username = Column(String(50), nullable=False, comment="用户名")
@@ -277,6 +278,7 @@ class SlowQuery(Base):
     database_name = Column(String(100), comment="数据库名")
     sql_fingerprint = Column(String(500), nullable=False, comment="SQL指纹")
     sql_sample = Column(Text, comment="SQL样例")
+    digest = Column(String(100), index=True, comment="SQL摘要(Digest)")
     query_time = Column(Float, comment="执行耗时（秒）")
     lock_time = Column(Float, comment="锁等待时间")
     rows_sent = Column(Integer, comment="返回行数")

@@ -3,9 +3,9 @@
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, text, create_engine
 import pymysql
 from pymysql.cursors import DictCursor
 import logging
@@ -613,3 +613,550 @@ async def run_explain(
         "error": explain_result.get("error"),
         "suggestions": suggestions
     }
+
+
+# ============================================================================
+# AWS RDS 慢查询抓取功能（基于 performance_schema）
+# ============================================================================
+
+async def fetch_slow_queries_from_performance_schema(
+    instance: Instance,
+    limit: int = 100,
+    min_exec_time: float = 1.0,
+    database_name: Optional[str] = None
+) -> List[dict]:
+    """
+    从 performance_schema.events_statements_summary_by_digest 抓取慢查询
+    
+    Args:
+        instance: 数据库实例
+        limit: 返回记录数限制
+        min_exec_time: 最小执行时间（秒）
+        database_name: 过滤特定数据库
+    
+    Returns:
+        慢查询列表
+    """
+    engine = None
+    try:
+        # 构建连接字符串
+        if instance.db_type == "mysql":
+            password = aes_cipher.decrypt(instance.password_encrypted)
+            connection_url = f"mysql+pymysql://{instance.username}:{password}@{instance.host}:{instance.port}/performance_schema"
+        else:
+            raise ValueError("仅支持 MySQL 实例")
+        
+        engine = create_engine(connection_url, connect_args={"connect_timeout": 10})
+        
+        # 查询 events_statements_summary_by_digest
+        # 按总执行时间排序
+        query = text("""
+            SELECT 
+                DIGEST_TEXT as digest_text,
+                DIGEST as digest,
+                SCHEMA_NAME as schema_name,
+                COUNT_STAR as exec_count,
+                SUM_TIMER_WAIT/1000000000000 as total_exec_time_sec,
+                AVG_TIMER_WAIT/1000000000000 as avg_exec_time_sec,
+                MAX_TIMER_WAIT/1000000000000 as max_exec_time_sec,
+                MIN_TIMER_WAIT/1000000000000 as min_exec_time_sec,
+                SUM_ROWS_EXAMINED as rows_examined,
+                SUM_ROWS_SENT as rows_sent,
+                SUM_ROWS_AFFECTED as rows_affected,
+                SUM_CREATED_TMP_TABLES as created_tmp_tables,
+                SUM_CREATED_TMP_DISK_TABLES as created_tmp_disk_tables,
+                SUM_SELECT_SCAN as select_scan,
+                SUM_SELECT_FULL_JOIN as select_full_join,
+                SUM_NO_INDEX_USED as no_index_used,
+                SUM_NO_GOOD_INDEX_USED as no_good_index_used,
+                FIRST_SEEN as first_seen,
+                LAST_SEEN as last_seen,
+                QUERY_SAMPLE_TEXT as sample_query,
+                QUERY_SAMPLE_SEEN as sample_seen,
+                QUERY_SAMPLE_TIMER_WAIT/1000000000000 as sample_exec_time_sec
+            FROM events_statements_summary_by_digest
+            WHERE DIGEST_TEXT IS NOT NULL
+            AND AVG_TIMER_WAIT/1000000000000 >= :min_exec_time
+        """)
+        
+        params = {"min_exec_time": min_exec_time}
+        
+        # 如果指定了数据库，添加过滤条件
+        if database_name:
+            query = text(str(query) + " AND SCHEMA_NAME = :db_name")
+            params["db_name"] = database_name
+        
+        # 按总执行时间降序排序
+        query = text(str(query) + " ORDER BY SUM_TIMER_WAIT DESC LIMIT :limit")
+        params["limit"] = limit
+        
+        with engine.connect() as conn:
+            result = conn.execute(query, params)
+            rows = result.fetchall()
+        
+        slow_queries = []
+        for row in rows:
+            slow_queries.append({
+                "digest_text": row.digest_text,
+                "digest": row.digest,
+                "schema_name": row.schema_name,
+                "exec_count": row.exec_count,
+                "total_exec_time_sec": float(row.total_exec_time_sec) if row.total_exec_time_sec else 0,
+                "avg_exec_time_sec": float(row.avg_exec_time_sec) if row.avg_exec_time_sec else 0,
+                "max_exec_time_sec": float(row.max_exec_time_sec) if row.max_exec_time_sec else 0,
+                "min_exec_time_sec": float(row.min_exec_time_sec) if row.min_exec_time_sec else 0,
+                "rows_examined": row.rows_examined or 0,
+                "rows_sent": row.rows_sent or 0,
+                "rows_affected": row.rows_affected or 0,
+                "created_tmp_tables": row.created_tmp_tables or 0,
+                "created_tmp_disk_tables": row.created_tmp_disk_tables or 0,
+                "select_scan": row.select_scan or 0,
+                "select_full_join": row.select_full_join or 0,
+                "no_index_used": row.no_index_used or 0,
+                "no_good_index_used": row.no_good_index_used or 0,
+                "first_seen": row.first_seen.isoformat() if row.first_seen else None,
+                "last_seen": row.last_seen.isoformat() if row.last_seen else None,
+                "sample_query": row.sample_query,
+                "sample_seen": row.sample_seen.isoformat() if row.sample_seen else None,
+                "sample_exec_time_sec": float(row.sample_exec_time_sec) if row.sample_exec_time_sec else 0
+            })
+        
+        return slow_queries
+    
+    except Exception as e:
+        logger.error(f"从 performance_schema 抓取慢查询失败: {str(e)}")
+        raise
+    finally:
+        if engine:
+            engine.dispose()
+
+
+async def fetch_statement_analysis(
+    instance: Instance,
+    limit: int = 100,
+    database_name: Optional[str] = None
+) -> List[dict]:
+    """
+    从 sys.statement_analysis 获取分析数据
+    
+    sys.statement_analysis 是一个视图，提供了更友好的查询分析数据
+    
+    Args:
+        instance: 数据库实例
+        limit: 返回记录数限制
+        database_name: 过滤特定数据库
+    
+    Returns:
+        语句分析列表
+    """
+    engine = None
+    try:
+        # 构建连接字符串
+        if instance.db_type == "mysql":
+            password = aes_cipher.decrypt(instance.password_encrypted)
+            connection_url = f"mysql+pymysql://{instance.username}:{password}@{instance.host}:{instance.port}/sys"
+        else:
+            raise ValueError("仅支持 MySQL 实例")
+        
+        engine = create_engine(connection_url, connect_args={"connect_timeout": 10})
+        
+        # 检查 sys.statement_analysis 是否存在
+        check_query = text("""
+            SELECT COUNT(*) FROM information_schema.VIEWS 
+            WHERE TABLE_SCHEMA = 'sys' AND TABLE_NAME = 'statement_analysis'
+        """)
+        
+        with engine.connect() as conn:
+            result = conn.execute(check_query)
+            exists = result.scalar() > 0
+            
+            if not exists:
+                logger.warning("sys.statement_analysis 视图不存在")
+                return []
+        
+        # 查询 statement_analysis
+        query = text("""
+            SELECT 
+                query as query_text,
+                db as schema_name,
+                full_scan,
+                exec_count,
+                err_count,
+                warn_count,
+                total_latency_sec,
+                max_latency_sec,
+                avg_latency_sec,
+                lock_latency_sec,
+                rows_sent,
+                rows_sent_avg,
+                rows_examined,
+                rows_examined_avg,
+                rows_affected,
+                rows_affected_avg,
+                tmp_tables,
+                tmp_disk_tables,
+                rows_sorted,
+                sort_merge_passes,
+                digest,
+                first_seen,
+                last_seen
+            FROM statement_analysis
+            WHERE 1=1
+        """)
+        
+        params = {}
+        
+        # 如果指定了数据库，添加过滤条件
+        if database_name:
+            query = text(str(query) + " AND db = :db_name")
+            params["db_name"] = database_name
+        
+        # 按总延迟时间降序排序
+        query = text(str(query) + " ORDER BY total_latency_sec DESC LIMIT :limit")
+        params["limit"] = limit
+        
+        with engine.connect() as conn:
+            result = conn.execute(query, params)
+            rows = result.fetchall()
+        
+        statements = []
+        for row in rows:
+            statements.append({
+                "query_text": row.query_text,
+                "schema_name": row.schema_name,
+                "full_scan": row.full_scan == "*",
+                "exec_count": row.exec_count or 0,
+                "err_count": row.err_count or 0,
+                "warn_count": row.warn_count or 0,
+                "total_latency_sec": float(row.total_latency_sec) if row.total_latency_sec else 0,
+                "max_latency_sec": float(row.max_latency_sec) if row.max_latency_sec else 0,
+                "avg_latency_sec": float(row.avg_latency_sec) if row.avg_latency_sec else 0,
+                "lock_latency_sec": float(row.lock_latency_sec) if row.lock_latency_sec else 0,
+                "rows_sent": row.rows_sent or 0,
+                "rows_sent_avg": row.rows_sent_avg or 0,
+                "rows_examined": row.rows_examined or 0,
+                "rows_examined_avg": row.rows_examined_avg or 0,
+                "rows_affected": row.rows_affected or 0,
+                "rows_affected_avg": row.rows_affected_avg or 0,
+                "tmp_tables": row.tmp_tables or 0,
+                "tmp_disk_tables": row.tmp_disk_tables or 0,
+                "rows_sorted": row.rows_sorted or 0,
+                "sort_merge_passes": row.sort_merge_passes or 0,
+                "digest": row.digest,
+                "first_seen": row.first_seen.isoformat() if row.first_seen else None,
+                "last_seen": row.last_seen.isoformat() if row.last_seen else None
+            })
+        
+        return statements
+    
+    except Exception as e:
+        logger.error(f"从 sys.statement_analysis 获取数据失败: {str(e)}")
+        raise
+    finally:
+        if engine:
+            engine.dispose()
+
+
+async def check_performance_schema_enabled(instance: Instance) -> dict:
+    """
+    检查 performance_schema 是否启用
+    
+    Args:
+        instance: 数据库实例
+    
+    Returns:
+        包含启用状态和配置的字典
+    """
+    engine = None
+    try:
+        if instance.db_type == "mysql":
+            password = aes_cipher.decrypt(instance.password_encrypted)
+            connection_url = f"mysql+pymysql://{instance.username}:{password}@{instance.host}:{instance.port}/information_schema"
+        else:
+            raise ValueError("仅支持 MySQL 实例")
+        
+        engine = create_engine(connection_url, connect_args={"connect_timeout": 10})
+        
+        with engine.connect() as conn:
+            # 检查 performance_schema 是否启用
+            result = conn.execute(text("SHOW VARIABLES LIKE 'performance_schema'"))
+            perf_schema_var = result.fetchone()
+            
+            if not perf_schema_var or perf_schema_var[1] != 'ON':
+                return {
+                    "enabled": False,
+                    "message": "performance_schema 未启用，请在 RDS 参数组中开启"
+                }
+            
+            # 检查 consumers 是否启用
+            result = conn.execute(text("""
+                SELECT NAME, ENABLED 
+                FROM performance_schema.setup_consumers
+                WHERE NAME IN ('events_statements_current', 'events_statements_history', 'events_statements_history_long')
+            """))
+            consumers = {row[0]: row[1] for row in result.fetchall()}
+            
+            # 检查 instruments 是否启用
+            result = conn.execute(text("""
+                SELECT COUNT(*) as total,
+                       SUM(CASE WHEN ENABLED = 'YES' THEN 1 ELSE 0 END) as enabled_count
+                FROM performance_schema.setup_instruments
+                WHERE NAME LIKE 'statement/%'
+            """))
+            instruments = result.fetchone()
+            
+            return {
+                "enabled": True,
+                "consumers": consumers,
+                "instruments": {
+                    "total": instruments[0],
+                    "enabled_count": instruments[1]
+                },
+                "message": "performance_schema 已启用"
+            }
+    
+    except Exception as e:
+        logger.error(f"检查 performance_schema 状态失败: {str(e)}")
+        return {
+            "enabled": False,
+            "message": f"检查失败: {str(e)}"
+        }
+    finally:
+        if engine:
+            engine.dispose()
+
+
+@router.get("/{instance_id}/performance-schema-status")
+async def get_performance_schema_status(
+    instance_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取 performance_schema 启用状态
+    """
+    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    status = await check_performance_schema_enabled(instance)
+    return status
+
+
+@router.get("/{instance_id}/fetch-slow-queries")
+async def fetch_slow_queries(
+    instance_id: int,
+    limit: int = Query(100, ge=1, le=500),
+    min_exec_time: float = Query(1.0, ge=0, description="最小平均执行时间（秒）"),
+    database_name: Optional[str] = Query(None, description="过滤特定数据库"),
+    use_sys_schema: bool = Query(False, description="使用 sys.statement_analysis 视图"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    从 performance_schema 抓取慢查询
+    
+    支持:
+    - performance_schema.events_statements_summary_by_digest (默认)
+    - sys.statement_analysis (可选)
+    """
+    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    if instance.db_type != "mysql":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="仅支持 MySQL 实例"
+        )
+    
+    try:
+        # 检查 performance_schema 是否启用
+        ps_status = await check_performance_schema_enabled(instance)
+        if not ps_status.get("enabled"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ps_status.get("message", "performance_schema 未启用")
+            )
+        
+        # 根据参数选择数据源
+        if use_sys_schema:
+            queries = await fetch_statement_analysis(instance, limit, database_name)
+            source = "sys.statement_analysis"
+        else:
+            queries = await fetch_slow_queries_from_performance_schema(
+                instance, limit, min_exec_time, database_name
+            )
+            source = "performance_schema.events_statements_summary_by_digest"
+        
+        return {
+            "total": len(queries),
+            "source": source,
+            "instance_id": instance_id,
+            "instance_name": instance.name,
+            "items": queries,
+            "performance_schema_status": ps_status
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"抓取慢查询失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"抓取慢查询失败: {str(e)}"
+        )
+
+
+@router.post("/{instance_id}/sync-slow-queries")
+async def sync_slow_queries_to_db(
+    instance_id: int,
+    limit: int = Query(100, ge=1, le=500),
+    min_exec_time: float = Query(1.0, ge=0),
+    database_name: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    从 performance_schema 同步慢查询到本地数据库
+    
+    将抓取的慢查询保存到 slow_queries 表中
+    """
+    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    if instance.db_type != "mysql":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="仅支持 MySQL 实例"
+        )
+    
+    try:
+        # 检查 performance_schema 是否启用
+        ps_status = await check_performance_schema_enabled(instance)
+        if not ps_status.get("enabled"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=ps_status.get("message", "performance_schema 未启用")
+            )
+        
+        # 抓取慢查询
+        queries = await fetch_slow_queries_from_performance_schema(
+            instance, limit, min_exec_time, database_name
+        )
+        
+        # 保存到数据库
+        saved_count = 0
+        updated_count = 0
+        
+        for query_data in queries:
+            # 检查是否已存在相同的 digest
+            existing = db.query(SlowQuery).filter(
+                SlowQuery.instance_id == instance_id,
+                SlowQuery.digest == query_data.get("digest")
+            ).first()
+            
+            if existing:
+                # 更新已有记录
+                existing.sql_sample = query_data.get("sample_query") or query_data.get("digest_text", "")
+                existing.sql_fingerprint = query_data.get("digest_text", "")[:500]  # 截断以适应字段长度
+                existing.database_name = query_data.get("schema_name") or ""
+                existing.query_time = query_data.get("avg_exec_time_sec", 0)
+                existing.rows_examined = query_data.get("rows_examined", 0)
+                existing.rows_sent = query_data.get("rows_sent", 0)
+                existing.lock_time = 0  # performance_schema 不提供单独的锁时间
+                existing.execution_count = query_data.get("exec_count", 1)
+                existing.last_seen = datetime.fromisoformat(query_data["last_seen"]) if query_data.get("last_seen") else datetime.utcnow()
+                updated_count += 1
+            else:
+                # 创建新记录
+                record = SlowQuery(
+                    instance_id=instance_id,
+                    sql_sample=query_data.get("sample_query") or query_data.get("digest_text", ""),
+                    sql_fingerprint=query_data.get("digest_text", "")[:500],  # 截断以适应字段长度
+                    digest=query_data.get("digest", ""),
+                    database_name=query_data.get("schema_name") or "",
+                    query_time=query_data.get("avg_exec_time_sec", 0),
+                    rows_examined=query_data.get("rows_examined", 0),
+                    rows_sent=query_data.get("rows_sent", 0),
+                    lock_time=0,
+                    execution_count=query_data.get("exec_count", 1),
+                    first_seen=datetime.fromisoformat(query_data["first_seen"]) if query_data.get("first_seen") else datetime.utcnow(),
+                    last_seen=datetime.fromisoformat(query_data["last_seen"]) if query_data.get("last_seen") else datetime.utcnow()
+                )
+                db.add(record)
+                saved_count += 1
+        
+        db.commit()
+        
+        return {
+            "message": "同步完成",
+            "saved_count": saved_count,
+            "updated_count": updated_count,
+            "total_count": len(queries)
+        }
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"同步慢查询失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"同步慢查询失败: {str(e)}"
+        )
+
+
+@router.get("/{instance_id}/databases")
+async def get_instance_databases(
+    instance_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    获取实例的数据库列表（用于过滤）
+    """
+    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    engine = None
+    try:
+        password = aes_cipher.decrypt(instance.password_encrypted)
+        if instance.db_type == "mysql":
+            connection_url = f"mysql+pymysql://{instance.username}:{password}@{instance.host}:{instance.port}/information_schema"
+            query = text("SELECT SCHEMA_NAME FROM SCHEMATA WHERE SCHEMA_NAME NOT IN ('information_schema', 'mysql', 'performance_schema', 'sys') ORDER BY SCHEMA_NAME")
+        else:
+            connection_url = f"postgresql+psycopg2://{instance.username}:{password}@{instance.host}:{instance.port}/postgres"
+            query = text("SELECT datname FROM pg_database WHERE datistemplate = false AND datname NOT IN ('postgres') ORDER BY datname")
+        
+        engine = create_engine(connection_url, connect_args={"connect_timeout": 10})
+        
+        with engine.connect() as conn:
+            result = conn.execute(query)
+            databases = [row[0] for row in result.fetchall()]
+        
+        return {"databases": databases}
+    
+    except Exception as e:
+        logger.error(f"获取数据库列表失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取数据库列表失败: {str(e)}"
+        )
+    finally:
+        if engine:
+            engine.dispose()
