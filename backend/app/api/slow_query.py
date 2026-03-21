@@ -9,6 +9,7 @@ from sqlalchemy import func
 import pymysql
 from pymysql.cursors import DictCursor
 import logging
+import json
 
 from app.database import get_db
 from app.models import (
@@ -21,6 +22,157 @@ from app.utils.auth import aes_cipher
 
 router = APIRouter(prefix="/slow-query", tags=["慢查询监控"])
 logger = logging.getLogger(__name__)
+
+
+# ============ LLM 分析服务 ============
+
+async def analyze_with_llm(sql: str, explain_result: Dict, slow_query: SlowQuery = None) -> Dict[str, Any]:
+    """
+    使用大模型分析 SQL 和 EXPLAIN 结果，生成优化建议
+    
+    Args:
+        sql: SQL 语句
+        explain_result: EXPLAIN 分析结果
+        slow_query: 慢查询记录（可选）
+    
+    Returns:
+        大模型分析结果
+    """
+    try:
+        from coze_coding_dev_sdk import LLMClient
+        from langchain_core.messages import SystemMessage, HumanMessage
+        
+        # 构建 EXPLAIN 结果的文本描述
+        explain_text = ""
+        if explain_result.get("explain"):
+            explain_text = "执行计划:\n"
+            for idx, row in enumerate(explain_result["explain"]):
+                explain_text += f"表 {idx + 1}:\n"
+                explain_text += f"  - 查询类型: {row.get('select_type', '-')}\n"
+                explain_text += f"  - 表名: {row.get('table', '-')}\n"
+                explain_text += f"  - 访问类型: {row.get('type', '-')}\n"
+                explain_text += f"  - 可能使用的索引: {row.get('possible_keys', '-')}\n"
+                explain_text += f"  - 实际使用的索引: {row.get('key', '-')}\n"
+                explain_text += f"  - 索引长度: {row.get('key_len', '-')}\n"
+                explain_text += f"  - 预估扫描行数: {row.get('rows', '-')}\n"
+                explain_text += f"  - 额外信息: {row.get('Extra', '-')}\n\n"
+        
+        # 构建慢查询统计信息
+        stats_text = ""
+        if slow_query:
+            stats_text = f"""
+查询统计信息:
+- 执行耗时: {slow_query.query_time:.2f} 秒
+- 锁等待时间: {slow_query.lock_time:.3f} 秒
+- 扫描行数: {slow_query.rows_examined or 0}
+- 返回行数: {slow_query.rows_sent or 0}
+- 执行次数: {slow_query.execution_count or 1}
+"""
+        
+        # 构建提示词
+        system_prompt = """你是一位资深的数据库性能优化专家，擅长分析 MySQL 慢查询和 EXPLAIN 执行计划。
+
+你的任务是：
+1. 分析 SQL 语句的结构和逻辑
+2. 解读 EXPLAIN 执行计划，识别性能瓶颈
+3. 给出具体、可执行的优化建议
+
+分析要点：
+- 访问类型（type）：重点关注 ALL（全表扫描）、index（索引扫描）、range（范围扫描）
+- 索引使用：检查是否使用了合适的索引
+- 扫描行数：预估扫描行数与实际返回行数的比例
+- Extra 信息：关注 Using temporary（临时表）、Using filesort（文件排序）
+- SQL 写法：检查是否有不合理的写法
+
+请以 JSON 格式输出分析结果，格式如下：
+{
+  "summary": "一句话总结查询性能问题",
+  "issues": [
+    {
+      "severity": "high/medium/low",
+      "type": "问题类型",
+      "description": "问题描述",
+      "location": "问题位置"
+    }
+  ],
+  "suggestions": [
+    {
+      "priority": "high/medium/low",
+      "type": "索引优化/SQL改写/配置调整",
+      "description": "建议描述",
+      "action": "具体操作步骤",
+      "expected_improvement": "预期效果"
+    }
+  ],
+  "optimized_sql": "优化后的SQL（如有）",
+  "create_index_sql": "建议创建索引的SQL语句（如有）"
+}"""
+
+        user_prompt = f"""请分析以下慢查询：
+
+SQL 语句:
+```sql
+{sql}
+```
+
+{explain_text}
+{stats_text}
+
+请给出详细的性能分析和优化建议。"""
+
+        client = LLMClient()
+        
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt)
+        ]
+        
+        # 调用大模型
+        response = client.invoke(
+            messages=messages,
+            model="doubao-seed-2-0-lite-260215",  # 使用平衡性能和成本的模型
+            temperature=0.3,  # 低温度保证输出稳定
+            max_completion_tokens=4096
+        )
+        
+        # 处理响应内容
+        content = response.content
+        if isinstance(content, list):
+            # 处理多模态响应
+            text_parts = []
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_parts.append(item.get("text", ""))
+            content = " ".join(text_parts)
+        
+        # 尝试解析 JSON
+        try:
+            # 提取 JSON 部分（可能被 markdown 包裹）
+            json_str = content
+            if "```json" in content:
+                json_str = content.split("```json")[1].split("```")[0]
+            elif "```" in content:
+                json_str = content.split("```")[1].split("```")[0]
+            
+            llm_analysis = json.loads(json_str.strip())
+        except json.JSONDecodeError:
+            # 如果无法解析 JSON，返回原始文本
+            llm_analysis = {
+                "summary": "大模型分析结果",
+                "raw_response": content
+            }
+        
+        return {
+            "success": True,
+            "analysis": llm_analysis
+        }
+        
+    except Exception as e:
+        logger.error(f"LLM 分析失败: {e}")
+        return {
+            "success": False,
+            "error": str(e)
+        }
 
 
 @router.get("/{instance_id}", response_model=List[SlowQueryResponse])
@@ -129,10 +281,18 @@ async def get_slow_query_statistics(
 async def analyze_slow_query(
     instance_id: int,
     query_id: int,
+    use_llm: bool = True,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """分析慢查询"""
+    """
+    分析慢查询
+    
+    Args:
+        instance_id: 实例ID
+        query_id: 慢查询ID
+        use_llm: 是否使用大模型分析（默认True）
+    """
     slow_query = db.query(SlowQuery).filter(
         SlowQuery.id == query_id,
         SlowQuery.instance_id == instance_id
@@ -154,6 +314,18 @@ async def analyze_slow_query(
     # 执行 EXPLAIN 分析
     explain_result = await execute_explain(instance, slow_query.sql_sample, slow_query.database_name)
     
+    # 基础建议
+    basic_suggestions = generate_suggestions(explain_result, slow_query)
+    
+    # LLM 分析
+    llm_analysis = None
+    if use_llm and slow_query.sql_sample:
+        llm_analysis = await analyze_with_llm(
+            sql=slow_query.sql_sample,
+            explain_result=explain_result,
+            slow_query=slow_query
+        )
+    
     return {
         "query_id": slow_query.id,
         "sql_fingerprint": slow_query.sql_fingerprint,
@@ -167,7 +339,8 @@ async def analyze_slow_query(
         "explain": explain_result.get("explain"),
         "explain_json": explain_result.get("explain_json"),
         "warnings": explain_result.get("warnings", []),
-        "suggestions": generate_suggestions(explain_result, slow_query)
+        "suggestions": basic_suggestions,
+        "llm_analysis": llm_analysis
     }
 
 

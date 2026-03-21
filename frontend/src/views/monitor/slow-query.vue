@@ -239,7 +239,10 @@
         <!-- 优化建议 -->
         <el-card shadow="never" class="suggestions-card" v-if="explainDialog.data.suggestions?.length">
           <template #header>
-            <span>优化建议</span>
+            <div class="card-header">
+              <span>基础优化建议</span>
+              <el-tag size="small" type="info">规则引擎</el-tag>
+            </div>
           </template>
           <div class="suggestions-list">
             <div
@@ -262,6 +265,95 @@
             </div>
           </div>
         </el-card>
+        
+        <!-- AI 智能分析 -->
+        <el-card shadow="never" class="llm-card" v-if="explainDialog.data.llm_analysis?.success">
+          <template #header>
+            <div class="card-header">
+              <span>AI 智能分析</span>
+              <el-tag size="small" type="success">大模型</el-tag>
+            </div>
+          </template>
+          
+          <div class="llm-content" v-if="explainDialog.data.llm_analysis.analysis">
+            <!-- 问题总结 -->
+            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.summary">
+              <div class="llm-section-title">问题总结</div>
+              <div class="llm-summary">{{ explainDialog.data.llm_analysis.analysis.summary }}</div>
+            </div>
+            
+            <!-- 发现的问题 -->
+            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.issues?.length">
+              <div class="llm-section-title">发现的问题</div>
+              <div class="llm-issues">
+                <div 
+                  v-for="(issue, idx) in explainDialog.data.llm_analysis.analysis.issues" 
+                  :key="idx"
+                  class="llm-issue-item"
+                  :class="issue.severity"
+                >
+                  <div class="issue-header">
+                    <el-tag :type="getSeverityType(issue.severity)" size="small">{{ issue.type }}</el-tag>
+                    <span class="issue-location" v-if="issue.location">{{ issue.location }}</span>
+                  </div>
+                  <div class="issue-desc">{{ issue.description }}</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 优化建议 -->
+            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.suggestions?.length">
+              <div class="llm-section-title">优化建议</div>
+              <div class="llm-suggestions">
+                <div 
+                  v-for="(suggestion, idx) in explainDialog.data.llm_analysis.analysis.suggestions" 
+                  :key="idx"
+                  class="llm-suggestion-item"
+                >
+                  <div class="suggestion-header">
+                    <el-tag :type="getPriorityType(suggestion.priority)" size="small">{{ suggestion.priority }}</el-tag>
+                    <span class="suggestion-type">{{ suggestion.type }}</span>
+                  </div>
+                  <div class="suggestion-desc">{{ suggestion.description }}</div>
+                  <div class="suggestion-action" v-if="suggestion.action">
+                    <strong>操作步骤：</strong>{{ suggestion.action }}
+                  </div>
+                  <div class="suggestion-effect" v-if="suggestion.expected_improvement">
+                    <strong>预期效果：</strong>{{ suggestion.expected_improvement }}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 优化后的SQL -->
+            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.optimized_sql">
+              <div class="llm-section-title">优化后的 SQL</div>
+              <div class="llm-sql-box">
+                <pre>{{ explainDialog.data.llm_analysis.analysis.optimized_sql }}</pre>
+                <el-button size="small" type="primary" link @click="copyOptimizedSQL">复制</el-button>
+              </div>
+            </div>
+            
+            <!-- 建议创建的索引 -->
+            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.create_index_sql">
+              <div class="llm-section-title">建议创建索引</div>
+              <div class="llm-sql-box">
+                <pre>{{ explainDialog.data.llm_analysis.analysis.create_index_sql }}</pre>
+                <el-button size="small" type="primary" link @click="copyIndexSQL">复制</el-button>
+              </div>
+            </div>
+          </div>
+        </el-card>
+        
+        <!-- LLM 分析失败 -->
+        <el-alert
+          v-else-if="explainDialog.data.llm_analysis && !explainDialog.data.llm_analysis.success"
+          :title="`AI 分析失败: ${explainDialog.data.llm_analysis.error}`"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 20px;"
+        />
       </div>
       
       <template #footer>
@@ -443,6 +535,52 @@ const getTypeTag = (type) => {
     'ALL': 'danger'
   }
   return types[type] || 'info'
+}
+
+// 获取严重级别标签类型
+const getSeverityType = (severity) => {
+  const types = {
+    'high': 'danger',
+    'medium': 'warning',
+    'low': 'info'
+  }
+  return types[severity] || 'info'
+}
+
+// 获取优先级标签类型
+const getPriorityType = (priority) => {
+  const types = {
+    'high': 'danger',
+    'medium': 'warning',
+    'low': 'info'
+  }
+  return types[priority] || 'info'
+}
+
+// 复制优化后的SQL
+const copyOptimizedSQL = async () => {
+  const sql = explainDialog.data?.llm_analysis?.analysis?.optimized_sql
+  if (sql) {
+    try {
+      await navigator.clipboard.writeText(sql)
+      ElMessage.success('优化SQL已复制到剪贴板')
+    } catch (e) {
+      ElMessage.error('复制失败')
+    }
+  }
+}
+
+// 复制索引创建SQL
+const copyIndexSQL = async () => {
+  const sql = explainDialog.data?.llm_analysis?.analysis?.create_index_sql
+  if (sql) {
+    try {
+      await navigator.clipboard.writeText(sql)
+      ElMessage.success('索引SQL已复制到剪贴板')
+    } catch (e) {
+      ElMessage.error('复制失败')
+    }
+  }
 }
 
 onMounted(() => {
@@ -640,6 +778,148 @@ onMounted(() => {
               font-size: 12px;
               color: #409eff;
             }
+          }
+        }
+      }
+    }
+    
+    .llm-card {
+      margin-top: 20px;
+      border: 1px solid #e1f3d8;
+      background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
+      
+      .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      
+      .llm-content {
+        .llm-section {
+          margin-bottom: 20px;
+          
+          &:last-child {
+            margin-bottom: 0;
+          }
+          
+          .llm-section-title {
+            font-weight: bold;
+            font-size: 14px;
+            color: #303133;
+            margin-bottom: 10px;
+            padding-left: 10px;
+            border-left: 3px solid #67c23a;
+          }
+          
+          .llm-summary {
+            background: #f5f7fa;
+            padding: 12px 15px;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #303133;
+            line-height: 1.6;
+          }
+        }
+        
+        .llm-issues {
+          .llm-issue-item {
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            background: #fafafa;
+            
+            &.high {
+              border-left: 3px solid #f56c6c;
+            }
+            
+            &.medium {
+              border-left: 3px solid #e6a23c;
+            }
+            
+            &.low {
+              border-left: 3px solid #909399;
+            }
+            
+            .issue-header {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              margin-bottom: 8px;
+              
+              .issue-location {
+                color: #909399;
+                font-size: 12px;
+              }
+            }
+            
+            .issue-desc {
+              font-size: 13px;
+              color: #606266;
+            }
+          }
+        }
+        
+        .llm-suggestions {
+          .llm-suggestion-item {
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 8px;
+            background: #fff;
+            border: 1px solid #e4e7ed;
+            
+            .suggestion-header {
+              display: flex;
+              align-items: center;
+              gap: 10px;
+              margin-bottom: 10px;
+              
+              .suggestion-type {
+                font-weight: 500;
+                color: #303133;
+              }
+            }
+            
+            .suggestion-desc {
+              font-size: 14px;
+              color: #303133;
+              margin-bottom: 8px;
+            }
+            
+            .suggestion-action {
+              font-size: 13px;
+              color: #606266;
+              margin-bottom: 5px;
+              background: #f5f7fa;
+              padding: 8px 12px;
+              border-radius: 4px;
+            }
+            
+            .suggestion-effect {
+              font-size: 13px;
+              color: #67c23a;
+            }
+          }
+        }
+        
+        .llm-sql-box {
+          background: #1e1e1e;
+          padding: 15px;
+          border-radius: 6px;
+          position: relative;
+          
+          pre {
+            margin: 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 13px;
+            color: #d4d4d4;
+            white-space: pre-wrap;
+            word-break: break-all;
+          }
+          
+          .el-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
           }
         }
       }
