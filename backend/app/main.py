@@ -78,11 +78,62 @@ async def lifespan(app: FastAPI):
     logger.info("运维管理平台已关闭")
 
 
+async def init_dev_instance(db):
+    """开发环境：自动创建测试用的 PostgreSQL 实例"""
+    import os
+    from urllib.parse import urlparse
+    from app.models import Instance, Environment
+    from app.utils.auth import encrypt_instance_password
+    
+    # 仅在开发环境执行
+    if os.getenv("COZE_PROJECT_ENV", "DEV") != "DEV":
+        return
+    
+    # 检查是否已存在开发测试实例
+    existing = db.query(Instance).filter(Instance.name == "开发测试实例(PostgreSQL)").first()
+    if existing:
+        logger.info("开发测试实例已存在，跳过创建")
+        return
+    
+    # 从环境变量获取 PostgreSQL 连接信息
+    pg_url = os.getenv("PGDATABASE_URL") or os.getenv("DATABASE_URL")
+    if not pg_url:
+        logger.info("未找到 PostgreSQL 连接信息，跳过创建开发实例")
+        return
+    
+    try:
+        parsed = urlparse(pg_url)
+        host = parsed.hostname or "localhost"
+        port = parsed.port or 5432
+        username = parsed.username or "postgres"
+        password = parsed.password or ""
+        database = parsed.path.lstrip("/") if parsed.path else "postgres"
+        
+        # 获取开发环境
+        dev_env = db.query(Environment).filter(Environment.code == "development").first()
+        
+        # 创建实例
+        instance = Instance(
+            name="开发测试实例(PostgreSQL)",
+            host=host,
+            port=port,
+            username=username,
+            password_encrypted=encrypt_instance_password(password),
+            environment_id=dev_env.id if dev_env else None,
+            description=f"开发环境自动创建 - 数据库: {database}",
+            status=True
+        )
+        db.add(instance)
+        logger.info(f"开发环境：自动创建 PostgreSQL 测试实例 - {host}:{port}")
+    except Exception as e:
+        logger.warning(f"创建开发测试实例失败: {e}")
+
+
 async def init_default_data():
     """初始化默认数据"""
     from sqlalchemy.orm import Session
     from app.database import SessionLocal
-    from app.models import User, Environment, UserRole, GlobalConfig, DingTalkChannel, SystemInitState
+    from app.models import User, Environment, UserRole, GlobalConfig, DingTalkChannel, SystemInitState, Instance
     from app.utils.auth import hash_password
     
     db: Session = SessionLocal()
@@ -155,6 +206,9 @@ async def init_default_data():
             if not db.query(GlobalConfig).filter(GlobalConfig.config_key == key).first():
                 config = GlobalConfig(config_key=key, config_value=value, description=desc)
                 db.add(config)
+        
+        # 开发环境：自动创建测试用的 PostgreSQL 实例
+        await init_dev_instance(db)
         
         db.commit()
         logger.info("默认数据初始化完成")
