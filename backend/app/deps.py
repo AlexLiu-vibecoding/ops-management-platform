@@ -10,7 +10,7 @@ from app.utils.auth import decode_access_token
 from app.models import User, UserRole
 
 # HTTP Bearer认证
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
@@ -32,9 +32,13 @@ async def get_current_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="无效的认证凭据",
+        detail="Not authenticated",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    # 检查是否提供了凭据
+    if credentials is None:
+        raise credentials_exception
     
     token = credentials.credentials
     payload = decode_access_token(token)

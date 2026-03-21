@@ -167,7 +167,7 @@ async def get_channel(
     """获取通知通道详情"""
     channel = db.query(DingTalkChannel).filter(DingTalkChannel.id == channel_id).first()
     if not channel:
-        raise HTTPException(status_code=404, detail="通知通道不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知通道不存在")
     
     return {
         "id": channel.id,
@@ -192,18 +192,18 @@ async def create_channel(
     """创建通知通道"""
     # 检查名称是否已存在
     if db.query(DingTalkChannel).filter(DingTalkChannel.name == data.name).first():
-        raise HTTPException(status_code=400, detail="通道名称已存在")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="通道名称已存在")
     
     # 验证配置
     if data.channel_type in ["dingtalk", "wechat", "feishu", "webhook"]:
         if not data.webhook:
-            raise HTTPException(status_code=400, detail="Webhook地址不能为空")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook地址不能为空")
     
     if data.auth_type == "sign" and not data.secret:
-        raise HTTPException(status_code=400, detail="加签验证必须提供密钥")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="加签验证必须提供密钥")
     
     if data.auth_type == "keyword" and not data.keywords:
-        raise HTTPException(status_code=400, detail="关键词验证必须提供关键词")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="关键词验证必须提供关键词")
     
     channel = DingTalkChannel(
         name=data.name,
@@ -230,7 +230,7 @@ async def update_channel(
     """更新通知通道"""
     channel = db.query(DingTalkChannel).filter(DingTalkChannel.id == channel_id).first()
     if not channel:
-        raise HTTPException(status_code=404, detail="通知通道不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知通道不存在")
     
     if data.name is not None:
         channel.name = data.name
@@ -260,7 +260,7 @@ async def delete_channel(
     """删除通知通道"""
     channel = db.query(DingTalkChannel).filter(DingTalkChannel.id == channel_id).first()
     if not channel:
-        raise HTTPException(status_code=404, detail="通知通道不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知通道不存在")
     
     # 删除关联的绑定
     db.query(NotificationBinding).filter(NotificationBinding.channel_id == channel_id).delete()
@@ -281,7 +281,7 @@ async def test_channel(
     """测试通知通道"""
     channel = db.query(DingTalkChannel).filter(DingTalkChannel.id == channel_id).first()
     if not channel:
-        raise HTTPException(status_code=404, detail="通知通道不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知通道不存在")
     
     try:
         webhook = decrypt_secret(channel.webhook_encrypted)
@@ -310,7 +310,7 @@ async def test_channel(
         
         return {"success": True, "message": "测试消息发送成功"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"发送失败: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"发送失败: {str(e)}")
 
 
 # ==================== Binding Management ====================
@@ -358,7 +358,7 @@ async def create_binding(
     # 检查通道是否存在
     channel = db.query(DingTalkChannel).filter(DingTalkChannel.id == data.channel_id).first()
     if not channel:
-        raise HTTPException(status_code=404, detail="通知通道不存在")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知通道不存在")
     
     # 检查是否已存在相同绑定
     existing = db.query(NotificationBinding).filter(
@@ -370,7 +370,7 @@ async def create_binding(
     ).first()
     
     if existing:
-        raise HTTPException(status_code=400, detail="该通知绑定已存在")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该通知绑定已存在")
     
     binding = NotificationBinding(
         channel_id=data.channel_id,

@@ -130,6 +130,9 @@ async def parse_sql_databases(
         "databases": list(databases),
         "total": len(databases)
     }
+
+
+def get_sql_preview(sql_content: str, max_lines: int = PREVIEW_LINES) -> str:
     """
     获取SQL预览内容（截取前N行）
     """
