@@ -4,15 +4,43 @@
       <template #header>
         <div class="card-header">
           <div class="header-left">
-            <span>变更申请</span>
-            <el-tag type="info" size="small" style="margin-left: 10px;">我的申请记录</el-tag>
+            <span>DB 变更申请</span>
+            <el-tag type="info" size="small" style="margin-left: 10px;">MySQL / PostgreSQL</el-tag>
           </div>
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
-            提交变更
-          </el-button>
+          <div class="header-right">
+            <el-badge v-if="canApprove && pendingCount > 0" :value="pendingCount" class="pending-badge">
+              <el-button type="primary" @click="handleAdd">
+                <el-icon><Plus /></el-icon>
+                提交变更
+              </el-button>
+            </el-badge>
+            <el-button v-else type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>
+              提交变更
+            </el-button>
+          </div>
         </div>
       </template>
+      
+      <!-- Tab 切换 -->
+      <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+        <el-tab-pane name="myRequests">
+          <template #label>
+            <span>我的申请</span>
+          </template>
+        </el-tab-pane>
+        <el-tab-pane v-if="canApprove" name="pendingApproval">
+          <template #label>
+            <span>待审批</span>
+            <el-badge v-if="pendingCount > 0" :value="pendingCount" class="tab-badge" />
+          </template>
+        </el-tab-pane>
+        <el-tab-pane v-if="canApprove" name="processed">
+          <template #label>
+            <span>已审批</span>
+          </template>
+        </el-tab-pane>
+      </el-tabs>
       
       <!-- 快速筛选 -->
       <div class="filter-bar">
@@ -39,16 +67,13 @@
         </el-table-column>
         <el-table-column prop="change_type" label="类型" width="90" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.change_type === 'REDIS' ? 'danger' : ''" size="small">{{ row.change_type }}</el-tag>
+            <el-tag size="small">{{ row.change_type }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="instance_name" label="实例" min-width="120" show-overflow-tooltip />
         <el-table-column prop="database_target" label="目标" min-width="100" show-overflow-tooltip>
           <template #default="{ row }">
-            <span v-if="row.change_type === 'REDIS'">
-              <el-tag type="danger" size="small">Redis</el-tag>
-            </span>
-            <span v-else-if="row.database_mode === 'all'">
+            <span v-if="row.database_mode === 'all'">
               <el-tag type="warning" size="small">全部</el-tag>
             </span>
             <span v-else-if="row.database_mode === 'pattern'">
@@ -74,10 +99,16 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right" align="center">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" @click="handleView(row)">详情</el-button>
+              <!-- 待审批状态：审批人可操作 -->
+              <template v-if="row.status === 'pending' && canApprove">
+                <el-button link type="success" @click="handleApprove(row, true)">通过</el-button>
+                <el-button link type="danger" @click="handleApprove(row, false)">拒绝</el-button>
+              </template>
+              <!-- 已通过且非自动执行：可手动执行 -->
               <el-button
                 v-if="row.status === 'approved' && !row.auto_execute && !row.scheduled_time"
                 link
@@ -103,7 +134,7 @@
       />
     </el-card>
     
-    <!-- 提交变更对话框 - 复用原有逻辑 -->
+    <!-- 提交变更对话框 -->
     <el-dialog v-model="dialog.visible" title="提交变更申请" width="900px" :close-on-click-modal="false">
       <el-form :model="dialog.form" :rules="dialog.rules" ref="formRef" label-width="110px">
         <el-row :gutter="20">
@@ -114,12 +145,11 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="变更类型" prop="change_type">
-              <el-select v-model="dialog.form.change_type" placeholder="请选择变更类型" style="width: 100%;" :disabled="isRedisInstance">
-                <el-option label="DDL变更" value="DDL" :disabled="isRedisInstance" />
-                <el-option label="DML变更" value="DML" :disabled="isRedisInstance" />
-                <el-option label="运维操作" value="OPERATION" :disabled="isRedisInstance" />
-                <el-option label="自定义SQL" value="CUSTOM" :disabled="isRedisInstance" />
-                <el-option label="Redis命令" value="REDIS" />
+              <el-select v-model="dialog.form.change_type" placeholder="请选择变更类型" style="width: 100%;">
+                <el-option label="DDL变更" value="DDL" />
+                <el-option label="DML变更" value="DML" />
+                <el-option label="运维操作" value="OPERATION" />
+                <el-option label="自定义SQL" value="CUSTOM" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -129,27 +159,20 @@
           <el-col :span="12">
             <el-form-item label="实例" prop="instance_id">
               <el-select v-model="dialog.form.instance_id" placeholder="请选择实例" style="width: 100%;" @change="handleInstanceSelect">
-                <el-option v-for="inst in instances" :key="inst.id" :label="`${inst.name} (${inst.db_type || 'mysql'})`" :value="inst.id" />
+                <el-option v-for="inst in dbInstances" :key="inst.id" :label="`${inst.name} (${inst.db_type || 'mysql'})`" :value="inst.id" />
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12" v-if="!isRedisChange">
+          <el-col :span="12">
             <el-form-item label="数据库">
               <el-select v-model="dialog.form.database_name" placeholder="请选择数据库" style="width: 100%;" :loading="dialog.dbLoading" filterable clearable>
                 <el-option v-for="db in dialog.databases" :key="db" :label="db" :value="db" />
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12" v-else>
-            <el-form-item label="Redis DB">
-              <el-select v-model="dialog.form.redis_db" placeholder="选择数据库索引" style="width: 100%;">
-                <el-option v-for="i in 16" :key="i-1" :label="`DB ${i-1}`" :value="i-1" />
-              </el-select>
-            </el-form-item>
-          </el-col>
         </el-row>
         
-        <el-form-item :label="isRedisChange ? 'Redis命令' : 'SQL内容'" prop="sql_content">
+        <el-form-item label="SQL内容" prop="sql_content">
           <div class="sql-input-wrapper">
             <!-- 文件上传区域 -->
             <div class="upload-section">
@@ -157,13 +180,13 @@
                 ref="uploadRef"
                 :auto-upload="false"
                 :show-file-list="false"
-                :accept="isRedisChange ? '.txt,.cmd' : '.sql,.txt'"
+                accept=".sql,.txt"
                 :on-change="handleFileSelect"
                 :disabled="dialog.fileLoading"
               >
                 <el-button type="primary" plain :loading="dialog.fileLoading">
                   <el-icon><Upload /></el-icon>
-                  {{ dialog.fileLoading ? '正在读取文件...' : (isRedisChange ? '上传命令文件' : '上传SQL文件') }}
+                  {{ dialog.fileLoading ? '正在读取文件...' : '上传SQL文件' }}
                 </el-button>
               </el-upload>
               
@@ -234,8 +257,23 @@
     </el-dialog>
     
     <!-- 详情对话框 -->
-    <el-dialog v-model="detailDialog.visible" title="变更详情" width="800px">
+    <el-dialog v-model="detailDialog.visible" title="变更详情" width="900px">
       <ApprovalDetailCard :approval="detailDialog.data" title="变更申请详情" />
+      
+      <!-- 审批操作（待审批状态且是审批人） -->
+      <div v-if="detailDialog.data?.status === 'pending' && canApprove" class="approval-actions">
+        <el-divider />
+        <el-form :model="approvalForm" label-width="80px">
+          <el-form-item label="审批意见">
+            <el-input v-model="approvalForm.comment" type="textarea" :rows="2" placeholder="请输入审批意见（可选）" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="success" @click="handleApprove(detailDialog.data, true)">通过</el-button>
+            <el-button type="danger" @click="handleApprove(detailDialog.data, false)">拒绝</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+      
       <template #footer>
         <el-button @click="detailDialog.visible = false">关闭</el-button>
       </template>
@@ -255,6 +293,10 @@ import dayjs from 'dayjs'
 
 const userStore = useUserStore()
 const currentUserId = computed(() => userStore.user?.id)
+const userRole = computed(() => userStore.user?.role)
+
+// 是否有审批权限
+const canApprove = computed(() => ['super_admin', 'approval_admin'].includes(userRole.value))
 
 const loading = ref(false)
 const approvalList = ref([])
@@ -263,6 +305,8 @@ const formRef = ref(null)
 const uploadRef = ref(null)
 const statusFilter = ref('')
 const searchKeyword = ref('')
+const activeTab = ref('myRequests')
+const pendingCount = ref(0)
 
 // 完整SQL内容（大文件时用于提交）
 const fullSqlContent = ref('')
@@ -283,14 +327,9 @@ const pagination = reactive({
   total: 0
 })
 
-// 计算属性：是否为 Redis 变更类型
-const isRedisChange = computed(() => dialog.form.change_type === 'REDIS')
-
-// 计算属性：当前选中的实例是否为 Redis 类型
-const isRedisInstance = computed(() => {
-  if (!dialog.form.instance_id) return false
-  const instance = instances.value.find(i => i.id === dialog.form.instance_id || String(i.id) === String(dialog.form.instance_id))
-  return instance?.db_type === 'redis'
+// 过滤出 DB 实例（非 Redis）
+const dbInstances = computed(() => {
+  return instances.value.filter(inst => inst.db_type !== 'redis')
 })
 
 const dialog = reactive({
@@ -303,7 +342,7 @@ const dialog = reactive({
     title: '',
     instance_id: null,
     database_name: '',
-    change_type: 'DDL',
+    change_type: 'DML',  // 默认 DML
     sql_content: '',
     remark: '',
     affected_rows_estimate: 0,
@@ -322,23 +361,57 @@ const detailDialog = reactive({
   data: null
 })
 
+const approvalForm = reactive({
+  comment: ''
+})
+
 const fetchApprovals = async () => {
   loading.value = true
   try {
     const params = {
       skip: (pagination.page - 1) * pagination.pageSize,
-      limit: pagination.pageSize,
-      requester_id: currentUserId.value
+      limit: pagination.pageSize
     }
+    
+    // 根据 Tab 设置不同的查询参数
+    if (activeTab.value === 'myRequests') {
+      params.requester_id = currentUserId.value
+    } else if (activeTab.value === 'pendingApproval') {
+      params.status_filter = 'pending'
+      // 排除 REDIS 类型（REDIS 在 redis-requests 页面处理）
+      params.exclude_change_type = 'REDIS'
+    } else if (activeTab.value === 'processed') {
+      params.except_status = 'pending'
+      params.approver_id = currentUserId.value
+      params.exclude_change_type = 'REDIS'
+    }
+    
     if (statusFilter.value) params.status = statusFilter.value
     
     const data = await request.get('/approvals', { params })
     approvalList.value = data.items || []
     pagination.total = data.total || 0
+    
+    // 更新待审批数量
+    if (activeTab.value === 'pendingApproval') {
+      pendingCount.value = data.total || 0
+    }
   } catch (error) {
     console.error('获取列表失败:', error)
   } finally {
     loading.value = false
+  }
+}
+
+const fetchPendingCount = async () => {
+  if (!canApprove.value) return
+  try {
+    const data = await request.get('/approvals', { 
+      params: { status_filter: 'pending', exclude_change_type: 'REDIS', limit: 1 } 
+    })
+    pendingCount.value = data.total || 0
+  } catch (error) {
+    console.error('获取待审批数量失败:', error)
   }
 }
 
@@ -351,18 +424,23 @@ const fetchInstances = async () => {
   }
 }
 
+const handleTabChange = () => {
+  pagination.page = 1
+  statusFilter.value = ''
+  fetchApprovals()
+}
+
 const handleAdd = () => {
   dialog.form = {
     title: '',
     instance_id: null,
     database_name: '',
-    change_type: 'DDL',
+    change_type: 'DML',  // 默认 DML
     sql_content: '',
     remark: '',
     affected_rows_estimate: 0,
     execution_mode: 'auto',
-    scheduled_time: null,
-    redis_db: 0
+    scheduled_time: null
   }
   // 重置文件状态
   fullSqlContent.value = ''
@@ -471,28 +549,7 @@ const handleInstanceSelect = async (instanceId) => {
   dialog.form.database_name = ''
   dialog.databases = []
   
-  // 获取选中的实例信息（处理可能的类型不匹配问题）
-  const instance = instances.value.find(i => i.id === instanceId || String(i.id) === String(instanceId))
-  console.log('=== handleInstanceSelect ===')
-  console.log('instanceId:', instanceId, typeof instanceId)
-  console.log('instances.value:', instances.value.map(i => ({ id: i.id, name: i.name, db_type: i.db_type })))
-  console.log('found instance:', instance)
-  
-  // 如果是 Redis 实例，自动设置变更类型并跳过数据库列表获取
-  if (instance?.db_type === 'redis') {
-    console.log('检测到 Redis 实例，自动切换变更类型为 REDIS')
-    dialog.form.change_type = 'REDIS'
-    dialog.form.redis_db = instance.redis_db || 0
-    console.log('切换后 change_type:', dialog.form.change_type)
-    return  // Redis 实例不需要获取数据库列表
-  }
-  
-  // 非 Redis 实例，如果是 Redis 变更类型，需要重置
-  if (dialog.form.change_type === 'REDIS') {
-    dialog.form.change_type = 'DDL'
-  }
-  
-  // 非 Redis 实例，获取数据库列表
+  // 获取数据库列表
   dialog.dbLoading = true
   try {
     const data = await request.get(`/sql/databases/${instanceId}`)
@@ -520,15 +577,11 @@ const handleSubmit = async () => {
         title: dialog.form.title,
         change_type: dialog.form.change_type,
         instance_id: dialog.form.instance_id,
+        database_name: dialog.form.database_name,
         sql_content: sqlToSubmit,
         remark: dialog.form.remark,
         affected_rows_estimate: dialog.form.affected_rows_estimate,
         auto_execute: dialog.form.execution_mode === 'auto'
-      }
-      
-      // Redis 变更不需要数据库字段
-      if (dialog.form.change_type !== 'REDIS') {
-        submitData.database_name = dialog.form.database_name
       }
       
       if (dialog.form.execution_mode === 'scheduled' && dialog.form.scheduled_time) {
@@ -539,6 +592,7 @@ const handleSubmit = async () => {
       ElMessage.success('提交成功')
       dialog.visible = false
       fetchApprovals()
+      fetchPendingCount()
     } catch (error) {
       ElMessage.error(error.response?.data?.detail || '提交失败')
     } finally {
@@ -551,9 +605,42 @@ const handleView = async (row) => {
   try {
     const data = await request.get(`/approvals/${row.id}`)
     detailDialog.data = data
+    approvalForm.comment = ''
     detailDialog.visible = true
   } catch (error) {
     ElMessage.error('获取详情失败')
+  }
+}
+
+const handleApprove = async (row, approved) => {
+  const action = approved ? '通过' : '拒绝'
+  
+  try {
+    const { value: comment } = await ElMessageBox.prompt(
+      `确定要${action}此变更申请吗？`,
+      '审批确认',
+      {
+        confirmButtonText: action,
+        cancelButtonText: '取消',
+        inputPlaceholder: '请输入审批意见（可选）',
+        inputValue: approvalForm.comment,
+        type: approved ? 'success' : 'warning'
+      }
+    )
+    
+    await request.post(`/approvals/${row.id}/approve`, {
+      approved,
+      comment: comment || ''
+    })
+    
+    ElMessage.success(`审批${action}成功`)
+    detailDialog.visible = false
+    fetchApprovals()
+    fetchPendingCount()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '审批失败')
+    }
   }
 }
 
@@ -588,6 +675,7 @@ const formatTime = (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : 
 onMounted(() => {
   fetchApprovals()
   fetchInstances()
+  fetchPendingCount()
 })
 </script>
 
@@ -602,6 +690,14 @@ onMounted(() => {
       display: flex;
       align-items: center;
     }
+    
+    .pending-badge {
+      margin-right: 0;
+    }
+  }
+  
+  .tab-badge {
+    margin-left: 5px;
   }
   
   .filter-bar {
@@ -697,6 +793,10 @@ onMounted(() => {
   .table-operations {
     display: flex;
     gap: 8px;
+  }
+  
+  .approval-actions {
+    margin-top: 15px;
   }
 }
 </style>

@@ -391,6 +391,8 @@ async def list_approvals(
     requester_id: Optional[int] = None,
     approver_id: Optional[int] = None,
     environment_id: Optional[int] = None,
+    change_type: Optional[str] = None,
+    exclude_change_type: Optional[str] = None,
     skip: int = 0,
     limit: int = 20,
     current_user: User = Depends(get_current_user),
@@ -409,6 +411,10 @@ async def list_approvals(
         query = query.filter(ApprovalRecord.approver_id == approver_id)
     if environment_id:
         query = query.filter(ApprovalRecord.environment_id == environment_id)
+    if change_type:
+        query = query.filter(ApprovalRecord.change_type == change_type)
+    if exclude_change_type:
+        query = query.filter(ApprovalRecord.change_type != exclude_change_type)
     
     # 普通用户只能看自己的申请
     if current_user.role.value == "readonly":

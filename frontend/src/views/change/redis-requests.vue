@@ -7,12 +7,40 @@
             <span>Redis 变更申请</span>
             <el-tag type="danger" size="small" style="margin-left: 10px;">Redis 专用</el-tag>
           </div>
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
-            提交 Redis 变更
-          </el-button>
+          <div class="header-right">
+            <el-badge v-if="canApprove && pendingCount > 0" :value="pendingCount" class="pending-badge">
+              <el-button type="primary" @click="handleAdd">
+                <el-icon><Plus /></el-icon>
+                提交 Redis 变更
+              </el-button>
+            </el-badge>
+            <el-button v-else type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>
+              提交 Redis 变更
+            </el-button>
+          </div>
         </div>
       </template>
+      
+      <!-- Tab 切换 -->
+      <el-tabs v-model="activeTab" @tab-change="handleTabChange">
+        <el-tab-pane name="myRequests">
+          <template #label>
+            <span>我的申请</span>
+          </template>
+        </el-tab-pane>
+        <el-tab-pane v-if="canApprove" name="pendingApproval">
+          <template #label>
+            <span>待审批</span>
+            <el-badge v-if="pendingCount > 0" :value="pendingCount" class="tab-badge" />
+          </template>
+        </el-tab-pane>
+        <el-tab-pane v-if="canApprove" name="processed">
+          <template #label>
+            <span>已审批</span>
+          </template>
+        </el-tab-pane>
+      </el-tabs>
       
       <!-- 快速筛选 -->
       <div class="filter-bar">
@@ -47,9 +75,15 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right" align="center">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" @click="handleView(row)">详情</el-button>
+            <!-- 待审批状态：审批人可操作 -->
+            <template v-if="row.status === 'pending' && canApprove">
+              <el-button link type="success" @click="handleApprove(row, true)">通过</el-button>
+              <el-button link type="danger" @click="handleApprove(row, false)">拒绝</el-button>
+            </template>
+            <!-- 已通过且非自动执行：可手动执行 -->
             <el-button
               v-if="row.status === 'approved' && !row.auto_execute && !row.scheduled_time"
               link
@@ -152,6 +186,21 @@ EXPIRE user:1:name 3600"
           <pre class="cmd-preview">{{ detailDialog.data?.execute_result }}</pre>
         </el-descriptions-item>
       </el-descriptions>
+      
+      <!-- 审批操作（待审批状态且是审批人） -->
+      <div v-if="detailDialog.data?.status === 'pending' && canApprove" class="approval-actions">
+        <el-divider />
+        <el-form :model="approvalForm" label-width="80px">
+          <el-form-item label="审批意见">
+            <el-input v-model="approvalForm.comment" type="textarea" :rows="2" placeholder="请输入审批意见（可选）" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="success" @click="handleApprove(detailDialog.data, true)">通过</el-button>
+            <el-button type="danger" @click="handleApprove(detailDialog.data, false)">拒绝</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+      
       <template #footer>
         <el-button @click="detailDialog.visible = false">关闭</el-button>
       </template>
@@ -169,12 +218,18 @@ import dayjs from 'dayjs'
 
 const userStore = useUserStore()
 const currentUserId = computed(() => userStore.user?.id)
+const userRole = computed(() => userStore.user?.role)
+
+// 是否有审批权限
+const canApprove = computed(() => ['super_admin', 'approval_admin'].includes(userRole.value))
 
 const loading = ref(false)
 const approvalList = ref([])
 const redisInstances = ref([])
 const formRef = ref(null)
 const statusFilter = ref('')
+const activeTab = ref('myRequests')
+const pendingCount = ref(0)
 
 const pagination = reactive({
   page: 1,
@@ -190,7 +245,7 @@ const dialog = reactive({
     instance_id: null,
     sql_content: '',
     remark: '',
-    execution_mode: 'manual',
+    execution_mode: 'auto',  // 默认审批后自动执行
     scheduled_time: null
   },
   rules: {
@@ -205,25 +260,59 @@ const detailDialog = reactive({
   data: null
 })
 
+const approvalForm = reactive({
+  comment: ''
+})
+
 // 获取 Redis 变更列表
 const fetchApprovals = async () => {
   loading.value = true
   try {
     const params = {
       skip: (pagination.page - 1) * pagination.pageSize,
-      limit: pagination.pageSize,
-      requester_id: currentUserId.value
+      limit: pagination.pageSize
     }
+    
+    // 根据 Tab 设置不同的查询参数
+    if (activeTab.value === 'myRequests') {
+      params.requester_id = currentUserId.value
+    } else if (activeTab.value === 'pendingApproval') {
+      params.status_filter = 'pending'
+    } else if (activeTab.value === 'processed') {
+      params.except_status = 'pending'
+      params.approver_id = currentUserId.value
+    }
+    
+    // 只显示 REDIS 类型
+    params.change_type = 'REDIS'
+    
     if (statusFilter.value) params.status = statusFilter.value
     
     const data = await request.get('/approvals', { params })
-    // 只显示 REDIS 类型的变更
-    approvalList.value = (data.items || []).filter(item => item.change_type === 'REDIS')
-    pagination.total = approvalList.value.length
+    approvalList.value = data.items || []
+    pagination.total = data.total || 0
+    
+    // 更新待审批数量
+    if (activeTab.value === 'pendingApproval') {
+      pendingCount.value = data.total || 0
+    }
   } catch (error) {
     console.error('获取列表失败:', error)
   } finally {
     loading.value = false
+  }
+}
+
+// 获取待审批数量
+const fetchPendingCount = async () => {
+  if (!canApprove.value) return
+  try {
+    const data = await request.get('/approvals', { 
+      params: { status_filter: 'pending', change_type: 'REDIS', limit: 1 } 
+    })
+    pendingCount.value = data.total || 0
+  } catch (error) {
+    console.error('获取待审批数量失败:', error)
   }
 }
 
@@ -237,13 +326,19 @@ const fetchRedisInstances = async () => {
   }
 }
 
+const handleTabChange = () => {
+  pagination.page = 1
+  statusFilter.value = ''
+  fetchApprovals()
+}
+
 const handleAdd = () => {
   dialog.form = {
     title: '',
     instance_id: null,
     sql_content: '',
     remark: '',
-    execution_mode: 'manual',
+    execution_mode: 'auto',  // 默认审批后自动执行
     scheduled_time: null
   }
   dialog.visible = true
@@ -273,6 +368,7 @@ const handleSubmit = async () => {
       ElMessage.success('提交成功')
       dialog.visible = false
       fetchApprovals()
+      fetchPendingCount()
     } catch (error) {
       ElMessage.error(error.response?.data?.detail || '提交失败')
     } finally {
@@ -285,9 +381,42 @@ const handleView = async (row) => {
   try {
     const data = await request.get(`/approvals/${row.id}`)
     detailDialog.data = data
+    approvalForm.comment = ''
     detailDialog.visible = true
   } catch (error) {
     ElMessage.error('获取详情失败')
+  }
+}
+
+const handleApprove = async (row, approved) => {
+  const action = approved ? '通过' : '拒绝'
+  
+  try {
+    const { value: comment } = await ElMessageBox.prompt(
+      `确定要${action}此变更申请吗？`,
+      '审批确认',
+      {
+        confirmButtonText: action,
+        cancelButtonText: '取消',
+        inputPlaceholder: '请输入审批意见（可选）',
+        inputValue: approvalForm.comment,
+        type: approved ? 'success' : 'warning'
+      }
+    )
+    
+    await request.post(`/approvals/${row.id}/approve`, {
+      approved,
+      comment: comment || ''
+    })
+    
+    ElMessage.success(`审批${action}成功`)
+    detailDialog.visible = false
+    fetchApprovals()
+    fetchPendingCount()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '审批失败')
+    }
   }
 }
 
@@ -324,6 +453,7 @@ const formatTime = (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-'
 onMounted(() => {
   fetchApprovals()
   fetchRedisInstances()
+  fetchPendingCount()
 })
 </script>
 
@@ -338,6 +468,14 @@ onMounted(() => {
       display: flex;
       align-items: center;
     }
+    
+    .pending-badge {
+      margin-right: 0;
+    }
+  }
+  
+  .tab-badge {
+    margin-left: 5px;
   }
   
   .filter-bar {
@@ -381,6 +519,10 @@ onMounted(() => {
     &.rollback {
       background: #fef0f0;
     }
+  }
+  
+  .approval-actions {
+    margin-top: 15px;
   }
 }
 </style>

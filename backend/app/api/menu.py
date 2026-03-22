@@ -323,7 +323,6 @@ async def add_missing_menus(
         change_child_menus = [
             {"name": "DB变更申请", "path": "/change/requests", "icon": "Coin", "sort_order": 1},
             {"name": "Redis变更申请", "path": "/change/redis-requests", "icon": "Key", "sort_order": 2},
-            {"name": "审批中心", "path": "/change/approvals", "icon": "Checked", "sort_order": 3, "roles": "super_admin,approval_admin"},
         ]
         
         for menu_data in change_child_menus:
