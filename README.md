@@ -82,6 +82,15 @@ chmod +x start.sh
 - ✅ 慢查询日志、客户端列表
 - ✅ 配置查看与修改
 
+### 大文件存储管理
+- ✅ 智能存储：大SQL文件自动切换到文件存储
+- ✅ 多后端支持：本地存储 / AWS S3 / 阿里云 OSS
+- ✅ 生命周期管理：自动清理过期SQL文件（默认30天）
+- ✅ 历史记录永久保存：数据库记录保留，仅清理物理文件
+- ✅ 配置灵活：支持阈值、保留天数、存储类型等配置
+- ✅ 慢查询日志、客户端列表
+- ✅ 配置查看与修改
+
 ---
 
 ## 🛠️ 技术栈
@@ -119,7 +128,60 @@ DATABASE_URL=postgresql://user:password@host:5432/dbname
 # JWT_SECRET_KEY=your-custom-key
 # AES_KEY=your-custom-32-char-aes-key!
 # PASSWORD_SALT=your-custom-salt
+
+# ====== 存储配置 ======
+# 存储类型: local (本地), s3 (AWS S3), oss (阿里云OSS)
+STORAGE_TYPE=local
+
+# 本地存储路径（STORAGE_TYPE=local 时使用）
+LOCAL_STORAGE_PATH=/app/data/sql_files
+
+# 文件生命周期（天数）
+SQL_FILE_RETENTION_DAYS=30
+
+# 大文件阈值（字符数），超过此大小存文件而非数据库
+SQL_FILE_SIZE_THRESHOLD=10000
+
+# AWS S3 配置（STORAGE_TYPE=s3 时使用）
+# AWS_ACCESS_KEY_ID=your-access-key
+# AWS_SECRET_ACCESS_KEY=your-secret-key
+# AWS_REGION=us-east-1
+# S3_BUCKET_NAME=your-bucket
+# S3_ENDPOINT_URL=https://s3.amazonaws.com  # 可选，用于兼容S3的服务
+
+# 阿里云 OSS 配置（STORAGE_TYPE=oss 时使用）
+# OSS_ACCESS_KEY_ID=your-access-key
+# OSS_ACCESS_KEY_SECRET=your-secret-key
+# OSS_ENDPOINT=oss-cn-hangzhou.aliyuncs.com
+# OSS_BUCKET_NAME=your-bucket
 ```
+
+---
+
+## 💾 大文件存储架构
+
+### 设计原则
+
+1. **智能存储**：小SQL直接存数据库，大SQL自动存文件
+2. **多后端支持**：本地存储、AWS S3、阿里云OSS 三种选择
+3. **生命周期管理**：定时清理过期文件，控制存储成本
+4. **历史永久保存**：数据库记录保留，仅清理物理文件
+
+### 存储策略
+
+| 场景 | 存储位置 | 保留策略 |
+|------|---------|---------|
+| 小SQL（<10KB） | 数据库 `sql_content` 字段 | 永久保留 |
+| 大SQL（≥10KB） | 文件存储（本地/S3/OSS） | 30天后清理 |
+| 回滚SQL | 与原SQL相同策略 | 与原SQL相同 |
+| 审批记录 | 数据库 `approval_records` 表 | 永久保留 |
+
+### 文件清理规则
+
+- **触发条件**：已执行/已拒绝/执行失败的审批
+- **清理时间**：创建时间超过保留天数（默认30天）
+- **清理内容**：仅删除物理文件，数据库记录保留
+- **定时任务**：每天凌晨2点自动执行
 
 ---
 

@@ -6,7 +6,7 @@ import logging
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
@@ -20,6 +20,7 @@ from app.deps import get_approval_admin, get_current_user
 from app.services.notification import notification_service
 from app.services.scheduler import approval_scheduler
 from app.services.rollback_generator import rollback_generator
+from app.services.storage import storage_manager
 
 logger = logging.getLogger(__name__)
 
@@ -202,10 +203,59 @@ def analyze_sql_risk(sql: str, environment_id: int, db: Session) -> str:
 def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = False) -> dict:
     """
     格式化审批响应，处理大SQL文件的预览
+    支持从文件存储读取SQL内容
     """
+    import asyncio
+    
+    # 获取SQL内容
+    sql_content = approval.sql_content
+    sql_file_path = approval.sql_file_path
+    sql_download_url = None
+    
+    # 如果存储在文件中，从文件读取
+    if sql_file_path and not sql_content:
+        try:
+            # 尝试从文件读取
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # 如果在异步上下文中，使用缓存的内容
+                sql_content = None
+            else:
+                sql_content = loop.run_until_complete(storage_manager.read_sql_file(sql_file_path))
+            
+            # 生成下载URL
+            if include_full_sql:
+                sql_download_url = loop.run_until_complete(
+                    storage_manager.get_download_url(sql_file_path)
+                ) if not loop.is_running() else None
+        except Exception as e:
+            logger.warning(f"读取SQL文件失败: {e}")
+            sql_content = None
+    
+    # 获取回滚SQL
+    rollback_sql = approval.rollback_sql
+    rollback_file_path = approval.rollback_file_path
+    rollback_download_url = None
+    
+    if rollback_file_path and not rollback_sql:
+        try:
+            loop = asyncio.get_event_loop()
+            if not loop.is_running():
+                rollback_sql = loop.run_until_complete(storage_manager.read_sql_file(rollback_file_path))
+                rollback_download_url = loop.run_until_complete(
+                    storage_manager.get_download_url(rollback_file_path)
+                )
+        except Exception as e:
+            logger.warning(f"读取回滚SQL文件失败: {e}")
+            rollback_sql = None
+    
     # 获取SQL预览
-    sql_preview = get_sql_preview(approval.sql_content)
-    total_lines = approval.sql_line_count or len(approval.sql_content.split('\n'))
+    if sql_content:
+        sql_preview = get_sql_preview(sql_content)
+        total_lines = approval.sql_line_count or len(sql_content.split('\n'))
+    else:
+        sql_preview = None
+        total_lines = approval.sql_line_count or 0
     
     # 构建数据库目标描述
     database_target = ""
@@ -231,12 +281,17 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
         "database_pattern": approval.database_pattern,
         "matched_database_count": approval.matched_database_count,
         "database_target": database_target,
-        "sql_content": approval.sql_content if include_full_sql else None,
+        "sql_content": sql_content if include_full_sql else None,
         "sql_content_preview": sql_preview if total_lines > PREVIEW_LINES else None,
+        "sql_file_path": sql_file_path,
+        "sql_download_url": sql_download_url,
         "sql_line_count": total_lines,
         "sql_risk_level": approval.sql_risk_level,
-        "rollback_sql": approval.rollback_sql if include_full_sql else None,
+        "rollback_sql": rollback_sql if include_full_sql else None,
+        "rollback_file_path": rollback_file_path,
+        "rollback_download_url": rollback_download_url,
         "rollback_generated": approval.rollback_generated,
+        "file_storage_type": approval.file_storage_type,
         "affected_rows_estimate": approval.affected_rows_estimate,
         "affected_rows_actual": approval.affected_rows_actual,
         "auto_execute": approval.auto_execute,
@@ -366,30 +421,101 @@ async def create_approval(
     except Exception as e:
         logger.warning(f"生成回滚SQL失败: {e}")
     
-    # 创建审批记录
-    approval = ApprovalRecord(
-        title=approval_data.title,
-        change_type=approval_data.change_type,
-        instance_id=approval_data.instance_id,
-        database_mode=approval_data.database_mode,
-        database_name=approval_data.database_name,
-        database_list=approval_data.database_list,
-        database_pattern=approval_data.database_pattern,
-        matched_database_count=approval_data.matched_database_count,
-        sql_content=approval_data.sql_content,
-        sql_line_count=sql_line_count,
-        sql_risk_level=risk_level,
-        rollback_sql=rollback_sql,
-        rollback_generated=rollback_generated,
-        affected_rows_estimate=approval_data.affected_rows_estimate or 0,
-        auto_execute=approval_data.auto_execute or False,
-        environment_id=instance.environment_id,
-        requester_id=current_user.id,
-        scheduled_time=approval_data.scheduled_time
-    )
-    db.add(approval)
-    db.commit()
-    db.refresh(approval)
+    # 判断是否需要存储到文件
+    sql_content = approval_data.sql_content
+    sql_file_path = None
+    rollback_file_path = None
+    file_storage_type = "database"
+    
+    if storage_manager.should_store_as_file(sql_content):
+        file_storage_type = storage_manager._settings.STORAGE_TYPE
+        # 先创建记录获取ID
+        approval = ApprovalRecord(
+            title=approval_data.title,
+            change_type=approval_data.change_type,
+            instance_id=approval_data.instance_id,
+            database_mode=approval_data.database_mode,
+            database_name=approval_data.database_name,
+            database_list=approval_data.database_list,
+            database_pattern=approval_data.database_pattern,
+            matched_database_count=approval_data.matched_database_count,
+            sql_content=None,  # 大文件不存数据库
+            sql_line_count=sql_line_count,
+            sql_risk_level=risk_level,
+            rollback_sql=None,  # 大文件不存数据库
+            rollback_generated=rollback_generated,
+            file_storage_type=file_storage_type,
+            affected_rows_estimate=approval_data.affected_rows_estimate or 0,
+            auto_execute=approval_data.auto_execute or False,
+            environment_id=instance.environment_id,
+            requester_id=current_user.id,
+            scheduled_time=approval_data.scheduled_time
+        )
+        db.add(approval)
+        db.commit()
+        db.refresh(approval)
+        
+        # 保存SQL到文件
+        try:
+            sql_file_path = await storage_manager.save_sql_file(
+                approval_id=approval.id,
+                sql_type="sql",
+                content=sql_content,
+                metadata={
+                    'title': approval_data.title,
+                    'change_type': approval_data.change_type,
+                    'risk_level': risk_level
+                }
+            )
+            approval.sql_file_path = sql_file_path
+            
+            # 如果有回滚SQL，也保存到文件
+            if rollback_sql:
+                rollback_file_path = await storage_manager.save_sql_file(
+                    approval_id=approval.id,
+                    sql_type="rollback",
+                    content=rollback_sql,
+                    metadata={
+                        'generated': rollback_generated
+                    }
+                )
+                approval.rollback_file_path = rollback_file_path
+            
+            db.commit()
+            logger.info(f"SQL已存储到文件: {sql_file_path}")
+        except Exception as e:
+            logger.error(f"保存SQL文件失败: {e}")
+            # 降级处理：存入数据库
+            approval.sql_content = sql_content
+            approval.rollback_sql = rollback_sql
+            approval.file_storage_type = "database"
+            db.commit()
+    else:
+        # 小文件直接存数据库
+        approval = ApprovalRecord(
+            title=approval_data.title,
+            change_type=approval_data.change_type,
+            instance_id=approval_data.instance_id,
+            database_mode=approval_data.database_mode,
+            database_name=approval_data.database_name,
+            database_list=approval_data.database_list,
+            database_pattern=approval_data.database_pattern,
+            matched_database_count=approval_data.matched_database_count,
+            sql_content=sql_content,
+            sql_line_count=sql_line_count,
+            sql_risk_level=risk_level,
+            rollback_sql=rollback_sql,
+            rollback_generated=rollback_generated,
+            file_storage_type="database",
+            affected_rows_estimate=approval_data.affected_rows_estimate or 0,
+            auto_execute=approval_data.auto_execute or False,
+            environment_id=instance.environment_id,
+            requester_id=current_user.id,
+            scheduled_time=approval_data.scheduled_time
+        )
+        db.add(approval)
+        db.commit()
+        db.refresh(approval)
     
     # 构建数据库目标描述
     db_target_desc = ""

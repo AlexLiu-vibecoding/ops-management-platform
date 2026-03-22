@@ -1,20 +1,22 @@
 """
 定时任务调度器
-使用 APScheduler 实现定时执行审批工单
+使用 APScheduler 实现定时执行审批工单和文件清理
 """
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 import logging
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.date import DateTrigger
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import ApprovalRecord, ApprovalStatus, Instance, AuditLog, User
 from app.services.notification import notification_service
+from app.config.storage import get_storage_settings
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,14 @@ class ApprovalScheduler:
             self.check_scheduled_approvals,
             trigger=IntervalTrigger(minutes=1),
             id="check_scheduled_approvals",
+            replace_existing=True
+        )
+        
+        # 添加文件清理任务：每天凌晨2点执行
+        self.scheduler.add_job(
+            self.cleanup_expired_files,
+            trigger=CronTrigger(hour=2, minute=0),
+            id="cleanup_expired_files",
             replace_existing=True
         )
         
@@ -191,6 +201,69 @@ class ApprovalScheduler:
         finally:
             if own_db:
                 db.close()
+    
+    async def cleanup_expired_files(self):
+        """
+        清理过期的SQL文件
+        
+        根据配置的保留天数清理过期的SQL文件
+        保留数据库中的历史记录，只清理物理文件
+        """
+        from app.services.storage import storage_manager
+        
+        try:
+            settings = get_storage_settings()
+            retention_days = settings.SQL_FILE_RETENTION_DAYS
+            cutoff_date = datetime.now() - timedelta(days=retention_days)
+            
+            logger.info(f"开始清理过期SQL文件，保留天数: {retention_days}, 截止日期: {cutoff_date}")
+            
+            db = SessionLocal()
+            try:
+                # 查找过期的审批记录（只清理已执行/已拒绝的）
+                expired_approvals = db.query(ApprovalRecord).filter(
+                    ApprovalRecord.created_at < cutoff_date,
+                    ApprovalRecord.status.in_([
+                        ApprovalStatus.EXECUTED,
+                        ApprovalStatus.REJECTED,
+                        ApprovalStatus.FAILED
+                    ]),
+                    ApprovalRecord.sql_file_path != None
+                ).all()
+                
+                cleaned_count = 0
+                for approval in expired_approvals:
+                    try:
+                        # 删除SQL文件
+                        if approval.sql_file_path:
+                            await storage_manager.delete_sql_file(approval.sql_file_path)
+                            approval.sql_file_path = None
+                            cleaned_count += 1
+                        
+                        # 删除回滚SQL文件
+                        if approval.rollback_file_path:
+                            await storage_manager.delete_sql_file(approval.rollback_file_path)
+                            approval.rollback_file_path = None
+                        
+                        # 保留数据库记录和预览
+                        # sql_content 和 rollback_sql 如果存在则保留（小文件）
+                        
+                    except Exception as e:
+                        logger.warning(f"清理文件失败: approval_id={approval.id}, error={e}")
+                
+                db.commit()
+                logger.info(f"清理完成，共清理 {cleaned_count} 个SQL文件")
+                
+                # 如果是本地存储，额外清理孤立文件
+                cleaned_orphans = await storage_manager.cleanup_expired_files()
+                if cleaned_orphans > 0:
+                    logger.info(f"清理孤立文件: {cleaned_orphans} 个")
+                
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"清理过期文件任务失败: {e}")
 
 
 # 全局调度器实例
