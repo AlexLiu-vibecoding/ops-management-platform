@@ -191,8 +191,11 @@ def decrypt_instance_password(encrypted_password: str) -> str:
         encrypted_password: 加密后的密码
     
     Returns:
-        明文密码
+        明文密码，如果加密密码为空则返回空字符串
     """
+    # 空密码直接返回（Redis 等实例可能不需要密码）
+    if not encrypted_password:
+        return ""
     return aes_cipher.decrypt(encrypted_password)
 
 
