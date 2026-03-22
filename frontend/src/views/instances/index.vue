@@ -37,7 +37,7 @@
     <!-- 实例列表 -->
     <el-card shadow="never" class="table-card">
       <el-table :data="instanceList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="name" label="实例名称" width="180">
+        <el-table-column prop="name" label="实例名称" min-width="150">
           <template #default="{ row }">
             <div>
               <span>{{ row.name }}</span>
@@ -55,7 +55,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="地址" width="200">
+        <el-table-column label="地址" min-width="180">
           <template #default="{ row }">
             <span v-if="row.is_rds && row.rds_instance_id">
               {{ row.rds_instance_id }}
@@ -64,7 +64,7 @@
             <span v-else>{{ row.host }}:{{ row.port }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="环境" width="120">
+        <el-table-column label="环境" width="100">
           <template #default="{ row }">
             <span
               v-if="row.environment"
@@ -83,32 +83,19 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" show-overflow-tooltip />
-        <el-table-column prop="created_at" label="创建时间" width="180">
+        <el-table-column prop="description" label="描述" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="created_at" label="创建时间" width="160">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <div class="table-operations">
-              <el-button link type="primary" @click="handleView(row)">详情</el-button>
-              <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
-              <el-dropdown trigger="click" @command="(cmd) => handleDropdownCommand(cmd, row)">
-                <el-button link type="primary">
-                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="test">
-                      <el-icon><Connection /></el-icon>测试连接
-                    </el-dropdown-item>
-                    <el-dropdown-item command="delete" divided style="color: #F56C6C;">
-                      <el-icon><Delete /></el-icon>删除
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <el-button link type="primary" size="small" @click="handleView(row)">详情</el-button>
+              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button link type="primary" size="small" @click="handleTest(row)">测试</el-button>
+              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
             </div>
           </template>
         </el-table-column>
@@ -174,32 +161,34 @@
           />
         </el-form-item>
         
-        <!-- AWS RDS 配置 -->
-        <el-divider content-position="left">
-          <el-checkbox v-model="dialog.form.is_rds" :label="'AWS RDS 实例'" />
-        </el-divider>
-        
-        <el-row v-if="dialog.form.is_rds">
-          <el-col :span="12">
-            <el-form-item label="RDS 实例ID" prop="rds_instance_id">
-              <el-input v-model="dialog.form.rds_instance_id" placeholder="如: my-db-instance" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="AWS 区域" prop="aws_region">
-              <el-select v-model="dialog.form.aws_region" placeholder="请选择区域" style="width: 100%;">
-                <el-option label="us-east-1 (弗吉尼亚)" value="us-east-1" />
-                <el-option label="us-west-2 (俄勒冈)" value="us-west-2" />
-                <el-option label="eu-west-1 (爱尔兰)" value="eu-west-1" />
-                <el-option label="ap-northeast-1 (东京)" value="ap-northeast-1" />
-                <el-option label="ap-southeast-1 (新加坡)" value="ap-southeast-1" />
-                <el-option label="ap-southeast-2 (悉尼)" value="ap-southeast-2" />
-                <el-option label="cn-north-1 (北京)" value="cn-north-1" />
-                <el-option label="cn-northwest-1 (宁夏)" value="cn-northwest-1" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <!-- AWS RDS 配置 (仅 MySQL/PostgreSQL) -->
+        <template v-if="dialog.form.db_type !== 'redis'">
+          <el-divider content-position="left">
+            <el-checkbox v-model="dialog.form.is_rds" :label="'AWS RDS 实例'" />
+          </el-divider>
+          
+          <el-row v-if="dialog.form.is_rds">
+            <el-col :span="12">
+              <el-form-item label="RDS 实例ID" prop="rds_instance_id">
+                <el-input v-model="dialog.form.rds_instance_id" placeholder="如: my-db-instance" />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="AWS 区域" prop="aws_region">
+                <el-select v-model="dialog.form.aws_region" placeholder="请选择区域" style="width: 100%;">
+                  <el-option label="us-east-1 (弗吉尼亚)" value="us-east-1" />
+                  <el-option label="us-west-2 (俄勒冈)" value="us-west-2" />
+                  <el-option label="eu-west-1 (爱尔兰)" value="eu-west-1" />
+                  <el-option label="ap-northeast-1 (东京)" value="ap-northeast-1" />
+                  <el-option label="ap-southeast-1 (新加坡)" value="ap-southeast-1" />
+                  <el-option label="ap-southeast-2 (悉尼)" value="ap-southeast-2" />
+                  <el-option label="cn-north-1 (北京)" value="cn-north-1" />
+                  <el-option label="cn-northwest-1 (宁夏)" value="cn-northwest-1" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
         
         <!-- 直连配置 -->
         <el-divider content-position="left" v-if="!dialog.form.is_rds">直连配置</el-divider>
@@ -269,12 +258,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { instancesApi } from '@/api/instances'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, Connection, Delete } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 
 const router = useRouter()
@@ -357,6 +345,13 @@ const getFullRules = () => {
 }
 
 const instanceFormRef = ref(null)
+
+// 监听数据库类型变化，Redis 不支持 RDS
+watch(() => dialog.form.db_type, (newType) => {
+  if (newType === 'redis') {
+    dialog.form.is_rds = false
+  }
+})
 
 // 获取环境列表
 const fetchEnvironments = async () => {
@@ -484,18 +479,6 @@ const handleDelete = async (row) => {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
     }
-  }
-}
-
-// 下拉菜单命令处理
-const handleDropdownCommand = (command, row) => {
-  switch (command) {
-    case 'test':
-      handleTest(row)
-      break
-    case 'delete':
-      handleDelete(row)
-      break
   }
 }
 
