@@ -370,7 +370,8 @@ const fetchApprovals = async () => {
   try {
     const params = {
       skip: (pagination.page - 1) * pagination.pageSize,
-      limit: pagination.pageSize
+      limit: pagination.pageSize,
+      exclude_change_type: 'REDIS'  // 所有 Tab 都排除 REDIS 类型
     }
     
     // 根据 Tab 设置不同的查询参数
@@ -378,12 +379,9 @@ const fetchApprovals = async () => {
       params.requester_id = currentUserId.value
     } else if (activeTab.value === 'pendingApproval') {
       params.status_filter = 'pending'
-      // 排除 REDIS 类型（REDIS 在 redis-requests 页面处理）
-      params.exclude_change_type = 'REDIS'
     } else if (activeTab.value === 'processed') {
       params.except_status = 'pending'
       params.approver_id = currentUserId.value
-      params.exclude_change_type = 'REDIS'
     }
     
     if (statusFilter.value) params.status = statusFilter.value
