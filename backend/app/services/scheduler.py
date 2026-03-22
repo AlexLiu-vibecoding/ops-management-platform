@@ -161,14 +161,27 @@ class ApprovalScheduler:
             
             logger.info(f"开始执行审批工单: {approval_id} - {approval.title}")
             
-            # TODO: 实际执行SQL的逻辑
-            # 这里需要连接到目标MySQL实例执行SQL
-            # 当前先标记为执行成功
+            # 获取实例信息
+            instance = db.query(Instance).filter(Instance.id == approval.instance_id).first()
+            if not instance:
+                logger.error(f"实例不存在: {approval.instance_id}")
+                approval.status = ApprovalStatus.FAILED
+                approval.execute_result = "实例不存在"
+                db.commit()
+                return
+            
+            # 根据 change_type 执行不同的逻辑
+            if approval.change_type == "REDIS":
+                # 执行 Redis 命令
+                execute_result = await self._execute_redis_commands(approval, instance, db)
+            else:
+                # 执行 SQL（TODO: 实际连接数据库执行）
+                execute_result = "执行成功（SQL执行待实现）"
             
             # 更新状态
             approval.status = ApprovalStatus.EXECUTED
             approval.execute_time = datetime.now()
-            approval.execute_result = "执行成功（定时任务自动执行）"
+            approval.execute_result = execute_result
             
             db.commit()
             
@@ -201,6 +214,84 @@ class ApprovalScheduler:
         finally:
             if own_db:
                 db.close()
+    
+    async def _execute_redis_commands(self, approval: ApprovalRecord, instance: Instance, db: Session) -> str:
+        """
+        执行 Redis 命令
+        
+        Args:
+            approval: 审批记录
+            instance: Redis 实例
+            db: 数据库会话
+        
+        Returns:
+            执行结果描述
+        """
+        from app.utils.redis_operations import RedisInstanceClient
+        
+        try:
+            # 获取命令内容
+            commands_content = approval.sql_content
+            if not commands_content and approval.sql_file_path:
+                from app.services.storage import storage_manager
+                commands_content = await storage_manager.read_sql_file(approval.sql_file_path)
+            
+            if not commands_content:
+                return "错误：无命令内容"
+            
+            # 创建 Redis 客户端
+            client = RedisInstanceClient(
+                host=instance.host,
+                port=instance.port,
+                password=instance.password or None,
+                db=instance.redis_db or 0,
+                redis_mode=instance.redis_mode or "standalone"
+            )
+            
+            # 解析并执行命令
+            lines = commands_content.strip().split('\n')
+            success_count = 0
+            fail_count = 0
+            results = []
+            
+            for line in lines:
+                line = line.strip()
+                # 跳过空行和注释
+                if not line or line.startswith('#') or line.startswith('--'):
+                    continue
+                
+                try:
+                    # 解析命令
+                    parts = line.split()
+                    if not parts:
+                        continue
+                    
+                    cmd = parts[0].upper()
+                    args = parts[1:] if len(parts) > 1 else []
+                    
+                    # 执行命令
+                    result = client.client.execute_command(cmd, *args)
+                    success_count += 1
+                    
+                    # 记录结果（简化）
+                    if success_count <= 10:  # 只记录前10条
+                        results.append(f"✓ {line[:50]}...")
+                        
+                except Exception as e:
+                    fail_count += 1
+                    if fail_count <= 5:  # 只记录前5条错误
+                        results.append(f"✗ {line[:30]}... 错误: {str(e)[:50]}")
+            
+            # 构建结果描述
+            result_desc = f"执行完成: 成功 {success_count} 条, 失败 {fail_count} 条"
+            if results:
+                result_desc += "\n" + "\n".join(results[:10])
+            
+            return result_desc
+            
+        except Exception as e:
+            logger.error(f"执行 Redis 命令失败: {e}")
+            return f"执行失败: {str(e)}"
     
     async def cleanup_expired_files(self):
         """

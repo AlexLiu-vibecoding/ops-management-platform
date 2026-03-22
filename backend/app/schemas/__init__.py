@@ -280,7 +280,7 @@ class NotificationBindingCreate(BaseModel):
 class ApprovalCreate(BaseModel):
     """创建审批请求"""
     title: str = Field(..., max_length=200)
-    change_type: str  # DDL/DML/OPERATION/CUSTOM
+    change_type: str  # DDL/DML/OPERATION/CUSTOM/REDIS
     instance_id: int
     database_mode: Optional[str] = Field("single", description="数据库选择模式: single/multiple/pattern/all/auto")
     database_name: Optional[str] = Field(None, description="单库模式时的数据库名")

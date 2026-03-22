@@ -37,15 +37,18 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="change_type" label="类型" width="80" align="center">
+        <el-table-column prop="change_type" label="类型" width="90" align="center">
           <template #default="{ row }">
-            <el-tag size="small">{{ row.change_type }}</el-tag>
+            <el-tag :type="row.change_type === 'REDIS' ? 'danger' : ''" size="small">{{ row.change_type }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="instance_name" label="实例" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="database_target" label="目标数据库" min-width="100" show-overflow-tooltip>
+        <el-table-column prop="database_target" label="目标" min-width="100" show-overflow-tooltip>
           <template #default="{ row }">
-            <span v-if="row.database_mode === 'all'">
+            <span v-if="row.change_type === 'REDIS'">
+              <el-tag type="danger" size="small">Redis</el-tag>
+            </span>
+            <span v-else-if="row.database_mode === 'all'">
               <el-tag type="warning" size="small">全部</el-tag>
             </span>
             <span v-else-if="row.database_mode === 'pattern'">
@@ -111,11 +114,12 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="变更类型" prop="change_type">
-              <el-select v-model="dialog.form.change_type" placeholder="请选择变更类型" style="width: 100%;">
-                <el-option label="DDL变更" value="DDL" />
-                <el-option label="DML变更" value="DML" />
-                <el-option label="运维操作" value="OPERATION" />
-                <el-option label="自定义SQL" value="CUSTOM" />
+              <el-select v-model="dialog.form.change_type" placeholder="请选择变更类型" style="width: 100%;" :disabled="isRedisInstance">
+                <el-option label="DDL变更" value="DDL" :disabled="isRedisInstance" />
+                <el-option label="DML变更" value="DML" :disabled="isRedisInstance" />
+                <el-option label="运维操作" value="OPERATION" :disabled="isRedisInstance" />
+                <el-option label="自定义SQL" value="CUSTOM" :disabled="isRedisInstance" />
+                <el-option label="Redis命令" value="REDIS" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -125,20 +129,27 @@
           <el-col :span="12">
             <el-form-item label="实例" prop="instance_id">
               <el-select v-model="dialog.form.instance_id" placeholder="请选择实例" style="width: 100%;" @change="handleInstanceSelect">
-                <el-option v-for="inst in instances" :key="inst.id" :label="inst.name" :value="inst.id" />
+                <el-option v-for="inst in instances" :key="inst.id" :label="`${inst.name} (${inst.db_type || 'mysql'})`" :value="inst.id" />
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="12" v-if="!isRedisChange">
             <el-form-item label="数据库">
               <el-select v-model="dialog.form.database_name" placeholder="请选择数据库" style="width: 100%;" :loading="dialog.dbLoading" filterable clearable>
                 <el-option v-for="db in dialog.databases" :key="db" :label="db" :value="db" />
               </el-select>
             </el-form-item>
           </el-col>
+          <el-col :span="12" v-else>
+            <el-form-item label="Redis DB">
+              <el-select v-model="dialog.form.redis_db" placeholder="选择数据库索引" style="width: 100%;">
+                <el-option v-for="i in 16" :key="i-1" :label="`DB ${i-1}`" :value="i-1" />
+              </el-select>
+            </el-form-item>
+          </el-col>
         </el-row>
         
-        <el-form-item label="SQL内容" prop="sql_content">
+        <el-form-item :label="isRedisChange ? 'Redis命令' : 'SQL内容'" prop="sql_content">
           <div class="sql-input-wrapper">
             <!-- 文件上传区域 -->
             <div class="upload-section">
@@ -146,13 +157,13 @@
                 ref="uploadRef"
                 :auto-upload="false"
                 :show-file-list="false"
-                accept=".sql,.txt"
+                :accept="isRedisChange ? '.txt,.cmd' : '.sql,.txt'"
                 :on-change="handleFileSelect"
                 :disabled="dialog.fileLoading"
               >
                 <el-button type="primary" plain :loading="dialog.fileLoading">
                   <el-icon><Upload /></el-icon>
-                  {{ dialog.fileLoading ? '正在读取文件...' : '上传SQL文件' }}
+                  {{ dialog.fileLoading ? '正在读取文件...' : (isRedisChange ? '上传命令文件' : '上传SQL文件') }}
                 </el-button>
               </el-upload>
               
@@ -272,6 +283,16 @@ const pagination = reactive({
   total: 0
 })
 
+// 计算属性：是否为 Redis 变更类型
+const isRedisChange = computed(() => dialog.form.change_type === 'REDIS')
+
+// 计算属性：当前选中的实例是否为 Redis 类型
+const isRedisInstance = computed(() => {
+  if (!dialog.form.instance_id) return false
+  const instance = instances.value.find(i => i.id === dialog.form.instance_id)
+  return instance?.db_type === 'redis'
+})
+
 const dialog = reactive({
   visible: false,
   submitting: false,
@@ -340,7 +361,8 @@ const handleAdd = () => {
     remark: '',
     affected_rows_estimate: 0,
     execution_mode: 'auto',
-    scheduled_time: null
+    scheduled_time: null,
+    redis_db: 0
   }
   // 重置文件状态
   fullSqlContent.value = ''
@@ -448,6 +470,18 @@ const formatFileSize = (bytes) => {
 const handleInstanceSelect = async (instanceId) => {
   dialog.form.database_name = ''
   dialog.databases = []
+  
+  // 获取选中的实例信息
+  const instance = instances.value.find(i => i.id === instanceId)
+  
+  // 如果是 Redis 实例，自动设置变更类型
+  if (instance?.db_type === 'redis') {
+    dialog.form.change_type = 'REDIS'
+    dialog.form.redis_db = instance.redis_db || 0
+    return  // Redis 实例不需要获取数据库列表
+  }
+  
+  // 非 Redis 实例，获取数据库列表
   dialog.dbLoading = true
   try {
     const data = await request.get(`/sql/databases/${instanceId}`)
@@ -474,11 +508,15 @@ const handleSubmit = async () => {
         title: dialog.form.title,
         change_type: dialog.form.change_type,
         instance_id: dialog.form.instance_id,
-        database_name: dialog.form.database_name,
         sql_content: sqlToSubmit,
         remark: dialog.form.remark,
         affected_rows_estimate: dialog.form.affected_rows_estimate,
         auto_execute: dialog.form.execution_mode === 'auto'
+      }
+      
+      // Redis 变更不需要数据库字段
+      if (dialog.form.change_type !== 'REDIS') {
+        submitData.database_name = dialog.form.database_name
       }
       
       if (dialog.form.execution_mode === 'scheduled' && dialog.form.scheduled_time) {

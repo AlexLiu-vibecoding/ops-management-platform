@@ -200,6 +200,78 @@ def analyze_sql_risk(sql: str, environment_id: int, db: Session) -> str:
     return "low"
 
 
+def analyze_redis_risk(commands: str, environment_id: int, db: Session) -> str:
+    """
+    分析 Redis 命令风险等级
+    返回: critical/high/medium/low
+    """
+    commands_upper = commands.upper().strip()
+    
+    # 极高风险：删除所有数据、关闭服务器
+    critical_patterns = [
+        r'\bFLUSHALL\b',
+        r'\bFLUSHDB\b',
+        r'\bSHUTDOWN\b',
+        r'\bDEBUG\s+RELOAD\b',
+        r'\bDEBUG\s+SEGFAULT\b',
+    ]
+    
+    # 高风险：删除键、重命名
+    high_patterns = [
+        r'\bDEL\b',
+        r'\bUNLINK\b',
+        r'\bRENAME\b',
+        r'\bRENAMENX\b',
+        r'\bMOVE\b',
+        r'\bMIGRATE\b',
+        r'\bRESTORE\b',
+    ]
+    
+    # 中风险：修改数据
+    medium_patterns = [
+        r'\bSET\b',
+        r'\bSETEX\b',
+        r'\bSETNX\b',
+        r'\bMSET\b',
+        r'\bINCR\b',
+        r'\bDECR\b',
+        r'\bINCRBY\b',
+        r'\bDECRBY\b',
+        r'\bAPPEND\b',
+        r'\bLPUSH\b',
+        r'\bRPUSH\b',
+        r'\bLPOP\b',
+        r'\bRPOP\b',
+        r'\bSADD\b',
+        r'\bSREM\b',
+        r'\bZADD\b',
+        r'\bZREM\b',
+        r'\bHSET\b',
+        r'\bHDEL\b',
+        r'\bEXPIRE\b',
+        r'\bPEXPIRE\b',
+        r'\bPERSIST\b',
+    ]
+    
+    # 检查极高风险
+    for pattern in critical_patterns:
+        if re.search(pattern, commands_upper, re.IGNORECASE):
+            return "critical"
+    
+    # 检查高风险
+    for pattern in high_patterns:
+        if re.search(pattern, commands_upper, re.IGNORECASE):
+            return "high"
+    
+    # 检查中风险
+    for pattern in medium_patterns:
+        if re.search(pattern, commands_upper, re.IGNORECASE):
+            return "medium"
+    
+    # 只读命令为低风险
+    return "low"
+
+
 def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = False) -> dict:
     """
     格式化审批响应，处理大SQL文件的预览
@@ -386,40 +458,61 @@ async def create_approval(
             detail="Instance not found"
         )
     
-    # 分析SQL风险等级
-    risk_level = analyze_sql_risk(approval_data.sql_content, instance.environment_id, db)
+    # 根据 change_type 分析风险等级
+    if approval_data.change_type == "REDIS":
+        # Redis 命令风险分析
+        risk_level = analyze_redis_risk(approval_data.sql_content, instance.environment_id, db)
+        # 验证实例类型
+        if instance.db_type != "redis":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Redis 变更只能选择 Redis 类型的实例"
+            )
+    else:
+        # SQL 风险分析
+        risk_level = analyze_sql_risk(approval_data.sql_content, instance.environment_id, db)
     
     # 极高风险直接拒绝
     if risk_level == "critical":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Critical risk SQL detected, submission rejected"
+            detail="Critical risk detected, submission rejected"
         )
     
-    # 计算SQL行数（如果前端没传）
+    # 计算SQL/命令行数（如果前端没传）
     sql_line_count = approval_data.sql_line_count
     if not sql_line_count:
         sql_line_count = len(approval_data.sql_content.split('\n'))
     
-    # 生成回滚SQL
+    # 生成回滚SQL（仅对 SQL 类型）
     rollback_sql = None
     rollback_generated = False
-    try:
-        rollback_results = rollback_generator.generate_rollback_sql(approval_data.sql_content)
-        if rollback_results:
-            rollback_parts = []
-            for result in rollback_results:
-                if result.success and result.rollback_sql:
-                    rollback_parts.append(f"-- 原SQL类型: {result.sql_type.value}")
-                    rollback_parts.append(result.rollback_sql)
-                    if result.warning:
-                        rollback_parts.append(f"-- 警告: {result.warning}")
-                    rollback_parts.append("")
-            if rollback_parts:
-                rollback_sql = "\n".join(rollback_parts)
+    if approval_data.change_type != "REDIS":
+        try:
+            rollback_results = rollback_generator.generate_rollback_sql(approval_data.sql_content)
+            if rollback_results:
+                rollback_parts = []
+                for result in rollback_results:
+                    if result.success and result.rollback_sql:
+                        rollback_parts.append(f"-- 原SQL类型: {result.sql_type.value}")
+                        rollback_parts.append(result.rollback_sql)
+                        if result.warning:
+                            rollback_parts.append(f"-- 警告: {result.warning}")
+                        rollback_parts.append("")
+                if rollback_parts:
+                    rollback_sql = "\n".join(rollback_parts)
+                    rollback_generated = True
+        except Exception as e:
+            logger.warning(f"生成回滚SQL失败: {e}")
+    else:
+        # Redis 命令回滚生成
+        try:
+            rollback_results = rollback_generator.generate_redis_rollback(approval_data.sql_content)
+            if rollback_results and rollback_results.success and rollback_results.rollback_sql:
+                rollback_sql = rollback_results.rollback_sql
                 rollback_generated = True
-    except Exception as e:
-        logger.warning(f"生成回滚SQL失败: {e}")
+        except Exception as e:
+            logger.warning(f"生成Redis回滚命令失败: {e}")
     
     # 判断是否需要存储到文件
     sql_content = approval_data.sql_content
