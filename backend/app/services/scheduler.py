@@ -175,8 +175,11 @@ class ApprovalScheduler:
                 # 执行 Redis 命令
                 execute_result = await self._execute_redis_commands(approval, instance, db)
             else:
-                # 执行 SQL（TODO: 实际连接数据库执行）
-                execute_result = "执行成功（SQL执行待实现）"
+                # 执行 SQL
+                from app.api.approval import execute_sql_for_approval
+                success, result_msg, affected_rows = await execute_sql_for_approval(approval, instance)
+                execute_result = result_msg
+                approval.affected_rows_actual = affected_rows
             
             # 更新状态
             approval.status = ApprovalStatus.EXECUTED
