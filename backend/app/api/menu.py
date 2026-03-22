@@ -321,8 +321,8 @@ async def add_missing_menus(
     change_parent = db.query(MenuConfig).filter(MenuConfig.path == "/change").first()
     if change_parent:
         change_child_menus = [
-            {"name": "DB变更申请", "path": "/change/requests", "icon": "Coin", "sort_order": 1},
-            {"name": "Redis变更申请", "path": "/change/redis-requests", "icon": "Key", "sort_order": 2},
+            {"name": "DB变更", "path": "/change/requests", "icon": "Coin", "sort_order": 1},
+            {"name": "Redis变更", "path": "/change/redis-requests", "icon": "Key", "sort_order": 2},
         ]
         
         for menu_data in change_child_menus:

@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <div class="header-left">
-            <span>DB 变更申请</span>
+            <span>DB 变更</span>
             <el-tag type="info" size="small" style="margin-left: 10px;">MySQL / PostgreSQL</el-tag>
           </div>
           <div class="header-right">

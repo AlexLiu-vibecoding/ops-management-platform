@@ -4,7 +4,7 @@
       <template #header>
         <div class="card-header">
           <div class="header-left">
-            <span>Redis 变更申请</span>
+            <span>Redis 变更</span>
             <el-tag type="danger" size="small" style="margin-left: 10px;">Redis 专用</el-tag>
           </div>
           <div class="header-right">
