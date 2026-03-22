@@ -98,7 +98,7 @@
             class="keys-table"
           >
             <el-table-column prop="key" label="键名" min-width="150" show-overflow-tooltip />
-            <el-table-column prop="type" label="类型" width="70" align="center">
+            <el-table-column prop="type" label="类型" width="80" align="center">
               <template #default="{ row }">
                 <el-tag size="small" :type="getTypeTagType(row.type)">{{ row.type }}</el-tag>
               </template>
@@ -268,7 +268,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Coin, Key, Lightning, User, Plus } from '@element-plus/icons-vue'
@@ -557,6 +557,19 @@ const startRefresh = () => {
     }
   }, 30000)
 }
+
+// 监听 tab 切换，懒加载数据
+watch(activeTab, (newTab) => {
+  if (newTab === 'slowlog' && slowlogList.value.length === 0) {
+    fetchSlowlog()
+  } else if (newTab === 'clients' && clientList.value.length === 0) {
+    fetchClients()
+  } else if (newTab === 'server' && !redisInfo.value?.server) {
+    fetchRedisInfo()
+  } else if (newTab === 'config' && Object.keys(redisConfig.value).length === 0) {
+    fetchConfig()
+  }
+})
 
 onMounted(async () => {
   await fetchInstance()
