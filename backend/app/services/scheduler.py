@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import ApprovalRecord, ApprovalStatus, Instance, AuditLog, User
 from app.services.notification import notification_service
+from app.services.sql_executor import sql_executor, redis_executor
 from app.config.storage import get_storage_settings
 
 logger = logging.getLogger(__name__)
@@ -173,23 +174,13 @@ class ApprovalScheduler:
             # 根据 change_type 执行不同的逻辑
             if approval.change_type == "REDIS":
                 # 执行 Redis 命令
-                execute_result = await self._execute_redis_commands(approval, instance, db)
-                # 检查是否有失败
-                import re
-                fail_match = re.search(r'失败(\d+)条', execute_result)
-                fail_count = int(fail_match.group(1)) if fail_match else 0
-                execution_success = fail_count == 0
+                execute_result = await redis_executor.execute_for_approval(approval, instance)
+                execution_success = sql_executor.check_execution_success(execute_result)
             else:
                 # 执行 SQL
-                from app.api.approval import execute_sql_for_approval
-                success, result_msg, affected_rows = await execute_sql_for_approval(approval, instance)
-                execute_result = result_msg
+                success, execute_result, affected_rows = await sql_executor.execute_for_approval(approval, instance)
                 approval.affected_rows_actual = affected_rows
-                # 检查是否有失败
-                import re
-                fail_match = re.search(r'失败(\d+)条', execute_result)
-                fail_count = int(fail_match.group(1)) if fail_match else 0
-                execution_success = fail_count == 0
+                execution_success = sql_executor.check_execution_success(execute_result)
             
             # 更新状态
             if execution_success:
@@ -242,90 +233,6 @@ class ApprovalScheduler:
         finally:
             if own_db:
                 db.close()
-    
-    async def _execute_redis_commands(self, approval: ApprovalRecord, instance: Instance, db: Session) -> str:
-        """
-        执行 Redis 命令
-        
-        Args:
-            approval: 审批记录
-            instance: Redis 实例
-            db: 数据库会话
-        
-        Returns:
-            执行结果描述
-        """
-        from app.utils.redis_operations import RedisInstanceClient
-        from app.utils.auth import decrypt_instance_password
-        
-        try:
-            # 获取命令内容
-            commands_content = approval.sql_content
-            if not commands_content and approval.sql_file_path:
-                from app.services.storage import storage_manager
-                commands_content = await storage_manager.read_sql_file(approval.sql_file_path)
-            
-            if not commands_content:
-                return "错误：无命令内容"
-            
-            # 解密密码
-            password = None
-            if instance.password_encrypted:
-                password = decrypt_instance_password(instance.password_encrypted)
-            
-            # 创建 Redis 客户端
-            client = RedisInstanceClient(
-                host=instance.host,
-                port=instance.port,
-                password=password,
-                db=instance.redis_db or 0,
-                redis_mode=instance.redis_mode or "standalone"
-            )
-            
-            # 解析并执行命令
-            lines = commands_content.strip().split('\n')
-            success_count = 0
-            fail_count = 0
-            results = []
-            
-            for line in lines:
-                line = line.strip()
-                # 跳过空行和注释
-                if not line or line.startswith('#') or line.startswith('--'):
-                    continue
-                
-                try:
-                    # 解析命令
-                    parts = line.split()
-                    if not parts:
-                        continue
-                    
-                    cmd = parts[0].upper()
-                    args = parts[1:] if len(parts) > 1 else []
-                    
-                    # 执行命令
-                    result = client.client.execute_command(cmd, *args)
-                    success_count += 1
-                    
-                    # 记录结果（简化）
-                    if success_count <= 10:  # 只记录前10条
-                        results.append(f"✓ {line[:50]}...")
-                        
-                except Exception as e:
-                    fail_count += 1
-                    if fail_count <= 5:  # 只记录前5条错误
-                        results.append(f"✗ {line[:30]}... 错误: {str(e)[:50]}")
-            
-            # 构建结果描述
-            result_desc = f"执行完成: 成功 {success_count} 条, 失败 {fail_count} 条"
-            if results:
-                result_desc += "\n" + "\n".join(results[:10])
-            
-            return result_desc
-            
-        except Exception as e:
-            logger.error(f"执行 Redis 命令失败: {e}")
-            return f"执行失败: {str(e)}"
     
     async def cleanup_expired_files(self):
         """

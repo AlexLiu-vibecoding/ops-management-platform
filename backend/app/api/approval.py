@@ -21,7 +21,7 @@ from app.services.notification import notification_service
 from app.services.scheduler import approval_scheduler
 from app.services.rollback_generator import rollback_generator
 from app.services.storage import storage_manager
-from app.utils.auth import decrypt_instance_password
+from app.services.sql_executor import sql_executor, redis_executor
 
 logger = logging.getLogger(__name__)
 
@@ -29,125 +29,6 @@ router = APIRouter(prefix="/approvals", tags=["变更审批"])
 
 # 大文件预览行数限制
 PREVIEW_LINES = 100
-
-
-async def execute_sql_for_approval(approval: ApprovalRecord, instance: Instance) -> tuple:
-    """
-    执行审批工单中的SQL
-    
-    Returns:
-        tuple: (success: bool, result_message: str, affected_rows: int)
-    """
-    import pymysql
-    import psycopg2
-    
-    # 获取数据库连接
-    try:
-        password = decrypt_instance_password(instance.password_encrypted)
-    except ValueError as e:
-        return False, f"密码解密失败: {str(e)}", 0
-    
-    # 确定数据库类型
-    db_type = instance.db_type.lower() if instance.db_type else 'mysql'
-    
-    # 确定目标数据库
-    database = None
-    if approval.database_mode == 'single':
-        database = approval.database_name
-    elif approval.database_mode == 'multiple' and approval.database_list:
-        database = approval.database_list[0]  # 使用第一个数据库
-    
-    conn = None
-    total_affected = 0
-    results = []
-    
-    try:
-        # 建立连接
-        if db_type == 'postgresql':
-            conn = psycopg2.connect(
-                host=instance.host,
-                port=instance.port,
-                user=instance.username,
-                password=password,
-                database=database or 'postgres',
-                connect_timeout=10
-            )
-        else:
-            # MySQL
-            conn = pymysql.connect(
-                host=instance.host,
-                port=instance.port,
-                user=instance.username,
-                password=password,
-                database=database,
-                connect_timeout=10,
-                charset='utf8mb4'
-            )
-        
-        cursor = conn.cursor()
-        
-        # 获取SQL内容
-        sql_content = approval.sql_content or ""
-        
-        # 处理大文件SQL
-        if approval.sql_file_path:
-            try:
-                file_content = storage_manager.backend.read(approval.sql_file_path)
-                if file_content:
-                    sql_content = file_content if isinstance(file_content, str) else file_content.decode('utf-8')
-            except Exception as e:
-                return False, f"读取SQL文件失败: {str(e)}", 0
-        
-        # 分割SQL语句
-        sql_statements = [s.strip() for s in sql_content.split(';') if s.strip()]
-        
-        # 逐条执行
-        for i, sql in enumerate(sql_statements):
-            if not sql:
-                continue
-            
-            try:
-                cursor.execute(sql)
-                
-                # 判断是否为查询语句
-                sql_upper = sql.upper().strip()
-                if sql_upper.startswith(('SELECT', 'SHOW', 'DESC', 'EXPLAIN')):
-                    # 查询语句，获取行数
-                    rows = cursor.fetchall()
-                    affected = len(rows)
-                else:
-                    # 修改语句
-                    affected = cursor.rowcount if cursor.rowcount >= 0 else 0
-                    conn.commit()
-                
-                total_affected += affected
-                results.append(f"语句{i+1}: 成功, 影响{affected}行")
-                
-            except Exception as e:
-                conn.rollback()
-                results.append(f"语句{i+1}: 失败 - {str(e)}")
-                # 继续执行下一条
-        
-        cursor.close()
-        
-        # 构建结果消息
-        if results:
-            success_count = sum(1 for r in results if '成功' in r)
-            fail_count = len(results) - success_count
-            result_msg = f"执行完成: 成功{success_count}条, 失败{fail_count}条, 共影响{total_affected}行"
-        else:
-            result_msg = "执行完成: 无有效SQL语句"
-        
-        return True, result_msg, total_affected
-        
-    except Exception as e:
-        return False, f"数据库连接/执行失败: {str(e)}", 0
-    finally:
-        if conn:
-            try:
-                conn.close()
-            except:
-                pass
 
 
 @router.get("/preview-databases/{instance_id}")
@@ -896,23 +777,13 @@ async def execute_approval(
         # 根据 change_type 执行不同的逻辑
         if approval.change_type == "REDIS" and instance:
             # 执行 Redis 命令
-            from app.services.scheduler import approval_scheduler
-            execute_result = await approval_scheduler._execute_redis_commands(approval, instance, db)
-            # 检查是否有失败
-            import re
-            fail_match = re.search(r'失败(\d+)条', execute_result)
-            fail_count = int(fail_match.group(1)) if fail_match else 0
-            execution_success = fail_count == 0
+            execute_result = await redis_executor.execute_for_approval(approval, instance)
+            execution_success = sql_executor.check_execution_success(execute_result)
         else:
             # 执行 SQL
-            success, result_msg, affected_rows = await execute_sql_for_approval(approval, instance)
-            execute_result = result_msg
+            success, execute_result, affected_rows = await sql_executor.execute_for_approval(approval, instance)
             approval.affected_rows_actual = affected_rows
-            # 检查是否有失败
-            import re
-            fail_match = re.search(r'失败(\d+)条', execute_result)
-            fail_count = int(fail_match.group(1)) if fail_match else 0
-            execution_success = fail_count == 0
+            execution_success = sql_executor.check_execution_success(execute_result)
         
         # 更新状态
         if execution_success:
