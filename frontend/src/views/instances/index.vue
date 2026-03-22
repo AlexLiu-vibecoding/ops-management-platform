@@ -221,23 +221,13 @@
         
         <!-- Redis 特有配置 -->
         <template v-if="dialog.form.db_type === 'redis' && !dialog.form.is_rds">
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <el-form-item label="运行模式">
-                <el-select v-model="dialog.form.redis_mode" placeholder="请选择运行模式" style="width: 100%;">
-                  <el-option label="单机模式" value="standalone" />
-                  <el-option label="集群模式" value="cluster" />
-                  <el-option label="哨兵模式" value="sentinel" />
-                </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="DB 索引">
-                <el-input-number v-model="dialog.form.redis_db" :min="0" :max="15" style="width: 100%;" />
-                <div style="font-size: 12px; color: #999; margin-top: 4px;">Redis 数据库编号 (0-15)</div>
-              </el-form-item>
-            </el-col>
-          </el-row>
+          <el-form-item label="运行模式">
+            <el-select v-model="dialog.form.redis_mode" placeholder="请选择运行模式" style="width: 100%;">
+              <el-option label="单机模式" value="standalone" />
+              <el-option label="集群模式" value="cluster" />
+              <el-option label="哨兵模式" value="sentinel" />
+            </el-select>
+          </el-form-item>
         </template>
         
         <el-form-item label="描述">
@@ -357,10 +347,22 @@ const getFullRules = () => {
 
 const instanceFormRef = ref(null)
 
-// 监听数据库类型变化，Redis 不支持 RDS
-watch(() => dialog.form.db_type, (newType) => {
+// 监听数据库类型变化，自动调整端口和 RDS 选项
+watch(() => dialog.form.db_type, (newType, oldType) => {
   if (newType === 'redis') {
     dialog.form.is_rds = false
+    // 如果端口是其他数据库的默认端口，改为 Redis 默认端口
+    if (dialog.form.port === 3306 || dialog.form.port === 5432) {
+      dialog.form.port = 6379
+    }
+  } else if (newType === 'postgresql') {
+    if (dialog.form.port === 3306 || dialog.form.port === 6379) {
+      dialog.form.port = 5432
+    }
+  } else if (newType === 'mysql') {
+    if (dialog.form.port === 5432 || dialog.form.port === 6379) {
+      dialog.form.port = 3306
+    }
   }
 })
 
