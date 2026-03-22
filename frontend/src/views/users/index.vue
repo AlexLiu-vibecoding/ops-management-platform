@@ -281,8 +281,8 @@ const fetchUsers = async () => {
       ...searchForm
     }
     const data = await usersApi.getList(params)
-    userList.value = data
-    pagination.total = data.length
+    userList.value = data.items || data
+    pagination.total = data.total || data.length || 0
   } catch (error) {
     console.error('获取用户列表失败:', error)
   } finally {
