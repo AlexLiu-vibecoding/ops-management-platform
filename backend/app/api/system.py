@@ -11,7 +11,7 @@ from app.deps import get_super_admin
 from app.models import User, GlobalConfig
 from app.database import get_db
 from app.config import settings as app_settings
-from app.config.storage import get_storage_settings, StorageSettings
+from app.config.storage import get_storage_settings
 
 router = APIRouter(prefix="/system", tags=["系统配置"])
 
@@ -153,12 +153,12 @@ class StorageConfigResponse(BaseModel):
     storage_type: str
     retention_days: int
     size_threshold: int
-    local_path: str = None
-    s3_bucket: str = None
-    s3_region: str = None
-    s3_endpoint: str = None
-    oss_bucket: str = None
-    oss_endpoint: str = None
+    local_path: Optional[str] = None
+    s3_bucket: Optional[str] = None
+    s3_region: Optional[str] = None
+    s3_endpoint: Optional[str] = None
+    oss_bucket: Optional[str] = None
+    oss_endpoint: Optional[str] = None
 
 
 class StorageConfigUpdate(BaseModel):
