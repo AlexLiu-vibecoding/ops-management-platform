@@ -473,11 +473,13 @@ const handleInstanceSelect = async (instanceId) => {
   
   // 获取选中的实例信息
   const instance = instances.value.find(i => i.id === instanceId)
+  console.log('Selected instance:', instance?.name, 'db_type:', instance?.db_type)
   
-  // 如果是 Redis 实例，自动设置变更类型
+  // 如果是 Redis 实例，自动设置变更类型并跳过数据库列表获取
   if (instance?.db_type === 'redis') {
     dialog.form.change_type = 'REDIS'
     dialog.form.redis_db = instance.redis_db || 0
+    console.log('Redis instance selected, skip database list fetch')
     return  // Redis 实例不需要获取数据库列表
   }
   
@@ -489,6 +491,7 @@ const handleInstanceSelect = async (instanceId) => {
     dialog.databases = data.filter(db => !systemDbs.includes(db))
   } catch (error) {
     console.error('获取数据库列表失败:', error)
+    ElMessage.warning('获取数据库列表失败，请手动输入数据库名')
   } finally {
     dialog.dbLoading = false
   }

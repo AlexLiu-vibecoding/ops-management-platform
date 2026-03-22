@@ -283,6 +283,10 @@ async def list_databases(
             detail="Instance not found"
         )
     
+    # Redis 实例没有数据库列表概念，返回空列表
+    if instance.db_type == "redis":
+        return []
+    
     try:
         conn, db_type = get_db_connection(instance)
         cursor = conn.cursor()
