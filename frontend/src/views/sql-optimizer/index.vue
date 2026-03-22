@@ -282,7 +282,8 @@ const canAnalyze = computed(() => {
 const loadInstances = async () => {
   try {
     const data = await instancesApi.getList()
-    instances.value = data.items || data || []
+    // 过滤掉 Redis 实例，SQL 优化器不支持 Redis
+    instances.value = (data.items || data || []).filter(inst => inst.db_type !== 'redis')
   } catch (error) {
     console.error('加载实例列表失败:', error)
   }
