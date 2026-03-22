@@ -15,7 +15,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.main import app
 from app.database import Base, get_db
-from app.models import User, UserRole, Environment
+from app.models import User, UserRole, Environment, GlobalConfig
 from app.utils.auth import hash_password, create_access_token
 
 
@@ -51,11 +51,26 @@ def db_session():
     
     db = TestingSessionLocal()
     try:
+        # 初始化默认配置
+        _init_default_configs(db)
         yield db
     finally:
         db.close()
         # 清理所有表
         Base.metadata.drop_all(bind=engine)
+
+
+def _init_default_configs(db):
+    """初始化默认配置"""
+    configs = [
+        GlobalConfig(config_key="storage_type", config_value="local"),
+        GlobalConfig(config_key="retention_days", config_value="30"),
+        GlobalConfig(config_key="size_threshold", config_value="10000"),
+        GlobalConfig(config_key="local_path", config_value="/app/data/sql_files"),
+    ]
+    for config in configs:
+        db.add(config)
+    db.commit()
 
 
 @pytest.fixture(scope="function")
@@ -92,6 +107,24 @@ def operator_token(db_session):
         real_name="运维人员",
         email="operator@test.com",
         role=UserRole.OPERATOR,
+        status=True
+    )
+    db_session.add(user)
+    db_session.commit()
+    
+    token = create_access_token({"sub": user.id})
+    return token
+
+
+@pytest.fixture(scope="function")
+def approval_admin_token(db_session):
+    """创建审批管理员并返回 token"""
+    user = User(
+        username="approval_admin",
+        password_hash=hash_password("admin123"),
+        real_name="审批管理员",
+        email="approval@test.com",
+        role=UserRole.APPROVAL_ADMIN,
         status=True
     )
     db_session.add(user)
