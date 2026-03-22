@@ -72,10 +72,13 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="scheduled_task_id" label="定时任务" min-width="100">
+        <el-table-column prop="scheduled_task_id" label="关联任务" min-width="100">
           <template #default="{ row }">
-            <span v-if="row.scheduled_task_id">{{ getScheduledTaskName(row.scheduled_task_id) }}</span>
-            <span v-else>-</span>
+            <template v-if="row.notification_type === 'scheduled_task'">
+              <span v-if="row.scheduled_task_id">{{ getScheduledTaskName(row.scheduled_task_id) }}</span>
+              <span v-else class="text-gray-400">全部任务</span>
+            </template>
+            <span v-else class="text-gray-400">-</span>
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="160">
