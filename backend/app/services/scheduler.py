@@ -174,15 +174,28 @@ class ApprovalScheduler:
             if approval.change_type == "REDIS":
                 # 执行 Redis 命令
                 execute_result = await self._execute_redis_commands(approval, instance, db)
+                # 检查是否有失败
+                import re
+                fail_match = re.search(r'失败(\d+)条', execute_result)
+                fail_count = int(fail_match.group(1)) if fail_match else 0
+                execution_success = fail_count == 0
             else:
                 # 执行 SQL
                 from app.api.approval import execute_sql_for_approval
                 success, result_msg, affected_rows = await execute_sql_for_approval(approval, instance)
                 execute_result = result_msg
                 approval.affected_rows_actual = affected_rows
+                # 检查是否有失败
+                import re
+                fail_match = re.search(r'失败(\d+)条', execute_result)
+                fail_count = int(fail_match.group(1)) if fail_match else 0
+                execution_success = fail_count == 0
             
             # 更新状态
-            approval.status = ApprovalStatus.EXECUTED
+            if execution_success:
+                approval.status = ApprovalStatus.EXECUTED
+            else:
+                approval.status = ApprovalStatus.FAILED
             approval.execute_time = datetime.now()
             approval.execute_result = execute_result
             
@@ -212,6 +225,18 @@ class ApprovalScheduler:
             
         except Exception as e:
             logger.error(f"执行审批工单失败: {approval_id}, 错误: {e}")
+            # 发送失败通知
+            try:
+                if own_db:
+                    approval = db.query(ApprovalRecord).filter(ApprovalRecord.id == approval_id).first()
+                    if approval:
+                        approval.status = ApprovalStatus.FAILED
+                        approval.execute_time = datetime.now()
+                        approval.execute_result = f"执行失败: {str(e)}"
+                        db.commit()
+                        await notification_service.send_approval_notification(db, approval, "executed")
+            except Exception as notify_error:
+                logger.error(f"发送失败通知失败: {notify_error}")
             if own_db:
                 db.rollback()
         finally:

@@ -329,7 +329,11 @@ class NotificationService:
 
 拒绝时间: {approval.approve_time.strftime('%m-%d %H:%M') if approval.approve_time else '未知'}"""
         elif notification_type == "executed":
-            title = "变更执行完成"
+            # 根据状态判断标题
+            if approval.status and approval.status.value == "failed":
+                title = "变更执行失败"
+            else:
+                title = "变更执行完成"
             
             # 实际影响行数
             affected_info = "未知"

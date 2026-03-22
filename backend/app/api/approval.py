@@ -889,28 +889,52 @@ async def execute_approval(
             detail="Only the applicant can execute this approval"
         )
     
-    # 获取实例
-    instance = db.query(Instance).filter(Instance.id == approval.instance_id).first()
+    try:
+        # 获取实例
+        instance = db.query(Instance).filter(Instance.id == approval.instance_id).first()
+        
+        # 根据 change_type 执行不同的逻辑
+        if approval.change_type == "REDIS" and instance:
+            # 执行 Redis 命令
+            from app.services.scheduler import approval_scheduler
+            execute_result = await approval_scheduler._execute_redis_commands(approval, instance, db)
+            # 检查是否有失败
+            import re
+            fail_match = re.search(r'失败(\d+)条', execute_result)
+            fail_count = int(fail_match.group(1)) if fail_match else 0
+            execution_success = fail_count == 0
+        else:
+            # 执行 SQL
+            success, result_msg, affected_rows = await execute_sql_for_approval(approval, instance)
+            execute_result = result_msg
+            approval.affected_rows_actual = affected_rows
+            # 检查是否有失败
+            import re
+            fail_match = re.search(r'失败(\d+)条', execute_result)
+            fail_count = int(fail_match.group(1)) if fail_match else 0
+            execution_success = fail_count == 0
+        
+        # 更新状态
+        if execution_success:
+            approval.status = ApprovalStatus.EXECUTED
+        else:
+            approval.status = ApprovalStatus.FAILED
+        approval.execute_time = datetime.now()
+        approval.execute_result = execute_result
+        
+        db.commit()
+        
+        message = "审批执行成功" if execution_success else f"审批执行失败: {execute_result}"
+        
+    except Exception as e:
+        # 执行异常，记录失败
+        approval.status = ApprovalStatus.FAILED
+        approval.execute_time = datetime.now()
+        approval.execute_result = f"执行异常: {str(e)}"
+        db.commit()
+        message = f"审批执行失败: {str(e)}"
     
-    # 根据 change_type 执行不同的逻辑
-    if approval.change_type == "REDIS" and instance:
-        # 执行 Redis 命令
-        from app.services.scheduler import approval_scheduler
-        execute_result = await approval_scheduler._execute_redis_commands(approval, instance, db)
-    else:
-        # 执行 SQL
-        success, result_msg, affected_rows = await execute_sql_for_approval(approval, instance)
-        execute_result = result_msg
-        approval.affected_rows_actual = affected_rows
-    
-    # 更新状态
-    approval.status = ApprovalStatus.EXECUTED
-    approval.execute_time = datetime.now()
-    approval.execute_result = execute_result
-    
-    db.commit()
-    
-    # 发送执行完成通知
+    # 发送执行完成通知（无论成功失败都发送）
     try:
         await notification_service.send_approval_notification(db, approval, "executed")
     except Exception as e:
@@ -924,7 +948,7 @@ async def execute_approval(
         instance_name=approval.instance.name if approval.instance else None,
         environment_id=approval.environment_id,
         operation_type="execute_approval",
-        operation_detail=f"Execute approval: {approval.title}\nSQL: {get_sql_preview(approval.sql_content, 20)}...",
+        operation_detail=f"Execute approval: {approval.title}\nResult: {approval.execute_result}",
         request_ip="",
         request_method="POST",
         request_path=f"/api/approvals/{approval_id}/execute",
@@ -933,7 +957,7 @@ async def execute_approval(
     db.add(audit_log)
     db.commit()
     
-    return MessageResponse(message="审批执行成功")
+    return MessageResponse(message=message)
 
 
 @router.get("/dingtalk-action", response_class=HTMLResponse)
