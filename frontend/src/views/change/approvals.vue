@@ -156,8 +156,11 @@ const fetchApprovals = async () => {
     }
     
     if (activeTab.value === 'pending') {
-      params.status = 'pending'
+      // 待审批：只显示 status=pending 的记录
+      params.status_filter = 'pending'
     } else {
+      // 已审批：显示非 pending 状态，且当前用户审批过的记录
+      params.except_status = 'pending'
       params.approver_id = currentUserId.value
     }
     

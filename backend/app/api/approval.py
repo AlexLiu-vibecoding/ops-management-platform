@@ -387,7 +387,9 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
 @router.get("")
 async def list_approvals(
     status_filter: Optional[ApprovalStatus] = None,
+    except_status: Optional[ApprovalStatus] = None,
     requester_id: Optional[int] = None,
+    approver_id: Optional[int] = None,
     environment_id: Optional[int] = None,
     skip: int = 0,
     limit: int = 20,
@@ -399,8 +401,12 @@ async def list_approvals(
     
     if status_filter:
         query = query.filter(ApprovalRecord.status == status_filter)
+    if except_status:
+        query = query.filter(ApprovalRecord.status != except_status)
     if requester_id:
         query = query.filter(ApprovalRecord.requester_id == requester_id)
+    if approver_id:
+        query = query.filter(ApprovalRecord.approver_id == approver_id)
     if environment_id:
         query = query.filter(ApprovalRecord.environment_id == environment_id)
     
