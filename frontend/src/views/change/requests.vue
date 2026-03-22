@@ -37,7 +37,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="change_type" label="类型" width="70" align="center">
+        <el-table-column prop="change_type" label="类型" width="80" align="center">
           <template #default="{ row }">
             <el-tag size="small">{{ row.change_type }}</el-tag>
           </template>

@@ -152,15 +152,6 @@
           </el-col>
         </el-row>
         
-        <!-- 状态开关 -->
-        <el-form-item label="状态">
-          <el-switch
-            v-model="dialog.form.status"
-            active-text="启用"
-            inactive-text="禁用"
-          />
-        </el-form-item>
-        
         <!-- AWS RDS 配置 (仅 MySQL/PostgreSQL) -->
         <template v-if="dialog.form.db_type !== 'redis'">
           <el-divider content-position="left">
@@ -247,6 +238,15 @@
             type="textarea"
             :rows="3"
             placeholder="请输入描述"
+          />
+        </el-form-item>
+        
+        <!-- 状态开关 -->
+        <el-form-item label="状态">
+          <el-switch
+            v-model="dialog.form.status"
+            active-text="启用"
+            inactive-text="禁用"
           />
         </el-form-item>
       </el-form>

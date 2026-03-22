@@ -24,7 +24,7 @@
       
       <!-- 脚本列表 -->
       <el-table :data="scripts" v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="脚本名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="name" label="脚本名称" min-width="100" show-overflow-tooltip />
         <el-table-column prop="script_type" label="类型" width="70" align="center">
           <template #default="{ row }">
             <el-tag :type="getScriptTypeTag(row.script_type)" size="small">
@@ -32,7 +32,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="description" label="描述" min-width="100" show-overflow-tooltip />
         <el-table-column prop="is_enabled" label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.is_enabled ? 'success' : 'info'" size="small">

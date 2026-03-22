@@ -35,14 +35,14 @@
         :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
         v-loading="loading"
       >
-        <el-table-column prop="name" label="菜单名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="name" label="菜单名称" min-width="100" show-overflow-tooltip />
         <el-table-column prop="icon" label="图标" width="70" align="center">
           <template #default="{ row }">
             <el-icon v-if="row.icon" :size="18"><component :is="row.icon" /></el-icon>
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="path" label="路径" min-width="120" show-overflow-tooltip>
+        <el-table-column prop="path" label="路径" min-width="100" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.path || '-' }}
           </template>
