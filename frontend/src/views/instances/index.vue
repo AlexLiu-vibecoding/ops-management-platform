@@ -175,52 +175,83 @@
             </el-col>
             <el-col :span="12">
               <el-form-item label="AWS 区域" prop="aws_region">
-                <el-select v-model="dialog.form.aws_region" placeholder="请选择区域" style="width: 100%;">
-                  <el-option label="us-east-1 (弗吉尼亚)" value="us-east-1" />
-                  <el-option label="us-west-2 (俄勒冈)" value="us-west-2" />
-                  <el-option label="eu-west-1 (爱尔兰)" value="eu-west-1" />
-                  <el-option label="ap-northeast-1 (东京)" value="ap-northeast-1" />
-                  <el-option label="ap-southeast-1 (新加坡)" value="ap-southeast-1" />
-                  <el-option label="ap-southeast-2 (悉尼)" value="ap-southeast-2" />
-                  <el-option label="cn-north-1 (北京)" value="cn-north-1" />
-                  <el-option label="cn-northwest-1 (宁夏)" value="cn-northwest-1" />
+                <el-select 
+                  v-model="dialog.form.aws_region" 
+                  placeholder="请选择或输入区域" 
+                  style="width: 100%;"
+                  filterable
+                  allow-create
+                  default-first-option
+                >
+                  <el-option-group label="美洲">
+                    <el-option label="us-east-1 (弗吉尼亚北部)" value="us-east-1" />
+                    <el-option label="us-east-2 (俄亥俄)" value="us-east-2" />
+                    <el-option label="us-west-1 (加利福尼亚北部)" value="us-west-1" />
+                    <el-option label="us-west-2 (俄勒冈)" value="us-west-2" />
+                    <el-option label="af-south-1 (开普敦)" value="af-south-1" />
+                    <el-option label="sa-east-1 (圣保罗)" value="sa-east-1" />
+                    <el-option label="ca-central-1 (加拿大中部)" value="ca-central-1" />
+                    <el-option label="me-south-1 (巴林)" value="me-south-1" />
+                  </el-option-group>
+                  <el-option-group label="欧洲">
+                    <el-option label="eu-west-1 (爱尔兰)" value="eu-west-1" />
+                    <el-option label="eu-west-2 (伦敦)" value="eu-west-2" />
+                    <el-option label="eu-west-3 (巴黎)" value="eu-west-3" />
+                    <el-option label="eu-south-1 (米兰)" value="eu-south-1" />
+                    <el-option label="eu-central-1 (法兰克福)" value="eu-central-1" />
+                    <el-option label="eu-north-1 (斯德哥尔摩)" value="eu-north-1" />
+                  </el-option-group>
+                  <el-option-group label="亚太">
+                    <el-option label="ap-northeast-1 (东京)" value="ap-northeast-1" />
+                    <el-option label="ap-northeast-2 (首尔)" value="ap-northeast-2" />
+                    <el-option label="ap-northeast-3 (大阪)" value="ap-northeast-3" />
+                    <el-option label="ap-southeast-1 (新加坡)" value="ap-southeast-1" />
+                    <el-option label="ap-southeast-2 (悉尼)" value="ap-southeast-2" />
+                    <el-option label="ap-southeast-3 (雅加达)" value="ap-southeast-3" />
+                    <el-option label="ap-south-1 (孟买)" value="ap-south-1" />
+                    <el-option label="ap-east-1 (香港)" value="ap-east-1" />
+                  </el-option-group>
+                  <el-option-group label="中国">
+                    <el-option label="cn-north-1 (北京)" value="cn-north-1" />
+                    <el-option label="cn-northwest-1 (宁夏)" value="cn-northwest-1" />
+                  </el-option-group>
                 </el-select>
               </el-form-item>
             </el-col>
           </el-row>
         </template>
         
-        <!-- 直连配置 -->
-        <el-divider content-position="left" v-if="!dialog.form.is_rds">{{ dialog.form.db_type === 'redis' ? 'Redis 连接配置' : '直连配置' }}</el-divider>
+        <!-- 直连配置 - 始终显示 -->
+        <el-divider content-position="left">{{ dialog.form.db_type === 'redis' ? 'Redis 连接配置' : (dialog.form.is_rds ? '直连配置（可选，用于直接连接 RDS）' : '直连配置') }}</el-divider>
         
-        <el-row :gutter="20" v-if="!dialog.form.is_rds">
+        <el-row :gutter="20">
           <el-col :span="16">
-            <el-form-item label="主机地址" prop="host">
-              <el-input v-model="dialog.form.host" placeholder="请输入主机地址" />
+            <el-form-item label="主机地址" :prop="dialog.form.is_rds ? '' : 'host'">
+              <el-input v-model="dialog.form.host" :placeholder="dialog.form.is_rds ? 'RDS 端点地址（可选）' : '请输入主机地址'" />
             </el-form-item>
           </el-col>
           <el-col :span="8">
-            <el-form-item label="端口" prop="port">
+            <el-form-item label="端口" :prop="dialog.form.is_rds ? '' : 'port'">
               <el-input v-model="dialog.form.port" :placeholder="dialog.form.db_type === 'postgresql' ? '5432' : dialog.form.db_type === 'redis' ? '6379' : '3306'" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
         <!-- MySQL/PostgreSQL 需要用户名 -->
-        <el-form-item label="用户名" prop="username" v-if="!dialog.form.is_rds && dialog.form.db_type !== 'redis'">
-          <el-input v-model="dialog.form.username" placeholder="请输入用户名" />
+        <el-form-item label="用户名" :prop="dialog.form.is_rds ? '' : 'username'" v-if="dialog.form.db_type !== 'redis'">
+          <el-input v-model="dialog.form.username" :placeholder="dialog.form.is_rds ? 'RDS 用户名（可选）' : '请输入用户名'" />
         </el-form-item>
         <!-- 密码 -->
-        <el-form-item :label="dialog.form.db_type === 'redis' ? '密码' : '密码'" prop="password" v-if="!dialog.form.is_rds">
+        <el-form-item :label="dialog.form.db_type === 'redis' ? '密码' : '密码'" :prop="dialog.form.is_rds ? '' : 'password'">
           <el-input
             v-model="dialog.form.password"
             type="password"
             show-password
-            :placeholder="dialog.isEdit ? '留空则不修改密码' : (dialog.form.db_type === 'redis' ? '请输入 Redis 密码（如有）' : '请输入密码')"
+            :placeholder="dialog.isEdit ? '留空则不修改密码' : (dialog.form.is_rds ? 'RDS 密码（可选）' : (dialog.form.db_type === 'redis' ? '请输入 Redis 密码（如有）' : '请输入密码'))"
           />
         </el-form-item>
         
         <!-- Redis 特有配置 -->
-        <template v-if="dialog.form.db_type === 'redis' && !dialog.form.is_rds">
+        <template v-if="dialog.form.db_type === 'redis'">
           <el-form-item label="运行模式">
             <el-select v-model="dialog.form.redis_mode" placeholder="请选择运行模式" style="width: 100%;">
               <el-option label="单机模式" value="standalone" />
@@ -312,7 +343,9 @@ const dialog = reactive({
 })
 
 // 动态验证规则 - 直连实例需要 host/port，MySQL/PostgreSQL 需要 username
+// RDS 实例时，直连配置可选
 const getConnectionRules = () => {
+  // RDS 模式下直连配置可选
   if (dialog.form.is_rds) {
     return {}
   }
@@ -328,6 +361,7 @@ const getConnectionRules = () => {
 }
 
 // 密码验证规则 - 新增时 MySQL/PostgreSQL 必填，Redis 可选
+// RDS 模式下密码可选（可能通过 IAM 认证等）
 const getPasswordRule = () => {
   if (dialog.isEdit) {
     return {}
