@@ -458,6 +458,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import request from '@/api/index'
 import { instancesApi } from '@/api/instances'
 import { useUserStore } from '@/stores/user'
@@ -466,6 +467,7 @@ import { Plus, Upload, MagicStick, Delete, InfoFilled } from '@element-plus/icon
 import dayjs from 'dayjs'
 
 const userStore = useUserStore()
+const route = useRoute()
 const currentUserId = computed(() => userStore.user?.id)
 const canApprove = computed(() => ['super_admin', 'approval_admin'].includes(userStore.user?.role))
 
@@ -1004,6 +1006,12 @@ const getStatusLabel = (status) => {
 const formatTime = (time) => dayjs(time).format('YYYY-MM-DD HH:mm:ss')
 
 onMounted(() => {
+  // 处理 URL 参数中的 tab
+  const tabParam = route.query.tab
+  if (tabParam && ['pending', 'processed', 'mine'].includes(tabParam)) {
+    activeTab.value = tabParam
+  }
+  
   fetchApprovals()
   fetchInstances()
 })

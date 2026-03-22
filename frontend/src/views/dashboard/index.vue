@@ -21,7 +21,7 @@
 
     <!-- 统计卡片 -->
     <div class="stats-grid">
-      <div class="stat-card gradient-blue">
+      <div class="stat-card gradient-blue clickable" @click="navigateTo('instances')">
         <div class="stat-card-content">
           <div class="stat-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -36,9 +36,14 @@
           </div>
         </div>
         <div class="stat-decoration"></div>
+        <div class="click-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
       </div>
 
-      <div class="stat-card gradient-green">
+      <div class="stat-card gradient-green clickable" @click="navigateTo('instances')">
         <div class="stat-card-content">
           <div class="stat-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -52,9 +57,14 @@
           </div>
         </div>
         <div class="stat-decoration"></div>
+        <div class="click-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
       </div>
 
-      <div class="stat-card gradient-orange">
+      <div class="stat-card gradient-orange clickable" @click="navigateTo('approvals')">
         <div class="stat-card-content">
           <div class="stat-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -71,9 +81,14 @@
           </div>
         </div>
         <div class="stat-decoration"></div>
+        <div class="click-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
       </div>
 
-      <div class="stat-card gradient-red">
+      <div class="stat-card gradient-red clickable" @click="navigateTo('alerts')">
         <div class="stat-card-content">
           <div class="stat-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -88,6 +103,11 @@
           </div>
         </div>
         <div class="stat-decoration"></div>
+        <div class="click-hint">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </div>
       </div>
     </div>
 
@@ -202,6 +222,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { monitorApi } from '@/api/monitor'
+import { dashboardApi } from '@/api/dashboard'
 import dayjs from 'dayjs'
 
 const router = useRouter()
@@ -255,10 +276,31 @@ const animateNumber = (target, end, duration = 800) => {
 const refreshAll = async () => {
   loading.value = true
   try {
-    await refreshPerformance()
+    // 并行获取统计数据和性能数据
+    await Promise.all([refreshStats(), refreshPerformance()])
     lastUpdateTime.value = `${dayjs().format('HH:mm:ss')} 已更新`
   } finally {
     loading.value = false
+  }
+}
+
+// 刷新统计数据
+const refreshStats = async () => {
+  try {
+    const data = await dashboardApi.getStats()
+    
+    // 动画更新数字
+    animateNumber({ value: animatedStats.instanceCount }, data.instance_count)
+    animateNumber({ value: animatedStats.onlineCount }, data.online_count)
+    animateNumber({ value: animatedStats.pendingApprovalCount }, data.pending_approval_count)
+    animateNumber({ value: animatedStats.alertCount }, data.alert_count)
+    
+    stats.instanceCount = data.instance_count
+    stats.onlineCount = data.online_count
+    stats.pendingApprovalCount = data.pending_approval_count
+    stats.alertCount = data.alert_count
+  } catch (error) {
+    console.error('获取统计数据失败:', error)
   }
 }
 
@@ -267,17 +309,6 @@ const refreshPerformance = async () => {
   try {
     const data = await monitorApi.performance.getOverview()
     performanceData.value = data
-    
-    // 更新统计
-    const newInstanceCount = data.length
-    const newOnlineCount = data.filter(d => d.monitor_enabled).length
-    
-    // 动画更新数字
-    animateNumber({ value: animatedStats.instanceCount }, newInstanceCount)
-    animateNumber({ value: animatedStats.onlineCount }, newOnlineCount)
-    
-    stats.instanceCount = newInstanceCount
-    stats.onlineCount = newOnlineCount
   } catch (error) {
     console.error('获取性能概览失败:', error)
   }
@@ -299,6 +330,19 @@ const formatTime = (time) => {
 // 查看实例详情
 const viewInstance = (id) => {
   router.push(`/instances/${id}`)
+}
+
+// 导航到对应功能页面
+const navigateTo = (type) => {
+  const routes = {
+    instances: '/instances',
+    approvals: '/approvals?tab=pending',
+    alerts: '/monitor/performance'
+  }
+  
+  if (routes[type]) {
+    router.push(routes[type])
+  }
 }
 
 onMounted(() => {
@@ -404,9 +448,18 @@ onMounted(() => {
   overflow: hidden;
   transition: all 0.3s ease;
   
-  &:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+  &.clickable {
+    cursor: pointer;
+    
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.15);
+      
+      .click-hint {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
   }
   
   &.gradient-blue {
@@ -474,6 +527,21 @@ onMounted(() => {
     height: 120px;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 50%;
+  }
+  
+  .click-hint {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%) translateX(-8px);
+    opacity: 0;
+    transition: all 0.3s ease;
+    
+    svg {
+      width: 20px;
+      height: 20px;
+      color: rgba(255, 255, 255, 0.8);
+    }
   }
 }
 
