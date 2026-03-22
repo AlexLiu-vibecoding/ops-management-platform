@@ -910,6 +910,12 @@ async def execute_approval(
     
     db.commit()
     
+    # 发送执行完成通知
+    try:
+        await notification_service.send_approval_notification(db, approval, "executed")
+    except Exception as e:
+        logger.warning(f"发送执行完成通知失败: {e}")
+    
     # 记录审计日志
     audit_log = AuditLog(
         user_id=current_user.id,
