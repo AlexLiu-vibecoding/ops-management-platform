@@ -228,6 +228,7 @@ class ApprovalScheduler:
             执行结果描述
         """
         from app.utils.redis_operations import RedisInstanceClient
+        from app.utils.auth import decrypt_instance_password
         
         try:
             # 获取命令内容
@@ -239,11 +240,16 @@ class ApprovalScheduler:
             if not commands_content:
                 return "错误：无命令内容"
             
+            # 解密密码
+            password = None
+            if instance.password_encrypted:
+                password = decrypt_instance_password(instance.password_encrypted)
+            
             # 创建 Redis 客户端
             client = RedisInstanceClient(
                 host=instance.host,
                 port=instance.port,
-                password=instance.password or None,
+                password=password,
                 db=instance.redis_db or 0,
                 redis_mode=instance.redis_mode or "standalone"
             )

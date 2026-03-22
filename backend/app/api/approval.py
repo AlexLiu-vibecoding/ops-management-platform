@@ -753,14 +753,22 @@ async def execute_approval(
             detail="Only the applicant can execute this approval"
         )
     
-    # TODO: 实际执行SQL
-    # 这里需要连接到目标MySQL实例执行SQL
-    # 执行前需要生成快照（如果是DML操作）
+    # 获取实例
+    instance = db.query(Instance).filter(Instance.id == approval.instance_id).first()
+    
+    # 根据 change_type 执行不同的逻辑
+    if approval.change_type == "REDIS" and instance:
+        # 执行 Redis 命令
+        from app.services.scheduler import approval_scheduler
+        execute_result = await approval_scheduler._execute_redis_commands(approval, instance, db)
+    else:
+        # TODO: 实际执行 SQL
+        execute_result = "执行成功（SQL执行待实现）"
     
     # 更新状态
     approval.status = ApprovalStatus.EXECUTED
     approval.execute_time = datetime.now()
-    approval.execute_result = "执行成功"
+    approval.execute_result = execute_result
     
     db.commit()
     
