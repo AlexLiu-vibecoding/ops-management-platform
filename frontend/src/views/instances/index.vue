@@ -191,7 +191,7 @@
         </template>
         
         <!-- 直连配置 -->
-        <el-divider content-position="left" v-if="!dialog.form.is_rds">直连配置</el-divider>
+        <el-divider content-position="left" v-if="!dialog.form.is_rds">{{ dialog.form.db_type === 'redis' ? 'Redis 连接配置' : '直连配置' }}</el-divider>
         
         <el-row v-if="!dialog.form.is_rds">
           <el-col :span="16">
@@ -205,15 +205,17 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="用户名" prop="username" v-if="!dialog.form.is_rds">
+        <!-- MySQL/PostgreSQL 需要用户名 -->
+        <el-form-item label="用户名" prop="username" v-if="!dialog.form.is_rds && dialog.form.db_type !== 'redis'">
           <el-input v-model="dialog.form.username" placeholder="请输入用户名" />
         </el-form-item>
-        <el-form-item label="密码" prop="password" v-if="!dialog.form.is_rds">
+        <!-- 密码 -->
+        <el-form-item :label="dialog.form.db_type === 'redis' ? '密码' : '密码'" prop="password" v-if="!dialog.form.is_rds">
           <el-input
             v-model="dialog.form.password"
             type="password"
             show-password
-            :placeholder="dialog.isEdit ? '留空则不修改密码' : '请输入密码'"
+            :placeholder="dialog.isEdit ? '留空则不修改密码' : (dialog.form.db_type === 'redis' ? '请输入 Redis 密码（如有）' : '请输入密码')"
           />
         </el-form-item>
         
@@ -223,15 +225,16 @@
             <el-col :span="12">
               <el-form-item label="运行模式">
                 <el-select v-model="dialog.form.redis_mode" placeholder="请选择运行模式" style="width: 100%;">
-                  <el-option label="单机" value="standalone" />
-                  <el-option label="集群" value="cluster" />
-                  <el-option label="哨兵" value="sentinel" />
+                  <el-option label="单机模式" value="standalone" />
+                  <el-option label="集群模式" value="cluster" />
+                  <el-option label="哨兵模式" value="sentinel" />
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="12">
-              <el-form-item label="数据库">
+              <el-form-item label="DB 索引">
                 <el-input-number v-model="dialog.form.redis_db" :min="0" :max="15" style="width: 100%;" />
+                <div style="font-size: 12px; color: #999; margin-top: 4px;">Redis 数据库编号 (0-15)</div>
               </el-form-item>
             </el-col>
           </el-row>
@@ -310,24 +313,32 @@ const dialog = reactive({
   }
 })
 
-// 动态验证规则 - 直连实例需要 host/port/username
+// 动态验证规则 - 直连实例需要 host/port，MySQL/PostgreSQL 需要 username
 const getConnectionRules = () => {
   if (dialog.form.is_rds) {
     return {}
   }
-  return {
+  const rules = {
     host: [{ required: true, message: '请输入主机地址', trigger: 'blur' }],
-    port: [{ required: true, message: '请输入端口', trigger: 'blur' }],
-    username: [{ required: true, message: '请输入用户名', trigger: 'blur' }]
+    port: [{ required: true, message: '请输入端口', trigger: 'blur' }]
   }
+  // MySQL/PostgreSQL 需要用户名
+  if (dialog.form.db_type !== 'redis') {
+    rules.username = [{ required: true, message: '请输入用户名', trigger: 'blur' }]
+  }
+  return rules
 }
 
-// 密码验证规则 - 新增时必填，编辑时可选
+// 密码验证规则 - 新增时 MySQL/PostgreSQL 必填，Redis 可选
 const getPasswordRule = () => {
   if (dialog.isEdit) {
     return {}
   }
   if (dialog.form.is_rds) {
+    return {}
+  }
+  // Redis 密码可选
+  if (dialog.form.db_type === 'redis') {
     return {}
   }
   return {

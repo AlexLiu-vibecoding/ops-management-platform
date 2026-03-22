@@ -75,12 +75,58 @@ async def test_postgresql_connection(host: str, port: int, username: str, passwo
         }
 
 
-async def test_connection(db_type: str, host: str, port: int, username: str, password: str, database: str = "postgres") -> dict:
-    """测试数据库连接（支持MySQL和PostgreSQL）"""
+async def test_connection(db_type: str, host: str, port: int, username: str, password: str, database: str = "postgres", redis_db: int = 0) -> dict:
+    """测试数据库连接（支持MySQL、PostgreSQL和Redis）"""
     if db_type == "postgresql":
         return await test_postgresql_connection(host, port, username, password, database)
+    elif db_type == "redis":
+        return await test_redis_connection(host, port, password, redis_db)
     else:
         return await test_mysql_connection(host, port, username, password)
+
+
+async def test_redis_connection(host: str, port: int, password: str = "", redis_db: int = 0) -> dict:
+    """测试Redis连接"""
+    import redis.asyncio as redis
+    
+    try:
+        # 创建 Redis 连接
+        client = redis.Redis(
+            host=host,
+            port=port,
+            password=password if password else None,
+            db=redis_db,
+            decode_responses=True,
+            socket_connect_timeout=5
+        )
+        
+        # 测试连接
+        info = await client.info()
+        await client.close()
+        
+        # 获取 Redis 版本
+        version = info.get("redis_version", "unknown")
+        
+        return {
+            "success": True,
+            "message": "Connection successful",
+            "version": f"Redis {version}"
+        }
+    except redis.AuthenticationError:
+        return {
+            "success": False,
+            "message": "Authentication failed: invalid password"
+        }
+    except redis.ConnectionError as e:
+        return {
+            "success": False,
+            "message": f"Connection failed: {str(e)}"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Connection test failed: {str(e)}"
+        }
 
 
 @router.get("")
@@ -139,8 +185,10 @@ async def test_instance_connection(
         instance_data.db_type or "mysql",
         instance_data.host,
         instance_data.port,
-        instance_data.username,
-        instance_data.password
+        instance_data.username or "",
+        instance_data.password or "",
+        "postgres",
+        instance_data.redis_db or 0
     )
     return InstanceTestResult(**result)
 
@@ -162,19 +210,29 @@ async def create_instance(
     # RDS 实例不需要测试连接
     if not instance_data.is_rds:
         # 非RDS实例必须有连接信息
-        if not instance_data.host or not instance_data.username or not instance_data.password:
+        if not instance_data.host:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Host, username and password are required for non-RDS instances"
+                detail="Host is required for non-RDS instances"
             )
+        
+        # MySQL/PostgreSQL 需要用户名和密码
+        if instance_data.db_type != "redis":
+            if not instance_data.username or not instance_data.password:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username and password are required for MySQL/PostgreSQL instances"
+                )
         
         # 测试连接
         conn_result = await test_connection(
             instance_data.db_type or "mysql",
             instance_data.host,
-            instance_data.port or 3306,
-            instance_data.username,
-            instance_data.password
+            instance_data.port or 6379 if instance_data.db_type == "redis" else 3306,
+            instance_data.username or "",
+            instance_data.password or "",
+            "postgres",
+            instance_data.redis_db or 0
         )
         
         if not conn_result["success"]:
@@ -197,7 +255,9 @@ async def create_instance(
         status=instance_data.status if instance_data.status is not None else True,
         is_rds=instance_data.is_rds,
         rds_instance_id=instance_data.rds_instance_id,
-        aws_region=instance_data.aws_region
+        aws_region=instance_data.aws_region,
+        redis_mode=instance_data.redis_mode or "standalone",
+        redis_db=instance_data.redis_db or 0
     )
     db.add(instance)
     db.commit()

@@ -136,8 +136,8 @@ class InstanceCreate(BaseModel):
     db_type: str = Field("mysql", pattern="^(mysql|postgresql|redis)$")
     host: Optional[str] = Field(None, max_length=100, description="主机地址，RDS实例可选")
     port: Optional[int] = Field(None, ge=1, le=65535, description="端口，RDS实例可选")
-    username: Optional[str] = Field(None, max_length=50, description="用户名，RDS实例可选")
-    password: Optional[str] = Field(None, min_length=1, description="密码，RDS实例可选")
+    username: Optional[str] = Field(None, max_length=50, description="用户名，RDS实例可选，Redis不需要")
+    password: Optional[str] = Field(None, description="密码，RDS实例可选，Redis可选")
     environment_id: Optional[int] = None
     group_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=200)
@@ -158,7 +158,7 @@ class InstanceUpdate(BaseModel):
     host: Optional[str] = Field(None, max_length=100)
     port: Optional[int] = Field(None, ge=1, le=65535)
     username: Optional[str] = Field(None, max_length=50)
-    password: Optional[str] = Field(None, min_length=1)
+    password: Optional[str] = Field(None, description="密码，Redis可选")
     environment_id: Optional[int] = None
     group_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=200)
