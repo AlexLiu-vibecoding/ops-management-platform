@@ -249,7 +249,8 @@ const sqlStatements = computed(() => {
 const fetchInstances = async () => {
   try {
     const data = await instancesApi.getList({ limit: 100 })
-    instances.value = data.items || data
+    // 过滤掉 Redis 实例，SQL 编辑器不支持 Redis
+    instances.value = (data.items || data).filter(inst => inst.db_type !== 'redis')
   } catch (error) {
     console.error('获取实例列表失败:', error)
   }
