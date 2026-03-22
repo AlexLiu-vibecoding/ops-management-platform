@@ -120,11 +120,11 @@ async def get_storage_stats(
         rollback_files = [f for f in files if f.endswith('_rollback.sql')]
         
         return {
-            "storage_type": storage_manager._settings.STORAGE_TYPE,
+            "storage_type": storage_manager.settings.STORAGE_TYPE,
             "total_files": total_files,
             "sql_files": len(sql_files),
             "rollback_files": len(rollback_files),
-            "retention_days": storage_manager._settings.SQL_FILE_RETENTION_DAYS
+            "retention_days": storage_manager.settings.SQL_FILE_RETENTION_DAYS
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取统计信息失败: {str(e)}")

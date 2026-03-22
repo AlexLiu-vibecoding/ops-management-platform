@@ -11,7 +11,7 @@ from app.deps import get_super_admin
 from app.models import User, GlobalConfig
 from app.database import get_db
 from app.config import settings as app_settings
-from app.config.storage import get_storage_settings
+from app.config.storage import get_storage_settings, get_effective_storage_settings
 
 router = APIRouter(prefix="/system", tags=["系统配置"])
 
@@ -188,8 +188,9 @@ async def get_storage_config(
     获取存储配置
     
     只有超级管理员可以查看完整配置
+    配置来源优先级：数据库 > 环境变量
     """
-    settings = get_storage_settings()
+    settings = get_effective_storage_settings()
     
     return StorageConfigResponse(
         storage_type=settings.STORAGE_TYPE,
@@ -213,68 +214,76 @@ async def update_storage_config(
     """
     更新存储配置
     
-    只有超级管理员可以修改，修改后需要重启服务生效
+    只有超级管理员可以修改，修改后立即生效
     """
     updates = []
     
-    # 更新配置
-    if request.storage_type:
+    def save_config(key: str, value: str, description: str):
+        """保存配置到数据库"""
         config = db.query(GlobalConfig).filter(
-            GlobalConfig.config_key == "storage_type"
+            GlobalConfig.config_key == key
         ).first()
         if config:
-            config.config_value = request.storage_type
+            config.config_value = value
             config.updated_by = current_user.id
         else:
             config = GlobalConfig(
-                config_key="storage_type",
-                config_value=request.storage_type,
-                description="存储类型",
+                config_key=key,
+                config_value=value,
+                description=description,
                 updated_by=current_user.id
             )
             db.add(config)
+    
+    # 更新存储类型
+    if request.storage_type:
+        save_config("storage_type", request.storage_type, "存储类型")
         updates.append("存储类型")
     
+    # 更新保留天数
     if request.retention_days:
-        config = db.query(GlobalConfig).filter(
-            GlobalConfig.config_key == "sql_file_retention_days"
-        ).first()
-        if config:
-            config.config_value = str(request.retention_days)
-            config.updated_by = current_user.id
-        else:
-            config = GlobalConfig(
-                config_key="sql_file_retention_days",
-                config_value=str(request.retention_days),
-                description="SQL文件保留天数",
-                updated_by=current_user.id
-            )
-            db.add(config)
+        save_config("sql_file_retention_days", str(request.retention_days), "SQL文件保留天数")
         updates.append("保留天数")
     
+    # 更新大文件阈值
     if request.size_threshold:
-        config = db.query(GlobalConfig).filter(
-            GlobalConfig.config_key == "sql_file_size_threshold"
-        ).first()
-        if config:
-            config.config_value = str(request.size_threshold)
-            config.updated_by = current_user.id
-        else:
-            config = GlobalConfig(
-                config_key="sql_file_size_threshold",
-                config_value=str(request.size_threshold),
-                description="大文件阈值",
-                updated_by=current_user.id
-            )
-            db.add(config)
+        save_config("sql_file_size_threshold", str(request.size_threshold), "大文件阈值")
         updates.append("大小阈值")
+    
+    # 更新本地存储路径
+    if request.local_path:
+        save_config("local_storage_path", request.local_path, "本地存储路径")
+        updates.append("存储路径")
+    
+    # 更新 S3 配置
+    if request.s3_bucket:
+        save_config("s3_bucket_name", request.s3_bucket, "S3 Bucket名称")
+        updates.append("S3 Bucket")
+    if request.s3_region:
+        save_config("aws_region", request.s3_region, "AWS区域")
+        updates.append("S3区域")
+    if request.s3_endpoint:
+        save_config("s3_endpoint_url", request.s3_endpoint, "S3端点URL")
+        updates.append("S3端点")
+    
+    # 更新 OSS 配置
+    if request.oss_bucket:
+        save_config("oss_bucket_name", request.oss_bucket, "OSS Bucket名称")
+        updates.append("OSS Bucket")
+    if request.oss_endpoint:
+        save_config("oss_endpoint", request.oss_endpoint, "OSS端点")
+        updates.append("OSS端点")
     
     db.commit()
     
+    # 重载存储后端，使配置立即生效
+    from app.services.storage import storage_manager
+    storage_manager.reload_backend()
+    
     return {
         "success": True,
-        "message": f"配置已更新: {', '.join(updates)}。注意：部分配置需要重启服务后生效。",
-        "requires_restart": True
+        "message": f"配置已更新: {', '.join(updates)}，已立即生效。",
+        "requires_restart": False
     }
 
 
@@ -410,9 +419,8 @@ async def get_system_overview(
     显示系统版本、运行状态等信息
     """
     import sys
-    from app.config.storage import get_storage_settings
     
-    storage_settings = get_storage_settings()
+    storage_settings = get_effective_storage_settings()
     
     # 检查调度器状态
     scheduler_running = False

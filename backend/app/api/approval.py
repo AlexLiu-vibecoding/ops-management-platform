@@ -428,7 +428,7 @@ async def create_approval(
     file_storage_type = "database"
     
     if storage_manager.should_store_as_file(sql_content):
-        file_storage_type = storage_manager._settings.STORAGE_TYPE
+        file_storage_type = storage_manager.settings.STORAGE_TYPE
         # 先创建记录获取ID
         approval = ApprovalRecord(
             title=approval_data.title,

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, Tuple, List, Dict, Any
 from dataclasses import dataclass
 
-from app.config.storage import get_storage_settings
+from app.config.storage import get_storage_settings, get_effective_storage_settings
 
 logger = logging.getLogger(__name__)
 
@@ -478,7 +478,11 @@ class StorageManager:
     
     def __init__(self):
         self._backend: Optional[StorageBackend] = None
-        self._settings = get_storage_settings()
+    
+    @property
+    def settings(self):
+        """获取当前有效的存储配置（动态从数据库读取）"""
+        return get_effective_storage_settings()
     
     @property
     def backend(self) -> StorageBackend:
@@ -487,35 +491,41 @@ class StorageManager:
             self._backend = self._create_backend()
         return self._backend
     
+    def reload_backend(self):
+        """重新加载存储后端（配置变更后调用）"""
+        self._backend = None
+        logger.info("存储后端已重置，将在下次使用时重新初始化")
+    
     def _create_backend(self) -> StorageBackend:
         """创建存储后端"""
-        storage_type = self._settings.STORAGE_TYPE
+        settings = self.settings
+        storage_type = settings.STORAGE_TYPE
         
         if storage_type == "local":
-            logger.info(f"使用本地存储: {self._settings.LOCAL_STORAGE_PATH}")
-            return LocalStorage(self._settings.LOCAL_STORAGE_PATH)
+            logger.info(f"使用本地存储: {settings.LOCAL_STORAGE_PATH}")
+            return LocalStorage(settings.LOCAL_STORAGE_PATH)
         
         elif storage_type == "s3":
-            if not all([self._settings.S3_BUCKET_NAME, self._settings.AWS_ACCESS_KEY_ID]):
+            if not all([settings.S3_BUCKET_NAME, settings.AWS_ACCESS_KEY_ID]):
                 raise ValueError("S3存储需要配置 S3_BUCKET_NAME 和 AWS_ACCESS_KEY_ID")
-            logger.info(f"使用AWS S3存储: {self._settings.S3_BUCKET_NAME}")
+            logger.info(f"使用AWS S3存储: {settings.S3_BUCKET_NAME}")
             return S3Storage(
-                bucket_name=self._settings.S3_BUCKET_NAME,
-                access_key=self._settings.AWS_ACCESS_KEY_ID,
-                secret_key=self._settings.AWS_SECRET_ACCESS_KEY,
-                region=self._settings.AWS_REGION or "us-east-1",
-                endpoint_url=self._settings.S3_ENDPOINT_URL
+                bucket_name=settings.S3_BUCKET_NAME,
+                access_key=settings.AWS_ACCESS_KEY_ID,
+                secret_key=settings.AWS_SECRET_ACCESS_KEY,
+                region=settings.AWS_REGION or "us-east-1",
+                endpoint_url=settings.S3_ENDPOINT_URL
             )
         
         elif storage_type == "oss":
-            if not all([self._settings.OSS_BUCKET_NAME, self._settings.OSS_ACCESS_KEY_ID]):
+            if not all([settings.OSS_BUCKET_NAME, settings.OSS_ACCESS_KEY_ID]):
                 raise ValueError("OSS存储需要配置 OSS_BUCKET_NAME 和 OSS_ACCESS_KEY_ID")
-            logger.info(f"使用阿里云OSS存储: {self._settings.OSS_BUCKET_NAME}")
+            logger.info(f"使用阿里云OSS存储: {settings.OSS_BUCKET_NAME}")
             return OSSStorage(
-                bucket_name=self._settings.OSS_BUCKET_NAME,
-                access_key=self._settings.OSS_ACCESS_KEY_ID,
-                secret_key=self._settings.OSS_ACCESS_KEY_SECRET,
-                endpoint=self._settings.OSS_ENDPOINT
+                bucket_name=settings.OSS_BUCKET_NAME,
+                access_key=settings.OSS_ACCESS_KEY_ID,
+                secret_key=settings.OSS_ACCESS_KEY_SECRET,
+                endpoint=settings.OSS_ENDPOINT
             )
         
         else:
@@ -569,7 +579,7 @@ class StorageManager:
     
     async def cleanup_expired_files(self) -> int:
         """清理过期文件"""
-        retention_days = self._settings.SQL_FILE_RETENTION_DAYS
+        retention_days = self.settings.SQL_FILE_RETENTION_DAYS
         
         if isinstance(self.backend, LocalStorage):
             return await self.backend.cleanup_old_files(retention_days)
@@ -580,7 +590,7 @@ class StorageManager:
     
     def should_store_as_file(self, content: str) -> bool:
         """判断是否应该存储为文件"""
-        return len(content) > self._settings.SQL_FILE_SIZE_THRESHOLD
+        return len(content) > self.settings.SQL_FILE_SIZE_THRESHOLD
 
 
 # 全局存储管理器实例
