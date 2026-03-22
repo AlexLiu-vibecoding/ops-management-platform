@@ -58,28 +58,13 @@
             {{ row.last_login_time ? formatTime(row.last_login_time) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <div class="table-operations">
-              <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
-              <el-dropdown trigger="click" @command="(cmd) => handleDropdownCommand(cmd, row)" :disabled="row.id === currentUserId">
-                <el-button link type="primary">
-                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="resetPwd">
-                      <el-icon><Key /></el-icon>重置密码
-                    </el-dropdown-item>
-                    <el-dropdown-item command="bindEnv">
-                      <el-icon><Setting /></el-icon>环境权限
-                    </el-dropdown-item>
-                    <el-dropdown-item command="delete" divided style="color: #F56C6C;">
-                      <el-icon><Delete /></el-icon>删除
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button link type="primary" size="small" @click="handleResetPwd(row)" :disabled="row.id === currentUserId">重置密码</el-button>
+              <el-button link type="primary" size="small" @click="handleBindEnv(row)">环境权限</el-button>
+              <el-button link type="danger" size="small" @click="handleDelete(row)" :disabled="row.id === currentUserId">删除</el-button>
             </div>
           </template>
         </el-table-column>
@@ -204,7 +189,6 @@ import { useUserStore } from '@/stores/user'
 import { usersApi } from '@/api/users'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowDown, Key, Setting, Delete } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 
 const userStore = useUserStore()
@@ -372,21 +356,6 @@ const handleDelete = async (row) => {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
     }
-  }
-}
-
-// 下拉菜单命令处理
-const handleDropdownCommand = (command, row) => {
-  switch (command) {
-    case 'resetPwd':
-      handleResetPwd(row)
-      break
-    case 'bindEnv':
-      handleBindEnv(row)
-      break
-    case 'delete':
-      handleDelete(row)
-      break
   }
 }
 

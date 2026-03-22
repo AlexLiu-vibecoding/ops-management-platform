@@ -51,28 +51,13 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <div class="table-operations">
-              <el-button link type="primary" @click="handleExecute(row)">执行</el-button>
-              <el-dropdown trigger="click" @command="(cmd) => handleDropdownCommand(cmd, row)">
-                <el-button link type="primary">
-                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="edit">
-                      <el-icon><Edit /></el-icon>编辑
-                    </el-dropdown-item>
-                    <el-dropdown-item command="duplicate">
-                      <el-icon><CopyDocument /></el-icon>复制
-                    </el-dropdown-item>
-                    <el-dropdown-item command="delete" divided style="color: #F56C6C;">
-                      <el-icon><Delete /></el-icon>删除
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
+              <el-button link type="primary" size="small" @click="handleExecute(row)">执行</el-button>
+              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button link type="primary" size="small" @click="handleDuplicate(row)">复制</el-button>
+              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
             </div>
           </template>
         </el-table-column>
@@ -423,21 +408,6 @@ const handleDelete = async (row) => {
     if (error !== 'cancel') {
       ElMessage.error('删除失败')
     }
-  }
-}
-
-// 下拉菜单命令处理
-const handleDropdownCommand = (command, row) => {
-  switch (command) {
-    case 'edit':
-      handleEdit(row)
-      break
-    case 'duplicate':
-      handleDuplicate(row)
-      break
-    case 'delete':
-      handleDelete(row)
-      break
   }
 }
 

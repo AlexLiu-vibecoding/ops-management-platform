@@ -163,9 +163,6 @@
             <el-radio value="auto">审批后自动执行</el-radio>
             <el-radio value="scheduled">定时执行</el-radio>
           </el-radio-group>
-          <div v-if="dialog.form.execution_mode === 'auto'" style="margin-top: 8px;">
-            <el-alert type="warning" :closable="false" show-icon>审批通过后将立即自动执行SQL变更</el-alert>
-          </div>
           <div v-if="dialog.form.execution_mode === 'scheduled'" style="margin-top: 8px;">
             <el-date-picker v-model="dialog.form.scheduled_time" type="datetime" placeholder="选择执行时间" />
           </div>
