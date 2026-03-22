@@ -274,11 +274,19 @@ async def delete_channel(
 @router.post("/channels/{channel_id}/test")
 async def test_channel(
     channel_id: int,
-    test_message: str = "这是一条测试消息",
+    test_message: str = None,
+    format: str = "text",
     current_user: User = Depends(get_super_admin),
     db: Session = Depends(get_db)
 ):
-    """测试通知通道"""
+    """
+    测试通知通道
+    
+    Args:
+        channel_id: 通道ID
+        test_message: 自定义测试消息（可选）
+        format: 消息格式，text 或 markdown（默认text）
+    """
     channel = db.query(DingTalkChannel).filter(DingTalkChannel.id == channel_id).first()
     if not channel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知通道不存在")
@@ -293,17 +301,54 @@ async def test_channel(
             separator = "&" if "?" in webhook else "?"
             webhook = f"{webhook}{separator}timestamp={timestamp}&sign={sign}"
         
-        # 构建消息内容
-        content = test_message
-        if channel.auth_type == "keyword" and channel.keywords:
-            content = f"{test_message} {channel.keywords[0]}"
+        # 构建消息
+        if format == "markdown":
+            # 发送模拟的"变更执行完成"通知
+            keyword_suffix = f" {channel.keywords[0]}" if channel.auth_type == "keyword" and channel.keywords else ""
+            content = f"""### 🚀 变更执行完成
+
+---
+
+**📋 申请信息**
+
+> **标题**: 测试变更申请
+> **申请人**: {current_user.real_name}
+
+---
+
+**🎯 变更详情**
+
+> 🖥️ **目标实例**: test-mysql-master
+> 🗄️ **目标数据库**: production_db
+> 🔧 **变更类型**: 📝 DML (数据变更)
+> 📈 **实际影响**: **1,234** 行
+
+---
+
+**📊 执行结果**
+
+> **状态**: ✅ 执行成功
+> **完成时间**: {__import__('datetime').datetime.now().strftime('%m-%d %H:%M')}{keyword_suffix}"""
+            
+            message = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "title": "变更执行完成",
+                    "text": content
+                }
+            }
+        else:
+            # 发送简单文本消息
+            content = test_message or "这是一条测试消息"
+            if channel.auth_type == "keyword" and channel.keywords:
+                content = f"{content} {channel.keywords[0]}"
+            message = {
+                "msgtype": "text",
+                "text": {"content": content}
+            }
         
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                webhook,
-                json={"msgtype": "text", "text": {"content": content}},
-                timeout=10
-            )
+            response = await client.post(webhook, json=message, timeout=10)
             result = response.json()
             if result.get("errcode") != 0:
                 raise Exception(result.get("errmsg", "发送失败"))
