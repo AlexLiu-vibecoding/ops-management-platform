@@ -17,6 +17,7 @@ from app.database import engine, Base
 from app.utils.redis_client import redis_client
 from app.services.scheduler import approval_scheduler
 from app.services.task_scheduler import task_scheduler
+from app.core import register_exception_handlers
 
 # 导入路由
 from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions
@@ -262,30 +263,8 @@ async def log_requests(request: Request, call_next):
     return response
 
 
-# Exception handling
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Parameter validation error handler"""
-    return JSONResponse(
-        status_code=422,
-        content={
-            "detail": "Parameter validation failed",
-            "errors": exc.errors()
-        }
-    )
-
-
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    """全局异常处理"""
-    logger.error(f"未处理的异常: {exc}", exc_info=True)
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": "服务器内部错误",
-            "message": str(exc) if settings.DEBUG else "请稍后重试"
-        }
-    )
+# 注册统一异常处理器
+register_exception_handlers(app)
 
 
 # 注册API路由 (v1版本)
