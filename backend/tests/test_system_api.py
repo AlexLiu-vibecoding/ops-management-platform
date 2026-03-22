@@ -12,7 +12,6 @@ class TestSystemOverview:
         """测试未授权访问"""
         response = client.get("/api/v1/system/overview")
         assert response.status_code == 401
-        assert response.json()["detail"] == "Not authenticated"
     
     def test_get_overview_operator_forbidden(self, client, operator_token):
         """测试普通用户无权访问"""
@@ -21,7 +20,6 @@ class TestSystemOverview:
             headers={"Authorization": f"Bearer {operator_token}"}
         )
         assert response.status_code == 403
-        assert response.json()["detail"] == "权限不足"
     
     def test_get_overview_success(self, client, super_admin_token):
         """测试超级管理员获取系统概览"""

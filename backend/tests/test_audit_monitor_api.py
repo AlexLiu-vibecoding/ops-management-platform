@@ -10,24 +10,24 @@ class TestAuditAPI:
 
     def test_get_audit_logs_unauthorized(self, client):
         """测试未授权访问"""
-        response = client.get("/api/v1/audit")
+        response = client.get("/api/v1/audit/logs")
         assert response.status_code == 401
 
     def test_get_audit_logs_success(self, client, operator_token):
         """测试获取审计日志列表"""
         response = client.get(
-            "/api/v1/audit",
+            "/api/v1/audit/logs",
             headers={"Authorization": f"Bearer {operator_token}"}
         )
         assert response.status_code == 200
         data = response.json()
-        assert "items" in data
+        assert "data" in data
         assert "total" in data
 
     def test_get_audit_logs_with_filters(self, client, operator_token):
         """测试带过滤条件获取审计日志"""
         response = client.get(
-            "/api/v1/audit",
+            "/api/v1/audit/logs",
             params={
                 "operation_type": "login",
                 "page": 1,
@@ -37,7 +37,7 @@ class TestAuditAPI:
         )
         assert response.status_code == 200
         data = response.json()
-        assert "items" in data
+        assert "data" in data
 
     def test_get_audit_operation_types(self, client, operator_token):
         """测试获取操作类型列表"""
@@ -185,20 +185,20 @@ class TestDashboardAPI:
 
     def test_get_dashboard_unauthorized(self, client):
         """测试未授权访问"""
-        response = client.get("/api/v1/dashboard")
+        response = client.get("/api/v1/dashboard/stats")
         assert response.status_code == 401
 
     def test_get_dashboard_success(self, client, operator_token):
         """测试获取仪表盘数据"""
         response = client.get(
-            "/api/v1/dashboard",
+            "/api/v1/dashboard/stats",
             headers={"Authorization": f"Bearer {operator_token}"}
         )
         assert response.status_code == 200
         data = response.json()
         # 验证返回数据结构
         assert "instance_count" in data
-        assert "approval_stats" in data
+        assert "pending_approval_count" in data
 
 
 class TestSQLAPI:

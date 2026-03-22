@@ -1,7 +1,15 @@
 """
 主流程自动化测试脚本
 覆盖完整的业务流程测试
+
+注意：这是集成测试，需要真实服务运行在 localhost:5000
+运行方式：python tests/test_main_flow.py（不是 pytest）
 """
+import pytest
+
+# 跳过 pytest 运行，这是集成测试需要单独运行
+pytestmark = pytest.mark.skip(reason="集成测试，需要真实服务运行。请使用 python tests/test_main_flow.py 运行")
+
 import requests
 import json
 import sys

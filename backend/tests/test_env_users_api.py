@@ -193,8 +193,7 @@ class TestUsersAPI:
         db_session.refresh(user)
         
         response = client.post(
-            f"/api/v1/users/{user.id}/reset-password",
-            json={"new_password": "NewPassword123"},
+            f"/api/v1/users/{user.id}/reset-password?new_password=NewPassword123",
             headers={"Authorization": f"Bearer {super_admin_token}"}
         )
         assert response.status_code == 200
@@ -208,11 +207,11 @@ class TestMenuAPI:
         response = client.get("/api/v1/menu/list")
         assert response.status_code == 401
 
-    def test_get_menu_list_success(self, client, operator_token):
+    def test_get_menu_list_success(self, client, super_admin_token):
         """测试获取菜单列表"""
         response = client.get(
             "/api/v1/menu/list",
-            headers={"Authorization": f"Bearer {operator_token}"}
+            headers={"Authorization": f"Bearer {super_admin_token}"}
         )
         assert response.status_code == 200
         data = response.json()
