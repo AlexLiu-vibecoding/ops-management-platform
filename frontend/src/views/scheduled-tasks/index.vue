@@ -23,14 +23,14 @@
       
       <!-- 任务列表 -->
       <el-table :data="tasks" v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="任务名称" width="200" />
-        <el-table-column prop="script_name" label="关联脚本" width="150" />
-        <el-table-column prop="cron_expression" label="Cron表达式" width="150">
+        <el-table-column prop="name" label="任务名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="script_name" label="关联脚本" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="cron_expression" label="Cron表达式" width="130">
           <template #default="{ row }">
-            <code>{{ row.cron_expression }}</code>
+            <code style="font-size: 12px;">{{ row.cron_expression }}</code>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80">
+        <el-table-column prop="status" label="状态" width="70" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'enabled' ? 'success' : 'info'" size="small">
               {{ row.status === 'enabled' ? '启用' : '禁用' }}
@@ -42,15 +42,14 @@
             {{ formatTime(row.next_run_time) }}
           </template>
         </el-table-column>
-        <el-table-column label="执行统计" width="120">
+        <el-table-column label="执行统计" width="100" align="center">
           <template #default="{ row }">
-            <span>成功: {{ row.success_count }}</span>
-            <br>
-            <span>失败: {{ row.fail_count }}</span>
+            <span style="color: #67c23a;">{{ row.success_count }}</span> / 
+            <span style="color: #f56c6c;">{{ row.fail_count }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="created_by" label="创建人" width="100" />
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column prop="created_by" label="创建人" width="80" show-overflow-tooltip />
+        <el-table-column label="操作" width="240" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleTrigger(row)" :disabled="row.status !== 'enabled'">执行</el-button>

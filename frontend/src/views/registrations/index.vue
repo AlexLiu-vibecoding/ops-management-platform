@@ -20,23 +20,20 @@
       </template>
       
       <el-table :data="registrations" style="width: 100%" v-loading="loading">
-        <el-table-column prop="username" label="用户名" width="120" />
-        <el-table-column prop="real_name" label="真实姓名" width="100" />
-        <el-table-column prop="email" label="邮箱" width="180" />
-        <el-table-column prop="phone" label="手机号" width="120">
+        <el-table-column prop="username" label="用户名" min-width="80" show-overflow-tooltip />
+        <el-table-column prop="real_name" label="姓名" min-width="70" show-overflow-tooltip />
+        <el-table-column prop="email" label="邮箱" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="phone" label="手机号" width="110">
           <template #default="{ row }">
             {{ row.phone || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="reason" label="申请理由" min-width="150">
+        <el-table-column prop="reason" label="申请理由" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
-            <el-tooltip v-if="row.reason" :content="row.reason" placement="top">
-              <span class="reason-text">{{ row.reason }}</span>
-            </el-tooltip>
-            <span v-else>-</span>
+            {{ row.reason || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="status" label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ getStatusLabel(row.status) }}
@@ -48,12 +45,12 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column prop="reviewer_name" label="审批人" width="100">
+        <el-table-column prop="reviewer_name" label="审批人" width="80" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.reviewer_name || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="140" fixed="right" align="center">
           <template #default="{ row }">
             <template v-if="row.status === 'pending'">
               <el-button type="success" size="small" @click="handleReview(row, true)">

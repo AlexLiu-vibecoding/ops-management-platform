@@ -12,31 +12,31 @@
       </template>
       
       <el-table :data="environments" style="width: 100%">
-        <el-table-column prop="name" label="环境名称" width="200" />
-        <el-table-column prop="code" label="环境编码" width="150" />
-        <el-table-column label="颜色标记" width="120">
+        <el-table-column prop="name" label="环境名称" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="code" label="环境编码" min-width="80" show-overflow-tooltip />
+        <el-table-column label="颜色标记" width="100" align="center">
           <template #default="{ row }">
             <span class="env-tag" :style="{ backgroundColor: row.color, color: '#FFFFFF' }">
               {{ row.name }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="require_approval" label="需要审批" width="100">
+        <el-table-column prop="require_approval" label="需要审批" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.require_approval ? 'warning' : 'success'" size="small">
               {{ row.require_approval ? '是' : '否' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80">
+        <el-table-column prop="status" label="状态" width="70" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status ? 'success' : 'info'" size="small">
               {{ row.status ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" show-overflow-tooltip />
-        <el-table-column label="操作" width="150" v-if="isAdmin" fixed="right">
+        <el-table-column prop="description" label="描述" min-width="100" show-overflow-tooltip />
+        <el-table-column label="操作" width="120" v-if="isAdmin" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>

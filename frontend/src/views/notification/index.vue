@@ -13,28 +13,28 @@
       </template>
       
       <el-table :data="channels" style="width: 100%" v-loading="channelLoading">
-        <el-table-column prop="name" label="通道名称" width="150" />
-        <el-table-column prop="channel_type_label" label="类型" width="100">
+        <el-table-column prop="name" label="通道名称" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="channel_type_label" label="类型" width="80" align="center">
           <template #default="{ row }">
             <el-tag size="small">{{ row.channel_type_label }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="auth_type" label="验证方式" width="100">
+        <el-table-column prop="auth_type" label="验证方式" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getAuthTypeTag(row.auth_type)" size="small">
               {{ getAuthTypeName(row.auth_type) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" show-overflow-tooltip />
-        <el-table-column prop="is_enabled" label="状态" width="80">
+        <el-table-column prop="description" label="描述" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="is_enabled" label="状态" width="70" align="center">
           <template #default="{ row }">
             <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
               {{ row.is_enabled ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleTestChannel(row)">测试</el-button>
@@ -59,20 +59,20 @@
       </template>
       
       <el-table :data="bindings" style="width: 100%" v-loading="bindingLoading">
-        <el-table-column prop="channel_name" label="通道" width="150" />
-        <el-table-column prop="channel_type" label="通道类型" width="100">
+        <el-table-column prop="channel_name" label="通道" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="channel_type" label="通道类型" width="80" align="center">
           <template #default="{ row }">
             <el-tag size="small">钉钉</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="notification_type_label" label="通知类型" width="120">
+        <el-table-column prop="notification_type_label" label="通知类型" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getNotificationTypeTag(row.notification_type)" size="small">
               {{ row.notification_type_label }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="scheduled_task_id" label="定时任务" width="150">
+        <el-table-column prop="scheduled_task_id" label="定时任务" min-width="100" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.scheduled_task_id">{{ getScheduledTaskName(row.scheduled_task_id) }}</span>
             <span v-else>-</span>
@@ -83,7 +83,7 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="80" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="danger" size="small" @click="handleDeleteBinding(row)">删除</el-button>

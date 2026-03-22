@@ -37,7 +37,7 @@
     <!-- 实例列表 -->
     <el-card shadow="never" class="table-card">
       <el-table :data="instanceList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="name" label="实例名称" min-width="150">
+        <el-table-column prop="name" label="实例名称" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
             <div>
               <span>{{ row.name }}</span>
@@ -45,7 +45,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="类型" width="100">
+        <el-table-column label="类型" width="90" align="center">
           <template #default="{ row }">
             <el-tag 
               :type="row.db_type === 'postgresql' ? 'success' : row.db_type === 'redis' ? 'warning' : 'primary'" 
@@ -55,7 +55,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="地址" min-width="180">
+        <el-table-column label="地址" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.is_rds && row.rds_instance_id">
               {{ row.rds_instance_id }}
@@ -64,7 +64,7 @@
             <span v-else>{{ row.host }}:{{ row.port }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="环境" width="100">
+        <el-table-column label="环境" width="80" align="center">
           <template #default="{ row }">
             <span
               v-if="row.environment"
@@ -76,20 +76,20 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80">
+        <el-table-column prop="status" label="状态" width="70" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status ? 'success' : 'danger'" size="small">
               {{ row.status ? '在线' : '离线' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="description" label="描述" min-width="100" show-overflow-tooltip />
         <el-table-column prop="created_at" label="创建时间" width="160">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleView(row)">详情</el-button>

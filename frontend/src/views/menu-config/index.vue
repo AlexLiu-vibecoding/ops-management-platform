@@ -35,34 +35,34 @@
         :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
         v-loading="loading"
       >
-        <el-table-column prop="name" label="菜单名称" width="200" />
-        <el-table-column prop="icon" label="图标" width="100">
+        <el-table-column prop="name" label="菜单名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="icon" label="图标" width="70" align="center">
           <template #default="{ row }">
             <el-icon v-if="row.icon" :size="18"><component :is="row.icon" /></el-icon>
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="path" label="路径" width="200">
+        <el-table-column prop="path" label="路径" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
             {{ row.path || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="sort_order" label="排序" width="80" />
-        <el-table-column prop="is_visible" label="显示" width="80">
+        <el-table-column prop="sort_order" label="排序" width="60" align="center" />
+        <el-table-column prop="is_visible" label="显示" width="60" align="center">
           <template #default="{ row }">
             <el-tag :type="row.is_visible ? 'success' : 'info'" size="small">
               {{ row.is_visible ? '是' : '否' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="is_enabled" label="启用" width="80">
+        <el-table-column prop="is_enabled" label="启用" width="60" align="center">
           <template #default="{ row }">
             <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
-              {{ row.is_enabled ? '启用' : '禁用' }}
+              {{ row.is_enabled ? '是' : '否' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="roles" label="可见角色" width="200">
+        <el-table-column prop="roles" label="可见角色" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
             <template v-if="row.roles">
               <el-tag
@@ -77,7 +77,7 @@
             <span v-else>所有用户</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleAdd(row)">添加</el-button>

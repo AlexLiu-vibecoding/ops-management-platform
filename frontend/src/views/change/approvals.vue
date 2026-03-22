@@ -25,23 +25,23 @@
       </el-tabs>
       
       <el-table :data="approvalList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="title" label="标题" min-width="200">
+        <el-table-column prop="title" label="标题" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="title-cell">
               <span>{{ row.title }}</span>
-              <el-tag v-if="row.auto_execute" type="success" size="small" style="margin-left: 6px;">自动执行</el-tag>
+              <el-tag v-if="row.auto_execute" type="success" size="small" style="margin-left: 6px;">自动</el-tag>
               <el-tag v-if="row.scheduled_time" type="warning" size="small" style="margin-left: 6px;">定时</el-tag>
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="requester_name" label="申请人" width="100" />
-        <el-table-column prop="change_type" label="类型" width="80">
+        <el-table-column prop="requester_name" label="申请人" width="80" show-overflow-tooltip />
+        <el-table-column prop="change_type" label="类型" width="70" align="center">
           <template #default="{ row }">
             <el-tag size="small">{{ row.change_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="instance_name" label="实例" width="150" />
-        <el-table-column prop="database_target" label="数据库" width="120">
+        <el-table-column prop="instance_name" label="实例" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="database_target" label="数据库" min-width="80" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.database_mode === 'all'">
               <el-tag type="warning" size="small">全部</el-tag>
@@ -49,14 +49,14 @@
             <span v-else>{{ row.database_name || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="sql_risk_level" label="风险" width="70">
+        <el-table-column prop="sql_risk_level" label="风险" width="60" align="center">
           <template #default="{ row }">
             <span class="risk-tag" :class="row.sql_risk_level">{{ getRiskLabel(row.sql_risk_level) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="affected_rows_estimate" label="预估影响" width="90">
+        <el-table-column prop="affected_rows_estimate" label="预估影响" width="80" align="right">
           <template #default="{ row }">
-            <span v-if="row.affected_rows_estimate">{{ row.affected_rows_estimate.toLocaleString() }}行</span>
+            <span v-if="row.affected_rows_estimate">{{ row.affected_rows_estimate.toLocaleString() }}</span>
             <span v-else>-</span>
           </template>
         </el-table-column>
@@ -65,7 +65,7 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" @click="handleView(row)">详情</el-button>

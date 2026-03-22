@@ -28,7 +28,7 @@
       </div>
       
       <el-table :data="approvalList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="title" label="标题" min-width="200">
+        <el-table-column prop="title" label="标题" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="title-cell">
               <span class="title-text">{{ row.title }}</span>
@@ -37,13 +37,13 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="change_type" label="类型" width="80">
+        <el-table-column prop="change_type" label="类型" width="70" align="center">
           <template #default="{ row }">
             <el-tag size="small">{{ row.change_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="instance_name" label="实例" width="150" />
-        <el-table-column prop="database_target" label="目标数据库" width="150">
+        <el-table-column prop="instance_name" label="实例" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="database_target" label="目标数据库" min-width="100" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.database_mode === 'all'">
               <el-tag type="warning" size="small">全部</el-tag>
@@ -54,12 +54,12 @@
             <span v-else>{{ row.database_name || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="sql_risk_level" label="风险" width="70">
+        <el-table-column prop="sql_risk_level" label="风险" width="60" align="center">
           <template #default="{ row }">
             <span class="risk-tag" :class="row.sql_risk_level">{{ getRiskLabel(row.sql_risk_level) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="90">
+        <el-table-column prop="status" label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ getStatusLabel(row.status) }}
@@ -71,7 +71,7 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column label="操作" width="100" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" @click="handleView(row)">详情</el-button>

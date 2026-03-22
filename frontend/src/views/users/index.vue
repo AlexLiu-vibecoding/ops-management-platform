@@ -35,30 +35,30 @@
     <!-- 用户列表 -->
     <el-card shadow="never" class="table-card">
       <el-table :data="userList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="username" label="用户名" width="120" />
-        <el-table-column prop="real_name" label="姓名" width="120" />
-        <el-table-column prop="email" label="邮箱" width="200" />
-        <el-table-column prop="phone" label="电话" width="130" />
-        <el-table-column prop="role" label="角色" width="120">
+        <el-table-column prop="username" label="用户名" min-width="80" show-overflow-tooltip />
+        <el-table-column prop="real_name" label="姓名" min-width="70" show-overflow-tooltip />
+        <el-table-column prop="email" label="邮箱" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="phone" label="电话" width="110" show-overflow-tooltip />
+        <el-table-column prop="role" label="角色" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getRoleTagType(row.role)" size="small">
               {{ getRoleName(row.role) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80">
+        <el-table-column prop="status" label="状态" width="70" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status ? 'success' : 'danger'" size="small">
               {{ row.status ? '启用' : '禁用' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="last_login_time" label="最后登录" width="180">
+        <el-table-column prop="last_login_time" label="最后登录" width="160">
           <template #default="{ row }">
             {{ row.last_login_time ? formatTime(row.last_login_time) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>

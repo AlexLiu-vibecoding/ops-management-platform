@@ -97,15 +97,15 @@
             highlight-current-row
             class="keys-table"
           >
-            <el-table-column prop="key" label="键名" show-overflow-tooltip />
-            <el-table-column prop="type" label="类型" width="100">
+            <el-table-column prop="key" label="键名" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="type" label="类型" width="70" align="center">
               <template #default="{ row }">
                 <el-tag size="small" :type="getTypeTagType(row.type)">{{ row.type }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="length" label="长度" width="100" />
-            <el-table-column prop="ttl_human" label="TTL" width="120" />
-            <el-table-column label="操作" width="200" fixed="right">
+            <el-table-column prop="length" label="长度" width="80" align="right" />
+            <el-table-column prop="ttl_human" label="TTL" width="100" align="center" />
+            <el-table-column label="操作" width="160" fixed="right" align="center">
               <template #default="{ row }">
                 <div class="table-operations">
                   <el-button link type="primary" size="small" @click.stop="viewKeyDetail(row)">查看</el-button>
