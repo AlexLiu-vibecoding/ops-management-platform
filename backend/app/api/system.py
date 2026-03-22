@@ -154,11 +154,17 @@ class StorageConfigResponse(BaseModel):
     retention_days: int
     size_threshold: int
     local_path: Optional[str] = None
+    # AWS S3 配置
     s3_bucket: Optional[str] = None
     s3_region: Optional[str] = None
     s3_endpoint: Optional[str] = None
+    s3_access_key_id: Optional[str] = None
+    s3_secret_access_key: Optional[str] = None
+    # 阿里云 OSS 配置
     oss_bucket: Optional[str] = None
     oss_endpoint: Optional[str] = None
+    oss_access_key_id: Optional[str] = None
+    oss_access_key_secret: Optional[str] = None
 
 
 class StorageConfigUpdate(BaseModel):
@@ -167,11 +173,17 @@ class StorageConfigUpdate(BaseModel):
     retention_days: Optional[int] = Field(None, ge=1, le=365, description="文件保留天数")
     size_threshold: Optional[int] = Field(None, ge=1000, le=1000000, description="大文件阈值")
     local_path: Optional[str] = Field(None, description="本地存储路径")
+    # AWS S3 配置
     s3_bucket: Optional[str] = Field(None, description="S3 Bucket名称")
     s3_region: Optional[str] = Field(None, description="S3 区域")
     s3_endpoint: Optional[str] = Field(None, description="S3 端点URL")
+    s3_access_key_id: Optional[str] = Field(None, description="AWS Access Key ID")
+    s3_secret_access_key: Optional[str] = Field(None, description="AWS Secret Access Key")
+    # 阿里云 OSS 配置
     oss_bucket: Optional[str] = Field(None, description="OSS Bucket名称")
-    oss_endpoint: Optional[str] = Field(None, description="OSS 端点URL")
+    oss_endpoint: Optional[str] = Field(None, description="OSS 端点")
+    oss_access_key_id: Optional[str] = Field(None, description="OSS Access Key ID")
+    oss_access_key_secret: Optional[str] = Field(None, description="OSS Access Key Secret")
 
 
 class StorageTestResponse(BaseModel):
@@ -196,12 +208,18 @@ async def get_storage_config(
         storage_type=settings.STORAGE_TYPE,
         retention_days=settings.SQL_FILE_RETENTION_DAYS,
         size_threshold=settings.SQL_FILE_SIZE_THRESHOLD,
-        local_path=settings.LOCAL_STORAGE_PATH if settings.STORAGE_TYPE == "local" else None,
-        s3_bucket=settings.S3_BUCKET_NAME if settings.STORAGE_TYPE == "s3" else None,
-        s3_region=settings.AWS_REGION if settings.STORAGE_TYPE == "s3" else None,
-        s3_endpoint=settings.S3_ENDPOINT_URL if settings.STORAGE_TYPE == "s3" else None,
-        oss_bucket=settings.OSS_BUCKET_NAME if settings.STORAGE_TYPE == "oss" else None,
-        oss_endpoint=settings.OSS_ENDPOINT if settings.STORAGE_TYPE == "oss" else None
+        local_path=settings.LOCAL_STORAGE_PATH,
+        # AWS S3 配置
+        s3_bucket=settings.S3_BUCKET_NAME,
+        s3_region=settings.AWS_REGION,
+        s3_endpoint=settings.S3_ENDPOINT_URL,
+        s3_access_key_id=settings.AWS_ACCESS_KEY_ID,
+        s3_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        # 阿里云 OSS 配置
+        oss_bucket=settings.OSS_BUCKET_NAME,
+        oss_endpoint=settings.OSS_ENDPOINT,
+        oss_access_key_id=settings.OSS_ACCESS_KEY_ID,
+        oss_access_key_secret=settings.OSS_ACCESS_KEY_SECRET
     )
 
 
@@ -265,6 +283,12 @@ async def update_storage_config(
     if request.s3_endpoint:
         save_config("s3_endpoint_url", request.s3_endpoint, "S3端点URL")
         updates.append("S3端点")
+    if request.s3_access_key_id:
+        save_config("aws_access_key_id", request.s3_access_key_id, "AWS Access Key ID")
+        updates.append("AWS AK")
+    if request.s3_secret_access_key:
+        save_config("aws_secret_access_key", request.s3_secret_access_key, "AWS Secret Access Key")
+        updates.append("AWS SK")
     
     # 更新 OSS 配置
     if request.oss_bucket:
@@ -273,6 +297,12 @@ async def update_storage_config(
     if request.oss_endpoint:
         save_config("oss_endpoint", request.oss_endpoint, "OSS端点")
         updates.append("OSS端点")
+    if request.oss_access_key_id:
+        save_config("oss_access_key_id", request.oss_access_key_id, "OSS Access Key ID")
+        updates.append("OSS AK")
+    if request.oss_access_key_secret:
+        save_config("oss_access_key_secret", request.oss_access_key_secret, "OSS Access Key Secret")
+        updates.append("OSS SK")
     
     db.commit()
     

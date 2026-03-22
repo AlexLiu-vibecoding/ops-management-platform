@@ -171,8 +171,30 @@
                   v-model="storageConfig.s3_endpoint"
                   placeholder="可选，用于兼容 S3 的其他服务"
                 />
-                <div class="hint">AWS 凭证请通过环境变量配置</div>
+                <div class="hint">留空使用 AWS 默认端点</div>
               </el-form-item>
+              <el-divider content-position="left">AWS 凭证</el-divider>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="Access Key ID">
+                    <el-input 
+                      v-model="storageConfig.s3_access_key_id" 
+                      placeholder="AKIAIOSFODNN7EXAMPLE"
+                      show-password
+                    />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="Secret Access Key">
+                    <el-input 
+                      v-model="storageConfig.s3_secret_access_key" 
+                      placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                      show-password
+                    />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <div class="hint" style="margin-left: 140px;">AWS 凭证也可通过环境变量 AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY 配置</div>
             </template>
 
             <!-- 阿里云 OSS 配置 -->
@@ -190,7 +212,28 @@
                   </el-form-item>
                 </el-col>
               </el-row>
-              <div class="hint" style="margin-left: 140px;">OSS 凭证请通过环境变量配置</div>
+              <el-divider content-position="left">OSS 凭证</el-divider>
+              <el-row :gutter="20">
+                <el-col :span="12">
+                  <el-form-item label="Access Key ID">
+                    <el-input 
+                      v-model="storageConfig.oss_access_key_id" 
+                      placeholder="LTAI4xxx..."
+                      show-password
+                    />
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="Access Key Secret">
+                    <el-input 
+                      v-model="storageConfig.oss_access_key_secret" 
+                      placeholder="xxx..."
+                      show-password
+                    />
+                  </el-form-item>
+                </el-col>
+              </el-row>
+              <div class="hint" style="margin-left: 140px;">OSS 凭证也可通过环境变量 OSS_ACCESS_KEY_ID / OSS_ACCESS_KEY_SECRET 配置</div>
             </template>
 
             <el-form-item>
@@ -304,11 +347,17 @@ const storageConfig = reactive({
   retention_days: 30,
   size_threshold: 10000,
   local_path: '/app/data/sql_files',
+  // AWS S3 配置
   s3_bucket: '',
   s3_region: '',
   s3_endpoint: '',
+  s3_access_key_id: '',
+  s3_secret_access_key: '',
+  // 阿里云 OSS 配置
   oss_bucket: '',
-  oss_endpoint: ''
+  oss_endpoint: '',
+  oss_access_key_id: '',
+  oss_access_key_secret: ''
 })
 
 // 安全配置

@@ -68,8 +68,12 @@ def get_storage_settings_from_db() -> dict:
                 "s3_bucket_name",
                 "aws_region",
                 "s3_endpoint_url",
+                "aws_access_key_id",
+                "aws_secret_access_key",
                 "oss_bucket_name",
-                "oss_endpoint"
+                "oss_endpoint",
+                "oss_access_key_id",
+                "oss_access_key_secret"
             ]
             
             configs = {}
@@ -111,13 +115,15 @@ def get_effective_storage_settings() -> StorageSettings:
         'LOCAL_STORAGE_PATH': db_configs.get('local_storage_path', base_settings.LOCAL_STORAGE_PATH),
         'SQL_FILE_RETENTION_DAYS': int(db_configs.get('sql_file_retention_days', base_settings.SQL_FILE_RETENTION_DAYS)),
         'SQL_FILE_SIZE_THRESHOLD': int(db_configs.get('sql_file_size_threshold', base_settings.SQL_FILE_SIZE_THRESHOLD)),
-        'AWS_ACCESS_KEY_ID': base_settings.AWS_ACCESS_KEY_ID,
-        'AWS_SECRET_ACCESS_KEY': base_settings.AWS_SECRET_ACCESS_KEY,
+        # AWS S3 配置 - 支持数据库配置 AK/SK
+        'AWS_ACCESS_KEY_ID': db_configs.get('aws_access_key_id') or base_settings.AWS_ACCESS_KEY_ID,
+        'AWS_SECRET_ACCESS_KEY': db_configs.get('aws_secret_access_key') or base_settings.AWS_SECRET_ACCESS_KEY,
         'AWS_REGION': db_configs.get('aws_region', base_settings.AWS_REGION),
         'S3_BUCKET_NAME': db_configs.get('s3_bucket_name', base_settings.S3_BUCKET_NAME),
         'S3_ENDPOINT_URL': db_configs.get('s3_endpoint_url', base_settings.S3_ENDPOINT_URL),
-        'OSS_ACCESS_KEY_ID': base_settings.OSS_ACCESS_KEY_ID,
-        'OSS_ACCESS_KEY_SECRET': base_settings.OSS_ACCESS_KEY_SECRET,
+        # 阿里云 OSS 配置 - 支持数据库配置 AK/SK
+        'OSS_ACCESS_KEY_ID': db_configs.get('oss_access_key_id') or base_settings.OSS_ACCESS_KEY_ID,
+        'OSS_ACCESS_KEY_SECRET': db_configs.get('oss_access_key_secret') or base_settings.OSS_ACCESS_KEY_SECRET,
         'OSS_ENDPOINT': db_configs.get('oss_endpoint', base_settings.OSS_ENDPOINT),
         'OSS_BUCKET_NAME': db_configs.get('oss_bucket_name', base_settings.OSS_BUCKET_NAME),
     }
