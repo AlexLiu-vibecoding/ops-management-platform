@@ -154,6 +154,12 @@ const routes = [
         name: 'ScheduledTasks',
         component: () => import('@/views/scheduled-tasks/index.vue'),
         meta: { title: '定时任务', icon: 'Timer', roles: ['super_admin', 'approval_admin', 'operator'] }
+      },
+      {
+        path: 'system',
+        name: 'SystemSettings',
+        component: () => import('@/views/system/index.vue'),
+        meta: { title: '系统设置', icon: 'Setting', roles: ['super_admin'] }
       }
     ]
   }
