@@ -60,6 +60,13 @@
         <el-form-item label="需要审批" prop="require_approval">
           <el-switch v-model="dialog.form.require_approval" />
         </el-form-item>
+        <el-form-item label="状态">
+          <el-switch
+            v-model="dialog.form.status"
+            active-text="启用"
+            inactive-text="禁用"
+          />
+        </el-form-item>
         <el-form-item label="描述">
           <el-input v-model="dialog.form.description" type="textarea" :rows="3" />
         </el-form-item>
@@ -92,6 +99,7 @@ const dialog = reactive({
     code: '',
     color: '#52C41A',
     require_approval: true,
+    status: true,
     description: ''
   },
   rules: {
@@ -111,13 +119,21 @@ const fetchEnvironments = async () => {
 
 const handleAdd = () => {
   dialog.isEdit = false
-  dialog.form = { name: '', code: '', color: '#52C41A', require_approval: true, description: '' }
+  dialog.form = { name: '', code: '', color: '#52C41A', require_approval: true, status: true, description: '' }
   dialog.visible = true
 }
 
 const handleEdit = (row) => {
   dialog.isEdit = true
-  dialog.form = { ...row }
+  dialog.form = { 
+    id: row.id,
+    name: row.name, 
+    code: row.code, 
+    color: row.color, 
+    require_approval: row.require_approval, 
+    status: row.status ?? true,
+    description: row.description 
+  }
   dialog.visible = true
 }
 

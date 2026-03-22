@@ -159,33 +159,45 @@ async def create_instance(
             detail="Instance name already exists"
         )
     
-    # 测试连接
-    conn_result = await test_connection(
-        instance_data.db_type or "mysql",
-        instance_data.host,
-        instance_data.port,
-        instance_data.username,
-        instance_data.password
-    )
-    
-    if not conn_result["success"]:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Connection test failed: {conn_result['message']}"
+    # RDS 实例不需要测试连接
+    if not instance_data.is_rds:
+        # 非RDS实例必须有连接信息
+        if not instance_data.host or not instance_data.username or not instance_data.password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Host, username and password are required for non-RDS instances"
+            )
+        
+        # 测试连接
+        conn_result = await test_connection(
+            instance_data.db_type or "mysql",
+            instance_data.host,
+            instance_data.port or 3306,
+            instance_data.username,
+            instance_data.password
         )
+        
+        if not conn_result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Connection test failed: {conn_result['message']}"
+            )
     
     # 创建实例
     instance = Instance(
         name=instance_data.name,
         db_type=instance_data.db_type or "mysql",
-        host=instance_data.host,
-        port=instance_data.port,
-        username=instance_data.username,
-        password_encrypted=encrypt_instance_password(instance_data.password),
+        host=instance_data.host or "",
+        port=instance_data.port or 3306,
+        username=instance_data.username or "",
+        password_encrypted=encrypt_instance_password(instance_data.password) if instance_data.password else "",
         environment_id=instance_data.environment_id,
         group_id=instance_data.group_id,
         description=instance_data.description,
-        status=True
+        status=instance_data.status if instance_data.status is not None else True,
+        is_rds=instance_data.is_rds,
+        rds_instance_id=instance_data.rds_instance_id,
+        aws_region=instance_data.aws_region
     )
     db.add(instance)
     db.commit()

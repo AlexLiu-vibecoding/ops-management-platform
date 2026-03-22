@@ -117,7 +117,7 @@
       <el-form
         ref="instanceFormRef"
         :model="dialog.form"
-        :rules="dialog.rules"
+        :rules="getFullRules()"
         label-width="110px"
       >
         <el-form-item label="实例名称" prop="name">
@@ -145,6 +145,15 @@
             </el-form-item>
           </el-col>
         </el-row>
+        
+        <!-- 状态开关 -->
+        <el-form-item label="状态">
+          <el-switch
+            v-model="dialog.form.status"
+            active-text="启用"
+            inactive-text="禁用"
+          />
+        </el-form-item>
         
         <!-- AWS RDS 配置 -->
         <el-divider content-position="left">
@@ -196,7 +205,7 @@
             v-model="dialog.form.password"
             type="password"
             show-password
-            placeholder="请输入密码"
+            :placeholder="dialog.isEdit ? '留空则不修改密码' : '请输入密码'"
           />
         </el-form-item>
         
@@ -258,6 +267,7 @@ const dialog = reactive({
     password: '',
     environment_id: null,
     description: '',
+    status: true,
     is_rds: false,
     rds_instance_id: '',
     aws_region: ''
@@ -265,12 +275,44 @@ const dialog = reactive({
   rules: {
     name: [{ required: true, message: '请输入实例名称', trigger: 'blur' }],
     db_type: [{ required: true, message: '请选择数据库类型', trigger: 'change' }],
-    host: [{ required: true, message: '请输入主机地址', trigger: 'blur' }],
-    port: [{ required: true, message: '请输入端口', trigger: 'blur' }],
-    username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-    password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+    rds_instance_id: [{ required: true, message: '请输入 RDS 实例ID', trigger: 'blur' }],
+    aws_region: [{ required: true, message: '请选择 AWS 区域', trigger: 'change' }]
   }
 })
+
+// 动态验证规则 - 直连实例需要 host/port/username
+const getConnectionRules = () => {
+  if (dialog.form.is_rds) {
+    return {}
+  }
+  return {
+    host: [{ required: true, message: '请输入主机地址', trigger: 'blur' }],
+    port: [{ required: true, message: '请输入端口', trigger: 'blur' }],
+    username: [{ required: true, message: '请输入用户名', trigger: 'blur' }]
+  }
+}
+
+// 密码验证规则 - 新增时必填，编辑时可选
+const getPasswordRule = () => {
+  if (dialog.isEdit) {
+    return {}
+  }
+  if (dialog.form.is_rds) {
+    return {}
+  }
+  return {
+    password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+  }
+}
+
+// 获取完整验证规则
+const getFullRules = () => {
+  return {
+    ...dialog.rules,
+    ...getConnectionRules(),
+    ...getPasswordRule()
+  }
+}
 
 const instanceFormRef = ref(null)
 
@@ -321,6 +363,20 @@ const handleReset = () => {
 const handleAdd = () => {
   dialog.isEdit = false
   dialog.visible = true
+  dialog.form = {
+    name: '',
+    db_type: 'mysql',
+    host: '',
+    port: 3306,
+    username: '',
+    password: '',
+    environment_id: null,
+    description: '',
+    status: true,
+    is_rds: false,
+    rds_instance_id: '',
+    aws_region: ''
+  }
 }
 
 // 编辑实例
@@ -328,14 +384,16 @@ const handleEdit = (row) => {
   dialog.isEdit = true
   dialog.visible = true
   dialog.form = {
+    id: row.id,
     name: row.name,
     db_type: row.db_type || 'mysql',
     host: row.host || '',
     port: row.port || 3306,
     username: row.username || '',
-    password: '',
+    password: '', // 编辑时密码留空表示不修改
     environment_id: row.environment_id,
     description: row.description || '',
+    status: row.status ?? true,
     is_rds: row.is_rds || false,
     rds_instance_id: row.rds_instance_id || '',
     aws_region: row.aws_region || ''
@@ -394,15 +452,30 @@ const handleSubmit = async () => {
         port: parseInt(dialog.form.port) || 3306
       }
       
+      // 编辑模式下，如果密码为空则不传密码字段
+      if (dialog.isEdit && !formData.password) {
+        delete formData.password
+      }
+      
+      // RDS 实例不需要连接信息
+      if (formData.is_rds) {
+        delete formData.host
+        delete formData.port
+        delete formData.username
+        delete formData.password
+      }
+      
       if (dialog.isEdit) {
         await instancesApi.update(formData.id, formData)
         ElMessage.success('更新成功')
       } else {
-        // 先测试连接
-        const testResult = await instancesApi.testConnection(formData)
-        if (!testResult.success) {
-          ElMessage.error(`连接测试失败: ${testResult.message}`)
-          return
+        // 非RDS实例需要先测试连接
+        if (!formData.is_rds) {
+          const testResult = await instancesApi.testConnection(formData)
+          if (!testResult.success) {
+            ElMessage.error(`连接测试失败: ${testResult.message}`)
+            return
+          }
         }
         
         await instancesApi.create(formData)
@@ -423,13 +496,19 @@ const handleSubmit = async () => {
 const resetForm = () => {
   dialog.form = {
     name: '',
+    db_type: 'mysql',
     host: '',
     port: 3306,
     username: '',
     password: '',
     environment_id: null,
-    description: ''
+    description: '',
+    status: true,
+    is_rds: false,
+    rds_instance_id: '',
+    aws_region: ''
   }
+  dialog.isEdit = false
 }
 
 // 格式化时间
