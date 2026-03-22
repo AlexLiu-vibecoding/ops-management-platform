@@ -37,10 +37,28 @@
     <!-- 实例列表 -->
     <el-card shadow="never" class="table-card">
       <el-table :data="instanceList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="name" label="实例名称" width="180" />
+        <el-table-column prop="name" label="实例名称" width="180">
+          <template #default="{ row }">
+            <div>
+              <span>{{ row.name }}</span>
+              <el-tag v-if="row.is_rds" type="warning" size="small" style="margin-left: 4px;">RDS</el-tag>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="类型" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.db_type === 'postgresql' ? 'success' : 'primary'" size="small">
+              {{ row.db_type === 'postgresql' ? 'PostgreSQL' : 'MySQL' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="地址" width="200">
           <template #default="{ row }">
-            {{ row.host }}:{{ row.port }}
+            <span v-if="row.is_rds && row.rds_instance_id">
+              {{ row.rds_instance_id }}
+              <span v-if="row.aws_region" style="color: #999;">({{ row.aws_region }})</span>
+            </span>
+            <span v-else>{{ row.host }}:{{ row.port }}</span>
           </template>
         </el-table-column>
         <el-table-column label="环境" width="120">
@@ -93,19 +111,72 @@
     <el-dialog
       v-model="dialog.visible"
       :title="dialog.isEdit ? '编辑实例' : '添加实例'"
-      width="600px"
+      width="650px"
       @close="resetForm"
     >
       <el-form
         ref="instanceFormRef"
         :model="dialog.form"
         :rules="dialog.rules"
-        label-width="100px"
+        label-width="110px"
       >
         <el-form-item label="实例名称" prop="name">
           <el-input v-model="dialog.form.name" placeholder="请输入实例名称" />
         </el-form-item>
         <el-row>
+          <el-col :span="12">
+            <el-form-item label="数据库类型" prop="db_type">
+              <el-select v-model="dialog.form.db_type" placeholder="请选择数据库类型" style="width: 100%;">
+                <el-option label="MySQL" value="mysql" />
+                <el-option label="PostgreSQL" value="postgresql" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="环境" prop="environment_id">
+              <el-select v-model="dialog.form.environment_id" placeholder="请选择环境" style="width: 100%;">
+                <el-option
+                  v-for="env in environments"
+                  :key="env.id"
+                  :label="env.name"
+                  :value="env.id"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <!-- AWS RDS 配置 -->
+        <el-divider content-position="left">
+          <el-checkbox v-model="dialog.form.is_rds" :label="'AWS RDS 实例'" />
+        </el-divider>
+        
+        <el-row v-if="dialog.form.is_rds">
+          <el-col :span="12">
+            <el-form-item label="RDS 实例ID" prop="rds_instance_id">
+              <el-input v-model="dialog.form.rds_instance_id" placeholder="如: my-db-instance" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="AWS 区域" prop="aws_region">
+              <el-select v-model="dialog.form.aws_region" placeholder="请选择区域" style="width: 100%;">
+                <el-option label="us-east-1 (弗吉尼亚)" value="us-east-1" />
+                <el-option label="us-west-2 (俄勒冈)" value="us-west-2" />
+                <el-option label="eu-west-1 (爱尔兰)" value="eu-west-1" />
+                <el-option label="ap-northeast-1 (东京)" value="ap-northeast-1" />
+                <el-option label="ap-southeast-1 (新加坡)" value="ap-southeast-1" />
+                <el-option label="ap-southeast-2 (悉尼)" value="ap-southeast-2" />
+                <el-option label="cn-north-1 (北京)" value="cn-north-1" />
+                <el-option label="cn-northwest-1 (宁夏)" value="cn-northwest-1" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <!-- 直连配置 -->
+        <el-divider content-position="left" v-if="!dialog.form.is_rds">直连配置</el-divider>
+        
+        <el-row v-if="!dialog.form.is_rds">
           <el-col :span="16">
             <el-form-item label="主机地址" prop="host">
               <el-input v-model="dialog.form.host" placeholder="请输入主机地址" />
@@ -113,14 +184,14 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="端口" prop="port">
-              <el-input v-model="dialog.form.port" placeholder="3306" style="width: 100%;" />
+              <el-input v-model="dialog.form.port" :placeholder="dialog.form.db_type === 'postgresql' ? '5432' : '3306'" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="用户名" prop="username">
+        <el-form-item label="用户名" prop="username" v-if="!dialog.form.is_rds">
           <el-input v-model="dialog.form.username" placeholder="请输入用户名" />
         </el-form-item>
-        <el-form-item label="密码" prop="password">
+        <el-form-item label="密码" prop="password" v-if="!dialog.form.is_rds">
           <el-input
             v-model="dialog.form.password"
             type="password"
@@ -128,16 +199,7 @@
             placeholder="请输入密码"
           />
         </el-form-item>
-        <el-form-item label="环境" prop="environment_id">
-          <el-select v-model="dialog.form.environment_id" placeholder="请选择环境" style="width: 100%;">
-            <el-option
-              v-for="env in environments"
-              :key="env.id"
-              :label="env.name"
-              :value="env.id"
-            />
-          </el-select>
-        </el-form-item>
+        
         <el-form-item label="描述">
           <el-input
             v-model="dialog.form.description"
@@ -189,15 +251,20 @@ const dialog = reactive({
   loading: false,
   form: {
     name: '',
+    db_type: 'mysql',
     host: '',
     port: 3306,
     username: '',
     password: '',
     environment_id: null,
-    description: ''
+    description: '',
+    is_rds: false,
+    rds_instance_id: '',
+    aws_region: ''
   },
   rules: {
     name: [{ required: true, message: '请输入实例名称', trigger: 'blur' }],
+    db_type: [{ required: true, message: '请选择数据库类型', trigger: 'change' }],
     host: [{ required: true, message: '请输入主机地址', trigger: 'blur' }],
     port: [{ required: true, message: '请输入端口', trigger: 'blur' }],
     username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
@@ -260,7 +327,19 @@ const handleAdd = () => {
 const handleEdit = (row) => {
   dialog.isEdit = true
   dialog.visible = true
-  dialog.form = { ...row, password: '' }
+  dialog.form = {
+    name: row.name,
+    db_type: row.db_type || 'mysql',
+    host: row.host || '',
+    port: row.port || 3306,
+    username: row.username || '',
+    password: '',
+    environment_id: row.environment_id,
+    description: row.description || '',
+    is_rds: row.is_rds || false,
+    rds_instance_id: row.rds_instance_id || '',
+    aws_region: row.aws_region || ''
+  }
 }
 
 // 查看详情

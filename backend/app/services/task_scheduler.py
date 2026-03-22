@@ -12,13 +12,14 @@ from typing import Optional
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.jobstores.base import JobLookupError
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import (
-    ScheduledTask, Script, ScriptExecution,
-    ExecutionStatus, TriggerType
+    ScheduledTask, Script, ScriptExecution, Instance, PerformanceMetric,
+    ExecutionStatus, TriggerType, MonitorSwitch, MonitorType
 )
 from app.services.notification import notification_service
 
@@ -27,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 class TaskScheduler:
     """定时任务调度器"""
+    
+    # 性能采集任务间隔（秒）
+    PERFORMANCE_COLLECT_INTERVAL = 300  # 5分钟采集一次
     
     def __init__(self):
         self.scheduler: Optional[AsyncIOScheduler] = None
@@ -43,13 +47,106 @@ class TaskScheduler:
         
         # 加载所有启用的任务
         self._load_enabled_tasks()
+        
+        # 启动性能指标采集任务
+        self._start_performance_collector()
     
     def stop(self):
         """停止调度器"""
         if self.scheduler:
+            # 停止性能采集任务
+            self._stop_performance_collector()
             self.scheduler.shutdown()
             self.scheduler = None
             logger.info("定时任务调度器已停止")
+    
+    def _start_performance_collector(self):
+        """启动性能指标采集任务"""
+        try:
+            # 每5分钟采集一次
+            self.scheduler.add_job(
+                self._collect_rds_metrics,
+                trigger=IntervalTrigger(seconds=self.PERFORMANCE_COLLECT_INTERVAL),
+                id="rds_performance_collector",
+                replace_existing=True
+            )
+            logger.info("RDS 性能指标采集任务已启动")
+        except Exception as e:
+            logger.error(f"启动性能采集任务失败: {e}")
+    
+    def _stop_performance_collector(self):
+        """停止性能指标采集任务"""
+        try:
+            self.scheduler.remove_job("rds_performance_collector")
+            logger.info("RDS 性能指标采集任务已停止")
+        except JobLookupError:
+            pass
+    
+    async def _collect_rds_metrics(self):
+        """采集所有 RDS 实例的性能指标"""
+        from app.utils.aws_rds_collector import get_rds_collector
+        
+        db = SessionLocal()
+        try:
+            # 查询所有启用了 RDS 监控的实例
+            rds_instances = db.query(Instance).filter(
+                Instance.is_rds == True,
+                Instance.rds_instance_id != None,
+                Instance.status == True  # 只采集在线实例
+            ).all()
+            
+            if not rds_instances:
+                return
+            
+            collector = get_rds_collector()
+            
+            for instance in rds_instances:
+                try:
+                    # 检查是否启用了性能监控
+                    switch = db.query(MonitorSwitch).filter(
+                        MonitorSwitch.instance_id == instance.id,
+                        MonitorSwitch.monitor_type == MonitorType.PERFORMANCE
+                    ).first()
+                    
+                    if not switch or not switch.enabled:
+                        continue
+                    
+                    # 使用实例配置的区域
+                    if instance.aws_region:
+                        collector.aws_region = instance.aws_region
+                    
+                    # 采集指标
+                    metrics = collector.collect_metrics(instance.rds_instance_id)
+                    
+                    if metrics.error:
+                        logger.warning(f"RDS {instance.rds_instance_id} 采集失败: {metrics.error}")
+                        continue
+                    
+                    # 存储到数据库
+                    metric_record = PerformanceMetric(
+                        instance_id=instance.id,
+                        collect_time=metrics.collect_time or datetime.now(),
+                        cpu_usage=metrics.cpu_usage,
+                        memory_usage=metrics.memory_usage,
+                        disk_io_read=metrics.read_iops,
+                        disk_io_write=metrics.write_iops,
+                        connections=metrics.connections,
+                        qps=metrics.qps
+                    )
+                    db.add(metric_record)
+                    
+                    logger.info(f"RDS {instance.rds_instance_id} 性能指标采集成功")
+                    
+                except Exception as e:
+                    logger.error(f"RDS {instance.rds_instance_id} 采集异常: {e}")
+            
+            db.commit()
+            
+        except Exception as e:
+            logger.error(f"RDS 性能采集任务执行失败: {e}")
+            db.rollback()
+        finally:
+            db.close()
     
     def _load_enabled_tasks(self):
         """加载所有启用的定时任务"""

@@ -2,6 +2,8 @@
 性能监控API
 """
 import random
+import os
+import logging
 from typing import List, Optional
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -14,8 +16,10 @@ from app.models import (
 )
 from app.schemas import PerformanceMetricResponse, MessageResponse
 from app.deps import get_current_user
+from app.utils.aws_rds_collector import get_rds_collector, RDSMetricsCollector
 
 router = APIRouter(prefix="/performance", tags=["性能监控"])
+logger = logging.getLogger(__name__)
 
 
 def generate_mock_metrics(instance_id: int, hours: int = 1):
@@ -98,7 +102,56 @@ async def get_current_performance(
             "message": "该实例的性能监控已禁用"
         }
     
-    # 获取最新性能数据
+    # 如果是 AWS RDS 实例，尝试实时采集
+    if instance.is_rds and instance.rds_instance_id:
+        try:
+            collector = get_rds_collector()
+            if instance.aws_region:
+                # 使用实例配置的区域
+                collector.aws_region = instance.aws_region
+            
+            rds_metrics = collector.collect_metrics(instance.rds_instance_id)
+            
+            if rds_metrics.error:
+                # 采集失败，返回数据库中存储的历史数据
+                logger.warning(f"RDS metrics collection failed for {instance.rds_instance_id}: {rds_metrics.error}")
+            else:
+                # 采集成功，存储到数据库
+                metric_record = PerformanceMetric(
+                    instance_id=instance_id,
+                    collect_time=rds_metrics.collect_time or datetime.now(),
+                    cpu_usage=rds_metrics.cpu_usage,
+                    memory_usage=rds_metrics.memory_usage,
+                    disk_io_read=rds_metrics.read_iops,
+                    disk_io_write=rds_metrics.write_iops,
+                    connections=rds_metrics.connections,
+                    qps=rds_metrics.qps
+                )
+                db.add(metric_record)
+                db.commit()
+                
+                return {
+                    "enabled": True,
+                    "data": {
+                        "id": metric_record.id,
+                        "instance_id": instance_id,
+                        "collect_time": metric_record.collect_time,
+                        "cpu_usage": metric_record.cpu_usage,
+                        "memory_usage": metric_record.memory_usage,
+                        "disk_io_read": metric_record.disk_io_read,
+                        "disk_io_write": metric_record.disk_io_write,
+                        "connections": metric_record.connections,
+                        "qps": metric_record.qps,
+                        "tps": None,
+                        "lock_wait_count": None
+                    },
+                    "collect_time": metric_record.collect_time,
+                    "source": "aws_cloudwatch"
+                }
+        except Exception as e:
+            logger.error(f"RDS metrics collection error: {e}")
+    
+    # 从数据库获取最新性能数据
     latest = db.query(PerformanceMetric).filter(
         PerformanceMetric.instance_id == instance_id
     ).order_by(PerformanceMetric.collect_time.desc()).first()

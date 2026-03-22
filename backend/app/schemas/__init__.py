@@ -141,6 +141,10 @@ class InstanceCreate(BaseModel):
     environment_id: Optional[int] = None
     group_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=200)
+    # AWS RDS 相关
+    is_rds: bool = Field(False, description="是否为 AWS RDS 实例")
+    rds_instance_id: Optional[str] = Field(None, max_length=100, description="AWS RDS 实例标识符")
+    aws_region: Optional[str] = Field(None, max_length=50, description="AWS 区域")
 
 
 class InstanceUpdate(BaseModel):
@@ -155,6 +159,10 @@ class InstanceUpdate(BaseModel):
     group_id: Optional[int] = None
     description: Optional[str] = Field(None, max_length=200)
     status: Optional[bool] = None
+    # AWS RDS 相关
+    is_rds: Optional[bool] = None
+    rds_instance_id: Optional[str] = Field(None, max_length=100)
+    aws_region: Optional[str] = Field(None, max_length=50)
 
 
 class InstanceResponse(BaseModel):
@@ -169,6 +177,10 @@ class InstanceResponse(BaseModel):
     group_id: Optional[int]
     description: Optional[str]
     status: bool
+    # AWS RDS 相关
+    is_rds: bool = False
+    rds_instance_id: Optional[str] = None
+    aws_region: Optional[str] = None
     last_check_time: Optional[datetime]
     created_at: datetime
     environment: Optional[EnvironmentResponse] = None

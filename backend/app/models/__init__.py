@@ -136,6 +136,10 @@ class Instance(Base):
     group_id = Column(Integer, ForeignKey("instance_groups.id"), comment="分组ID")
     description = Column(String(200), comment="描述")
     status = Column(Boolean, default=True, comment="在线状态")
+    # AWS RDS 相关字段
+    is_rds = Column(Boolean, default=False, comment="是否为 AWS RDS 实例")
+    rds_instance_id = Column(String(100), comment="AWS RDS 实例标识符")
+    aws_region = Column(String(50), comment="AWS 区域")
     last_check_time = Column(DateTime, comment="最后检测时间")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
