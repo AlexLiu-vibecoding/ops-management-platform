@@ -90,9 +90,9 @@ async def execute_sql_for_approval(approval: ApprovalRecord, instance: Instance)
         sql_content = approval.sql_content or ""
         
         # 处理大文件SQL
-        if approval.file_path:
+        if approval.sql_file_path:
             try:
-                file_content = storage_manager.backend.read(approval.file_path)
+                file_content = storage_manager.backend.read(approval.sql_file_path)
                 if file_content:
                     sql_content = file_content if isinstance(file_content, str) else file_content.decode('utf-8')
             except Exception as e:
