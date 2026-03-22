@@ -81,22 +81,11 @@
           <el-input v-model="dialog.form.title" placeholder="请输入变更标题" maxlength="100" show-word-limit />
         </el-form-item>
         
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="Redis 实例" prop="instance_id">
-              <el-select v-model="dialog.form.instance_id" placeholder="请选择 Redis 实例" style="width: 100%;">
-                <el-option v-for="inst in redisInstances" :key="inst.id" :label="inst.name" :value="inst.id" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="数据库索引">
-              <el-select v-model="dialog.form.redis_db" placeholder="选择数据库索引" style="width: 100%;">
-                <el-option v-for="i in 16" :key="i-1" :label="`DB ${i-1}`" :value="i-1" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
+        <el-form-item label="Redis 实例" prop="instance_id">
+          <el-select v-model="dialog.form.instance_id" placeholder="请选择 Redis 实例" style="width: 100%;">
+            <el-option v-for="inst in redisInstances" :key="inst.id" :label="inst.name" :value="inst.id" />
+          </el-select>
+        </el-form-item>
         
         <el-form-item label="Redis 命令" prop="sql_content">
           <div class="cmd-input-wrapper">
@@ -199,7 +188,6 @@ const dialog = reactive({
   form: {
     title: '',
     instance_id: null,
-    redis_db: 0,
     sql_content: '',
     remark: '',
     execution_mode: 'manual',
@@ -253,7 +241,6 @@ const handleAdd = () => {
   dialog.form = {
     title: '',
     instance_id: null,
-    redis_db: 0,
     sql_content: '',
     remark: '',
     execution_mode: 'manual',
