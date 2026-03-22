@@ -1,11 +1,12 @@
 """
-MySQL实例管理API
+数据库实例管理API（支持MySQL和PostgreSQL）
 """
 import asyncio
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import pymysql
+import psycopg2
 from app.database import get_db
 from app.models import Instance, InstanceGroup, Environment, MonitorSwitch, MonitorType
 from app.schemas import (
@@ -44,6 +45,42 @@ async def test_mysql_connection(host: str, port: int, username: str, password: s
             "message": f"连接失败: {str(e)}",
             "version": None
         }
+
+
+async def test_postgresql_connection(host: str, port: int, username: str, password: str, database: str = "postgres") -> dict:
+    """测试PostgreSQL连接"""
+    try:
+        conn = psycopg2.connect(
+            host=host,
+            port=port,
+            user=username,
+            password=password,
+            database=database,
+            connect_timeout=5
+        )
+        with conn.cursor() as cursor:
+            cursor.execute("SELECT version()")
+            version = cursor.fetchone()[0]
+        conn.close()
+        return {
+            "success": True,
+            "message": "连接成功",
+            "version": version
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"连接失败: {str(e)}",
+            "version": None
+        }
+
+
+async def test_connection(db_type: str, host: str, port: int, username: str, password: str, database: str = "postgres") -> dict:
+    """测试数据库连接（支持MySQL和PostgreSQL）"""
+    if db_type == "postgresql":
+        return await test_postgresql_connection(host, port, username, password, database)
+    else:
+        return await test_mysql_connection(host, port, username, password)
 
 
 @router.get("")
@@ -98,7 +135,8 @@ async def test_instance_connection(
     db: Session = Depends(get_db)
 ):
     """测试实例连接"""
-    result = await test_mysql_connection(
+    result = await test_connection(
+        instance_data.db_type or "mysql",
         instance_data.host,
         instance_data.port,
         instance_data.username,
@@ -122,7 +160,8 @@ async def create_instance(
         )
     
     # 测试连接
-    conn_result = await test_mysql_connection(
+    conn_result = await test_connection(
+        instance_data.db_type or "mysql",
         instance_data.host,
         instance_data.port,
         instance_data.username,
@@ -138,6 +177,7 @@ async def create_instance(
     # 创建实例
     instance = Instance(
         name=instance_data.name,
+        db_type=instance_data.db_type or "mysql",
         host=instance_data.host,
         port=instance_data.port,
         username=instance_data.username,
@@ -238,7 +278,8 @@ async def check_instance_status(
             detail=f"Password decryption failed, please re-save instance password: {str(e)}"
         )
     
-    result = await test_mysql_connection(
+    result = await test_connection(
+        instance.db_type or "mysql",
         instance.host,
         instance.port,
         instance.username,
@@ -312,17 +353,33 @@ async def get_instance_variables(
         )
     
     try:
-        conn = pymysql.connect(
-            host=instance.host,
-            port=instance.port,
-            user=instance.username,
-            password=password,
-            connect_timeout=5
-        )
-        with conn.cursor() as cursor:
-            cursor.execute("SHOW VARIABLES")
-            variables = {row[0]: row[1] for row in cursor.fetchall()}
-        conn.close()
+        if instance.db_type == "postgresql":
+            # PostgreSQL: 使用 SHOW ALL 获取所有参数
+            conn = psycopg2.connect(
+                host=instance.host,
+                port=instance.port,
+                user=instance.username,
+                password=password,
+                database="postgres",
+                connect_timeout=5
+            )
+            with conn.cursor() as cursor:
+                cursor.execute("SHOW ALL")
+                variables = {row[0]: row[1] for row in cursor.fetchall()}
+            conn.close()
+        else:
+            # MySQL: 使用 SHOW VARIABLES
+            conn = pymysql.connect(
+                host=instance.host,
+                port=instance.port,
+                user=instance.username,
+                password=password,
+                connect_timeout=5
+            )
+            with conn.cursor() as cursor:
+                cursor.execute("SHOW VARIABLES")
+                variables = {row[0]: row[1] for row in cursor.fetchall()}
+            conn.close()
         return variables
     except Exception as e:
         raise HTTPException(
@@ -356,47 +413,90 @@ async def get_instance_databases(
         )
     
     try:
-        conn = pymysql.connect(
-            host=instance.host,
-            port=instance.port,
-            user=instance.username,
-            password=password,
-            connect_timeout=10
-        )
         databases = []
-        with conn.cursor() as cursor:
-            # 获取数据库列表
-            cursor.execute("SHOW DATABASES")
-            db_list = cursor.fetchall()
-            
-            for db_row in db_list:
-                db_name = db_row[0]
-                # 过滤系统库
-                if db_name in ('information_schema', 'mysql', 'performance_schema', 'sys'):
-                    continue
-                
-                # 获取数据库大小和表数量
-                try:
-                    cursor.execute(f"""
-                        SELECT COUNT(*), 
-                               COALESCE(SUM(data_length + index_length) / 1024 / 1024, 0) as size_mb
-                        FROM information_schema.tables 
-                        WHERE table_schema = %s
-                    """, (db_name,))
-                    result = cursor.fetchone()
-                    databases.append({
-                        "name": db_name,
-                        "tables": result[0] if result else 0,
-                        "size_mb": round(result[1], 2) if result else 0
-                    })
-                except Exception:
-                    databases.append({
-                        "name": db_name,
-                        "tables": 0,
-                        "size_mb": 0
-                    })
         
-        conn.close()
+        if instance.db_type == "postgresql":
+            # PostgreSQL: 查询 pg_database
+            conn = psycopg2.connect(
+                host=instance.host,
+                port=instance.port,
+                user=instance.username,
+                password=password,
+                database="postgres",
+                connect_timeout=10
+            )
+            with conn.cursor() as cursor:
+                # 获取数据库列表
+                cursor.execute("""
+                    SELECT datname, pg_database_size(datname) as size_bytes
+                    FROM pg_database 
+                    WHERE datistemplate = false
+                    ORDER BY datname
+                """)
+                db_list = cursor.fetchall()
+                
+                for db_row in db_list:
+                    db_name = db_row[0]
+                    size_bytes = db_row[1] if len(db_row) > 1 else 0
+                    
+                    # 获取表数量
+                    try:
+                        cursor.execute(f"""
+                            SELECT COUNT(*) FROM information_schema.tables 
+                            WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
+                            AND table_catalog = %s
+                        """, (db_name,))
+                        table_count = cursor.fetchone()[0]
+                    except Exception:
+                        table_count = 0
+                    
+                    databases.append({
+                        "name": db_name,
+                        "tables": table_count,
+                        "size_mb": round(size_bytes / 1024 / 1024, 2) if size_bytes else 0
+                    })
+            conn.close()
+        else:
+            # MySQL: 使用 SHOW DATABASES
+            conn = pymysql.connect(
+                host=instance.host,
+                port=instance.port,
+                user=instance.username,
+                password=password,
+                connect_timeout=10
+            )
+            with conn.cursor() as cursor:
+                # 获取数据库列表
+                cursor.execute("SHOW DATABASES")
+                db_list = cursor.fetchall()
+                
+                for db_row in db_list:
+                    db_name = db_row[0]
+                    # 过滤系统库
+                    if db_name in ('information_schema', 'mysql', 'performance_schema', 'sys'):
+                        continue
+                    
+                    # 获取数据库大小和表数量
+                    try:
+                        cursor.execute(f"""
+                            SELECT COUNT(*), 
+                                   COALESCE(SUM(data_length + index_length) / 1024 / 1024, 0) as size_mb
+                            FROM information_schema.tables 
+                            WHERE table_schema = %s
+                        """, (db_name,))
+                        result = cursor.fetchone()
+                        databases.append({
+                            "name": db_name,
+                            "tables": result[0] if result else 0,
+                            "size_mb": round(result[1], 2) if result else 0
+                        })
+                    except Exception:
+                        databases.append({
+                            "name": db_name,
+                            "tables": 0,
+                            "size_mb": 0
+                        })
+            conn.close()
         
         # 按名称排序
         databases.sort(key=lambda x: x["name"])
