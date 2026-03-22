@@ -51,16 +51,18 @@ chmod +x start.sh
 ### 核心功能
 - 🔐 **认证与权限**：JWT Token 认证、RBAC 权限模型、多角色支持
 - 🌍 **多环境管理**：开发/测试/预发/生产环境隔离
-- 🗄️ **实例管理**：MySQL/PostgreSQL/Redis 实例管理、连接测试
+- 🗄️ **实例管理**：MySQL/PostgreSQL/Redis 实例管理、AWS RDS 支持、连接测试
 - 📝 **SQL 编辑器**：语法高亮、执行、风险检测
+- 🚀 **SQL 优化器**：EXPLAIN 分析、索引建议、AI 优化建议
 - 📋 **变更审批**：DDL/DML 变更审批、风险分析、分库分表支持
 - 🔄 **回滚SQL生成**：自动分析SQL变更，生成回滚脚本，提升操作安全性
-- 📊 **全维度监控**：性能监控、慢查询分析、高 CPU SQL 监控
+- 📊 **全维度监控**：性能监控、慢查询分析、高 CPU SQL 监控、CloudWatch 集成
 - 📦 **Redis 管理**：键管理、服务器信息、慢查询日志、客户端监控
 - 🔔 **消息通知**：钉钉/企业微信/飞书/邮件/Webhook 通知
-- 📜 **脚本管理**：SQL 脚本管理、批量执行
-- ⏰ **定时任务**：定时执行 SQL、审批定时执行
+- 📜 **脚本管理**：Python/Bash/SQL 脚本管理、批量执行
+- ⏰ **定时任务**：定时执行脚本、审批定时执行
 - 📒 **审计日志**：操作记录、查询导出
+- ⚙️ **系统配置**：动态菜单、数据库类型配置、存储策略配置
 
 ### 变更审批增强
 - ✅ 变更申请与审批中心分离，流程更清晰
@@ -88,8 +90,22 @@ chmod +x start.sh
 - ✅ 生命周期管理：自动清理过期SQL文件（默认30天）
 - ✅ 历史记录永久保存：数据库记录保留，仅清理物理文件
 - ✅ 配置灵活：支持阈值、保留天数、存储类型等配置
-- ✅ 慢查询日志、客户端列表
-- ✅ 配置查看与修改
+
+### AWS RDS 支持
+- ✅ RDS 实例管理：支持 AWS RDS MySQL/PostgreSQL
+- ✅ CloudWatch 监控：自动采集 RDS 性能指标
+- ✅ 区域配置：支持全球 31 个 AWS 区域动态配置
+
+### SQL 优化器
+- ✅ SQL 性能分析：EXPLAIN 结果可视化展示
+- ✅ 索引建议：分析并推荐最优索引
+- ✅ AI 深度分析：集成豆包大模型提供优化建议
+- ✅ 表结构同步：自动获取数据库表结构信息
+
+### 系统配置
+- ✅ 系统概览：版本、运行状态、组件状态一目了然
+- ✅ 数据库类型配置：启用/禁用支持的数据库类型
+- ✅ 存储配置：灵活配置大文件存储策略
 
 ---
 
@@ -103,6 +119,8 @@ chmod +x start.sh
 | 缓存 | Redis (可选) |
 | 定时任务 | APScheduler |
 | AI 集成 | 豆包大模型 (SQL优化建议) |
+| AWS 集成 | boto3 (RDS CloudWatch 监控) |
+| 存储 | 本地文件系统 / AWS S3 / 阿里云 OSS |
 
 ---
 
@@ -216,13 +234,27 @@ PASSWORD_SALT=your-custom-salt
 ├── backend/                 # 后端代码
 │   ├── app/
 │   │   ├── api/            # API 路由
+│   │   │   ├── auth.py              # 认证接口
+│   │   │   ├── instances.py         # 实例管理
+│   │   │   ├── sql.py               # SQL 操作
+│   │   │   ├── sql_optimizer.py     # SQL 优化器
+│   │   │   ├── approval.py          # 审批接口
+│   │   │   ├── monitor.py           # 监控接口
+│   │   │   ├── scripts.py           # 脚本管理
+│   │   │   ├── scheduled_tasks.py   # 定时任务
+│   │   │   ├── aws_regions.py       # AWS 区域配置
+│   │   │   └── ...
 │   │   ├── models/         # 数据库模型
 │   │   ├── schemas/        # 请求响应模型
 │   │   ├── services/       # 业务逻辑
 │   │   │   ├── rollback_generator.py  # 回滚SQL生成
-│   │   │   └── scheduler.py          # 定时任务调度
+│   │   │   ├── scheduler.py          # 定时任务调度
+│   │   │   ├── storage.py            # 存储服务
+│   │   │   └── notification.py       # 通知服务
 │   │   ├── utils/          # 工具类
-│   │   │   └── redis_operations.py   # Redis操作工具
+│   │   │   ├── auth.py               # 认证工具
+│   │   │   ├── redis_operations.py   # Redis操作工具
+│   │   │   └── aws_rds_collector.py  # AWS RDS 采集
 │   │   └── main.py         # 应用入口
 │   └── requirements.txt
 ├── frontend/               # 前端代码
@@ -230,9 +262,15 @@ PASSWORD_SALT=your-custom-salt
 │   │   ├── api/           # API 请求
 │   │   ├── stores/        # 状态管理
 │   │   ├── views/         # 页面组件
+│   │   │   ├── dashboard/            # 仪表盘
+│   │   │   ├── instances/            # 实例管理
+│   │   │   ├── sql-editor/           # SQL 编辑器
+│   │   │   ├── sql-optimizer/        # SQL 优化器
+│   │   │   ├── change/               # 变更审批
+│   │   │   ├── monitor/              # 监控
+│   │   │   ├── scripts/              # 脚本管理
+│   │   │   └── ...
 │   │   ├── components/    # 可复用组件
-│   │   │   ├── SqlViewer.vue          # SQL显示组件
-│   │   │   └── ApprovalDetailCard.vue # 审批详情卡片
 │   │   └── router/        # 路由配置
 │   └── package.json
 ├── docker/                 # Docker 配置
