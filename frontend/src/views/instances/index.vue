@@ -47,8 +47,11 @@
         </el-table-column>
         <el-table-column label="类型" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.db_type === 'postgresql' ? 'success' : 'primary'" size="small">
-              {{ row.db_type === 'postgresql' ? 'PostgreSQL' : 'MySQL' }}
+            <el-tag 
+              :type="row.db_type === 'postgresql' ? 'success' : row.db_type === 'redis' ? 'warning' : 'primary'" 
+              size="small"
+            >
+              {{ row.db_type === 'postgresql' ? 'PostgreSQL' : row.db_type === 'redis' ? 'Redis' : 'MySQL' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -144,6 +147,7 @@
               <el-select v-model="dialog.form.db_type" placeholder="请选择数据库类型" style="width: 100%;">
                 <el-option label="MySQL" value="mysql" />
                 <el-option label="PostgreSQL" value="postgresql" />
+                <el-option label="Redis" value="redis" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -208,7 +212,7 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="端口" prop="port">
-              <el-input v-model="dialog.form.port" :placeholder="dialog.form.db_type === 'postgresql' ? '5432' : '3306'" style="width: 100%;" />
+              <el-input v-model="dialog.form.port" :placeholder="dialog.form.db_type === 'postgresql' ? '5432' : dialog.form.db_type === 'redis' ? '6379' : '3306'" style="width: 100%;" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -223,6 +227,26 @@
             :placeholder="dialog.isEdit ? '留空则不修改密码' : '请输入密码'"
           />
         </el-form-item>
+        
+        <!-- Redis 特有配置 -->
+        <template v-if="dialog.form.db_type === 'redis' && !dialog.form.is_rds">
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="运行模式">
+                <el-select v-model="dialog.form.redis_mode" placeholder="请选择运行模式" style="width: 100%;">
+                  <el-option label="单机" value="standalone" />
+                  <el-option label="集群" value="cluster" />
+                  <el-option label="哨兵" value="sentinel" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="数据库">
+                <el-input-number v-model="dialog.form.redis_db" :min="0" :max="15" style="width: 100%;" />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </template>
         
         <el-form-item label="描述">
           <el-input
@@ -286,7 +310,9 @@ const dialog = reactive({
     status: true,
     is_rds: false,
     rds_instance_id: '',
-    aws_region: ''
+    aws_region: '',
+    redis_mode: 'standalone',
+    redis_db: 0
   },
   rules: {
     name: [{ required: true, message: '请输入实例名称', trigger: 'blur' }],
@@ -391,7 +417,9 @@ const handleAdd = () => {
     status: true,
     is_rds: false,
     rds_instance_id: '',
-    aws_region: ''
+    aws_region: '',
+    redis_mode: 'standalone',
+    redis_db: 0
   }
 }
 
@@ -412,13 +440,19 @@ const handleEdit = (row) => {
     status: row.status ?? true,
     is_rds: row.is_rds || false,
     rds_instance_id: row.rds_instance_id || '',
-    aws_region: row.aws_region || ''
+    aws_region: row.aws_region || '',
+    redis_mode: row.redis_mode || 'standalone',
+    redis_db: row.redis_db || 0
   }
 }
 
 // 查看详情
 const handleView = (row) => {
-  router.push(`/instances/${row.id}`)
+  if (row.db_type === 'redis') {
+    router.push(`/redis/${row.id}`)
+  } else {
+    router.push(`/instances/${row.id}`)
+  }
 }
 
 // 测试连接

@@ -122,16 +122,16 @@ class InstanceGroup(Base):
 
 
 class Instance(Base):
-    """数据库实例表（支持MySQL和PostgreSQL）"""
+    """数据库实例表（支持MySQL、PostgreSQL、Redis）"""
     __tablename__ = "instances"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(100), unique=True, nullable=False, comment="实例名称")
-    db_type = Column(String(20), default="mysql", comment="数据库类型: mysql/postgresql")
+    db_type = Column(String(20), default="mysql", comment="数据库类型: mysql/postgresql/redis")
     host = Column(String(100), nullable=False, comment="主机地址")
     port = Column(Integer, default=3306, comment="端口")
-    username = Column(String(50), nullable=False, comment="用户名")
-    password_encrypted = Column(String(255), nullable=False, comment="加密后的密码")
+    username = Column(String(50), comment="用户名")
+    password_encrypted = Column(String(255), comment="加密后的密码")
     environment_id = Column(Integer, ForeignKey("environments.id"), comment="环境ID")
     group_id = Column(Integer, ForeignKey("instance_groups.id"), comment="分组ID")
     description = Column(String(200), comment="描述")
@@ -140,6 +140,9 @@ class Instance(Base):
     is_rds = Column(Boolean, default=False, comment="是否为 AWS RDS 实例")
     rds_instance_id = Column(String(100), comment="AWS RDS 实例标识符")
     aws_region = Column(String(50), comment="AWS 区域")
+    # Redis 特有字段
+    redis_mode = Column(String(20), default="standalone", comment="Redis模式: standalone/cluster/sentinel")
+    redis_db = Column(Integer, default=0, comment="Redis数据库索引")
     last_check_time = Column(DateTime, comment="最后检测时间")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
@@ -234,6 +237,8 @@ class ApprovalRecord(Base):
     sql_content = Column(Text, nullable=False, comment="SQL内容")
     sql_line_count = Column(Integer, default=0, comment="SQL行数")
     sql_risk_level = Column(String(20), comment="风险等级：low/medium/high/critical")
+    rollback_sql = Column(Text, comment="回滚SQL")
+    rollback_generated = Column(Boolean, default=False, comment="是否已生成回滚SQL")
     affected_rows_estimate = Column(Integer, default=0, comment="预估影响行数")
     affected_rows_actual = Column(Integer, comment="实际影响行数")
     auto_execute = Column(Boolean, default=False, comment="审批通过后自动执行")

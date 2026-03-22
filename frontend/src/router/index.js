@@ -40,6 +40,12 @@ const routes = [
         meta: { title: '实例详情', hidden: true, roles: ['super_admin', 'approval_admin', 'operator'] }
       },
       {
+        path: 'redis/:id',
+        name: 'RedisDetail',
+        component: () => import('@/views/instances/redis-detail.vue'),
+        meta: { title: 'Redis详情', hidden: true, roles: ['super_admin', 'approval_admin', 'operator'] }
+      },
+      {
         path: 'environments',
         name: 'Environments',
         component: () => import('@/views/environments/index.vue'),
@@ -58,10 +64,28 @@ const routes = [
         meta: { title: 'SQL优化器', icon: 'MagicStick' }
       },
       {
+        path: 'change',
+        name: 'Change',
+        redirect: '/change/requests',
+        meta: { title: '变更管理', icon: 'Stamp' },
+        children: [
+          {
+            path: 'requests',
+            name: 'ChangeRequests',
+            component: () => import('@/views/change/requests.vue'),
+            meta: { title: '变更申请' }
+          },
+          {
+            path: 'approvals',
+            name: 'ChangeApprovals',
+            component: () => import('@/views/change/approvals.vue'),
+            meta: { title: '审批中心', roles: ['super_admin', 'approval_admin'] }
+          }
+        ]
+      },
+      {
         path: 'approvals',
-        name: 'Approvals',
-        component: () => import('@/views/approvals/index.vue'),
-        meta: { title: '变更审批', icon: 'Stamp' }
+        redirect: '/change/requests'
       },
       {
         path: 'monitor',

@@ -1,5 +1,5 @@
 """
-MySQL管理平台 - FastAPI主应用
+一站式运维平台 - FastAPI主应用
 """
 import os
 from pathlib import Path
@@ -19,7 +19,7 @@ from app.services.scheduler import approval_scheduler
 from app.services.task_scheduler import task_scheduler
 
 # 导入路由
-from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard
+from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis
 
 # 配置日志
 logging.basicConfig(
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
     # 启动时
-    logger.info("Starting MySQL Management Platform...")
+    logger.info("Starting OPS Management Platform...")
     
     # 创建数据库表
     try:
@@ -307,6 +307,7 @@ app.include_router(scheduled_tasks.router, prefix="/api/v1")  # 定时任务
 app.include_router(notification.router, prefix="/api/v1")  # 通知管理
 app.include_router(sql_optimizer.router, prefix="/api/v1")  # SQL优化器
 app.include_router(dashboard.router, prefix="/api/v1")  # 仪表盘
+app.include_router(redis.router, prefix="/api/v1")  # Redis管理
 
 
 # 健康检查

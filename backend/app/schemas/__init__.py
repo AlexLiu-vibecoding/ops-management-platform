@@ -133,7 +133,7 @@ class EnvironmentResponse(BaseModel):
 class InstanceCreate(BaseModel):
     """创建实例请求"""
     name: str = Field(..., max_length=100)
-    db_type: str = Field("mysql", pattern="^(mysql|postgresql)$")
+    db_type: str = Field("mysql", pattern="^(mysql|postgresql|redis)$")
     host: Optional[str] = Field(None, max_length=100, description="主机地址，RDS实例可选")
     port: Optional[int] = Field(None, ge=1, le=65535, description="端口，RDS实例可选")
     username: Optional[str] = Field(None, max_length=50, description="用户名，RDS实例可选")
@@ -146,12 +146,15 @@ class InstanceCreate(BaseModel):
     is_rds: bool = Field(False, description="是否为 AWS RDS 实例")
     rds_instance_id: Optional[str] = Field(None, max_length=100, description="AWS RDS 实例标识符")
     aws_region: Optional[str] = Field(None, max_length=50, description="AWS 区域")
+    # Redis 特有字段
+    redis_mode: Optional[str] = Field("standalone", pattern="^(standalone|cluster|sentinel)$", description="Redis模式")
+    redis_db: Optional[int] = Field(0, ge=0, le=15, description="Redis数据库索引")
 
 
 class InstanceUpdate(BaseModel):
     """更新实例请求"""
     name: Optional[str] = Field(None, max_length=100)
-    db_type: Optional[str] = Field(None, pattern="^(mysql|postgresql)$")
+    db_type: Optional[str] = Field(None, pattern="^(mysql|postgresql|redis)$")
     host: Optional[str] = Field(None, max_length=100)
     port: Optional[int] = Field(None, ge=1, le=65535)
     username: Optional[str] = Field(None, max_length=50)
@@ -164,6 +167,9 @@ class InstanceUpdate(BaseModel):
     is_rds: Optional[bool] = None
     rds_instance_id: Optional[str] = Field(None, max_length=100)
     aws_region: Optional[str] = Field(None, max_length=50)
+    # Redis 特有字段
+    redis_mode: Optional[str] = Field(None, pattern="^(standalone|cluster|sentinel)$")
+    redis_db: Optional[int] = Field(None, ge=0, le=15)
 
 
 class InstanceResponse(BaseModel):
@@ -173,7 +179,7 @@ class InstanceResponse(BaseModel):
     db_type: str = "mysql"
     host: str
     port: int
-    username: str
+    username: Optional[str]
     environment_id: Optional[int]
     group_id: Optional[int]
     description: Optional[str]
@@ -182,6 +188,9 @@ class InstanceResponse(BaseModel):
     is_rds: bool = False
     rds_instance_id: Optional[str] = None
     aws_region: Optional[str] = None
+    # Redis 特有字段
+    redis_mode: Optional[str] = "standalone"
+    redis_db: Optional[int] = 0
     last_check_time: Optional[datetime]
     created_at: datetime
     environment: Optional[EnvironmentResponse] = None
@@ -309,6 +318,8 @@ class ApprovalResponse(BaseModel):
     sql_content_preview: Optional[str] = Field(None, description="SQL预览（前100行）")
     sql_line_count: Optional[int] = Field(None, description="SQL总行数")
     sql_risk_level: Optional[str]
+    rollback_sql: Optional[str] = Field(None, description="回滚SQL")
+    rollback_generated: Optional[bool] = Field(False, description="是否已生成回滚SQL")
     affected_rows_estimate: Optional[int] = Field(None, description="预估影响行数")
     affected_rows_actual: Optional[int] = Field(None, description="实际影响行数")
     auto_execute: Optional[bool] = Field(False, description="审批通过后自动执行")

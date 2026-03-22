@@ -1,6 +1,6 @@
 # 运维管理平台
 
-企业级数据库运维管理平台，支持 MySQL/PostgreSQL 多实例管理、监控告警、变更审批、脚本执行、定时任务等功能。
+企业级一站式运维管理平台，支持 MySQL/PostgreSQL/Redis 多实例管理、监控告警、变更审批、回滚SQL生成、脚本执行、定时任务等功能。
 
 ## ⚡ 快速开始
 
@@ -51,20 +51,36 @@ chmod +x start.sh
 ### 核心功能
 - 🔐 **认证与权限**：JWT Token 认证、RBAC 权限模型、多角色支持
 - 🌍 **多环境管理**：开发/测试/预发/生产环境隔离
-- 🗄️ **实例管理**：MySQL/PostgreSQL 实例管理、连接测试
+- 🗄️ **实例管理**：MySQL/PostgreSQL/Redis 实例管理、连接测试
 - 📝 **SQL 编辑器**：语法高亮、执行、风险检测
 - 📋 **变更审批**：DDL/DML 变更审批、风险分析、分库分表支持
+- 🔄 **回滚SQL生成**：自动分析SQL变更，生成回滚脚本，提升操作安全性
 - 📊 **全维度监控**：性能监控、慢查询分析、高 CPU SQL 监控
+- 📦 **Redis 管理**：键管理、服务器信息、慢查询日志、客户端监控
 - 🔔 **消息通知**：钉钉/企业微信/飞书/邮件/Webhook 通知
 - 📜 **脚本管理**：SQL 脚本管理、批量执行
 - ⏰ **定时任务**：定时执行 SQL、审批定时执行
 - 📒 **审计日志**：操作记录、查询导出
+
+### 变更审批增强
+- ✅ 变更申请与审批中心分离，流程更清晰
+- ✅ 提交变更时自动生成回滚SQL
+- ✅ 支持 MySQL DDL/DML 回滚SQL生成
+- ✅ 支持 Redis 命令回滚建议
+- ✅ 回滚SQL一键复制，方便快速恢复
 
 ### 分库分表变更审批
 - ✅ 单库选择、多库选择
 - ✅ 通配符匹配：`db_%` 或 `user_db_*` 等模式
 - ✅ 全部数据库执行
 - ✅ SQL 自动解析 `db.table` 格式
+
+### Redis 实例管理
+- ✅ 单机/集群/哨兵模式支持
+- ✅ 键扫描、查看、编辑、删除
+- ✅ 服务器信息、内存使用、统计信息
+- ✅ 慢查询日志、客户端列表
+- ✅ 配置查看与修改
 
 ---
 
@@ -77,6 +93,7 @@ chmod +x start.sh
 | 数据库 | PostgreSQL / MySQL |
 | 缓存 | Redis (可选) |
 | 定时任务 | APScheduler |
+| AI 集成 | 豆包大模型 (SQL优化建议) |
 
 ---
 
@@ -127,12 +144,6 @@ PASSWORD_SALT=your-custom-salt
 ```
 
 ⚠️ **自定义密钥后需重置用户密码**
-JWT_SECRET_KEY=your-specified-key-here
-AES_KEY=your-32-character-aes-key!!
-PASSWORD_SALT=your-salt-value
-```
-
-⚠️ **密钥泄露会导致严重安全问题，请妥善保管 `.env` 文件，不要提交到公开仓库！**
 
 ---
 
@@ -144,7 +155,12 @@ PASSWORD_SALT=your-salt-value
 │   ├── app/
 │   │   ├── api/            # API 路由
 │   │   ├── models/         # 数据库模型
+│   │   ├── schemas/        # 请求响应模型
 │   │   ├── services/       # 业务逻辑
+│   │   │   ├── rollback_generator.py  # 回滚SQL生成
+│   │   │   └── scheduler.py          # 定时任务调度
+│   │   ├── utils/          # 工具类
+│   │   │   └── redis_operations.py   # Redis操作工具
 │   │   └── main.py         # 应用入口
 │   └── requirements.txt
 ├── frontend/               # 前端代码
@@ -152,6 +168,9 @@ PASSWORD_SALT=your-salt-value
 │   │   ├── api/           # API 请求
 │   │   ├── stores/        # 状态管理
 │   │   ├── views/         # 页面组件
+│   │   ├── components/    # 可复用组件
+│   │   │   ├── SqlViewer.vue          # SQL显示组件
+│   │   │   └── ApprovalDetailCard.vue # 审批详情卡片
 │   │   └── router/        # 路由配置
 │   └── package.json
 ├── docker/                 # Docker 配置

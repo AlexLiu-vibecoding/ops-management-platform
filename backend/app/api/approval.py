@@ -19,6 +19,7 @@ from app.schemas import (
 from app.deps import get_approval_admin, get_current_user
 from app.services.notification import notification_service
 from app.services.scheduler import approval_scheduler
+from app.services.rollback_generator import rollback_generator
 
 logger = logging.getLogger(__name__)
 
@@ -234,6 +235,8 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
         "sql_content_preview": sql_preview if total_lines > PREVIEW_LINES else None,
         "sql_line_count": total_lines,
         "sql_risk_level": approval.sql_risk_level,
+        "rollback_sql": approval.rollback_sql if include_full_sql else None,
+        "rollback_generated": approval.rollback_generated,
         "affected_rows_estimate": approval.affected_rows_estimate,
         "affected_rows_actual": approval.affected_rows_actual,
         "auto_execute": approval.auto_execute,
@@ -343,6 +346,26 @@ async def create_approval(
     if not sql_line_count:
         sql_line_count = len(approval_data.sql_content.split('\n'))
     
+    # 生成回滚SQL
+    rollback_sql = None
+    rollback_generated = False
+    try:
+        rollback_results = rollback_generator.generate_rollback_sql(approval_data.sql_content)
+        if rollback_results:
+            rollback_parts = []
+            for result in rollback_results:
+                if result.success and result.rollback_sql:
+                    rollback_parts.append(f"-- 原SQL类型: {result.sql_type.value}")
+                    rollback_parts.append(result.rollback_sql)
+                    if result.warning:
+                        rollback_parts.append(f"-- 警告: {result.warning}")
+                    rollback_parts.append("")
+            if rollback_parts:
+                rollback_sql = "\n".join(rollback_parts)
+                rollback_generated = True
+    except Exception as e:
+        logger.warning(f"生成回滚SQL失败: {e}")
+    
     # 创建审批记录
     approval = ApprovalRecord(
         title=approval_data.title,
@@ -356,6 +379,8 @@ async def create_approval(
         sql_content=approval_data.sql_content,
         sql_line_count=sql_line_count,
         sql_risk_level=risk_level,
+        rollback_sql=rollback_sql,
+        rollback_generated=rollback_generated,
         affected_rows_estimate=approval_data.affected_rows_estimate or 0,
         auto_execute=approval_data.auto_execute or False,
         environment_id=instance.environment_id,

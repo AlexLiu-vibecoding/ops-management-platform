@@ -14,7 +14,7 @@
         <transition name="fade">
           <div v-if="!isCollapse" class="logo-text">
             <span class="title">OpsCenter</span>
-            <span class="subtitle">数据库运维平台</span>
+            <span class="subtitle">一站式运维平台</span>
           </div>
         </transition>
       </div>
