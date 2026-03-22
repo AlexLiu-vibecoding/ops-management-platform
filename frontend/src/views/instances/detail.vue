@@ -140,6 +140,7 @@ const router = useRouter()
 const userStore = useUserStore()
 
 const isAdmin = computed(() => userStore.isAdmin)
+const canOperate = computed(() => userStore.canOperate)
 
 const instance = ref(null)
 const activeTab = ref('info')

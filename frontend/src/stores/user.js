@@ -58,6 +58,12 @@ export const useUserStore = defineStore('user', () => {
   })
   
   const isAdmin = computed(() => user.value?.role === 'super_admin')
+  
+  // 操作权限：超级管理员、审批管理员、运维人员可以操作实例
+  const canOperate = computed(() => {
+    const role = user.value?.role
+    return ['super_admin', 'approval_admin', 'operator'].includes(role)
+  })
 
   async function login(username, password) {
     try {
@@ -105,6 +111,7 @@ export const useUserStore = defineStore('user', () => {
     user,
     isLoggedIn,
     isAdmin,
+    canOperate,
     login,
     logout,
     checkAuth

@@ -28,7 +28,7 @@
         </el-form-item>
       </el-form>
       
-      <el-button type="primary" @click="handleAdd">
+      <el-button type="primary" @click="handleAdd" v-if="canOperate">
         <el-icon><Plus /></el-icon>
         添加实例
       </el-button>
@@ -93,9 +93,9 @@
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleView(row)">详情</el-button>
-              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button link type="primary" size="small" @click="handleEdit(row)" v-if="canOperate">编辑</el-button>
               <el-button link type="primary" size="small" @click="handleTest(row)">测试</el-button>
-              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+              <el-button link type="danger" size="small" @click="handleDelete(row)" v-if="canOperate">删除</el-button>
             </div>
           </template>
         </el-table-column>
@@ -251,14 +251,22 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { instancesApi } from '@/api/instances'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
+const userStore = useUserStore()
+
+// 操作权限：管理员和运维人员可以操作
+const canOperate = computed(() => {
+  const role = userStore.user?.role
+  return ['super_admin', 'approval_admin', 'operator'].includes(role)
+})
 
 const loading = ref(false)
 const instanceList = ref([])
