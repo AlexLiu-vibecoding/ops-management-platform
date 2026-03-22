@@ -255,8 +255,8 @@ async def get_performance_overview(
     db: Session = Depends(get_db)
 ):
     """获取所有实例的性能概览"""
-    # 获取所有在线实例
-    instances = db.query(Instance).filter(Instance.status == True).all()
+    # 获取所有实例（包括离线实例）
+    instances = db.query(Instance).all()
     
     result = []
     for instance in instances:
@@ -278,6 +278,7 @@ async def get_performance_overview(
             "instance_name": instance.name,
             "environment": instance.environment.name if instance.environment else None,
             "environment_color": instance.environment.color if instance.environment else None,
+            "status": instance.status,  # 在线状态
             "monitor_enabled": enabled,
             "current_cpu": latest.cpu_usage if latest else None,
             "current_memory": latest.memory_usage if latest else None,

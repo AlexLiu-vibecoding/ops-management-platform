@@ -125,6 +125,7 @@
           v-for="item in performanceData" 
           :key="item.instance_id" 
           class="performance-card"
+          :class="{ offline: !item.status }"
           @click="viewInstance(item.instance_id)"
         >
           <div class="card-header">
@@ -138,9 +139,12 @@
           </div>
           
           <div class="card-status">
-            <span class="status-dot" :class="{ active: item.monitor_enabled }"></span>
+            <span class="status-dot" :class="{ active: item.status }"></span>
             <span class="status-text">
-              {{ item.monitor_enabled ? '已启用' : '已禁用' }}
+              {{ item.status ? '在线' : '离线' }}
+            </span>
+            <span v-if="item.status && item.monitor_enabled" class="monitor-badge">
+              监控中
             </span>
           </div>
 
@@ -602,6 +606,15 @@ onMounted(() => {
     box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
   }
   
+  // 离线实例样式
+  &.offline {
+    opacity: 0.7;
+    
+    .instance-name {
+      color: var(--text-secondary);
+    }
+  }
+  
   .card-header {
     display: flex;
     justify-content: space-between;
@@ -633,7 +646,7 @@ onMounted(() => {
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: var(--text-secondary);
+      background: var(--danger);
       
       &.active {
         background: var(--success);
@@ -644,6 +657,15 @@ onMounted(() => {
     .status-text {
       font-size: 12px;
       color: var(--text-secondary);
+    }
+    
+    .monitor-badge {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: var(--primary);
+      color: white;
+      margin-left: 8px;
     }
   }
   
