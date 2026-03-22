@@ -19,7 +19,7 @@ from app.services.scheduler import approval_scheduler
 from app.services.task_scheduler import task_scheduler
 
 # 导入路由
-from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system
+from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions
 
 # 配置日志
 logging.basicConfig(
@@ -310,6 +310,7 @@ app.include_router(dashboard.router, prefix="/api/v1")  # 仪表盘
 app.include_router(redis.router, prefix="/api/v1")  # Redis管理
 app.include_router(storage.router, prefix="/api/v1")  # 存储管理
 app.include_router(system.router, prefix="/api/v1")  # 系统配置
+app.include_router(aws_regions.router, prefix="/api/v1")  # AWS区域配置
 
 
 # 健康检查

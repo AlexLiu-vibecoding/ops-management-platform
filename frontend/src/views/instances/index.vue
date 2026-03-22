@@ -183,37 +183,17 @@
                   allow-create
                   default-first-option
                 >
-                  <el-option-group label="美洲">
-                    <el-option label="us-east-1 (弗吉尼亚北部)" value="us-east-1" />
-                    <el-option label="us-east-2 (俄亥俄)" value="us-east-2" />
-                    <el-option label="us-west-1 (加利福尼亚北部)" value="us-west-1" />
-                    <el-option label="us-west-2 (俄勒冈)" value="us-west-2" />
-                    <el-option label="af-south-1 (开普敦)" value="af-south-1" />
-                    <el-option label="sa-east-1 (圣保罗)" value="sa-east-1" />
-                    <el-option label="ca-central-1 (加拿大中部)" value="ca-central-1" />
-                    <el-option label="me-south-1 (巴林)" value="me-south-1" />
-                  </el-option-group>
-                  <el-option-group label="欧洲">
-                    <el-option label="eu-west-1 (爱尔兰)" value="eu-west-1" />
-                    <el-option label="eu-west-2 (伦敦)" value="eu-west-2" />
-                    <el-option label="eu-west-3 (巴黎)" value="eu-west-3" />
-                    <el-option label="eu-south-1 (米兰)" value="eu-south-1" />
-                    <el-option label="eu-central-1 (法兰克福)" value="eu-central-1" />
-                    <el-option label="eu-north-1 (斯德哥尔摩)" value="eu-north-1" />
-                  </el-option-group>
-                  <el-option-group label="亚太">
-                    <el-option label="ap-northeast-1 (东京)" value="ap-northeast-1" />
-                    <el-option label="ap-northeast-2 (首尔)" value="ap-northeast-2" />
-                    <el-option label="ap-northeast-3 (大阪)" value="ap-northeast-3" />
-                    <el-option label="ap-southeast-1 (新加坡)" value="ap-southeast-1" />
-                    <el-option label="ap-southeast-2 (悉尼)" value="ap-southeast-2" />
-                    <el-option label="ap-southeast-3 (雅加达)" value="ap-southeast-3" />
-                    <el-option label="ap-south-1 (孟买)" value="ap-south-1" />
-                    <el-option label="ap-east-1 (香港)" value="ap-east-1" />
-                  </el-option-group>
-                  <el-option-group label="中国">
-                    <el-option label="cn-north-1 (北京)" value="cn-north-1" />
-                    <el-option label="cn-northwest-1 (宁夏)" value="cn-northwest-1" />
+                  <el-option-group 
+                    v-for="group in awsRegions" 
+                    :key="group.geo_group" 
+                    :label="group.geo_group"
+                  >
+                    <el-option 
+                      v-for="region in group.regions" 
+                      :key="region.region_code"
+                      :label="`${region.region_code} (${region.region_name})`" 
+                      :value="region.region_code" 
+                    />
                   </el-option-group>
                 </el-select>
               </el-form-item>
@@ -302,6 +282,7 @@ const canOperate = computed(() => {
 const loading = ref(false)
 const instanceList = ref([])
 const environments = ref([])
+const awsRegions = ref([])  // AWS 区域列表
 
 const searchForm = reactive({
   environment_id: null,
@@ -415,6 +396,16 @@ const fetchEnvironments = async () => {
     environments.value = data.items || data
   } catch (error) {
     console.error('获取环境列表失败:', error)
+  }
+}
+
+// 获取 AWS 区域列表
+const fetchAwsRegions = async () => {
+  try {
+    const data = await request.get('/aws-regions/grouped')
+    awsRegions.value = data || []
+  } catch (error) {
+    console.error('获取 AWS 区域列表失败:', error)
   }
 }
 
@@ -618,6 +609,7 @@ const formatTime = (time) => {
 
 onMounted(() => {
   fetchEnvironments()
+  fetchAwsRegions()
   fetchInstances()
 })
 </script>

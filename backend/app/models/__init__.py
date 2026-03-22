@@ -652,3 +652,20 @@ class SQLAnalysisHistory(Base):
     # 关联
     instance = relationship("Instance")
     analyzer = relationship("User", foreign_keys=[analyzed_by])
+
+
+# ==================== AWS 配置 ====================
+
+class AWSRegion(Base):
+    """AWS 区域配置表"""
+    __tablename__ = "aws_regions"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    region_code = Column(String(30), unique=True, nullable=False, comment="区域代码，如 us-east-1")
+    region_name = Column(String(100), nullable=False, comment="区域名称，如 美国东部(弗吉尼亚北部)")
+    geo_group = Column(String(50), nullable=False, comment="地理分组：美国/美洲其他/欧洲/亚太/中东/非洲/中国")
+    display_order = Column(Integer, default=0, comment="显示顺序")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    description = Column(String(200), comment="描述")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
