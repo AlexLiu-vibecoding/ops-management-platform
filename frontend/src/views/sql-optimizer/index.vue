@@ -248,6 +248,7 @@ import {
 } from '@element-plus/icons-vue'
 import { sqlOptimizerApi } from '@/api/sql-optimizer'
 import { instancesApi } from '@/api/instances'
+import request from '@/api/index'
 import dayjs from 'dayjs'
 
 // 数据
@@ -297,14 +298,14 @@ const onInstanceChange = async () => {
   if (!selectedInstance.value) return
   
   try {
-    // 获取实例的数据库列表
-    const instance = instances.value.find(i => i.id === selectedInstance.value)
-    if (instance) {
-      // 这里简化处理，实际应该调用API获取数据库列表
-      databases.value = ['information_schema', 'mysql', 'performance_schema', 'sys']
-    }
+    // 获取实例的真实数据库列表
+    const data = await request.get(`/sql/databases/${selectedInstance.value}`)
+    // 过滤系统数据库
+    const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys', 'template0', 'template1']
+    databases.value = (data || []).filter(db => !systemDbs.includes(db))
   } catch (error) {
     console.error('获取数据库列表失败:', error)
+    ElMessage.error('获取数据库列表失败')
   }
 }
 
