@@ -416,7 +416,8 @@ const fetchPendingCount = async () => {
 const fetchInstances = async () => {
   try {
     const data = await instancesApi.getList({ limit: 100 })
-    instances.value = data.items || []
+    // 过滤掉 Redis 实例，只显示 MySQL/PostgreSQL
+    instances.value = (data.items || []).filter(i => i.db_type !== 'redis')
   } catch (error) {
     console.error('获取实例列表失败:', error)
   }
