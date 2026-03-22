@@ -289,7 +289,7 @@ const isRedisChange = computed(() => dialog.form.change_type === 'REDIS')
 // 计算属性：当前选中的实例是否为 Redis 类型
 const isRedisInstance = computed(() => {
   if (!dialog.form.instance_id) return false
-  const instance = instances.value.find(i => i.id === dialog.form.instance_id)
+  const instance = instances.value.find(i => i.id === dialog.form.instance_id || String(i.id) === String(dialog.form.instance_id))
   return instance?.db_type === 'redis'
 })
 
@@ -471,16 +471,25 @@ const handleInstanceSelect = async (instanceId) => {
   dialog.form.database_name = ''
   dialog.databases = []
   
-  // 获取选中的实例信息
-  const instance = instances.value.find(i => i.id === instanceId)
-  console.log('Selected instance:', instance?.name, 'db_type:', instance?.db_type)
+  // 获取选中的实例信息（处理可能的类型不匹配问题）
+  const instance = instances.value.find(i => i.id === instanceId || String(i.id) === String(instanceId))
+  console.log('=== handleInstanceSelect ===')
+  console.log('instanceId:', instanceId, typeof instanceId)
+  console.log('instances.value:', instances.value.map(i => ({ id: i.id, name: i.name, db_type: i.db_type })))
+  console.log('found instance:', instance)
   
   // 如果是 Redis 实例，自动设置变更类型并跳过数据库列表获取
   if (instance?.db_type === 'redis') {
+    console.log('检测到 Redis 实例，自动切换变更类型为 REDIS')
     dialog.form.change_type = 'REDIS'
     dialog.form.redis_db = instance.redis_db || 0
-    console.log('Redis instance selected, skip database list fetch')
+    console.log('切换后 change_type:', dialog.form.change_type)
     return  // Redis 实例不需要获取数据库列表
+  }
+  
+  // 非 Redis 实例，如果是 Redis 变更类型，需要重置
+  if (dialog.form.change_type === 'REDIS') {
+    dialog.form.change_type = 'DDL'
   }
   
   // 非 Redis 实例，获取数据库列表
