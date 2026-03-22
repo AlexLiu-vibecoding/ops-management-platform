@@ -123,7 +123,7 @@ class TestInstancesAPI:
         db_session.refresh(instance)
         
         response = client.post(
-            f"/api/v1/instances/{instance.id}/test",
+            f"/api/v1/instances/{instance.id}/check",
             headers={"Authorization": f"Bearer {operator_token}"}
         )
         # 连接测试可能失败，但请求格式应该是正确的

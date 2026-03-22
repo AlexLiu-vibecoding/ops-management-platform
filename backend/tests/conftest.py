@@ -76,7 +76,7 @@ def _init_default_configs(db):
 @pytest.fixture(scope="function")
 def client(db_session):
     """创建测试客户端"""
-    with TestClient(app) as c:
+    with TestClient(app=app) as c:
         yield c
 
 

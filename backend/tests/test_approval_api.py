@@ -109,13 +109,13 @@ class TestApprovalPermissions:
     def test_approve_approval_as_operator(self, client, operator_token, db_session):
         """测试普通用户无法审批"""
         from app.models import ApprovalRecord, ApprovalStatus
-        from app.utils.auth import get_password_hash, create_access_token
+        from app.utils.auth import hash_password, create_access_token
         
         # 创建审批管理员
         from app.models import User, UserRole
         admin = User(
             username="approval_admin",
-            password_hash=get_password_hash("admin123"),
+            password_hash=hash_password("admin123"),
             real_name="审批管理员",
             email="approval@test.com",
             role=UserRole.APPROVAL_ADMIN,
