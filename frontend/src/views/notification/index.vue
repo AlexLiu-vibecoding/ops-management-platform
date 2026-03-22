@@ -59,7 +59,7 @@
       </template>
       
       <el-table :data="bindings" style="width: 100%" v-loading="bindingLoading">
-        <el-table-column prop="channel_name" label="通道" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="channel_name" label="通道" min-width="100" />
         <el-table-column prop="channel_type" label="通道类型" width="80" align="center">
           <template #default="{ row }">
             <el-tag size="small">钉钉</el-tag>
@@ -72,7 +72,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="scheduled_task_id" label="定时任务" min-width="100" show-overflow-tooltip>
+        <el-table-column prop="scheduled_task_id" label="定时任务" min-width="100">
           <template #default="{ row }">
             <span v-if="row.scheduled_task_id">{{ getScheduledTaskName(row.scheduled_task_id) }}</span>
             <span v-else>-</span>
