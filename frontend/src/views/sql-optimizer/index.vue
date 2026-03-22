@@ -244,7 +244,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Refresh, Analysis, Document, InfoFilled, Cpu
+  Refresh, Document, InfoFilled, Cpu, Operation
 } from '@element-plus/icons-vue'
 import { sqlOptimizerApi } from '@/api/sql-optimizer'
 import { instancesApi } from '@/api/instances'
