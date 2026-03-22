@@ -24,12 +24,13 @@
         <el-menu
           :default-active="activeMenu"
           :collapse="isCollapse"
-          :router="true"
+          :router="false"
           class="aside-menu"
+          @select="handleMenuSelect"
         >
           <template v-for="item in menuItems" :key="item.path || item.id">
             <!-- 有子菜单 -->
-            <el-sub-menu v-if="item.children && item.children.length > 0" :index="item.path || `menu-${item.id}`">
+            <el-sub-menu v-if="item.children && item.children.length > 0" :index="`group-${item.id}`">
               <template #title>
                 <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
                 <span>{{ item.name }}</span>
@@ -39,12 +40,13 @@
                 :key="child.path"
                 :index="child.path"
               >
-                {{ child.name }}
+                <el-icon v-if="child.icon"><component :is="child.icon" /></el-icon>
+                <span>{{ child.name }}</span>
               </el-menu-item>
             </el-sub-menu>
             
             <!-- 无子菜单 -->
-            <el-menu-item v-else :index="item.path || `menu-${item.id}`">
+            <el-menu-item v-else :index="item.path">
               <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
               <template #title>{{ item.name }}</template>
             </el-menu-item>
@@ -247,6 +249,14 @@ const passwordDialog = ref({
     confirmPassword: ''
   }
 })
+
+// 处理菜单选择（手动导航，避免点击分组时跳转）
+const handleMenuSelect = (index) => {
+  // 只有点击叶子菜单项才导航（以 / 开头的路径）
+  if (index && index.startsWith('/')) {
+    router.push(index)
+  }
+}
 
 // 处理下拉菜单命令
 const handleCommand = (command) => {
