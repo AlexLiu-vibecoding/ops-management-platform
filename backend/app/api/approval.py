@@ -415,6 +415,10 @@ async def list_approvals(
         query = query.filter(ApprovalRecord.change_type == change_type)
     if exclude_change_type:
         query = query.filter(ApprovalRecord.change_type != exclude_change_type)
+        # 同时排除关联到 Redis 实例的记录
+        if exclude_change_type.upper() == 'REDIS':
+            redis_instance_ids = db.query(Instance.id).filter(Instance.db_type == 'redis').subquery()
+            query = query.filter(~ApprovalRecord.instance_id.in_(redis_instance_ids))
     
     # 普通用户只能看自己的申请
     if current_user.role.value == "readonly":
