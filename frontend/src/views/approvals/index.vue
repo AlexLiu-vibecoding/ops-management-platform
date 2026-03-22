@@ -521,7 +521,7 @@ const dialog = reactive({
     sql_content: '',
     remark: '',
     affected_rows_estimate: 0,
-    execution_mode: 'manual', // manual, auto, scheduled
+    execution_mode: 'auto', // manual, auto, scheduled - 默认审批后自动执行
     scheduled_time: null
   },
   rules: {
@@ -869,7 +869,7 @@ const handleAdd = () => {
     change_type: 'DDL',
     sql_content: '',
     remark: '',
-    enable_scheduled: false,
+    execution_mode: 'auto', // 默认审批后自动执行
     scheduled_time: null
   }
   fullSqlContent.value = ''
