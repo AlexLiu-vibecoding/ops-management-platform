@@ -237,7 +237,7 @@ class TaskScheduler:
         if self.scheduler is None:
             return
         
-        job_id = f"scheduled_task_{task_id}"
+        job_id = f"scheduled_task_{task.id}"
         try:
             self.scheduler.resume_job(job_id)
         except JobLookupError:
