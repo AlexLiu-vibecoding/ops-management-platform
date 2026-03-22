@@ -61,21 +61,23 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button text type="primary" @click="handleView(row)">详情</el-button>
-            <template v-if="row.status === 'pending' && canApprove">
-              <el-button text type="success" @click="handleApprove(row, true)">通过</el-button>
-              <el-button text type="danger" @click="handleApprove(row, false)">拒绝</el-button>
-            </template>
-            <el-button
-              v-if="row.status === 'approved' && row.requester_id === currentUserId"
-              text
-              type="primary"
-              @click="handleExecute(row)"
-            >
-              执行
-            </el-button>
+            <div class="table-operations">
+              <el-button link type="primary" @click="handleView(row)">详情</el-button>
+              <template v-if="row.status === 'pending' && canApprove">
+                <el-button link type="success" @click="handleApprove(row, true)">通过</el-button>
+                <el-button link type="danger" @click="handleApprove(row, false)">拒绝</el-button>
+              </template>
+              <el-button
+                v-if="row.status === 'approved' && row.requester_id === currentUserId"
+                link
+                type="primary"
+                @click="handleExecute(row)"
+              >
+                执行
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -1173,6 +1175,17 @@ onMounted(() => {
     display: flex;
     align-items: center;
     gap: 4px;
+  }
+  
+  .table-operations {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    
+    .el-button + .el-button {
+      margin-left: 0;
+    }
   }
 }
 </style>

@@ -51,12 +51,29 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button text type="primary" @click="handleExecute(row)">执行</el-button>
-            <el-button text type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button text type="primary" @click="handleDuplicate(row)">复制</el-button>
-            <el-button text type="danger" @click="handleDelete(row)">删除</el-button>
+            <div class="table-operations">
+              <el-button link type="primary" @click="handleExecute(row)">执行</el-button>
+              <el-dropdown trigger="click" @command="(cmd) => handleDropdownCommand(cmd, row)">
+                <el-button link type="primary">
+                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="edit">
+                      <el-icon><Edit /></el-icon>编辑
+                    </el-dropdown-item>
+                    <el-dropdown-item command="duplicate">
+                      <el-icon><CopyDocument /></el-icon>复制
+                    </el-dropdown-item>
+                    <el-dropdown-item command="delete" divided style="color: #F56C6C;">
+                      <el-icon><Delete /></el-icon>删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -234,7 +251,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, ArrowDown, Edit, CopyDocument, Delete } from '@element-plus/icons-vue'
 import request from '@/api/index'
 import dayjs from 'dayjs'
 
@@ -409,6 +426,21 @@ const handleDelete = async (row) => {
   }
 }
 
+// 下拉菜单命令处理
+const handleDropdownCommand = (command, row) => {
+  switch (command) {
+    case 'edit':
+      handleEdit(row)
+      break
+    case 'duplicate':
+      handleDuplicate(row)
+      break
+    case 'delete':
+      handleDelete(row)
+      break
+  }
+}
+
 const handleDuplicate = async (row) => {
   try {
     const result = await request.post(`/scripts/${row.id}/duplicate`)
@@ -533,6 +565,16 @@ onMounted(() => {
         background: #fef0f0;
         color: #f56c6c;
       }
+    }
+  }
+  
+  .table-operations {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .el-button + .el-button {
+      margin-left: 0;
     }
   }
 }

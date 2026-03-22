@@ -58,12 +58,29 @@
             {{ row.last_login_time ? formatTime(row.last_login_time) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button text type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button text type="primary" @click="handleResetPwd(row)">重置密码</el-button>
-            <el-button text type="primary" @click="handleBindEnv(row)">环境权限</el-button>
-            <el-button text type="danger" @click="handleDelete(row)" :disabled="row.id === currentUserId">删除</el-button>
+            <div class="table-operations">
+              <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
+              <el-dropdown trigger="click" @command="(cmd) => handleDropdownCommand(cmd, row)" :disabled="row.id === currentUserId">
+                <el-button link type="primary">
+                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="resetPwd">
+                      <el-icon><Key /></el-icon>重置密码
+                    </el-dropdown-item>
+                    <el-dropdown-item command="bindEnv">
+                      <el-icon><Setting /></el-icon>环境权限
+                    </el-dropdown-item>
+                    <el-dropdown-item command="delete" divided style="color: #F56C6C;">
+                      <el-icon><Delete /></el-icon>删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -187,6 +204,7 @@ import { useUserStore } from '@/stores/user'
 import { usersApi } from '@/api/users'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowDown, Key, Setting, Delete } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 
 const userStore = useUserStore()
@@ -357,6 +375,21 @@ const handleDelete = async (row) => {
   }
 }
 
+// 下拉菜单命令处理
+const handleDropdownCommand = (command, row) => {
+  switch (command) {
+    case 'resetPwd':
+      handleResetPwd(row)
+      break
+    case 'bindEnv':
+      handleBindEnv(row)
+      break
+    case 'delete':
+      handleDelete(row)
+      break
+  }
+}
+
 // 提交表单
 const handleSubmit = async () => {
   if (!userFormRef.value) return
@@ -484,6 +517,16 @@ onMounted(() => {
     .el-pagination {
       margin-top: 20px;
       justify-content: flex-end;
+    }
+  }
+  
+  .table-operations {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .el-button + .el-button {
+      margin-left: 0;
     }
   }
 }

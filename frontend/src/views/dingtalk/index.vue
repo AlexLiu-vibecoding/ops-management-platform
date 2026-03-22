@@ -40,11 +40,26 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
-            <el-button text type="primary" @click="handleTestChannel(row)">测试</el-button>
-            <el-button text type="primary" @click="handleEditChannel(row)">编辑</el-button>
-            <el-button text type="danger" @click="handleDeleteChannel(row)">删除</el-button>
+            <div class="table-operations">
+              <el-button link type="primary" @click="handleEditChannel(row)">编辑</el-button>
+              <el-dropdown trigger="click" @command="(cmd) => handleChannelCommand(cmd, row)">
+                <el-button link type="primary">
+                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="test">
+                      <el-icon><Connection /></el-icon>测试
+                    </el-dropdown-item>
+                    <el-dropdown-item command="delete" divided style="color: #F56C6C;">
+                      <el-icon><Delete /></el-icon>删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -289,6 +304,7 @@ import { dingtalkApi } from '@/api/dingtalk'
 import { instancesApi } from '@/api/instances'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowDown, Connection, Delete } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 
 // 通道相关
@@ -476,6 +492,18 @@ const handleDeleteChannel = async (row) => {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
     }
+  }
+}
+
+// 通道下拉菜单命令处理
+const handleChannelCommand = (command, row) => {
+  switch (command) {
+    case 'test':
+      handleTestChannel(row)
+      break
+    case 'delete':
+      handleDeleteChannel(row)
+      break
   }
 }
 
@@ -695,6 +723,16 @@ onMounted(() => {
     
     .keyword-tag {
       margin: 0;
+    }
+  }
+  
+  .table-operations {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .el-button + .el-button {
+      margin-left: 0;
     }
   }
 }
