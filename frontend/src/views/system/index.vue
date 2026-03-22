@@ -211,7 +211,7 @@
           <template #header>
             <div class="card-header">
               <span>安全配置</span>
-              <el-tag type="danger" size="small">敏感信息，请通过环境变量修改</el-tag>
+              <el-tag type="danger" size="small">敏感信息，请妥善保管</el-tag>
             </div>
           </template>
 
@@ -222,28 +222,36 @@
             show-icon
             style="margin-bottom: 20px;"
           >
-            安全配置只能查看状态，无法在页面修改。如需更改，请在服务器环境变量中配置。
+            以下密钥用于系统安全加密，请勿泄露。如需修改，请在服务器环境变量中配置。
           </el-alert>
 
-          <el-descriptions :column="2" border>
+          <el-descriptions :column="1" border>
             <el-descriptions-item label="JWT 密钥">
-              <el-tag :type="securityConfig.jwt_configured ? 'success' : 'warning'">
-                {{ securityConfig.jwt_configured ? '已自定义' : '使用默认值' }}
-              </el-tag>
-              <span class="hint" v-if="!securityConfig.jwt_configured">
-                建议在生产环境通过 JWT_SECRET_KEY 环境变量自定义
-              </span>
+              <div class="secret-value">
+                <code>{{ securityConfig.jwt_secret_key }}</code>
+                <el-tag :type="securityConfig.jwt_configured ? 'success' : 'warning'" size="small" style="margin-left: 10px;">
+                  {{ securityConfig.jwt_configured ? '已自定义' : '使用默认值' }}
+                </el-tag>
+              </div>
+              <div class="hint">用于签名 JWT Token，环境变量: JWT_SECRET_KEY</div>
             </el-descriptions-item>
             <el-descriptions-item label="AES 密钥">
-              <el-tag :type="securityConfig.aes_configured ? 'success' : 'warning'">
-                {{ securityConfig.aes_configured ? '已自定义' : '使用默认值' }}
-              </el-tag>
-              <span class="hint" v-if="!securityConfig.aes_configured">
-                建议在生产环境通过 AES_KEY 环境变量自定义
-              </span>
+              <div class="secret-value">
+                <code>{{ securityConfig.aes_key }}</code>
+                <el-tag :type="securityConfig.aes_configured ? 'success' : 'warning'" size="small" style="margin-left: 10px;">
+                  {{ securityConfig.aes_configured ? '已自定义' : '使用默认值' }}
+                </el-tag>
+              </div>
+              <div class="hint">用于加密敏感数据，必须32字符，环境变量: AES_KEY</div>
+            </el-descriptions-item>
+            <el-descriptions-item label="密码加盐">
+              <div class="secret-value">
+                <code>{{ securityConfig.password_salt }}</code>
+              </div>
+              <div class="hint">用于密码哈希加盐，环境变量: PASSWORD_SALT</div>
             </el-descriptions-item>
             <el-descriptions-item label="Token 有效期">
-              {{ securityConfig.token_expire_hours }} 小时
+              <el-tag type="primary">{{ securityConfig.token_expire_hours }} 小时</el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="密码策略">
               <el-tag v-if="securityConfig.password_policy?.min_length">
@@ -306,7 +314,10 @@ const storageConfig = reactive({
 // 安全配置
 const securityConfig = reactive({
   jwt_configured: false,
+  jwt_secret_key: '',
   aes_configured: false,
+  aes_key: '',
+  password_salt: '',
   token_expire_hours: 24,
   password_policy: {}
 })
@@ -494,6 +505,22 @@ onMounted(() => {
   .unit {
     margin-left: 10px;
     color: #909399;
+  }
+
+  .secret-value {
+    display: flex;
+    align-items: center;
+    
+    code {
+      background: #f5f7fa;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+      color: #303133;
+      word-break: break-all;
+      border: 1px solid #e4e7ed;
+    }
   }
 }
 </style>

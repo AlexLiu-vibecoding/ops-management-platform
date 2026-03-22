@@ -365,7 +365,10 @@ async def test_storage_config(
 class SecurityConfigResponse(BaseModel):
     """安全配置响应（只读）"""
     jwt_configured: bool
+    jwt_secret_key: str
     aes_configured: bool
+    aes_key: str
+    password_salt: str
     token_expire_hours: int
     password_policy: Dict[str, Any]
 
@@ -379,13 +382,22 @@ async def get_security_config(
     
     安全配置只能查看，不能通过 API 修改
     """
+    from app.config import settings as app_settings
+    
     # 检查是否使用自定义密钥
+    jwt_secret = os.getenv("JWT_SECRET_KEY", app_settings.JWT_SECRET_KEY)
+    aes_key = os.getenv("AES_KEY", app_settings.AES_KEY)
+    password_salt = os.getenv("PASSWORD_SALT", app_settings.PASSWORD_SALT)
+    
     jwt_custom = os.getenv("JWT_SECRET_KEY") is not None
     aes_custom = os.getenv("AES_KEY") is not None
     
     return SecurityConfigResponse(
         jwt_configured=jwt_custom,
+        jwt_secret_key=jwt_secret,
         aes_configured=aes_custom,
+        aes_key=aes_key,
+        password_salt=password_salt,
         token_expire_hours=app_settings.ACCESS_TOKEN_EXPIRE_HOURS,
         password_policy={
             "min_length": 8,
