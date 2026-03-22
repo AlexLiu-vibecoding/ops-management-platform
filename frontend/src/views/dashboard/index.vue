@@ -255,9 +255,9 @@ const userName = computed(() => {
   return userStore.user?.real_name || userStore.user?.username || '用户'
 })
 
-// 动画数字
-const animateNumber = (target, end, duration = 800) => {
-  const start = target.value
+// 动画数字 - 直接修改 reactive 对象的属性
+const animateNumber = (obj, key, end, duration = 800) => {
+  const start = obj[key]
   const range = end - start
   const startTime = performance.now()
 
@@ -266,7 +266,7 @@ const animateNumber = (target, end, duration = 800) => {
     const progress = Math.min(elapsed / duration, 1)
     const easeOut = 1 - Math.pow(1 - progress, 3)
     
-    target.value = Math.round(start + range * easeOut)
+    obj[key] = Math.round(start + range * easeOut)
     
     if (progress < 1) {
       requestAnimationFrame(update)
@@ -294,10 +294,10 @@ const refreshStats = async () => {
     const data = await dashboardApi.getStats()
     
     // 动画更新数字
-    animateNumber({ value: animatedStats.instanceCount }, data.instance_count)
-    animateNumber({ value: animatedStats.onlineCount }, data.online_count)
-    animateNumber({ value: animatedStats.pendingApprovalCount }, data.pending_approval_count)
-    animateNumber({ value: animatedStats.alertCount }, data.alert_count)
+    animateNumber(animatedStats, 'instanceCount', data.instance_count)
+    animateNumber(animatedStats, 'onlineCount', data.online_count)
+    animateNumber(animatedStats, 'pendingApprovalCount', data.pending_approval_count)
+    animateNumber(animatedStats, 'alertCount', data.alert_count)
     
     stats.instanceCount = data.instance_count
     stats.onlineCount = data.online_count
