@@ -33,7 +33,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="is_enabled" label="状态" width="70" align="center">
+        <el-table-column prop="is_enabled" label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.is_enabled ? 'success' : 'info'" size="small">
               {{ row.is_enabled ? '启用' : '禁用' }}

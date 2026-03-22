@@ -30,7 +30,7 @@
             <code style="font-size: 12px;">{{ row.cron_expression }}</code>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="70" align="center">
+        <el-table-column prop="status" label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'enabled' ? 'success' : 'info'" size="small">
               {{ row.status === 'enabled' ? '启用' : '禁用' }}
