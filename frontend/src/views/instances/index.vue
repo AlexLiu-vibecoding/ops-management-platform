@@ -64,7 +64,7 @@
             <span v-else>{{ row.host }}:{{ row.port }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="环境" width="80" align="center">
+        <el-table-column label="环境" min-width="90" align="center">
           <template #default="{ row }">
             <span
               v-if="row.environment"
@@ -645,6 +645,7 @@ onMounted(() => {
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 12px;
+    white-space: nowrap;
   }
   
   .table-operations {
