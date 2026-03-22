@@ -224,173 +224,136 @@ class NotificationService:
         else:
             db_target = approval.database_name or "未指定"
         
-        # 风险等级颜色映射
-        risk_colors = {
-            "low": "🟢 低风险",
-            "medium": "🟡 中风险",
-            "high": "🟠 高风险",
-            "critical": "🔴 极高风险"
+        # 风险等级映射
+        risk_names = {
+            "low": "低风险",
+            "medium": "中风险",
+            "high": "高风险",
+            "critical": "极高风险"
         }
-        risk_display = risk_colors.get(approval.sql_risk_level, "⚪ 未评估")
+        risk_display = risk_names.get(approval.sql_risk_level, "未评估")
         
         # 变更类型映射
         change_type_names = {
-            "DDL": "📐 DDL (结构变更)",
-            "DML": "📝 DML (数据变更)",
-            "OPERATION": "⚙️ 运维操作",
-            "CUSTOM": "📋 自定义变更"
+            "DDL": "DDL(结构变更)",
+            "DML": "DML(数据变更)",
+            "OPERATION": "运维操作",
+            "CUSTOM": "自定义变更",
+            "REDIS": "Redis命令"
         }
         change_type_display = change_type_names.get(approval.change_type, approval.change_type)
         
         # 构建通知内容
         if notification_type == "new":
-            title = "🔔 变更审批通知"
+            title = "变更审批通知"
             
             # 构建影响行数显示
-            affected_rows_info = "—"
+            affected_rows_info = "未知"
             if approval.affected_rows_estimate and approval.affected_rows_estimate > 0:
-                affected_rows_info = f"**{approval.affected_rows_estimate:,}** 行"
+                affected_rows_info = f"{approval.affected_rows_estimate:,} 行"
             
             # 自动执行提示
-            execute_mode = "👤 手动执行"
+            execute_mode = "手动执行"
             if approval.auto_execute and not approval.scheduled_time:
-                execute_mode = "⚡ 审批通过后立即执行"
+                execute_mode = "审批通过后立即执行"
             elif approval.scheduled_time:
-                execute_mode = f"⏰ {approval.scheduled_time.strftime('%m-%d %H:%M')} 定时执行"
+                execute_mode = f"{approval.scheduled_time.strftime('%m-%d %H:%M')} 定时执行"
             
-            content = f"""### {title}
+            content = f"""## {title}
 
----
+**申请信息**
+- 标题: {approval.title}
+- 申请人: {requester_name}
+- 提交时间: {approval.created_at.strftime('%m-%d %H:%M')}
 
-**📋 申请信息**
-
-> **标题**: {approval.title}
-> **申请人**: {requester_name} | **提交时间**: {approval.created_at.strftime('%m-%d %H:%M')}
-
----
-
-**🎯 变更详情**
-
-> 🖥️ **目标实例**: {instance_name}
-> 🗄️ **目标数据库**: {db_target}
-> 🔧 **变更类型**: {change_type_display}
-> 📊 **风险等级**: {risk_display}
-> 📝 **SQL行数**: {approval.sql_line_count or 0} 行
-> 📈 **影响行数**: {affected_rows_info}
-> ⚙️ **执行方式**: {execute_mode}
-
----
-
-**✅ 请及时审批**
+**变更详情**
+- 目标实例: {instance_name}
+- 目标数据库: {db_target}
+- 变更类型: {change_type_display}
+- 风险等级: {risk_display}
+- SQL行数: {approval.sql_line_count or 0} 行
+- 影响行数: {affected_rows_info}
+- 执行方式: {execute_mode}
 
 [点击通过]({NotificationService.build_approval_url(approval.id, "approve")}) | [点击拒绝]({NotificationService.build_approval_url(approval.id, "reject")})"""
         elif notification_type == "approved":
-            title = "✅ 审批通过通知"
+            title = "审批通过通知"
             approver = db.query(User).filter(User.id == approval.approver_id).first()
             approver_name = approver.real_name if approver else "未知"
             
             # 执行状态提示
-            execute_status = "👤 等待申请人手动执行"
+            execute_status = "等待申请人手动执行"
             if approval.auto_execute and not approval.scheduled_time:
-                execute_status = "⚡ 即将自动执行..."
+                execute_status = "即将自动执行"
             elif approval.scheduled_time:
-                execute_status = f"⏰ {approval.scheduled_time.strftime('%m-%d %H:%M')} 定时执行"
+                execute_status = f"{approval.scheduled_time.strftime('%m-%d %H:%M')} 定时执行"
             
-            content = f"""### {title}
+            content = f"""## {title}
 
----
+**申请信息**
+- 标题: {approval.title}
+- 申请人: {requester_name}
+- 审批人: {approver_name}
 
-**📋 申请信息**
+**变更详情**
+- 目标实例: {instance_name}
+- 目标数据库: {db_target}
+- 变更类型: {change_type_display}
+- 风险等级: {risk_display}
 
-> **标题**: {approval.title}
-> **申请人**: {requester_name} | **审批人**: {approver_name}
+**审批信息**
+- 审批意见: {approval.approve_comment or '无'}
+- 审批时间: {approval.approve_time.strftime('%m-%d %H:%M') if approval.approve_time else '未知'}
 
----
-
-**🎯 变更详情**
-
-> 🖥️ **目标实例**: {instance_name}
-> 🗄️ **目标数据库**: {db_target}
-> 🔧 **变更类型**: {change_type_display}
-> 📊 **风险等级**: {risk_display}
-
----
-
-**📝 审批信息**
-
-> **审批意见**: {approval.approve_comment or '无'}
-> **审批时间**: {approval.approve_time.strftime('%m-%d %H:%M') if approval.approve_time else '未知'}
-
----
-
-**⚙️ 执行状态**: {execute_status}"""
+执行状态: {execute_status}"""
         
         elif notification_type == "rejected":
-            title = "❌ 审批拒绝通知"
+            title = "审批拒绝通知"
             approver = db.query(User).filter(User.id == approval.approver_id).first()
             approver_name = approver.real_name if approver else "未知"
-            content = f"""### {title}
+            content = f"""## {title}
 
----
+**申请信息**
+- 标题: {approval.title}
+- 申请人: {requester_name}
+- 审批人: {approver_name}
 
-**📋 申请信息**
+**变更详情**
+- 目标实例: {instance_name}
+- 目标数据库: {db_target}
+- 变更类型: {change_type_display}
+- 风险等级: {risk_display}
 
-> **标题**: {approval.title}
-> **申请人**: {requester_name} | **审批人**: {approver_name}
+**拒绝原因**
+{approval.approve_comment or '未填写原因'}
 
----
-
-**🎯 变更详情**
-
-> 🖥️ **目标实例**: {instance_name}
-> 🗄️ **目标数据库**: {db_target}
-> 🔧 **变更类型**: {change_type_display}
-> 📊 **风险等级**: {risk_display}
-
----
-
-**❌ 拒绝原因**
-
-> {approval.approve_comment or '未填写原因'}
-
----
-
-⏰ **拒绝时间**: {approval.approve_time.strftime('%m-%d %H:%M') if approval.approve_time else '未知'}"""
+拒绝时间: {approval.approve_time.strftime('%m-%d %H:%M') if approval.approve_time else '未知'}"""
         elif notification_type == "executed":
-            title = "🚀 变更执行完成"
+            title = "变更执行完成"
             
             # 实际影响行数
-            affected_info = "—"
+            affected_info = "未知"
             if approval.affected_rows_actual:
-                affected_info = f"**{approval.affected_rows_actual:,}** 行"
+                affected_info = f"{approval.affected_rows_actual:,} 行"
             
             # 执行结果状态
-            result_icon = "✅" if "成功" in (approval.execute_result or "") else "⚠️"
+            result_text = approval.execute_result or "执行完成"
             
-            content = f"""### {title}
+            content = f"""## {title}
 
----
+**申请信息**
+- 标题: {approval.title}
+- 申请人: {requester_name}
 
-**📋 申请信息**
+**变更详情**
+- 目标实例: {instance_name}
+- 目标数据库: {db_target}
+- 变更类型: {change_type_display}
+- 实际影响: {affected_info}
 
-> **标题**: {approval.title}
-> **申请人**: {requester_name}
-
----
-
-**🎯 变更详情**
-
-> 🖥️ **目标实例**: {instance_name}
-> 🗄️ **目标数据库**: {db_target}
-> 🔧 **变更类型**: {change_type_display}
-> 📈 **实际影响**: {affected_info}
-
----
-
-**📊 执行结果**
-
-> **状态**: {result_icon} {approval.execute_result or '执行完成'}
-> **完成时间**: {approval.execute_time.strftime('%m-%d %H:%M') if approval.execute_time else '未知'}"""
+**执行结果**
+- 状态: {result_text}
+- 完成时间: {approval.execute_time.strftime('%m-%d %H:%M') if approval.execute_time else '未知'}"""
         else:
             return
         
@@ -462,30 +425,24 @@ class NotificationService:
         
         # 构建通知内容
         if success:
-            title = "✅ 定时任务执行成功"
-            status_icon = "✅"
+            title = "定时任务执行成功"
+            status_text = "成功"
         else:
-            title = "❌ 定时任务执行失败"
-            status_icon = "❌"
+            title = "定时任务执行失败"
+            status_text = "失败"
         
-        content = f"""### {title}
+        content = f"""## {title}
 
----
+**任务信息**
+- 任务名称: {task.name}
+- 执行脚本: {execution.script.name if execution.script else '未知脚本'}
 
-**📋 任务信息**
-
-> **任务名称**: {task.name}
-> **执行脚本**: {execution.script.name if execution.script else '未知脚本'}
-
----
-
-**📊 执行详情**
-
-> 📌 **执行状态**: {status_icon} {'成功' if success else '失败'}
-> ⏱️ **执行耗时**: {f'{execution.duration:.2f}秒' if execution.duration else '未知'}
-> 🔢 **退出码**: {execution.exit_code if execution.exit_code is not None else 'N/A'}
-> 🕐 **开始时间**: {execution.start_time.strftime('%m-%d %H:%M:%S') if execution.start_time else '未知'}
-> 🏁 **结束时间**: {execution.end_time.strftime('%m-%d %H:%M:%S') if execution.end_time else '未知'}"""
+**执行详情**
+- 执行状态: {status_text}
+- 执行耗时: {f'{execution.duration:.2f}秒' if execution.duration else '未知'}
+- 退出码: {execution.exit_code if execution.exit_code is not None else 'N/A'}
+- 开始时间: {execution.start_time.strftime('%m-%d %H:%M:%S') if execution.start_time else '未知'}
+- 结束时间: {execution.end_time.strftime('%m-%d %H:%M:%S') if execution.end_time else '未知'}"""
         
         if not success and execution.error_output:
             # 截取错误信息前500字符
@@ -494,13 +451,8 @@ class NotificationService:
                 error_preview += "..."
             content += f"""
 
----
-
-**❌ 错误信息**
-
-```
-{error_preview}
-```"""
+**错误信息**
+{error_preview}"""
         
         # 获取通知绑定 - 定时任务类型
         bindings = db.query(NotificationBinding).filter(

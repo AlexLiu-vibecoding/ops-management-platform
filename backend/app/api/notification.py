@@ -305,30 +305,21 @@ async def test_channel(
         if format == "markdown":
             # 发送模拟的"变更执行完成"通知
             keyword_suffix = f" {channel.keywords[0]}" if channel.auth_type == "keyword" and channel.keywords else ""
-            content = f"""### 🚀 变更执行完成
+            content = f"""## 变更执行完成
 
----
+**申请信息**
+- 标题: 测试变更申请
+- 申请人: {current_user.real_name}
 
-**📋 申请信息**
+**变更详情**
+- 目标实例: test-mysql-master
+- 目标数据库: production_db
+- 变更类型: DML(数据变更)
+- 实际影响: 1,234 行
 
-> **标题**: 测试变更申请
-> **申请人**: {current_user.real_name}
-
----
-
-**🎯 变更详情**
-
-> 🖥️ **目标实例**: test-mysql-master
-> 🗄️ **目标数据库**: production_db
-> 🔧 **变更类型**: 📝 DML (数据变更)
-> 📈 **实际影响**: **1,234** 行
-
----
-
-**📊 执行结果**
-
-> **状态**: ✅ 执行成功
-> **完成时间**: {__import__('datetime').datetime.now().strftime('%m-%d %H:%M')}{keyword_suffix}"""
+**执行结果**
+- 状态: 执行成功
+- 完成时间: {__import__('datetime').datetime.now().strftime('%m-%d %H:%M')}{keyword_suffix}"""
             
             message = {
                 "msgtype": "markdown",
