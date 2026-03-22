@@ -13,7 +13,7 @@
       </template>
       
       <el-table :data="channels" style="width: 100%" v-loading="channelLoading">
-        <el-table-column prop="name" label="通道名称" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="name" label="通道名称" min-width="100" />
         <el-table-column prop="channel_type_label" label="类型" width="80" align="center">
           <template #default="{ row }">
             <el-tag size="small">{{ row.channel_type_label }}</el-tag>
@@ -26,7 +26,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="description" label="描述" min-width="100" />
         <el-table-column prop="is_enabled" label="状态" width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
@@ -259,7 +259,8 @@ const fetchChannels = async () => {
 const fetchBindings = async () => {
   bindingLoading.value = true
   try {
-    bindings.value = await request.get('/notification/bindings')
+    const res = await request.get('/notification/bindings')
+    bindings.value = res.items || []
   } catch (error) {
     console.error('获取绑定列表失败:', error)
   } finally {

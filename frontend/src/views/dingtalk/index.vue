@@ -241,7 +241,7 @@
           <el-select v-model="bindingDialog.form.notification_type" placeholder="请选择通知类型" style="width: 100%;">
             <el-option label="审批通知" value="approval" />
             <el-option label="告警通知" value="alert" />
-            <el-option label="操作通知" value="operation" />
+            <el-option label="审计日志通知" value="operation" />
           </el-select>
         </el-form-item>
         <el-form-item label="环境">
@@ -676,7 +676,7 @@ const getNotificationTypeName = (type) => {
   const typeMap = {
     approval: '审批通知',
     alert: '告警通知',
-    operation: '操作通知'
+    operation: '审计日志通知'
   }
   return typeMap[type] || type
 }

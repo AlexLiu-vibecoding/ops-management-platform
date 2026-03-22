@@ -105,7 +105,7 @@ NOTIFICATION_TYPE_LABELS = {
     "approval": "审批通知",
     "alert": "告警通知",
     "scheduled_task": "定时任务通知",
-    "operation": "操作通知"
+    "operation": "审计日志通知"
 }
 
 
@@ -130,7 +130,7 @@ async def get_notification_types():
         {"value": "approval", "label": "审批通知"},
         {"value": "alert", "label": "告警通知"},
         {"value": "scheduled_task", "label": "定时任务通知"},
-        {"value": "operation", "label": "操作通知"}
+        {"value": "operation", "label": "审计日志通知"}
     ]
 
 
