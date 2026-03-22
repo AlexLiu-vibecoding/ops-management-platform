@@ -271,15 +271,13 @@ class NotificationService:
 
 **🎯 变更详情**
 
-| 项目 | 内容 |
-|:---|:---|
-| 🖥️ 目标实例 | {instance_name} |
-| 🗄️ 目标数据库 | {db_target} |
-| 🔧 变更类型 | {change_type_display} |
-| 📊 风险等级 | {risk_display} |
-| 📝 SQL行数 | **{approval.sql_line_count or 0}** 行 |
-| 📈 影响行数 | {affected_rows_info} |
-| ⚙️ 执行方式 | {execute_mode} |
+> 🖥️ **目标实例**: {instance_name}
+> 🗄️ **目标数据库**: {db_target}
+> 🔧 **变更类型**: {change_type_display}
+> 📊 **风险等级**: {risk_display}
+> 📝 **SQL行数**: {approval.sql_line_count or 0} 行
+> 📈 **影响行数**: {affected_rows_info}
+> ⚙️ **执行方式**: {execute_mode}
 
 ---
 
@@ -311,12 +309,10 @@ class NotificationService:
 
 **🎯 变更详情**
 
-| 项目 | 内容 |
-|:---|:---|
-| 🖥️ 目标实例 | {instance_name} |
-| 🗄️ 目标数据库 | {db_target} |
-| 🔧 变更类型 | {change_type_display} |
-| 📊 风险等级 | {risk_display} |
+> 🖥️ **目标实例**: {instance_name}
+> 🗄️ **目标数据库**: {db_target}
+> 🔧 **变更类型**: {change_type_display}
+> 📊 **风险等级**: {risk_display}
 
 ---
 
@@ -346,12 +342,10 @@ class NotificationService:
 
 **🎯 变更详情**
 
-| 项目 | 内容 |
-|:---|:---|
-| 🖥️ 目标实例 | {instance_name} |
-| 🗄️ 目标数据库 | {db_target} |
-| 🔧 变更类型 | {change_type_display} |
-| 📊 风险等级 | {risk_display} |
+> 🖥️ **目标实例**: {instance_name}
+> 🗄️ **目标数据库**: {db_target}
+> 🔧 **变更类型**: {change_type_display}
+> 📊 **风险等级**: {risk_display}
 
 ---
 
@@ -386,12 +380,10 @@ class NotificationService:
 
 **🎯 变更详情**
 
-| 项目 | 内容 |
-|:---|:---|
-| 🖥️ 目标实例 | {instance_name} |
-| 🗄️ 目标数据库 | {db_target} |
-| 🔧 变更类型 | {change_type_display} |
-| 📈 实际影响 | {affected_info} |
+> 🖥️ **目标实例**: {instance_name}
+> 🗄️ **目标数据库**: {db_target}
+> 🔧 **变更类型**: {change_type_display}
+> 📈 **实际影响**: {affected_info}
 
 ---
 
@@ -489,13 +481,11 @@ class NotificationService:
 
 **📊 执行详情**
 
-| 项目 | 内容 |
-|:---|:---|
-| 📌 执行状态 | {status_icon} {'成功' if success else '失败'} |
-| ⏱️ 执行耗时 | {f'{execution.duration:.2f}秒' if execution.duration else '未知'} |
-| 🔢 退出码 | {execution.exit_code if execution.exit_code is not None else 'N/A'} |
-| 🕐 开始时间 | {execution.start_time.strftime('%m-%d %H:%M:%S') if execution.start_time else '未知'} |
-| 🏁 结束时间 | {execution.end_time.strftime('%m-%d %H:%M:%S') if execution.end_time else '未知'} |"""
+> 📌 **执行状态**: {status_icon} {'成功' if success else '失败'}
+> ⏱️ **执行耗时**: {f'{execution.duration:.2f}秒' if execution.duration else '未知'}
+> 🔢 **退出码**: {execution.exit_code if execution.exit_code is not None else 'N/A'}
+> 🕐 **开始时间**: {execution.start_time.strftime('%m-%d %H:%M:%S') if execution.start_time else '未知'}
+> 🏁 **结束时间**: {execution.end_time.strftime('%m-%d %H:%M:%S') if execution.end_time else '未知'}"""
         
         if not success and execution.error_output:
             # 截取错误信息前500字符
