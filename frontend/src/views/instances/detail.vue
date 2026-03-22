@@ -60,7 +60,9 @@
             </el-table-column>
             <el-table-column label="配置" width="100">
               <template #default="{ row }">
-                <el-button text type="primary" @click="showConfig(row)">详细配置</el-button>
+                <div class="table-operations">
+                  <el-button link type="primary" size="small" @click="showConfig(row)">配置</el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>

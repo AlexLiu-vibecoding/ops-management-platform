@@ -52,18 +52,14 @@
         <el-table-column prop="created_by" label="创建人" width="100" />
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button text type="primary" @click="handleTrigger(row)" :disabled="row.status !== 'enabled'">
-              立即执行
-            </el-button>
-            <el-button v-if="row.status === 'enabled'" text type="warning" @click="handlePause(row)">
-              暂停
-            </el-button>
-            <el-button v-else text type="success" @click="handleResume(row)">
-              恢复
-            </el-button>
-            <el-button text type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button text type="primary" @click="handleHistory(row)">历史</el-button>
-            <el-button text type="danger" @click="handleDelete(row)">删除</el-button>
+            <div class="table-operations">
+              <el-button link type="primary" size="small" @click="handleTrigger(row)" :disabled="row.status !== 'enabled'">执行</el-button>
+              <el-button v-if="row.status === 'enabled'" link type="warning" size="small" @click="handlePause(row)">暂停</el-button>
+              <el-button v-else link type="success" size="small" @click="handleResume(row)">恢复</el-button>
+              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button link type="primary" size="small" @click="handleHistory(row)">历史</el-button>
+              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -191,7 +187,9 @@
         <el-table-column prop="exit_code" label="退出码" width="80" />
         <el-table-column label="操作" width="100">
           <template #default="{ row }">
-            <el-button text type="primary" @click="viewExecutionDetail(row)">详情</el-button>
+            <div class="table-operations">
+              <el-button link type="primary" size="small" @click="viewExecutionDetail(row)">详情</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -499,6 +497,16 @@ onMounted(() => {
     margin-top: 15px;
     display: flex;
     justify-content: flex-end;
+  }
+  
+  .table-operations {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .el-button + .el-button {
+      margin-left: 0;
+    }
   }
   
   code {

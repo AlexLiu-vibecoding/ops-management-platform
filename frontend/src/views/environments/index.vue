@@ -36,10 +36,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
-        <el-table-column label="操作" width="150" v-if="isAdmin">
+        <el-table-column label="操作" width="150" v-if="isAdmin" fixed="right">
           <template #default="{ row }">
-            <el-button text type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button text type="danger" @click="handleDelete(row)">删除</el-button>
+            <div class="table-operations">
+              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -181,6 +183,16 @@ onMounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+  
+  .table-operations {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .el-button + .el-button {
+      margin-left: 0;
+    }
   }
 }
 </style>

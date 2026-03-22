@@ -105,7 +105,9 @@
         </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
-            <el-button text type="danger" @click="handleDeleteBinding(row)">删除</el-button>
+            <div class="table-operations">
+              <el-button link type="danger" size="small" @click="handleDeleteBinding(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>

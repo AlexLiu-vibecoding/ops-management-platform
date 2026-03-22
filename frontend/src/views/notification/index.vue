@@ -36,9 +36,11 @@
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button text type="primary" @click="handleTestChannel(row)">测试</el-button>
-            <el-button text type="primary" @click="handleEditChannel(row)">编辑</el-button>
-            <el-button text type="danger" @click="handleDeleteChannel(row)">删除</el-button>
+            <div class="table-operations">
+              <el-button link type="primary" size="small" @click="handleTestChannel(row)">测试</el-button>
+              <el-button link type="primary" size="small" @click="handleEditChannel(row)">编辑</el-button>
+              <el-button link type="danger" size="small" @click="handleDeleteChannel(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -83,7 +85,9 @@
         </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
-            <el-button text type="danger" @click="handleDeleteBinding(row)">删除</el-button>
+            <div class="table-operations">
+              <el-button link type="danger" size="small" @click="handleDeleteBinding(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -476,6 +480,16 @@ onMounted(() => {
     font-size: 12px;
     color: #909399;
     margin-top: 4px;
+  }
+  
+  .table-operations {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .el-button + .el-button {
+      margin-left: 0;
+    }
   }
 }
 </style>

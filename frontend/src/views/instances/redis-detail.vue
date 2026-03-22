@@ -107,9 +107,11 @@
             <el-table-column prop="ttl_human" label="TTL" width="120" />
             <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
-                <el-button text type="primary" size="small" @click.stop="viewKeyDetail(row)">查看</el-button>
-                <el-button text type="warning" size="small" @click.stop="editTTL(row)">设置TTL</el-button>
-                <el-button text type="danger" size="small" @click.stop="deleteKey(row)">删除</el-button>
+                <div class="table-operations">
+                  <el-button link type="primary" size="small" @click.stop="viewKeyDetail(row)">查看</el-button>
+                  <el-button link type="warning" size="small" @click.stop="editTTL(row)">TTL</el-button>
+                  <el-button link type="danger" size="small" @click.stop="deleteKey(row)">删除</el-button>
+                </div>
               </template>
             </el-table-column>
           </el-table>

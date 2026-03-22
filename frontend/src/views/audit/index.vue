@@ -105,7 +105,9 @@
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ row }">
-            <el-button text type="primary" @click="handleViewDetail(row)">详情</el-button>
+            <div class="table-operations">
+              <el-button link type="primary" size="small" @click="handleViewDetail(row)">详情</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>

@@ -77,17 +77,13 @@
             <span v-else>所有用户</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" text size="small" @click="handleAdd(row)">
-              添加子菜单
-            </el-button>
-            <el-button type="primary" text size="small" @click="handleEdit(row)">
-              编辑
-            </el-button>
-            <el-button type="danger" text size="small" @click="handleDelete(row)">
-              删除
-            </el-button>
+            <div class="table-operations">
+              <el-button link type="primary" size="small" @click="handleAdd(row)">添加</el-button>
+              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -386,6 +382,16 @@ onMounted(() => {
     .header-actions {
       display: flex;
       gap: 10px;
+    }
+  }
+  
+  .table-operations {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    
+    .el-button + .el-button {
+      margin-left: 0;
     }
   }
 }
