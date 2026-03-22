@@ -127,10 +127,10 @@
                   <el-input-number
                     v-model="storageConfig.size_threshold"
                     :min="1000"
-                    :max="1000000"
-                    :step="1000"
+                    :max="50000000"
+                    :step="100000"
                   />
-                  <span class="unit">字符 (约 {{ (storageConfig.size_threshold / 1000).toFixed(0) }}KB)</span>
+                  <span class="unit">字符 (约 {{ storageConfig.size_threshold >= 1000000 ? (storageConfig.size_threshold / 1000000).toFixed(1) + 'MB' : (storageConfig.size_threshold / 1000).toFixed(0) + 'KB' }})</span>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -345,7 +345,7 @@ const databaseConfigs = ref([])
 const storageConfig = reactive({
   storage_type: 'local',
   retention_days: 30,
-  size_threshold: 10000,
+  size_threshold: 10000000,
   local_path: '/app/data/sql_files',
   // AWS S3 配置
   s3_bucket: '',

@@ -21,7 +21,8 @@ class StorageSettings(BaseSettings):
     SQL_FILE_RETENTION_DAYS: int = 30
     
     # 大文件阈值（字符数），超过此大小存文件
-    SQL_FILE_SIZE_THRESHOLD: int = 10000  # 约10KB
+    # 对于变更审批场景，10MB 是合理阈值（避免正常的批量SQL被存文件）
+    SQL_FILE_SIZE_THRESHOLD: int = 10000000  # 约10MB
     
     # AWS S3 配置
     AWS_ACCESS_KEY_ID: Optional[str] = None

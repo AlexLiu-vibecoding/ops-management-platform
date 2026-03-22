@@ -65,7 +65,7 @@ def _init_default_configs(db):
     configs = [
         GlobalConfig(config_key="storage_type", config_value="local"),
         GlobalConfig(config_key="retention_days", config_value="30"),
-        GlobalConfig(config_key="size_threshold", config_value="10000"),
+        GlobalConfig(config_key="size_threshold", config_value="10000000"),
         GlobalConfig(config_key="local_path", config_value="/app/data/sql_files"),
     ]
     for config in configs:

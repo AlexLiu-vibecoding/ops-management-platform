@@ -171,7 +171,7 @@ class StorageConfigUpdate(BaseModel):
     """存储配置更新请求"""
     storage_type: Optional[str] = Field(None, description="存储类型: local, s3, oss")
     retention_days: Optional[int] = Field(None, ge=1, le=365, description="文件保留天数")
-    size_threshold: Optional[int] = Field(None, ge=1000, le=1000000, description="大文件阈值")
+    size_threshold: Optional[int] = Field(None, ge=1000, le=50000000, description="大文件阈值")
     local_path: Optional[str] = Field(None, description="本地存储路径")
     # AWS S3 配置
     s3_bucket: Optional[str] = Field(None, description="S3 Bucket名称")
