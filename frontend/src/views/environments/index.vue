@@ -49,7 +49,7 @@
     
     <!-- 添加/编辑对话框 -->
     <el-dialog v-model="dialog.visible" :title="dialog.isEdit ? '编辑环境' : '添加环境'" width="500px">
-      <el-form :model="dialog.form" :rules="dialog.rules" ref="formRef" label-width="100px">
+      <el-form :model="dialog.form" :rules="dialog.rules" ref="formRef" label-width="100px" class="dialog-form">
         <el-form-item label="环境名称" prop="name">
           <el-input v-model="dialog.form.name" placeholder="请输入环境名称" />
         </el-form-item>

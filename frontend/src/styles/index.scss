@@ -723,3 +723,187 @@ html, body {
     padding: 0 !important;
   }
 }
+
+// ========================================
+// Form Layout - 自适应表单布局
+// ========================================
+
+// 表单项间距统一
+.el-form {
+  .el-form-item {
+    margin-bottom: 18px !important;
+    
+    &:last-child {
+      margin-bottom: 0 !important;
+    }
+  }
+  
+  // 行内表单
+  &.el-form--inline {
+    .el-form-item {
+      margin-bottom: 0 !important;
+      margin-right: 16px !important;
+      
+      &:last-child {
+        margin-right: 0 !important;
+      }
+    }
+  }
+}
+
+// el-row 统一间距
+.el-row {
+  &.form-row, &[gutter] {
+    .el-col {
+      padding-left: 10px;
+      padding-right: 10px;
+      
+      &:first-child {
+        padding-left: 0;
+      }
+      
+      &:last-child {
+        padding-right: 0;
+      }
+    }
+  }
+}
+
+// 表单 label 自适应宽度
+.el-form-item {
+  .el-form-item__label {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 12px;
+    
+    // 响应式：小屏幕时 label 宽度自动
+    @media (max-width: 768px) {
+      justify-content: flex-start;
+      text-align: left;
+    }
+  }
+}
+
+// ========================================
+// Dialog 响应式宽度
+// ========================================
+.el-dialog {
+  // 默认最大宽度限制
+  max-width: calc(100vw - 40px) !important;
+  
+  // 不同尺寸的对话框
+  &.el-dialog--small, &[style*="width: 400px"], &[style*="width:420px"] {
+    width: 420px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  
+  &[style*="width: 500px"], &[style*="width:500px"] {
+    width: 500px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  
+  &[style*="width: 550px"], &[style*="width:550px"] {
+    width: 550px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  
+  &[style*="width: 600px"], &[style*="width:600px"] {
+    width: 600px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  
+  &[style*="width: 650px"], &[style*="width:650px"] {
+    width: 650px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  
+  &[style*="width: 700px"], &[style*="width:700px"] {
+    width: 700px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  
+  &[style*="width: 800px"], &[style*="width:800px"] {
+    width: 800px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  
+  &[style*="width: 900px"], &[style*="width:900px"] {
+    width: 900px !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  
+  // 小屏幕适配
+  @media (max-width: 768px) {
+    width: calc(100vw - 32px) !important;
+    margin-top: 16px !important;
+    
+    .el-dialog__body {
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+  }
+}
+
+// ========================================
+// Table 操作栏统一样式
+// ========================================
+.table-operations {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  
+  .el-button {
+    margin: 0 !important;
+    padding: 4px 8px !important;
+    
+    &.el-button--link, &.is-link {
+      padding: 4px 8px !important;
+    }
+  }
+}
+
+// ========================================
+// Dialog 表单样式
+// ========================================
+.dialog-form {
+  .el-form-item {
+    margin-bottom: 20px !important;
+  }
+  
+  // 紧凑模式
+  &.compact {
+    .el-form-item {
+      margin-bottom: 14px !important;
+    }
+  }
+}
+
+// ========================================
+// 搜索栏样式
+// ========================================
+.search-card {
+  .el-card__body {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    
+    .el-form {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      
+      .el-form-item {
+        margin-bottom: 0 !important;
+      }
+    }
+    
+    .el-button:not(.el-form .el-button) {
+      flex-shrink: 0;
+    }
+  }
+}

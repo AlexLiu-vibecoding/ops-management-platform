@@ -93,6 +93,7 @@
         :model="dialog.form"
         :rules="dialog.rules"
         label-width="80px"
+        class="dialog-form"
       >
         <el-form-item label="用户名" prop="username">
           <el-input v-model="dialog.form.username" placeholder="请输入用户名" :disabled="dialog.isEdit" />

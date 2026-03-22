@@ -128,7 +128,7 @@
         <el-form-item label="实例名称" prop="name">
           <el-input v-model="dialog.form.name" placeholder="请输入实例名称" />
         </el-form-item>
-        <el-row>
+        <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="数据库类型" prop="db_type">
               <el-select v-model="dialog.form.db_type" placeholder="请选择数据库类型" style="width: 100%;">
@@ -167,7 +167,7 @@
             <el-checkbox v-model="dialog.form.is_rds" :label="'AWS RDS 实例'" />
           </el-divider>
           
-          <el-row v-if="dialog.form.is_rds">
+          <el-row :gutter="20" v-if="dialog.form.is_rds">
             <el-col :span="12">
               <el-form-item label="RDS 实例ID" prop="rds_instance_id">
                 <el-input v-model="dialog.form.rds_instance_id" placeholder="如: my-db-instance" />
@@ -193,7 +193,7 @@
         <!-- 直连配置 -->
         <el-divider content-position="left" v-if="!dialog.form.is_rds">{{ dialog.form.db_type === 'redis' ? 'Redis 连接配置' : '直连配置' }}</el-divider>
         
-        <el-row v-if="!dialog.form.is_rds">
+        <el-row :gutter="20" v-if="!dialog.form.is_rds">
           <el-col :span="16">
             <el-form-item label="主机地址" prop="host">
               <el-input v-model="dialog.form.host" placeholder="请输入主机地址" />

@@ -100,7 +100,7 @@
       width="550px"
       destroy-on-close
     >
-      <el-form :model="channelDialog.form" label-width="100px">
+      <el-form :model="channelDialog.form" label-width="100px" class="dialog-form">
         <el-form-item label="通道名称" required>
           <el-input v-model="channelDialog.form.name" placeholder="请输入通道名称" />
         </el-form-item>
@@ -155,7 +155,7 @@
       width="500px"
       destroy-on-close
     >
-      <el-form :model="bindingDialog.form" label-width="100px">
+      <el-form :model="bindingDialog.form" label-width="100px" class="dialog-form">
         <el-form-item label="通知通道" required>
           <el-select v-model="bindingDialog.form.channel_id" placeholder="请选择通知通道" style="width: 100%">
             <el-option
