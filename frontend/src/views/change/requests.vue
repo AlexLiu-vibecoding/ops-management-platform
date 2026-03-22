@@ -139,13 +139,60 @@
         </el-row>
         
         <el-form-item label="SQL内容" prop="sql_content">
-          <el-input
-            v-model="dialog.form.sql_content"
-            type="textarea"
-            :rows="12"
-            placeholder="请输入SQL语句"
-            style="font-family: monospace;"
-          />
+          <div class="sql-input-wrapper">
+            <!-- 文件上传区域 -->
+            <div class="upload-section">
+              <el-upload
+                ref="uploadRef"
+                :auto-upload="false"
+                :show-file-list="false"
+                accept=".sql,.txt"
+                :on-change="handleFileSelect"
+                :disabled="dialog.fileLoading"
+              >
+                <el-button type="primary" plain :loading="dialog.fileLoading">
+                  <el-icon><Upload /></el-icon>
+                  {{ dialog.fileLoading ? '正在读取文件...' : '上传SQL文件' }}
+                </el-button>
+              </el-upload>
+              
+              <!-- SQL统计信息 -->
+              <div v-if="sqlStats.totalLines > 0" class="sql-stats">
+                <el-tag :type="sqlStats.totalLines > 1000 ? 'warning' : 'success'">
+                  共 {{ sqlStats.totalLines.toLocaleString() }} 行
+                </el-tag>
+                <el-tag type="info">
+                  {{ formatFileSize(sqlStats.fileSize) }}
+                </el-tag>
+              </div>
+            </div>
+            
+            <!-- SQL内容编辑器 -->
+            <div class="editor-container">
+              <div class="editor-header">
+                <span>SQL内容</span>
+                <div class="editor-actions">
+                  <el-button size="small" text @click="formatSQLContent">
+                    <el-icon><MagicStick /></el-icon>
+                    格式化
+                  </el-button>
+                  <el-button size="small" text @click="clearSQLContent">
+                    <el-icon><Delete /></el-icon>
+                    清空
+                  </el-button>
+                </div>
+              </div>
+              
+              <el-input
+                v-model="dialog.form.sql_content"
+                type="textarea"
+                :rows="10"
+                placeholder="请输入SQL语句，或上传SQL文件"
+                class="sql-textarea"
+                style="font-family: monospace;"
+              />
+            </div>
+          </div>
         </el-form-item>
         
         <el-form-item label="备注">
@@ -191,7 +238,7 @@ import request from '@/api/index'
 import { instancesApi } from '@/api/instances'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Upload, MagicStick, Delete } from '@element-plus/icons-vue'
 import ApprovalDetailCard from '@/components/ApprovalDetailCard.vue'
 import dayjs from 'dayjs'
 
@@ -202,8 +249,22 @@ const loading = ref(false)
 const approvalList = ref([])
 const instances = ref([])
 const formRef = ref(null)
+const uploadRef = ref(null)
 const statusFilter = ref('')
 const searchKeyword = ref('')
+
+// 完整SQL内容（大文件时用于提交）
+const fullSqlContent = ref('')
+
+// SQL统计信息
+const sqlStats = reactive({
+  totalLines: 0,
+  fileSize: 0,
+  isLargeFile: false
+})
+
+// 文件大小限制
+const MAX_FILE_SIZE = 10 * 1024 * 1024
 
 const pagination = reactive({
   page: 1,
@@ -214,6 +275,7 @@ const pagination = reactive({
 const dialog = reactive({
   visible: false,
   submitting: false,
+  fileLoading: false,
   dbLoading: false,
   databases: [],
   form: {
@@ -280,7 +342,107 @@ const handleAdd = () => {
     execution_mode: 'auto',
     scheduled_time: null
   }
+  // 重置文件状态
+  fullSqlContent.value = ''
+  sqlStats.totalLines = 0
+  sqlStats.fileSize = 0
+  sqlStats.isLargeFile = false
   dialog.visible = true
+}
+
+/**
+ * 处理文件选择
+ */
+const handleFileSelect = async (file) => {
+  const rawFile = file.raw
+  
+  if (!rawFile.name.endsWith('.sql') && !rawFile.name.endsWith('.txt')) {
+    ElMessage.error('仅支持 .sql 或 .txt 文件')
+    return
+  }
+  
+  if (rawFile.size > MAX_FILE_SIZE) {
+    ElMessage.error(`文件大小不能超过 ${formatFileSize(MAX_FILE_SIZE)}`)
+    return
+  }
+  
+  dialog.fileLoading = true
+  sqlStats.fileSize = rawFile.size
+  
+  try {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const content = e.target.result
+      fullSqlContent.value = content
+      
+      const lineCount = (content.match(/\n/g) || []).length + 1
+      sqlStats.totalLines = lineCount
+      sqlStats.isLargeFile = lineCount > 1000
+      
+      if (lineCount > 100) {
+        const lines = content.split('\n').slice(0, 100)
+        dialog.form.sql_content = lines.join('\n')
+        ElMessage.warning(`文件共 ${lineCount.toLocaleString()} 行，已截取前100行显示预览`)
+      } else {
+        dialog.form.sql_content = content
+      }
+      
+      ElMessage.success(`文件加载成功: ${rawFile.name}`)
+    }
+    reader.readAsText(rawFile)
+  } catch (error) {
+    ElMessage.error('文件读取失败: ' + error.message)
+    resetFileState()
+  } finally {
+    dialog.fileLoading = false
+  }
+}
+
+/**
+ * 重置文件状态
+ */
+const resetFileState = () => {
+  fullSqlContent.value = ''
+  sqlStats.totalLines = 0
+  sqlStats.fileSize = 0
+  sqlStats.isLargeFile = false
+}
+
+/**
+ * 格式化SQL内容
+ */
+const formatSQLContent = () => {
+  if (!dialog.form.sql_content.trim()) return
+  let formatted = dialog.form.sql_content.replace(/\s+/g, ' ').trim()
+  const keywords = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'LIMIT', 'JOIN', 'ON', 'AND', 'OR']
+  keywords.forEach(kw => {
+    formatted = formatted.replace(new RegExp(`\\b${kw}\\b`, 'gi'), '\n' + kw)
+  })
+  dialog.form.sql_content = formatted.trim()
+  fullSqlContent.value = dialog.form.sql_content
+  ElMessage.success('SQL已格式化')
+}
+
+/**
+ * 清空SQL内容
+ */
+const clearSQLContent = () => {
+  dialog.form.sql_content = ''
+  fullSqlContent.value = ''
+  sqlStats.totalLines = 0
+  sqlStats.fileSize = 0
+  sqlStats.isLargeFile = false
+}
+
+/**
+ * 格式化文件大小
+ */
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 const handleInstanceSelect = async (instanceId) => {
@@ -305,12 +467,15 @@ const handleSubmit = async () => {
     
     dialog.submitting = true
     try {
+      // 如果是大文件，使用完整内容提交
+      const sqlToSubmit = fullSqlContent.value || dialog.form.sql_content
+      
       const submitData = {
         title: dialog.form.title,
         change_type: dialog.form.change_type,
         instance_id: dialog.form.instance_id,
         database_name: dialog.form.database_name,
-        sql_content: dialog.form.sql_content,
+        sql_content: sqlToSubmit,
         remark: dialog.form.remark,
         affected_rows_estimate: dialog.form.affected_rows_estimate,
         auto_execute: dialog.form.execution_mode === 'auto'
@@ -413,6 +578,57 @@ onMounted(() => {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+  }
+  
+  .sql-input-wrapper {
+    width: 100%;
+    
+    .upload-section {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      
+      .sql-stats {
+        display: flex;
+        gap: 8px;
+      }
+    }
+    
+    .editor-container {
+      border: 1px solid #dcdfe6;
+      border-radius: 4px;
+      overflow: hidden;
+      
+      .editor-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        background: #f5f7fa;
+        border-bottom: 1px solid #dcdfe6;
+        
+        span {
+          font-weight: 500;
+          color: #606266;
+        }
+        
+        .editor-actions {
+          display: flex;
+          gap: 8px;
+        }
+      }
+      
+      .sql-textarea {
+        :deep(.el-textarea__inner) {
+          border: none;
+          border-radius: 0;
+          font-family: 'Consolas', 'Monaco', monospace;
+          font-size: 13px;
+          line-height: 1.5;
+        }
+      }
     }
   }
   
