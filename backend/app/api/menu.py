@@ -284,13 +284,13 @@ async def add_missing_menus(
     db: Session = Depends(get_db)
 ):
     """Add missing menus (used for version upgrades)"""
-    # Required menus
+    # Required top-level menus
     required_menus = [
         {"name": "仪表盘", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
         {"name": "实例管理", "path": "/instances", "icon": "Server", "sort_order": 2, "roles": "super_admin,approval_admin,operator"},
         {"name": "环境管理", "path": "/environments", "icon": "Collection", "sort_order": 3, "roles": "super_admin,approval_admin,operator"},
         {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
-        {"name": "变更审批", "path": "/approvals", "icon": "Stamp", "sort_order": 5},
+        {"name": "变更管理", "path": "/change", "icon": "Stamp", "sort_order": 5},  # Group menu, no direct access
         {"name": "监控中心", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
         {"name": "脚本管理", "path": "/scripts", "icon": "DocumentCopy", "sort_order": 7, "roles": "super_admin,approval_admin,operator"},
         {"name": "定时任务", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
@@ -303,13 +303,35 @@ async def add_missing_menus(
     ]
     
     added_count = 0
+    path_to_id = {}
+    
     for menu_data in required_menus:
         # Check if menu already exists
         existing = db.query(MenuConfig).filter(MenuConfig.path == menu_data["path"]).first()
         if not existing:
             menu = MenuConfig(**menu_data)
             db.add(menu)
+            db.flush()  # Get ID
+            path_to_id[menu_data["path"]] = menu.id
             added_count += 1
+        else:
+            path_to_id[menu_data["path"]] = existing.id
+    
+    # Check change management sub-menus
+    change_parent = db.query(MenuConfig).filter(MenuConfig.path == "/change").first()
+    if change_parent:
+        change_child_menus = [
+            {"name": "SQL变更申请", "path": "/change/requests", "icon": "EditPen", "sort_order": 1},
+            {"name": "Redis变更申请", "path": "/change/redis-requests", "icon": "Key", "sort_order": 2},
+            {"name": "审批中心", "path": "/change/approvals", "icon": "Checked", "sort_order": 3, "roles": "super_admin,approval_admin"},
+        ]
+        
+        for menu_data in change_child_menus:
+            existing = db.query(MenuConfig).filter(MenuConfig.path == menu_data["path"]).first()
+            if not existing:
+                menu = MenuConfig(**menu_data, parent_id=change_parent.id)
+                db.add(menu)
+                added_count += 1
     
     # Check monitor sub-menus
     monitor_parent = db.query(MenuConfig).filter(MenuConfig.path == "/monitor").first()
@@ -327,6 +349,14 @@ async def add_missing_menus(
                 db.add(menu)
                 added_count += 1
     
+    # Remove old menu entries that are no longer needed
+    old_paths = ["/approvals"]  # Old single approval menu
+    for old_path in old_paths:
+        old_menu = db.query(MenuConfig).filter(MenuConfig.path == old_path).first()
+        if old_menu:
+            db.delete(old_menu)
+            added_count += 1  # Count as change
+    
     db.commit()
     
-    return MessageResponse(message=f"Successfully added {added_count} missing menus")
+    return MessageResponse(message=f"Successfully added/updated {added_count} menus")

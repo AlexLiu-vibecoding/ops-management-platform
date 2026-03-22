@@ -82,7 +82,13 @@ const routes = [
             path: 'requests',
             name: 'ChangeRequests',
             component: () => import('@/views/change/requests.vue'),
-            meta: { title: '变更申请', icon: 'EditPen' }
+            meta: { title: 'SQL变更申请', icon: 'EditPen' }
+          },
+          {
+            path: 'redis-requests',
+            name: 'RedisChangeRequests',
+            component: () => import('@/views/change/redis-requests.vue'),
+            meta: { title: 'Redis变更申请', icon: 'Key' }
           },
           {
             path: 'approvals',
