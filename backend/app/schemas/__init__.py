@@ -530,3 +530,100 @@ class MenuItemResponse(BaseModel):
     path: str
     icon: Optional[str]
     children: Optional[List['MenuItemResponse']] = None
+
+
+# ============ SQL优化器相关 ============
+class TableSchemaSyncRequest(BaseModel):
+    """表结构同步请求"""
+    instance_id: int = Field(..., description="实例ID")
+    database_name: Optional[str] = Field(None, description="数据库名，不传则同步所有库")
+    table_names: Optional[List[str]] = Field(None, description="指定表名列表")
+
+
+class ColumnInfo(BaseModel):
+    """列信息"""
+    name: str
+    data_type: str
+    nullable: bool
+    default: Optional[str]
+    comment: Optional[str]
+    is_primary: bool = False
+    extra: Optional[str] = None
+
+
+class IndexInfo(BaseModel):
+    """索引信息"""
+    name: str
+    columns: List[str]
+    unique: bool = False
+    primary: bool = False
+    type: Optional[str] = None
+    comment: Optional[str] = None
+
+
+class TableSchemaResponse(BaseModel):
+    """表结构响应"""
+    id: int
+    instance_id: int
+    database_name: str
+    table_name: str
+    table_type: str
+    engine: Optional[str]
+    row_count: int
+    data_size: int
+    index_size: int
+    table_comment: Optional[str]
+    columns: List[ColumnInfo]
+    indexes: List[IndexInfo]
+    sync_time: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class SQLAnalyzeRequest(BaseModel):
+    """SQL分析请求"""
+    instance_id: int = Field(..., description="实例ID")
+    database_name: str = Field(..., description="数据库名")
+    sql_text: str = Field(..., description="待分析的SQL")
+    enable_llm: bool = Field(True, description="是否启用LLM深度分析")
+
+
+class ExplainRow(BaseModel):
+    """EXPLAIN单行结果"""
+    id: Optional[int] = None
+    select_type: Optional[str] = None
+    table: Optional[str] = None
+    partitions: Optional[str] = None
+    type: Optional[str] = None
+    possible_keys: Optional[str] = None
+    key: Optional[str] = None
+    key_len: Optional[str] = None
+    ref: Optional[str] = None
+    rows: Optional[int] = None
+    filtered: Optional[float] = None
+    Extra: Optional[str] = None
+
+
+class RuleIssue(BaseModel):
+    """规则检测结果"""
+    severity: str = Field(..., description="严重级别：info/warning/error/critical")
+    category: str = Field(..., description="问题分类：index/performance/syntax/risk")
+    title: str = Field(..., description="问题标题")
+    description: str = Field(..., description="问题描述")
+    suggestion: str = Field(..., description="优化建议")
+    related_table: Optional[str] = None
+    related_index: Optional[str] = None
+
+
+class SQLAnalysisResponse(BaseModel):
+    """SQL分析响应"""
+    sql_text: str
+    sql_normalized: str
+    explain_result: List[ExplainRow]
+    rule_issues: List[RuleIssue]
+    llm_suggestions: Optional[str] = None
+    optimized_sql: Optional[str] = None
+    risk_level: str
+    analysis_time: float
+    summary: Dict[str, Any] = Field(default_factory=dict, description="分析摘要")

@@ -19,7 +19,7 @@ from app.services.scheduler import approval_scheduler
 from app.services.task_scheduler import task_scheduler
 
 # 导入路由
-from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification
+from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer
 
 # 配置日志
 logging.basicConfig(
@@ -305,6 +305,7 @@ app.include_router(menu.router, prefix="/api/v1")
 app.include_router(scripts.router, prefix="/api/v1")  # 脚本管理
 app.include_router(scheduled_tasks.router, prefix="/api/v1")  # 定时任务
 app.include_router(notification.router, prefix="/api/v1")  # 通知管理
+app.include_router(sql_optimizer.router, prefix="/api/v1")  # SQL优化器
 
 
 # 健康检查

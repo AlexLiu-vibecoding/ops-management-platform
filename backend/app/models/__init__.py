@@ -588,3 +588,55 @@ class ScheduledTask(Base):
     # 关联
     script = relationship("Script", back_populates="scheduled_tasks")
     creator = relationship("User", foreign_keys=[created_by])
+
+
+# ==================== SQL优化器 - 库表结构存储 ====================
+
+class TableSchema(Base):
+    """表结构信息表"""
+    __tablename__ = "table_schemas"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    instance_id = Column(Integer, ForeignKey("instances.id", ondelete="CASCADE"), nullable=False, comment="实例ID")
+    database_name = Column(String(100), nullable=False, comment="数据库名")
+    table_name = Column(String(100), nullable=False, comment="表名")
+    table_type = Column(String(20), default="BASE TABLE", comment="表类型：BASE TABLE/VIEW")
+    engine = Column(String(50), comment="存储引擎")
+    row_format = Column(String(20), comment="行格式")
+    row_count = Column(Integer, default=0, comment="行数")
+    data_size = Column(Integer, default=0, comment="数据大小(字节)")
+    index_size = Column(Integer, default=0, comment="索引大小(字节)")
+    table_comment = Column(String(500), comment="表注释")
+    columns_json = Column(JSON, nullable=False, comment="列信息JSON")
+    indexes_json = Column(JSON, comment="索引信息JSON")
+    create_time = Column(DateTime, comment="表创建时间")
+    update_time = Column(DateTime, comment="表更新时间")
+    sync_time = Column(DateTime, default=datetime.now, comment="同步时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    # 关联
+    instance = relationship("Instance")
+
+
+class SQLAnalysisHistory(Base):
+    """SQL分析历史表"""
+    __tablename__ = "sql_analysis_history"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    instance_id = Column(Integer, ForeignKey("instances.id", ondelete="CASCADE"), comment="实例ID")
+    database_name = Column(String(100), comment="数据库名")
+    sql_text = Column(Text, nullable=False, comment="原始SQL")
+    sql_normalized = Column(Text, comment="标准化SQL")
+    explain_json = Column(JSON, comment="EXPLAIN结果JSON")
+    rule_issues = Column(JSON, comment="规则引擎检测结果")
+    llm_suggestions = Column(Text, comment="LLM优化建议")
+    optimized_sql = Column(Text, comment="优化后的SQL")
+    risk_level = Column(String(20), comment="风险等级：low/medium/high")
+    analysis_time = Column(Float, comment="分析耗时(秒)")
+    analyzed_by = Column(Integer, ForeignKey("users.id"), comment="分析人ID")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    
+    # 关联
+    instance = relationship("Instance")
+    analyzer = relationship("User", foreign_keys=[analyzed_by])

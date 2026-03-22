@@ -52,6 +52,12 @@ const routes = [
         meta: { title: 'SQL编辑器', icon: 'Document' }
       },
       {
+        path: 'sql-optimizer',
+        name: 'SqlOptimizer',
+        component: () => import('@/views/sql-optimizer/index.vue'),
+        meta: { title: 'SQL优化器', icon: 'MagicStick' }
+      },
+      {
         path: 'approvals',
         name: 'Approvals',
         component: () => import('@/views/approvals/index.vue'),
