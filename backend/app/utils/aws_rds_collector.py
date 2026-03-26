@@ -3,6 +3,7 @@ AWS RDS 性能指标采集器
 通过 CloudWatch API 获取 RDS 实例的性能指标
 """
 import os
+import re
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
@@ -12,6 +13,121 @@ import boto3
 from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
 
 logger = logging.getLogger(__name__)
+
+
+# AWS 区域列表
+AWS_REGIONS = {
+    # 美国东部
+    "us-east-1": "美国东部 (弗吉尼亚北部)",
+    "us-east-2": "美国东部 (俄亥俄)",
+    # 美国西部
+    "us-west-1": "美国西部 (加利福尼亚)",
+    "us-west-2": "美国西部 (俄勒冈)",
+    # 亚太地区
+    "ap-east-1": "亚太地区 (香港)",
+    "ap-northeast-1": "亚太地区 (东京)",
+    "ap-northeast-2": "亚太地区 (首尔)",
+    "ap-northeast-3": "亚太地区 (大阪)",
+    "ap-southeast-1": "亚太地区 (新加坡)",
+    "ap-southeast-2": "亚太地区 (悉尼)",
+    "ap-southeast-3": "亚太地区 (雅加达)",
+    "ap-south-1": "亚太地区 (孟买)",
+    # 中国
+    "cn-north-1": "中国 (北京)",
+    "cn-northwest-1": "中国 (宁夏)",
+    # 欧洲
+    "eu-central-1": "欧洲 (法兰克福)",
+    "eu-west-1": "欧洲 (爱尔兰)",
+    "eu-west-2": "欧洲 (伦敦)",
+    "eu-west-3": "欧洲 (巴黎)",
+    "eu-north-1": "欧洲 (斯德哥尔摩)",
+    # 南美洲
+    "sa-east-1": "南美洲 (圣保罗)",
+    # 加拿大
+    "ca-central-1": "加拿大 (中部)",
+}
+
+
+def parse_aws_region_from_host(host: str) -> Optional[str]:
+    """
+    从 RDS endpoint 解析 AWS 区域
+    
+    AWS RDS endpoint 格式：
+    - 国际版: {db-id}.{random-id}.{region}.rds.amazonaws.com
+    - 中国版: {db-id}.{random-id}.{region}.rds.amazonaws.com.cn
+    
+    示例：
+    - mydb.c9akciq32.us-east-1.rds.amazonaws.com → us-east-1
+    - test-pg.xxxxx.cn-north-1.rds.amazonaws.com.cn → cn-north-1
+    - mydb.xxxxx.ap-southeast-1.rds.amazonaws.com → ap-southeast-1
+    
+    Args:
+        host: RDS 实例的主机地址
+        
+    Returns:
+        AWS 区域代码，如果无法解析则返回 None
+    """
+    if not host:
+        return None
+    
+    # 尝试匹配 RDS endpoint 模式
+    # 模式1: 国际版 xxx.region.rds.amazonaws.com
+    pattern_intl = r'\.([a-z]{2}-[a-z]+-\d+)\.rds\.amazonaws\.com$'
+    match = re.search(pattern_intl, host, re.IGNORECASE)
+    
+    if match:
+        region = match.group(1)
+        if region in AWS_REGIONS:
+            logger.debug(f"从 host {host} 解析出区域: {region}")
+            return region
+    
+    # 模式2: 中国版 xxx.region.rds.amazonaws.com.cn
+    pattern_cn = r'\.([a-z]{2}-[a-z]+-\d+)\.rds\.amazonaws\.com\.cn$'
+    match = re.search(pattern_cn, host, re.IGNORECASE)
+    
+    if match:
+        region = match.group(1)
+        if region in AWS_REGIONS:
+            logger.debug(f"从 host {host} 解析出区域 (中国): {region}")
+            return region
+    
+    # 模式3: 宽松匹配，提取任何看起来像 AWS 区域的部分
+    # 格式: xx-xxxx-n (如 us-east-1, ap-southeast-1)
+    loose_pattern = r'([a-z]{2}-[a-z]+-\d+)'
+    matches = re.findall(loose_pattern, host, re.IGNORECASE)
+    
+    for region in matches:
+        if region in AWS_REGIONS:
+            logger.debug(f"从 host {host} 宽松匹配出区域: {region}")
+            return region
+    
+    logger.debug(f"无法从 host {host} 解析 AWS 区域")
+    return None
+
+
+def is_rds_endpoint(host: str) -> bool:
+    """
+    判断 host 是否为 AWS RDS endpoint
+    
+    Args:
+        host: 主机地址
+        
+    Returns:
+        是否为 RDS endpoint
+    """
+    if not host:
+        return False
+    
+    rds_patterns = [
+        r'\.rds\.amazonaws\.com$',
+        r'\.rds\.amazonaws\.com\.cn$',
+    ]
+    
+    for pattern in rds_patterns:
+        if re.search(pattern, host, re.IGNORECASE):
+            return True
+    
+    return False
 
 
 @dataclass

@@ -18,6 +18,7 @@ from app.models import RDBInstance, InstanceGroup, Environment, MonitorSwitch, M
 from app.utils.auth import encrypt_instance_password, decrypt_instance_password
 from app.deps import get_operator, get_current_user
 from app.models import User
+from app.utils.aws_rds_collector import parse_aws_region_from_host, is_rds_endpoint
 
 router = APIRouter(prefix="/rdb-instances", tags=["RDB实例管理"])
 logger = logging.getLogger(__name__)
@@ -306,8 +307,11 @@ async def create_rdb_instance(
             detail="实例名称已存在"
         )
     
-    # RDS 实例不需要测试连接
-    if not instance_data.is_rds:
+    # 检测是否为 RDS endpoint
+    detected_is_rds = instance_data.is_rds or (instance_data.host and is_rds_endpoint(instance_data.host))
+    
+    # RDS 实例不需要测试连接（可能无法从当前网络访问）
+    if not detected_is_rds:
         # 非RDS实例必须有连接信息
         if not instance_data.host:
             raise HTTPException(
@@ -338,6 +342,23 @@ async def create_rdb_instance(
             )
     
     # 创建实例
+    # 自动检测是否为 RDS 实例并解析区域
+    is_rds = instance_data.is_rds
+    aws_region = instance_data.aws_region
+    
+    if instance_data.host:
+        # 如果 host 是 RDS endpoint，自动设置 is_rds
+        if is_rds_endpoint(instance_data.host):
+            if not is_rds:
+                is_rds = True
+                logger.info(f"检测到 RDS endpoint，自动设置 is_rds=True: {instance_data.host}")
+            
+            # 如果用户没有指定区域，自动解析
+            if not aws_region:
+                aws_region = parse_aws_region_from_host(instance_data.host)
+                if aws_region:
+                    logger.info(f"从 host 自动解析出 AWS 区域: {aws_region}")
+    
     instance = RDBInstance(
         name=instance_data.name,
         db_type=instance_data.db_type or "mysql",
@@ -349,9 +370,9 @@ async def create_rdb_instance(
         group_id=instance_data.group_id,
         description=instance_data.description,
         status=instance_data.status if instance_data.status is not None else True,
-        is_rds=instance_data.is_rds,
+        is_rds=is_rds,
         rds_instance_id=instance_data.rds_instance_id,
-        aws_region=instance_data.aws_region,
+        aws_region=aws_region,
         slow_query_threshold=instance_data.slow_query_threshold,
         enable_monitoring=instance_data.enable_monitoring
     )
@@ -395,6 +416,22 @@ async def update_rdb_instance(
     if 'password' in update_data:
         update_data['password_encrypted'] = encrypt_instance_password(update_data.pop('password'))
     
+    # 如果更新了 host，自动检测 RDS 并解析区域
+    if 'host' in update_data:
+        host = update_data['host']
+        if host and is_rds_endpoint(host):
+            # 自动设置 is_rds
+            if 'is_rds' not in update_data:
+                update_data['is_rds'] = True
+                logger.info(f"检测到 RDS endpoint，自动设置 is_rds=True: {host}")
+            
+            # 自动解析区域
+            if 'aws_region' not in update_data:
+                parsed_region = parse_aws_region_from_host(host)
+                if parsed_region:
+                    update_data['aws_region'] = parsed_region
+                    logger.info(f"从 host 自动解析出 AWS 区域: {parsed_region}")
+    
     for key, value in update_data.items():
         setattr(instance, key, value)
     
@@ -403,6 +440,53 @@ async def update_rdb_instance(
     
     logger.info(f"更新 RDB 实例: {instance.name} (ID: {instance.id})")
     return RDBInstanceResponse.model_validate(instance)
+
+@router.post("/sync-aws-regions")
+async def sync_aws_regions(
+    current_user: User = Depends(get_operator),
+    db: Session = Depends(get_db)
+):
+    """
+    批量同步 AWS 区域
+    
+    自动从 RDS endpoint 解析区域并更新到数据库
+    适用于已有实例的区域信息补充
+    """
+    instances = db.query(RDBInstance).all()
+    updated_count = 0
+    updated_instances = []
+    
+    for instance in instances:
+        if instance.host and is_rds_endpoint(instance.host):
+            # 自动设置 is_rds
+            if not instance.is_rds:
+                instance.is_rds = True
+                updated_count += 1
+            
+            # 自动解析区域
+            parsed_region = parse_aws_region_from_host(instance.host)
+            if parsed_region and instance.aws_region != parsed_region:
+                old_region = instance.aws_region
+                instance.aws_region = parsed_region
+                updated_count += 1
+                updated_instances.append({
+                    "id": instance.id,
+                    "name": instance.name,
+                    "host": instance.host,
+                    "old_region": old_region,
+                    "new_region": parsed_region
+                })
+                logger.info(f"更新实例 {instance.name} 区域: {old_region} -> {parsed_region}")
+    
+    if updated_count > 0:
+        db.commit()
+    
+    return {
+        "success": True,
+        "message": f"已更新 {updated_count} 个实例的区域信息",
+        "updated_count": updated_count,
+        "updated_instances": updated_instances
+    }
 
 
 @router.delete("/{instance_id}", response_model=MessageResponse)
