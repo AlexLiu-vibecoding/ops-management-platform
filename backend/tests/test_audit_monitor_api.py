@@ -68,10 +68,10 @@ class TestSlowQueryAPI:
 
     def test_get_slow_queries_success(self, client, operator_token, test_environment, db_session):
         """测试获取慢查询列表"""
-        from app.models import Instance
+        from app.models import RDBInstance
         
         # 创建测试实例
-        instance = Instance(
+        instance = RDBInstance(
             name="慢查询测试实例",
             host="localhost",
             port=3306,
@@ -94,10 +94,10 @@ class TestSlowQueryAPI:
 
     def test_get_slow_query_statistics(self, client, operator_token, test_environment, db_session):
         """测试获取慢查询统计"""
-        from app.models import Instance
+        from app.models import RDBInstance
         
         # 创建测试实例
-        instance = Instance(
+        instance = RDBInstance(
             name="统计测试实例",
             host="localhost",
             port=3306,
@@ -129,10 +129,10 @@ class TestPerformanceAPI:
 
     def test_get_performance_history_success(self, client, operator_token, test_environment, db_session):
         """测试获取性能历史数据"""
-        from app.models import Instance
+        from app.models import RDBInstance
         
         # 创建测试实例
-        instance = Instance(
+        instance = RDBInstance(
             name="性能测试实例",
             host="localhost",
             port=3306,
@@ -155,10 +155,10 @@ class TestPerformanceAPI:
 
     def test_get_performance_statistics(self, client, operator_token, test_environment, db_session):
         """测试获取性能统计数据"""
-        from app.models import Instance
+        from app.models import RDBInstance
         
         # 创建测试实例
-        instance = Instance(
+        instance = RDBInstance(
             name="性能统计实例",
             host="localhost",
             port=3306,

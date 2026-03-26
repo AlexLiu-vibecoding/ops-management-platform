@@ -105,10 +105,10 @@ class TestInstancesAPI:
 
     def test_test_instance_connection(self, client, operator_token, test_environment, db_session):
         """测试实例连接测试"""
-        from app.models import Instance
+        from app.models import RDBInstance
         
         # 创建测试实例（不需要真实连接）
-        instance = Instance(
+        instance = RDBInstance(
             name="连接测试实例",
             host="localhost",
             port=3306,

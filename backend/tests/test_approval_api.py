@@ -35,10 +35,10 @@ class TestApprovalAPI:
     
     def test_create_approval_with_auto_execute(self, client, operator_token, test_environment, db_session):
         """测试创建自动执行的审批"""
-        from app.models import Instance
+        from app.models import RDBInstance
         
         # 创建测试实例
-        instance = Instance(
+        instance = RDBInstance(
             name="测试实例",
             host="localhost",
             port=3306,
@@ -69,10 +69,10 @@ class TestApprovalAPI:
     
     def test_create_approval_with_scheduled_time(self, client, operator_token, test_environment, db_session):
         """测试创建定时执行的审批"""
-        from app.models import Instance
+        from app.models import RDBInstance
         
         # 创建测试实例
-        instance = Instance(
+        instance = RDBInstance(
             name="测试实例2",
             host="localhost",
             port=3306,

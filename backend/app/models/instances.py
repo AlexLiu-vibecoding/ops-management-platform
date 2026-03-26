@@ -73,7 +73,7 @@ class RDBInstance(Base):
     # 关联
     environment = relationship("Environment", back_populates="rdb_instances")
     group = relationship("InstanceGroup", back_populates="rdb_instances")
-    monitor_switches = relationship("MonitorSwitch", back_populates="rdb_instance")
+    monitor_switches = relationship("MonitorSwitch", back_populates="rdb_instance", cascade="all, delete-orphan")
     performance_metrics = relationship("PerformanceMetric", back_populates="rdb_instance")
     slow_queries = relationship("SlowQuery", back_populates="rdb_instance")
     snapshots = relationship("OperationSnapshot", back_populates="rdb_instance")
