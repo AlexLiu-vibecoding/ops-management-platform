@@ -2,6 +2,7 @@
 一站式运维平台 - FastAPI主应用
 """
 import os
+import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
@@ -23,10 +24,12 @@ from app.core import register_exception_handlers
 from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions, alerts, monitor_ext, inspection
 from app.api import rdb_instances, redis_instances
 
-# 配置日志
+# 配置日志（统一配置，确保只调用一次）
 logging.basicConfig(
     level=logging.INFO if not settings.DEBUG else logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout,
+    force=True  # 强制覆盖已有配置，防止重复
 )
 logger = logging.getLogger(__name__)
 

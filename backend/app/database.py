@@ -5,12 +5,7 @@ import os
 import logging
 import sys
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stdout
-)
+# 只创建 logger，不重复配置 basicConfig（由 main.py 统一配置）
 logger = logging.getLogger(__name__)
 
 # 尝试从 workload identity 加载环境变量
