@@ -669,3 +669,142 @@ class AWSRegion(Base):
     description = Column(String(200), comment="描述")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+# ==================== 告警与监控扩展 ====================
+
+class AlertRecord(Base):
+    """告警记录表"""
+    __tablename__ = "alert_records"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    instance_id = Column(Integer, ForeignKey("instances.id", ondelete="CASCADE"), comment="实例ID")
+    metric_type = Column(String(32), nullable=False, comment="指标类型: slow_query/cpu_sql/performance/lock/repl/capacity")
+    alert_level = Column(String(16), nullable=False, comment="告警级别: info/warning/critical")
+    alert_title = Column(String(200), nullable=False, comment="告警标题")
+    alert_content = Column(Text, comment="告警详情")
+    alert_source = Column(String(100), comment="告警来源")
+    status = Column(String(16), default="pending", comment="状态: pending/acknowledged/resolved/ignored")
+    acknowledged_by = Column(Integer, ForeignKey("users.id"), comment="确认人ID")
+    acknowledged_at = Column(DateTime, comment="确认时间")
+    resolved_by = Column(Integer, ForeignKey("users.id"), comment="解决人ID")
+    resolved_at = Column(DateTime, comment="解决时间")
+    resolve_note = Column(Text, comment="解决说明")
+    notification_sent = Column(Boolean, default=False, comment="是否已发送通知")
+    created_at = Column(DateTime, default=datetime.now, index=True, comment="创建时间")
+    
+    # 关联
+    instance = relationship("Instance")
+    acknowledger = relationship("User", foreign_keys=[acknowledged_by])
+    resolver = relationship("User", foreign_keys=[resolved_by])
+
+
+class LockWait(Base):
+    """锁等待记录表"""
+    __tablename__ = "lock_waits"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    instance_id = Column(Integer, ForeignKey("instances.id", ondelete="CASCADE"), nullable=False, comment="实例ID")
+    database_name = Column(String(100), comment="数据库名")
+    wait_type = Column(String(32), comment="等待类型: MDL/Row_Lock/Table_Lock/Metadata_Lock")
+    waiting_thread_id = Column(Integer, comment="等待线程ID")
+    waiting_sql = Column(Text, comment="等待SQL")
+    waiting_time = Column(Integer, comment="等待时间(秒)")
+    blocking_thread_id = Column(Integer, comment="阻塞线程ID")
+    blocking_sql = Column(Text, comment="阻塞SQL")
+    blocking_time = Column(Integer, comment="阻塞时长(秒)")
+    status = Column(String(16), default="active", comment="状态: active/resolved/killed")
+    resolved_at = Column(DateTime, comment="解决时间")
+    created_at = Column(DateTime, default=datetime.now, index=True, comment="创建时间")
+    
+    # 关联
+    instance = relationship("Instance")
+
+
+class ReplicationStatus(Base):
+    """主从复制状态表"""
+    __tablename__ = "replication_status"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    instance_id = Column(Integer, ForeignKey("instances.id", ondelete="CASCADE"), nullable=False, comment="实例ID(主库)")
+    slave_host = Column(String(100), comment="从库地址")
+    slave_port = Column(Integer, comment="从库端口")
+    slave_io_running = Column(String(16), comment="IO线程状态: Yes/No/Connecting")
+    slave_sql_running = Column(String(16), comment="SQL线程状态: Yes/No")
+    seconds_behind_master = Column(Integer, comment="延迟秒数")
+    master_log_file = Column(String(100), comment="主库日志文件")
+    read_master_log_pos = Column(Integer, comment="读取位置")
+    relay_master_log_file = Column(String(100), comment="中继日志文件")
+    exec_master_log_pos = Column(Integer, comment="执行位置")
+    last_io_error = Column(Text, comment="最后IO错误")
+    last_sql_error = Column(Text, comment="最后SQL错误")
+    check_time = Column(DateTime, default=datetime.now, comment="检查时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    
+    # 关联
+    instance = relationship("Instance")
+
+
+class InspectMetric(Base):
+    """巡检指标配置表"""
+    __tablename__ = "inspect_metrics"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    module = Column(String(32), nullable=False, comment="模块: slow_query/index/lock/transaction/repl/capacity")
+    metric_name = Column(String(128), nullable=False, comment="指标名称")
+    metric_code = Column(String(64), unique=True, nullable=False, comment="指标编码")
+    check_freq = Column(String(16), default="daily", comment="检查频率: hourly/daily/weekly")
+    warn_threshold = Column(String(64), comment="告警阈值")
+    critical_threshold = Column(String(64), comment="严重阈值")
+    collect_sql = Column(Text, comment="采集SQL")
+    auto_fix_sql = Column(Text, comment="自动修复SQL")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    description = Column(String(500), comment="描述")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class InspectResult(Base):
+    """巡检结果表"""
+    __tablename__ = "inspect_results"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    instance_id = Column(Integer, ForeignKey("instances.id", ondelete="CASCADE"), nullable=False, comment="实例ID")
+    metric_id = Column(Integer, ForeignKey("inspect_metrics.id"), nullable=False, comment="指标ID")
+    check_time = Column(DateTime, default=datetime.now, index=True, comment="检查时间")
+    status = Column(String(16), nullable=False, comment="状态: normal/warning/critical/error")
+    actual_value = Column(String(255), comment="实际值")
+    result_detail = Column(JSON, comment="结果详情JSON")
+    suggestion = Column(Text, comment="优化建议")
+    is_fixed = Column(Boolean, default=False, comment="是否已修复")
+    fixed_at = Column(DateTime, comment="修复时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    
+    # 关联
+    instance = relationship("Instance")
+    metric = relationship("InspectMetric")
+
+
+class LongTransaction(Base):
+    """长事务记录表"""
+    __tablename__ = "long_transactions"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    instance_id = Column(Integer, ForeignKey("instances.id", ondelete="CASCADE"), nullable=False, comment="实例ID")
+    trx_id = Column(String(64), comment="事务ID")
+    trx_thread_id = Column(Integer, comment="线程ID")
+    database_name = Column(String(100), comment="数据库名")
+    trx_started = Column(DateTime, comment="事务开始时间")
+    trx_duration = Column(Integer, comment="事务持续时间(秒)")
+    trx_state = Column(String(32), comment="事务状态")
+    trx_query = Column(Text, comment="当前执行的SQL")
+    trx_rows_locked = Column(Integer, comment="锁定行数")
+    trx_tables_locked = Column(Integer, comment="锁定表数")
+    user = Column(String(64), comment="用户")
+    host = Column(String(100), comment="主机")
+    status = Column(String(16), default="active", comment="状态: active/killed/resolved")
+    killed_at = Column(DateTime, comment="Kill时间")
+    created_at = Column(DateTime, default=datetime.now, index=True, comment="创建时间")
+    
+    # 关联
+    instance = relationship("Instance")

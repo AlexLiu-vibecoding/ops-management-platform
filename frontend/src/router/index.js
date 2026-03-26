@@ -113,6 +113,30 @@ const routes = [
             meta: { title: '慢查询监控', icon: 'Timer' }
           },
           {
+            path: 'alerts',
+            name: 'Alerts',
+            component: () => import('@/views/alerts/index.vue'),
+            meta: { title: '告警中心', icon: 'Bell' }
+          },
+          {
+            path: 'replication',
+            name: 'Replication',
+            component: () => import('@/views/replication/index.vue'),
+            meta: { title: '主从复制', icon: 'Connection' }
+          },
+          {
+            path: 'locks',
+            name: 'Locks',
+            component: () => import('@/views/locks/index.vue'),
+            meta: { title: '事务与锁', icon: 'Lock' }
+          },
+          {
+            path: 'inspection',
+            name: 'Inspection',
+            component: () => import('@/views/inspection/index.vue'),
+            meta: { title: '巡检报告', icon: 'DocumentChecked' }
+          },
+          {
             path: 'settings',
             name: 'MonitorSettings',
             component: () => import('@/views/monitor/settings.vue'),

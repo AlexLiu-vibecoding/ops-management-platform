@@ -20,7 +20,7 @@ from app.services.task_scheduler import task_scheduler
 from app.core import register_exception_handlers
 
 # 导入路由
-from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions
+from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions, alerts, monitor_ext, inspection
 
 # 配置日志
 logging.basicConfig(
@@ -290,6 +290,9 @@ app.include_router(redis.router, prefix="/api/v1")  # Redis管理
 app.include_router(storage.router, prefix="/api/v1")  # 存储管理
 app.include_router(system.router, prefix="/api/v1")  # 系统配置
 app.include_router(aws_regions.router, prefix="/api/v1")  # AWS区域配置
+app.include_router(alerts.router, prefix="/api/v1")  # 告警中心
+app.include_router(monitor_ext.router, prefix="/api/v1")  # 监控扩展（主从复制、锁、事务）
+app.include_router(inspection.router, prefix="/api/v1")  # 巡检报告
 
 
 # 健康检查
