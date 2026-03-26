@@ -21,6 +21,7 @@ from app.core import register_exception_handlers
 
 # 导入路由
 from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions, alerts, monitor_ext, inspection
+from app.api import rdb_instances, redis_instances
 
 # 配置日志
 logging.basicConfig(
@@ -83,7 +84,7 @@ async def init_dev_instance(db):
     """开发环境：自动创建测试用的 PostgreSQL 实例"""
     import os
     from urllib.parse import urlparse
-    from app.models import Instance, Environment
+    from app.models import RDBInstance, Environment, RDBType
     from app.utils.auth import encrypt_instance_password
     
     # 仅在开发环境执行
@@ -91,7 +92,7 @@ async def init_dev_instance(db):
         return
     
     # 检查是否已存在开发测试实例
-    existing = db.query(Instance).filter(Instance.name == "开发测试实例(PostgreSQL)").first()
+    existing = db.query(RDBInstance).filter(RDBInstance.name == "开发测试实例(PostgreSQL)").first()
     if existing:
         logger.info("Dev test instance already exists, skipping creation")
         return
@@ -114,8 +115,9 @@ async def init_dev_instance(db):
         dev_env = db.query(Environment).filter(Environment.code == "development").first()
         
         # 创建实例
-        instance = Instance(
+        instance = RDBInstance(
             name="开发测试实例(PostgreSQL)",
+            db_type=RDBType.POSTGRESQL,
             host=host,
             port=port,
             username=username,
@@ -134,7 +136,7 @@ async def init_default_data():
     """初始化默认数据"""
     from sqlalchemy.orm import Session
     from app.database import SessionLocal
-    from app.models import User, Environment, UserRole, GlobalConfig, DingTalkChannel, SystemInitState, Instance
+    from app.models import User, Environment, UserRole, GlobalConfig, DingTalkChannel, SystemInitState
     from app.utils.auth import hash_password
     
     db: Session = SessionLocal()
@@ -272,7 +274,9 @@ app.include_router(init.router, prefix="/api/v1")  # 初始化API放在最前面
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(environments.router, prefix="/api/v1")
-app.include_router(instances.router, prefix="/api/v1")
+app.include_router(instances.router, prefix="/api/v1")  # 保留旧路由（向后兼容）
+app.include_router(rdb_instances.router, prefix="/api/v1")  # RDB 实例管理（新）
+app.include_router(redis_instances.router, prefix="/api/v1")  # Redis 实例管理（新）
 app.include_router(monitor.router, prefix="/api/v1")
 app.include_router(dingtalk.router, prefix="/api/v1")
 app.include_router(approval.router, prefix="/api/v1")
@@ -286,7 +290,7 @@ app.include_router(scheduled_tasks.router, prefix="/api/v1")  # 定时任务
 app.include_router(notification.router, prefix="/api/v1")  # 通知管理
 app.include_router(sql_optimizer.router, prefix="/api/v1")  # SQL优化器
 app.include_router(dashboard.router, prefix="/api/v1")  # 仪表盘
-app.include_router(redis.router, prefix="/api/v1")  # Redis管理
+app.include_router(redis.router, prefix="/api/v1")  # Redis管理（旧，保留兼容）
 app.include_router(storage.router, prefix="/api/v1")  # 存储管理
 app.include_router(system.router, prefix="/api/v1")  # 系统配置
 app.include_router(aws_regions.router, prefix="/api/v1")  # AWS区域配置

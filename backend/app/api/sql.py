@@ -11,7 +11,7 @@ import pymysql
 import psycopg2
 import psycopg2.extras
 from app.database import get_db
-from app.models import Instance, AuditLog, OperationSnapshot, User
+from app.models import RDBInstance, RedisInstance, AuditLog, OperationSnapshot, User
 from app.schemas import (
     SQLExecuteRequest, SQLExecuteResponse, MessageResponse
 )
@@ -21,7 +21,7 @@ from app.deps import get_operator, get_current_user
 router = APIRouter(prefix="/sql", tags=["SQL执行"])
 
 
-def get_instance_type(instance: Instance) -> str:
+def get_instance_type(instance: RDBInstance) -> str:
     """判断实例类型：mysql 或 postgresql"""
     # 通过端口判断：MySQL 默认 3306，PostgreSQL 默认 5432
     if instance.port == 5432:
@@ -72,7 +72,7 @@ def check_sql_risk(sql: str) -> Dict[str, Any]:
     }
 
 
-def get_mysql_connection(instance: Instance, database: str = None):
+def get_mysql_connection(instance: RDBInstance, database: str = None):
     """获取MySQL连接"""
     try:
         password = decrypt_instance_password(instance.password_encrypted)
@@ -94,7 +94,7 @@ def get_mysql_connection(instance: Instance, database: str = None):
     return conn
 
 
-def get_postgresql_connection(instance: Instance, database: str = None):
+def get_postgresql_connection(instance: RDBInstance, database: str = None):
     """获取PostgreSQL连接"""
     try:
         password = decrypt_instance_password(instance.password_encrypted)
@@ -115,7 +115,7 @@ def get_postgresql_connection(instance: Instance, database: str = None):
     return conn
 
 
-def get_db_connection(instance: Instance, database: str = None):
+def get_db_connection(instance: RDBInstance, database: str = None):
     """根据实例类型获取数据库连接"""
     db_type = get_instance_type(instance)
     if db_type == "postgresql":
@@ -131,7 +131,7 @@ async def execute_sql(
 ):
     """执行SQL"""
     # 检查实例
-    instance = db.query(Instance).filter(Instance.id == request.instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == request.instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -276,7 +276,7 @@ async def list_databases(
     db: Session = Depends(get_db)
 ):
     """获取实例的数据库列表"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -317,7 +317,7 @@ async def list_tables(
     db: Session = Depends(get_db)
 ):
     """获取数据库的表列表"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -388,6 +388,353 @@ def migration_005():
         logger.info("  - long_transactions 表已存在，跳过")
 
 
+def migration_006():
+    """
+    迁移 006: 实例表拆分
+    
+    将 instances 表拆分为：
+    - rdb_instances: MySQL/PostgreSQL 实例
+    - redis_instances: Redis 实例
+    
+    同时创建 Redis 专用监控表：
+    - redis_slow_logs
+    - redis_memory_stats
+    - redis_key_analyses
+    """
+    logger.info("执行迁移 006: 实例表拆分")
+    
+    # 1. 创建 rdb_instances 表
+    if not table_exists('rdb_instances'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE rdb_instances (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) UNIQUE NOT NULL,
+                    db_type VARCHAR(20) NOT NULL DEFAULT 'mysql',
+                    host VARCHAR(100) NOT NULL,
+                    port INTEGER DEFAULT 3306,
+                    username VARCHAR(50),
+                    password_encrypted VARCHAR(255),
+                    environment_id INTEGER REFERENCES environments(id),
+                    group_id INTEGER REFERENCES instance_groups(id),
+                    description VARCHAR(200),
+                    status BOOLEAN DEFAULT TRUE,
+                    is_rds BOOLEAN DEFAULT FALSE,
+                    rds_instance_id VARCHAR(100),
+                    aws_region VARCHAR(50),
+                    slow_query_threshold INTEGER DEFAULT 3,
+                    enable_monitoring BOOLEAN DEFAULT TRUE,
+                    last_check_time TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_rdb_instances_name ON rdb_instances(name)"))
+            conn.execute(text("CREATE INDEX idx_rdb_instances_environment ON rdb_instances(environment_id)"))
+            conn.execute(text("CREATE INDEX idx_rdb_instances_group ON rdb_instances(group_id)"))
+            conn.commit()
+            logger.info("  ✓ 创建 rdb_instances 表")
+    else:
+        logger.info("  - rdb_instances 表已存在，跳过")
+    
+    # 2. 创建 redis_instances 表
+    if not table_exists('redis_instances'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE redis_instances (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) UNIQUE NOT NULL,
+                    host VARCHAR(100) NOT NULL,
+                    port INTEGER DEFAULT 6379,
+                    password_encrypted VARCHAR(255),
+                    redis_mode VARCHAR(20) DEFAULT 'standalone',
+                    redis_db INTEGER DEFAULT 0,
+                    cluster_nodes TEXT,
+                    sentinel_master_name VARCHAR(100),
+                    sentinel_hosts TEXT,
+                    environment_id INTEGER REFERENCES environments(id),
+                    group_id INTEGER REFERENCES instance_groups(id),
+                    description VARCHAR(200),
+                    status BOOLEAN DEFAULT TRUE,
+                    slowlog_threshold INTEGER DEFAULT 10000,
+                    enable_monitoring BOOLEAN DEFAULT TRUE,
+                    last_check_time TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_redis_instances_name ON redis_instances(name)"))
+            conn.execute(text("CREATE INDEX idx_redis_instances_environment ON redis_instances(environment_id)"))
+            conn.execute(text("CREATE INDEX idx_redis_instances_group ON redis_instances(group_id)"))
+            conn.commit()
+            logger.info("  ✓ 创建 redis_instances 表")
+    else:
+        logger.info("  - redis_instances 表已存在，跳过")
+    
+    # 3. 从 instances 表迁移数据
+    if table_exists('instances'):
+        with engine.connect() as conn:
+            # 检查是否已有数据
+            rdb_count = conn.execute(text("SELECT COUNT(*) FROM rdb_instances")).scalar()
+            redis_count = conn.execute(text("SELECT COUNT(*) FROM redis_instances")).scalar()
+            
+            if rdb_count == 0 and redis_count == 0:
+                # 迁移 MySQL 和 PostgreSQL 实例
+                conn.execute(text("""
+                    INSERT INTO rdb_instances (
+                        id, name, db_type, host, port, username, password_encrypted,
+                        environment_id, group_id, description, status,
+                        is_rds, rds_instance_id, aws_region,
+                        last_check_time, created_at, updated_at
+                    )
+                    SELECT 
+                        id, name, db_type, host, port, username, password_encrypted,
+                        environment_id, group_id, description, status,
+                        COALESCE(is_rds, FALSE), rds_instance_id, aws_region,
+                        last_check_time, created_at, updated_at
+                    FROM instances
+                    WHERE db_type IN ('mysql', 'postgresql') OR db_type IS NULL
+                """))
+                rdb_migrated = conn.execute(text("SELECT COUNT(*) FROM rdb_instances")).scalar()
+                conn.commit()
+                logger.info(f"  ✓ 迁移 {rdb_migrated} 个 RDB 实例到 rdb_instances 表")
+                
+                # 迁移 Redis 实例
+                conn.execute(text("""
+                    INSERT INTO redis_instances (
+                        id, name, host, port, password_encrypted,
+                        redis_mode, redis_db,
+                        environment_id, group_id, description, status,
+                        last_check_time, created_at, updated_at
+                    )
+                    SELECT 
+                        id, name, host, port, password_encrypted,
+                        COALESCE(redis_mode, 'standalone'), COALESCE(redis_db, 0),
+                        environment_id, group_id, description, status,
+                        last_check_time, created_at, updated_at
+                    FROM instances
+                    WHERE db_type = 'redis'
+                """))
+                redis_migrated = conn.execute(text("SELECT COUNT(*) FROM redis_instances")).scalar()
+                conn.commit()
+                logger.info(f"  ✓ 迁移 {redis_migrated} 个 Redis 实例到 redis_instances 表")
+            else:
+                logger.info("  - 数据已迁移，跳过数据迁移")
+    else:
+        logger.info("  - instances 表不存在，跳过数据迁移")
+    
+    # 4. 更新 monitor_switches 表的外键
+    if table_exists('monitor_switches') and not column_exists('monitor_switches', 'rdb_instance_id'):
+        with engine.connect() as conn:
+            # 添加新外键列
+            conn.execute(text("ALTER TABLE monitor_switches ADD COLUMN rdb_instance_id INTEGER REFERENCES rdb_instances(id) ON DELETE CASCADE"))
+            # 迁移数据
+            conn.execute(text("""
+                UPDATE monitor_switches ms
+                SET rdb_instance_id = ms.instance_id
+                WHERE EXISTS (SELECT 1 FROM rdb_instances ri WHERE ri.id = ms.instance_id)
+            """))
+            conn.commit()
+            logger.info("  ✓ 更新 monitor_switches 表外键")
+    
+    # 5. 更新 performance_metrics 表的外键
+    if table_exists('performance_metrics') and not column_exists('performance_metrics', 'rdb_instance_id'):
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE performance_metrics ADD COLUMN rdb_instance_id INTEGER REFERENCES rdb_instances(id) ON DELETE CASCADE"))
+            conn.execute(text("""
+                UPDATE performance_metrics pm
+                SET rdb_instance_id = pm.instance_id
+                WHERE EXISTS (SELECT 1 FROM rdb_instances ri WHERE ri.id = pm.instance_id)
+            """))
+            conn.commit()
+            logger.info("  ✓ 更新 performance_metrics 表外键")
+    
+    # 6. 更新 slow_queries 表的外键
+    if table_exists('slow_queries') and not column_exists('slow_queries', 'rdb_instance_id'):
+        with engine.connect() as conn:
+            conn.execute(text("ALTER TABLE slow_queries ADD COLUMN rdb_instance_id INTEGER REFERENCES rdb_instances(id) ON DELETE CASCADE"))
+            conn.execute(text("""
+                UPDATE slow_queries sq
+                SET rdb_instance_id = sq.instance_id
+                WHERE EXISTS (SELECT 1 FROM rdb_instances ri WHERE ri.id = sq.instance_id)
+            """))
+            conn.commit()
+            logger.info("  ✓ 更新 slow_queries 表外键")
+    
+    # 7. 更新 approval_records 表的外键
+    if table_exists('approval_records'):
+        with engine.connect() as conn:
+            if not column_exists('approval_records', 'rdb_instance_id'):
+                conn.execute(text("ALTER TABLE approval_records ADD COLUMN rdb_instance_id INTEGER REFERENCES rdb_instances(id)"))
+            if not column_exists('approval_records', 'redis_instance_id'):
+                conn.execute(text("ALTER TABLE approval_records ADD COLUMN redis_instance_id INTEGER REFERENCES redis_instances(id)"))
+            # 迁移数据
+            conn.execute(text("""
+                UPDATE approval_records ar
+                SET rdb_instance_id = ar.instance_id
+                WHERE EXISTS (SELECT 1 FROM rdb_instances ri WHERE ri.id = ar.instance_id)
+            """))
+            conn.execute(text("""
+                UPDATE approval_records ar
+                SET redis_instance_id = ar.instance_id
+                WHERE EXISTS (SELECT 1 FROM redis_instances ri WHERE ri.id = ar.instance_id)
+            """))
+            conn.commit()
+            logger.info("  ✓ 更新 approval_records 表外键")
+    
+    # 8. 更新 alert_records 表的外键
+    if table_exists('alert_records'):
+        with engine.connect() as conn:
+            if not column_exists('alert_records', 'rdb_instance_id'):
+                conn.execute(text("ALTER TABLE alert_records ADD COLUMN rdb_instance_id INTEGER REFERENCES rdb_instances(id) ON DELETE CASCADE"))
+            if not column_exists('alert_records', 'redis_instance_id'):
+                conn.execute(text("ALTER TABLE alert_records ADD COLUMN redis_instance_id INTEGER REFERENCES redis_instances(id) ON DELETE CASCADE"))
+            # 迁移数据
+            conn.execute(text("""
+                UPDATE alert_records ar
+                SET rdb_instance_id = ar.instance_id
+                WHERE EXISTS (SELECT 1 FROM rdb_instances ri WHERE ri.id = ar.instance_id)
+            """))
+            conn.execute(text("""
+                UPDATE alert_records ar
+                SET redis_instance_id = ar.instance_id
+                WHERE EXISTS (SELECT 1 FROM redis_instances ri WHERE ri.id = ar.instance_id)
+            """))
+            conn.commit()
+            logger.info("  ✓ 更新 alert_records 表外键")
+    
+    # 9. 更新其他 RDB 相关表的外键
+    rdb_tables = [
+        ('lock_waits', 'lock_waits'),
+        ('replication_status', 'replication_status'),
+        ('long_transactions', 'long_transactions'),
+        ('inspect_results', 'inspect_results'),
+        ('inspection_reports', 'inspection_reports'),
+        ('index_analyses', 'index_analyses'),
+        ('high_cpu_sqls', 'high_cpu_sqls'),
+        ('operation_snapshots', 'operation_snapshots'),
+        ('table_schemas', 'table_schemas'),
+        ('sql_analysis_history', 'sql_analysis_history'),
+    ]
+    
+    for table_name, log_name in rdb_tables:
+        if table_exists(table_name) and not column_exists(table_name, 'rdb_instance_id'):
+            with engine.connect() as conn:
+                conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN rdb_instance_id INTEGER REFERENCES rdb_instances(id) ON DELETE CASCADE"))
+                conn.execute(text(f"""
+                    UPDATE {table_name} t
+                    SET rdb_instance_id = t.instance_id
+                    WHERE EXISTS (SELECT 1 FROM rdb_instances ri WHERE ri.id = t.instance_id)
+                """))
+                conn.commit()
+                logger.info(f"  ✓ 更新 {table_name} 表外键")
+    
+    # 10. 创建 Redis 慢日志表
+    if not table_exists('redis_slow_logs'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE redis_slow_logs (
+                    id SERIAL PRIMARY KEY,
+                    instance_id INTEGER REFERENCES redis_instances(id) ON DELETE CASCADE NOT NULL,
+                    slowlog_id INTEGER,
+                    timestamp TIMESTAMP,
+                    duration INTEGER,
+                    command VARCHAR(500),
+                    key VARCHAR(500),
+                    args TEXT,
+                    client_addr VARCHAR(100),
+                    client_name VARCHAR(100),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_redis_slow_logs_instance ON redis_slow_logs(instance_id)"))
+            conn.execute(text("CREATE INDEX idx_redis_slow_logs_timestamp ON redis_slow_logs(timestamp)"))
+            conn.commit()
+            logger.info("  ✓ 创建 redis_slow_logs 表")
+    else:
+        logger.info("  - redis_slow_logs 表已存在，跳过")
+    
+    # 11. 创建 Redis 内存统计表
+    if not table_exists('redis_memory_stats'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE redis_memory_stats (
+                    id SERIAL PRIMARY KEY,
+                    instance_id INTEGER REFERENCES redis_instances(id) ON DELETE CASCADE NOT NULL,
+                    collect_time TIMESTAMP NOT NULL,
+                    used_memory INTEGER,
+                    used_memory_peak INTEGER,
+                    used_memory_rss INTEGER,
+                    memory_fragmentation_ratio VARCHAR(20),
+                    total_keys INTEGER,
+                    expires_keys INTEGER,
+                    avg_ttl INTEGER,
+                    db_sizes TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_redis_memory_stats_instance ON redis_memory_stats(instance_id)"))
+            conn.execute(text("CREATE INDEX idx_redis_memory_stats_collect_time ON redis_memory_stats(collect_time)"))
+            conn.commit()
+            logger.info("  ✓ 创建 redis_memory_stats 表")
+    else:
+        logger.info("  - redis_memory_stats 表已存在，跳过")
+    
+    # 12. 创建 Redis Key 分析表
+    if not table_exists('redis_key_analyses'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE redis_key_analyses (
+                    id SERIAL PRIMARY KEY,
+                    instance_id INTEGER REFERENCES redis_instances(id) ON DELETE CASCADE NOT NULL,
+                    analysis_type VARCHAR(20),
+                    key_pattern VARCHAR(200),
+                    key_name VARCHAR(500),
+                    key_type VARCHAR(20),
+                    size INTEGER,
+                    ttl INTEGER,
+                    element_count INTEGER,
+                    access_count INTEGER,
+                    risk_level VARCHAR(10),
+                    suggestion TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_redis_key_analyses_instance ON redis_key_analyses(instance_id)"))
+            conn.execute(text("CREATE INDEX idx_redis_key_analyses_type ON redis_key_analyses(analysis_type)"))
+            conn.commit()
+            logger.info("  ✓ 创建 redis_key_analyses 表")
+    else:
+        logger.info("  - redis_key_analyses 表已存在，跳过")
+    
+    # 13. 创建统一实例视图（向后兼容）
+    with engine.connect() as conn:
+        conn.execute(text("DROP VIEW IF EXISTS v_all_instances"))
+        conn.execute(text("""
+            CREATE VIEW v_all_instances AS
+            SELECT 
+                id, name, db_type, host, port, username, password_encrypted,
+                environment_id, group_id, description, status,
+                last_check_time, created_at, updated_at,
+                NULL AS redis_mode, NULL AS redis_db,
+                is_rds, rds_instance_id, aws_region,
+                NULL AS slowlog_threshold, slow_query_threshold
+            FROM rdb_instances
+            UNION ALL
+            SELECT 
+                id, name, 'redis' AS db_type, host, port, 
+                NULL AS username, password_encrypted,
+                environment_id, group_id, description, status,
+                last_check_time, created_at, updated_at,
+                redis_mode, redis_db,
+                NULL AS is_rds, NULL AS rds_instance_id, NULL AS aws_region,
+                slowlog_threshold, NULL AS slow_query_threshold
+            FROM redis_instances
+        """))
+        conn.commit()
+        logger.info("  ✓ 创建 v_all_instances 视图（向后兼容）")
+
+
 def run_migrations():
     """执行所有迁移"""
     logger.info("=" * 50)
@@ -400,6 +747,7 @@ def run_migrations():
         migration_003()
         migration_004()
         migration_005()
+        migration_006()
         
         logger.info("=" * 50)
         logger.info("所有迁移执行完成")

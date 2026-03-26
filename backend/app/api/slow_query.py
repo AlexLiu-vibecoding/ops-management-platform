@@ -12,7 +12,7 @@ import logging
 
 from app.database import get_db
 from app.models import (
-    SlowQuery, Instance, MonitorSwitch, 
+    SlowQuery, RDBInstance, MonitorSwitch, 
     MonitorType, User
 )
 from app.schemas import SlowQueryResponse, MessageResponse
@@ -42,7 +42,7 @@ async def list_slow_queries(
         limit: 返回记录数
         min_time: 最小执行时间（秒）
     """
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -86,7 +86,7 @@ async def get_top_slow_queries(
         hours: 时间范围（小时）
         top_n: 返回记录数
     """
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -118,7 +118,7 @@ async def get_slow_query_statistics(
         instance_id: 实例ID
         hours: 时间范围（小时）
     """
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -173,7 +173,7 @@ async def analyze_slow_query(
             detail="慢查询记录不存在"
         )
     
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -236,7 +236,7 @@ async def run_explain(
         sql: SQL语句
         database_name: 数据库名
     """
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -274,7 +274,7 @@ async def check_performance_schema_status(
     Args:
         instance_id: 实例ID
     """
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -299,7 +299,7 @@ async def sync_slow_queries(
         instance_id: 实例ID
         limit: 同步记录数限制
     """
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -334,7 +334,7 @@ async def get_instance_databases(
     Args:
         instance_id: 实例ID
     """
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -363,7 +363,7 @@ async def get_realtime_slow_queries(
         min_exec_time: 最小执行时间（秒）
         database_name: 过滤特定数据库
     """
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -395,7 +395,7 @@ async def get_statement_analysis(
         limit: 返回记录数
         database_name: 过滤特定数据库
     """
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

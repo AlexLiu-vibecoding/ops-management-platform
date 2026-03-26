@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import (
-    ApprovalRecord, ApprovalStatus, Instance, User, AuditLog
+    ApprovalRecord, ApprovalStatus, RDBInstance, RedisInstance, User, AuditLog
 )
 from app.schemas import (
     ApprovalCreate, ApprovalAction, ApprovalResponse,
@@ -46,7 +46,7 @@ async def preview_matched_databases(
     - mode=all: 返回所有数据库
     """
     # 检查实例是否存在
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -418,7 +418,7 @@ async def list_approvals(
         query = query.filter(ApprovalRecord.change_type != exclude_change_type)
         # 同时排除关联到 Redis 实例的记录
         if exclude_change_type.upper() == 'REDIS':
-            redis_instance_ids = db.query(Instance.id).filter(Instance.db_type == 'redis').subquery()
+            redis_instance_ids = db.query(RDBInstance.id).filter(RDBInstance.db_type == 'redis').subquery()
             query = query.filter(~ApprovalRecord.instance_id.in_(redis_instance_ids))
     
     # 普通用户只能看自己的申请
@@ -468,7 +468,7 @@ async def create_approval(
 ):
     """提交审批申请"""
     # 检查实例是否存在
-    instance = db.query(Instance).filter(Instance.id == approval_data.instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == approval_data.instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -772,7 +772,7 @@ async def execute_approval(
     
     try:
         # 获取实例
-        instance = db.query(Instance).filter(Instance.id == approval.instance_id).first()
+        instance = db.query(RDBInstance).filter(RDBInstance.id == approval.instance_id).first()
         
         # 根据 change_type 执行不同的逻辑
         if approval.change_type == "REDIS" and instance:

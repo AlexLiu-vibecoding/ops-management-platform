@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
 from app.models import (
-    PerformanceMetric, Instance, MonitorSwitch, 
+    PerformanceMetric, RDBInstance, MonitorSwitch, 
     MonitorType, User
 )
 from app.schemas import PerformanceMetricResponse, MessageResponse
@@ -83,7 +83,7 @@ async def get_current_performance(
     db: Session = Depends(get_db)
 ):
     """获取实例当前性能指标"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -179,7 +179,7 @@ async def get_performance_history(
     db: Session = Depends(get_db)
 ):
     """获取实例历史性能指标"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -217,7 +217,7 @@ async def get_performance_statistics(
     db: Session = Depends(get_db)
 ):
     """获取性能统计数据（最大值、最小值、平均值）"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -309,7 +309,7 @@ async def get_performance_overview(
 ):
     """获取所有实例的性能概览"""
     # 获取所有实例（包括离线实例）
-    instances = db.query(Instance).all()
+    instances = db.query(RDBInstance).all()
     
     result = []
     for instance in instances:

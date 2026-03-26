@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
 from app.models import (
-    ScheduledTask, Script, ScriptExecution, Instance, PerformanceMetric,
+    ScheduledTask, Script, ScriptExecution, RDBInstance, PerformanceMetric,
     ExecutionStatus, TriggerType, MonitorSwitch, MonitorType
 )
 from app.services.notification import notification_service
@@ -89,10 +89,10 @@ class TaskScheduler:
         db = SessionLocal()
         try:
             # 查询所有启用了 RDS 监控的实例
-            rds_instances = db.query(Instance).filter(
-                Instance.is_rds == True,
-                Instance.rds_instance_id != None,
-                Instance.status == True  # 只采集在线实例
+            rds_instances = db.query(RDBInstance).filter(
+                RDBInstance.is_rds == True,
+                RDBInstance.rds_instance_id != None,
+                RDBInstance.status == True  # 只采集在线实例
             ).all()
             
             if not rds_instances:

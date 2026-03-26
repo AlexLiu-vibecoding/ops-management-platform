@@ -9,7 +9,7 @@ from sqlalchemy import desc, func
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.models import AlertRecord, Instance, User
+from app.models import AlertRecord, RDBInstance, RedisInstance, User
 from app.schemas import MessageResponse
 from app.deps import get_current_user, get_super_admin
 
@@ -120,7 +120,7 @@ async def list_alerts(
     
     # 获取实例名称
     instance_ids = [a.instance_id for a in alerts if a.instance_id]
-    instances = {i.id: i.name for i in db.query(Instance).filter(Instance.id.in_(instance_ids)).all()} if instance_ids else {}
+    instances = {i.id: i.name for i in db.query(RDBInstance).filter(RDBInstance.id.in_(instance_ids)).all()} if instance_ids else {}
     
     # 获取用户名称
     user_ids = set()
@@ -204,7 +204,7 @@ async def get_alert(
     
     instance_name = None
     if alert.instance_id:
-        instance = db.query(Instance).filter(Instance.id == alert.instance_id).first()
+        instance = db.query(RDBInstance).filter(RDBInstance.id == alert.instance_id).first()
         instance_name = instance.name if instance else None
     
     acknowledged_by_name = None

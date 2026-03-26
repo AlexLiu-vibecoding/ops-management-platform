@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from app.database import get_db
 from app.models import (
     MonitorSwitch, MonitorType, GlobalConfig, 
-    Instance, User, SlowQuery, PerformanceMetric
+    RDBInstance, RedisInstance, User, SlowQuery, PerformanceMetric
 )
 from sqlalchemy import func
 from app.schemas import (
@@ -137,8 +137,10 @@ async def get_instance_monitor_switches(
     db: Session = Depends(get_db)
 ):
     """获取实例级监控开关"""
-    # 检查实例是否存在
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    # 检查实例是否存在（支持 RDB 和 Redis）
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
+    if not instance:
+        instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -408,14 +410,14 @@ async def get_slow_query_statistics(
         func.avg(SlowQuery.query_time).label('avg_time')
     ).filter(SlowQuery.last_seen >= start_time).first()
     
-    # 按实例统计
+    # 按实例统计 (只关联 RDB 实例，因为慢查询只存在于 RDB)
     instance_stats = db.query(
-        SlowQuery.instance_id,
-        Instance.name.label('instance_name'),
+        SlowQuery.rdb_instance_id.label('instance_id'),
+        RDBInstance.name.label('instance_name'),
         func.count(SlowQuery.id).label('count')
-    ).join(Instance).filter(
+    ).join(RDBInstance, SlowQuery.rdb_instance_id == RDBInstance.id).filter(
         SlowQuery.last_seen >= start_time
-    ).group_by(SlowQuery.instance_id, Instance.name).all()
+    ).group_by(SlowQuery.rdb_instance_id, RDBInstance.name).all()
     
     return {
         "total_count": stats.total_count or 0,
@@ -516,18 +518,18 @@ async def get_high_cpu_statistics(
         PerformanceMetric.collect_time >= start_time
     ).first()
     
-    # 按实例统计
+    # 按实例统计 (只关联 RDB 实例)
     instance_stats = db.query(
-        PerformanceMetric.instance_id,
-        Instance.name.label('instance_name'),
+        PerformanceMetric.rdb_instance_id.label('instance_id'),
+        RDBInstance.name.label('instance_name'),
         func.max(PerformanceMetric.cpu_usage).label('max_cpu'),
         func.avg(PerformanceMetric.cpu_usage).label('avg_cpu'),
         func.max(PerformanceMetric.memory_usage).label('max_memory'),
-    ).join(Instance).filter(
+    ).join(RDBInstance, PerformanceMetric.rdb_instance_id == RDBInstance.id).filter(
         PerformanceMetric.collect_time >= start_time
     ).group_by(
-        PerformanceMetric.instance_id, 
-        Instance.name
+        PerformanceMetric.rdb_instance_id, 
+        RDBInstance.name
     ).all()
     
     return {
@@ -719,9 +721,13 @@ async def get_monitor_overview(
         func.avg(PerformanceMetric.qps).label('avg_qps')
     ).filter(PerformanceMetric.collect_time >= start_time).first()
     
-    # 实例统计
-    total_instances = db.query(func.count(Instance.id)).scalar()
-    online_instances = db.query(func.count(Instance.id)).filter(Instance.status == True).scalar()
+    # 实例统计 (RDB + Redis)
+    total_rdb = db.query(func.count(RDBInstance.id)).scalar() or 0
+    total_redis = db.query(func.count(RedisInstance.id)).scalar() or 0
+    online_rdb = db.query(func.count(RDBInstance.id)).filter(RDBInstance.status == True).scalar() or 0
+    online_redis = db.query(func.count(RedisInstance.id)).filter(RedisInstance.status == True).scalar() or 0
+    total_instances = total_rdb + total_redis
+    online_instances = online_rdb + online_redis
     
     return {
         "slow_query": {

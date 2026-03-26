@@ -1,370 +1,222 @@
 """
-数据库实例管理API（支持MySQL和PostgreSQL）
+数据库实例管理API（向后兼容 - 统一入口）
+
+推荐使用新的 API：
+- /api/v1/rdb-instances - MySQL/PostgreSQL 实例管理
+- /api/v1/redis-instances - Redis 实例管理
+
+此 API 保留用于向后兼容，底层使用 v_all_instances 视图
 """
-import asyncio
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-import pymysql
-import psycopg2
+from sqlalchemy import text, literal_column
+from pydantic import BaseModel
+from datetime import datetime
+import logging
+
 from app.database import get_db
-from app.models import Instance, InstanceGroup, Environment, MonitorSwitch, MonitorType
-from app.schemas import (
-    InstanceCreate, InstanceUpdate, InstanceResponse, 
-    InstanceTestResult, MessageResponse
-)
-from app.utils.auth import encrypt_instance_password, decrypt_instance_password
-from app.deps import get_operator, get_current_user
+from app.models import RDBInstance, RedisInstance, InstanceGroup
+from app.deps import get_current_user
 from app.models import User
 
-router = APIRouter(prefix="/instances", tags=["实例管理"])
+router = APIRouter(prefix="/instances", tags=["实例管理(兼容)"])
+logger = logging.getLogger(__name__)
 
 
-async def test_mysql_connection(host: str, port: int, username: str, password: str) -> dict:
-    """测试MySQL连接"""
-    try:
-        conn = pymysql.connect(
-            host=host,
-            port=port,
-            user=username,
-            password=password,
-            connect_timeout=5
-        )
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT VERSION()")
-            version = cursor.fetchone()[0]
-        conn.close()
-        return {
-            "success": True,
-            "message": "连接成功",
-            "version": version
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"连接失败: {str(e)}",
-            "version": None
-        }
+# ============ Schema 定义 ============
+
+class InstanceResponse(BaseModel):
+    """实例响应（兼容格式）"""
+    id: int
+    name: str
+    db_type: str
+    host: str
+    port: int
+    username: Optional[str] = None
+    environment_id: Optional[int] = None
+    group_id: Optional[int] = None
+    description: Optional[str] = None
+    status: bool = True
+    is_rds: bool = False
+    rds_instance_id: Optional[str] = None
+    aws_region: Optional[str] = None
+    redis_mode: Optional[str] = None
+    redis_db: Optional[int] = None
+    last_check_time: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
 
 
-async def test_postgresql_connection(host: str, port: int, username: str, password: str, database: str = "postgres") -> dict:
-    """测试PostgreSQL连接"""
-    try:
-        conn = psycopg2.connect(
-            host=host,
-            port=port,
-            user=username,
-            password=password,
-            database=database,
-            connect_timeout=5
-        )
-        with conn.cursor() as cursor:
-            cursor.execute("SELECT version()")
-            version = cursor.fetchone()[0]
-        conn.close()
-        return {
-            "success": True,
-            "message": "连接成功",
-            "version": version
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"连接失败: {str(e)}",
-            "version": None
-        }
+class MessageResponse(BaseModel):
+    """通用消息响应"""
+    message: str
 
 
-async def test_connection(db_type: str, host: str, port: int, username: str, password: str, database: str = "postgres", redis_db: int = 0) -> dict:
-    """测试数据库连接（支持MySQL、PostgreSQL和Redis）"""
-    if db_type == "postgresql":
-        return await test_postgresql_connection(host, port, username, password, database)
-    elif db_type == "redis":
-        return await test_redis_connection(host, port, password, redis_db)
-    else:
-        return await test_mysql_connection(host, port, username, password)
-
-
-async def test_redis_connection(host: str, port: int, password: str = "", redis_db: int = 0) -> dict:
-    """测试Redis连接"""
-    import redis.asyncio as redis
-    
-    try:
-        # 创建 Redis 连接
-        client = redis.Redis(
-            host=host,
-            port=port,
-            password=password if password else None,
-            db=redis_db,
-            decode_responses=True,
-            socket_connect_timeout=5
-        )
-        
-        # 测试连接
-        info = await client.info()
-        await client.close()
-        
-        # 获取 Redis 版本
-        version = info.get("redis_version", "unknown")
-        
-        return {
-            "success": True,
-            "message": "Connection successful",
-            "version": f"Redis {version}"
-        }
-    except redis.AuthenticationError:
-        return {
-            "success": False,
-            "message": "Authentication failed: invalid password"
-        }
-    except redis.ConnectionError as e:
-        return {
-            "success": False,
-            "message": f"Connection failed: {str(e)}"
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "message": f"Connection test failed: {str(e)}"
-        }
-
+# ============ API 路由 ============
 
 @router.get("")
 async def list_instances(
     environment_id: Optional[int] = None,
     group_id: Optional[int] = None,
+    db_type: Optional[str] = None,
     status: Optional[bool] = None,
     skip: int = 0,
     limit: int = 20,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """获取实例列表"""
-    query = db.query(Instance)
+    """获取实例列表（向后兼容）"""
+    # 使用 UNION 查询两个表
+    rdb_query = db.query(
+        RDBInstance.id,
+        RDBInstance.name,
+        RDBInstance.db_type,
+        RDBInstance.host,
+        RDBInstance.port,
+        RDBInstance.username,
+        RDBInstance.environment_id,
+        RDBInstance.group_id,
+        RDBInstance.description,
+        RDBInstance.status,
+        RDBInstance.is_rds,
+        RDBInstance.rds_instance_id,
+        RDBInstance.aws_region,
+        RDBInstance.last_check_time,
+        RDBInstance.created_at,
+        RDBInstance.updated_at,
+    )
     
+    redis_query = db.query(
+        RedisInstance.id,
+        RedisInstance.name,
+        literal_column("'redis'").label('db_type'),
+        RedisInstance.host,
+        RedisInstance.port,
+        literal_column("NULL").label('username'),
+        RedisInstance.environment_id,
+        RedisInstance.group_id,
+        RedisInstance.description,
+        RedisInstance.status,
+        literal_column("FALSE").label('is_rds'),
+        literal_column("NULL").label('rds_instance_id'),
+        literal_column("NULL").label('aws_region'),
+        RedisInstance.last_check_time,
+        RedisInstance.created_at,
+        RedisInstance.updated_at,
+    )
+    
+    # 合并查询
+    query = rdb_query.union_all(redis_query)
+    
+    # 应用过滤条件
     if environment_id:
-        query = query.filter(Instance.environment_id == environment_id)
+        query = query.filter(text(f"environment_id = {environment_id}"))
     if group_id:
-        query = query.filter(Instance.group_id == group_id)
+        query = query.filter(text(f"group_id = {group_id}"))
+    if db_type:
+        query = query.filter(text(f"db_type = '{db_type}'"))
     if status is not None:
-        query = query.filter(Instance.status == status)
+        query = query.filter(text(f"status = {status}"))
     
+    # 获取总数
     total = query.count()
+    
+    # 分页
     instances = query.offset(skip).limit(limit).all()
+    
+    # 转换为响应格式
+    items = []
+    for i in instances:
+        items.append({
+            "id": i.id,
+            "name": i.name,
+            "db_type": i.db_type if isinstance(i.db_type, str) else i.db_type.value if hasattr(i.db_type, 'value') else str(i.db_type),
+            "host": i.host,
+            "port": i.port,
+            "username": i.username,
+            "environment_id": i.environment_id,
+            "group_id": i.group_id,
+            "description": i.description,
+            "status": i.status,
+            "is_rds": i.is_rds if hasattr(i, 'is_rds') else False,
+            "rds_instance_id": i.rds_instance_id if hasattr(i, 'rds_instance_id') else None,
+            "aws_region": i.aws_region if hasattr(i, 'aws_region') else None,
+            "redis_mode": None,  # 兼容字段
+            "redis_db": None,
+            "last_check_time": i.last_check_time,
+            "created_at": i.created_at,
+            "updated_at": i.updated_at,
+        })
     
     return {
         "total": total,
-        "items": [InstanceResponse.from_orm(i) for i in instances]
+        "items": items
     }
 
 
-@router.get("/{instance_id}", response_model=InstanceResponse)
+@router.get("/{instance_id}")
 async def get_instance(
     instance_id: int,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """获取实例详情"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
-    if not instance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Instance not found"
-        )
-    return InstanceResponse.from_orm(instance)
-
-
-@router.post("/test", response_model=InstanceTestResult)
-async def test_instance_connection(
-    instance_data: InstanceCreate,
-    current_user: User = Depends(get_operator),
-    db: Session = Depends(get_db)
-):
-    """测试实例连接"""
-    result = await test_connection(
-        instance_data.db_type or "mysql",
-        instance_data.host,
-        instance_data.port,
-        instance_data.username or "",
-        instance_data.password or "",
-        "postgres",
-        instance_data.redis_db or 0
+    """获取实例详情（向后兼容）"""
+    # 先尝试从 RDB 表查找
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
+    if instance:
+        return {
+            "id": instance.id,
+            "name": instance.name,
+            "db_type": instance.db_type.value if hasattr(instance.db_type, 'value') else instance.db_type,
+            "host": instance.host,
+            "port": instance.port,
+            "username": instance.username,
+            "environment_id": instance.environment_id,
+            "group_id": instance.group_id,
+            "description": instance.description,
+            "status": instance.status,
+            "is_rds": instance.is_rds,
+            "rds_instance_id": instance.rds_instance_id,
+            "aws_region": instance.aws_region,
+            "redis_mode": None,
+            "redis_db": None,
+            "last_check_time": instance.last_check_time,
+            "created_at": instance.created_at,
+            "updated_at": instance.updated_at,
+        }
+    
+    # 再尝试从 Redis 表查找
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    if instance:
+        return {
+            "id": instance.id,
+            "name": instance.name,
+            "db_type": "redis",
+            "host": instance.host,
+            "port": instance.port,
+            "username": None,
+            "environment_id": instance.environment_id,
+            "group_id": instance.group_id,
+            "description": instance.description,
+            "status": instance.status,
+            "is_rds": False,
+            "rds_instance_id": None,
+            "aws_region": None,
+            "redis_mode": instance.redis_mode.value if hasattr(instance.redis_mode, 'value') else instance.redis_mode,
+            "redis_db": instance.redis_db,
+            "last_check_time": instance.last_check_time,
+            "created_at": instance.created_at,
+            "updated_at": instance.updated_at,
+        }
+    
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="实例不存在"
     )
-    return InstanceTestResult(**result)
-
-
-@router.post("", response_model=InstanceResponse)
-async def create_instance(
-    instance_data: InstanceCreate,
-    current_user: User = Depends(get_operator),
-    db: Session = Depends(get_db)
-):
-    """创建实例"""
-    # 检查名称是否已存在
-    if db.query(Instance).filter(Instance.name == instance_data.name).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Instance name already exists"
-        )
-    
-    # RDS 实例不需要测试连接
-    if not instance_data.is_rds:
-        # 非RDS实例必须有连接信息
-        if not instance_data.host:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Host is required for non-RDS instances"
-            )
-        
-        # MySQL/PostgreSQL 需要用户名和密码
-        if instance_data.db_type != "redis":
-            if not instance_data.username or not instance_data.password:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Username and password are required for MySQL/PostgreSQL instances"
-                )
-        
-        # 测试连接
-        conn_result = await test_connection(
-            instance_data.db_type or "mysql",
-            instance_data.host,
-            instance_data.port or 6379 if instance_data.db_type == "redis" else 3306,
-            instance_data.username or "",
-            instance_data.password or "",
-            "postgres",
-            instance_data.redis_db or 0
-        )
-        
-        if not conn_result["success"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Connection test failed: {conn_result['message']}"
-            )
-    
-    # 创建实例
-    instance = Instance(
-        name=instance_data.name,
-        db_type=instance_data.db_type or "mysql",
-        host=instance_data.host or "",
-        port=instance_data.port or 3306,
-        username=instance_data.username or "",
-        password_encrypted=encrypt_instance_password(instance_data.password) if instance_data.password else "",
-        environment_id=instance_data.environment_id,
-        group_id=instance_data.group_id,
-        description=instance_data.description,
-        status=instance_data.status if instance_data.status is not None else True,
-        is_rds=instance_data.is_rds,
-        rds_instance_id=instance_data.rds_instance_id,
-        aws_region=instance_data.aws_region,
-        redis_mode=instance_data.redis_mode or "standalone",
-        redis_db=instance_data.redis_db or 0
-    )
-    db.add(instance)
-    db.commit()
-    db.refresh(instance)
-    
-    # 创建默认监控开关（全部启用）
-    for monitor_type in MonitorType:
-        switch = MonitorSwitch(
-            instance_id=instance.id,
-            monitor_type=monitor_type,
-            enabled=True
-        )
-        db.add(switch)
-    db.commit()
-    
-    return InstanceResponse.from_orm(instance)
-
-
-@router.put("/{instance_id}", response_model=InstanceResponse)
-async def update_instance(
-    instance_id: int,
-    instance_data: InstanceUpdate,
-    current_user: User = Depends(get_operator),
-    db: Session = Depends(get_db)
-):
-    """更新实例"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
-    if not instance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Instance not found"
-        )
-    
-    # 更新字段
-    update_data = instance_data.dict(exclude_unset=True)
-    
-    # 如果更新了密码，需要加密
-    if 'password' in update_data:
-        update_data['password_encrypted'] = encrypt_instance_password(update_data.pop('password'))
-    
-    for key, value in update_data.items():
-        setattr(instance, key, value)
-    
-    db.commit()
-    db.refresh(instance)
-    
-    return InstanceResponse.from_orm(instance)
-
-
-@router.delete("/{instance_id}", response_model=MessageResponse)
-async def delete_instance(
-    instance_id: int,
-    current_user: User = Depends(get_operator),
-    db: Session = Depends(get_db)
-):
-    """删除实例"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
-    if not instance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Instance not found"
-        )
-    
-    db.delete(instance)
-    db.commit()
-    
-    return MessageResponse(message="实例删除成功")
-
-
-@router.post("/{instance_id}/check", response_model=InstanceTestResult)
-async def check_instance_status(
-    instance_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """检查实例状态"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
-    if not instance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Instance not found"
-        )
-    
-    # 尝试解密密码
-    try:
-        password = decrypt_instance_password(instance.password_encrypted)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
-        )
-    
-    result = await test_connection(
-        instance.db_type or "mysql",
-        instance.host,
-        instance.port,
-        instance.username,
-        password
-    )
-    
-    # 更新实例状态
-    from datetime import datetime
-    instance.status = result["success"]
-    instance.last_check_time = datetime.now()
-    db.commit()
-    
-    return InstanceTestResult(**result)
 
 
 # ============ 实例分组相关 ============
@@ -383,14 +235,14 @@ async def list_instance_groups(
 async def create_instance_group(
     name: str,
     description: str = "",
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """创建实例分组"""
     if db.query(InstanceGroup).filter(InstanceGroup.name == name).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Group name already exists"
+            detail="分组名称已存在"
         )
     
     group = InstanceGroup(name=name, description=description)
@@ -398,249 +250,3 @@ async def create_instance_group(
     db.commit()
     
     return MessageResponse(message="分组创建成功")
-
-
-# ============ 实例参数相关 ============
-
-@router.get("/{instance_id}/variables", response_model=dict)
-async def get_instance_variables(
-    instance_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """获取实例参数"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
-    if not instance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Instance not found"
-        )
-    
-    try:
-        password = decrypt_instance_password(instance.password_encrypted)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
-        )
-    
-    try:
-        if instance.db_type == "postgresql":
-            # PostgreSQL: 使用 SHOW ALL 获取所有参数
-            conn = psycopg2.connect(
-                host=instance.host,
-                port=instance.port,
-                user=instance.username,
-                password=password,
-                database="postgres",
-                connect_timeout=5
-            )
-            with conn.cursor() as cursor:
-                cursor.execute("SHOW ALL")
-                variables = {row[0]: row[1] for row in cursor.fetchall()}
-            conn.close()
-        else:
-            # MySQL: 使用 SHOW VARIABLES
-            conn = pymysql.connect(
-                host=instance.host,
-                port=instance.port,
-                user=instance.username,
-                password=password,
-                connect_timeout=5
-            )
-            with conn.cursor() as cursor:
-                cursor.execute("SHOW VARIABLES")
-                variables = {row[0]: row[1] for row in cursor.fetchall()}
-            conn.close()
-        return variables
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get parameters: {str(e)}"
-        )
-
-
-# ============ 数据库列表相关 ============
-
-@router.get("/{instance_id}/databases", response_model=List[dict])
-async def get_instance_databases(
-    instance_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """获取实例数据库列表"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
-    if not instance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Instance not found"
-        )
-    
-    try:
-        password = decrypt_instance_password(instance.password_encrypted)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
-        )
-    
-    try:
-        databases = []
-        
-        if instance.db_type == "postgresql":
-            # PostgreSQL: 查询 pg_database
-            conn = psycopg2.connect(
-                host=instance.host,
-                port=instance.port,
-                user=instance.username,
-                password=password,
-                database="postgres",
-                connect_timeout=10
-            )
-            with conn.cursor() as cursor:
-                # 获取数据库列表
-                cursor.execute("""
-                    SELECT datname, pg_database_size(datname) as size_bytes
-                    FROM pg_database 
-                    WHERE datistemplate = false
-                    ORDER BY datname
-                """)
-                db_list = cursor.fetchall()
-                
-                for db_row in db_list:
-                    db_name = db_row[0]
-                    size_bytes = db_row[1] if len(db_row) > 1 else 0
-                    
-                    # 获取表数量
-                    try:
-                        cursor.execute(f"""
-                            SELECT COUNT(*) FROM information_schema.tables 
-                            WHERE table_schema NOT IN ('pg_catalog', 'information_schema')
-                            AND table_catalog = %s
-                        """, (db_name,))
-                        table_count = cursor.fetchone()[0]
-                    except Exception:
-                        table_count = 0
-                    
-                    databases.append({
-                        "name": db_name,
-                        "tables": table_count,
-                        "size_mb": round(size_bytes / 1024 / 1024, 2) if size_bytes else 0
-                    })
-            conn.close()
-        else:
-            # MySQL: 使用 SHOW DATABASES
-            conn = pymysql.connect(
-                host=instance.host,
-                port=instance.port,
-                user=instance.username,
-                password=password,
-                connect_timeout=10
-            )
-            with conn.cursor() as cursor:
-                # 获取数据库列表
-                cursor.execute("SHOW DATABASES")
-                db_list = cursor.fetchall()
-                
-                for db_row in db_list:
-                    db_name = db_row[0]
-                    # 过滤系统库
-                    if db_name in ('information_schema', 'mysql', 'performance_schema', 'sys'):
-                        continue
-                    
-                    # 获取数据库大小和表数量
-                    try:
-                        cursor.execute(f"""
-                            SELECT COUNT(*), 
-                                   COALESCE(SUM(data_length + index_length) / 1024 / 1024, 0) as size_mb
-                            FROM information_schema.tables 
-                            WHERE table_schema = %s
-                        """, (db_name,))
-                        result = cursor.fetchone()
-                        databases.append({
-                            "name": db_name,
-                            "tables": result[0] if result else 0,
-                            "size_mb": round(result[1], 2) if result else 0
-                        })
-                    except Exception:
-                        databases.append({
-                            "name": db_name,
-                            "tables": 0,
-                            "size_mb": 0
-                        })
-            conn.close()
-        
-        # 按名称排序
-        databases.sort(key=lambda x: x["name"])
-        return databases
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get database list: {str(e)}"
-        )
-
-
-@router.get("/{instance_id}/databases/{database_name}/tables", response_model=List[dict])
-async def get_database_tables(
-    instance_id: int,
-    database_name: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """获取数据库表列表"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
-    if not instance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Instance not found"
-        )
-    
-    try:
-        password = decrypt_instance_password(instance.password_encrypted)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Password decryption failed, please re-save instance password: {str(e)}"
-        )
-    
-    try:
-        conn = pymysql.connect(
-            host=instance.host,
-            port=instance.port,
-            user=instance.username,
-            password=password,
-            database=database_name,
-            connect_timeout=10
-        )
-        tables = []
-        with conn.cursor() as cursor:
-            cursor.execute("""
-                SELECT 
-                    table_name,
-                    table_type,
-                    table_rows,
-                    COALESCE((data_length + index_length) / 1024 / 1024, 0) as size_mb,
-                    table_comment
-                FROM information_schema.tables 
-                WHERE table_schema = %s
-                ORDER BY table_name
-            """, (database_name,))
-            
-            for row in cursor.fetchall():
-                tables.append({
-                    "name": row[0],
-                    "type": row[1],
-                    "rows": row[2] or 0,
-                    "size_mb": round(row[3], 2),
-                    "comment": row[4] or ""
-                })
-        
-        conn.close()
-        return tables
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get table list: {str(e)}"
-        )

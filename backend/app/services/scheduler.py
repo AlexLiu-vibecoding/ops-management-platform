@@ -14,7 +14,7 @@ from apscheduler.triggers.cron import CronTrigger
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import ApprovalRecord, ApprovalStatus, Instance, AuditLog, User
+from app.models import ApprovalRecord, ApprovalStatus, RDBInstance, RedisInstance, AuditLog, User
 from app.services.notification import notification_service
 from app.services.sql_executor import sql_executor, redis_executor
 from app.config.storage import get_storage_settings
@@ -162,17 +162,35 @@ class ApprovalScheduler:
             
             logger.info(f"开始执行审批工单: {approval_id} - {approval.title}")
             
-            # 获取实例信息
-            instance = db.query(Instance).filter(Instance.id == approval.instance_id).first()
+            # 获取实例信息 - 支持新的拆分表结构
+            instance = None
+            instance_type = None
+            
+            if approval.rdb_instance_id:
+                instance = db.query(RDBInstance).filter(RDBInstance.id == approval.rdb_instance_id).first()
+                instance_type = "rdb"
+            elif approval.redis_instance_id:
+                instance = db.query(RedisInstance).filter(RedisInstance.id == approval.redis_instance_id).first()
+                instance_type = "redis"
+            elif approval.instance_id:
+                # 向后兼容：旧数据可能使用 instance_id
+                # 尝试从两个表中查找
+                instance = db.query(RDBInstance).filter(RDBInstance.id == approval.instance_id).first()
+                if instance:
+                    instance_type = "rdb"
+                else:
+                    instance = db.query(RedisInstance).filter(RedisInstance.id == approval.instance_id).first()
+                    instance_type = "redis"
+            
             if not instance:
-                logger.error(f"实例不存在: {approval.instance_id}")
+                logger.error(f"实例不存在: approval_id={approval_id}")
                 approval.status = ApprovalStatus.FAILED
                 approval.execute_result = "实例不存在"
                 db.commit()
                 return
             
             # 根据 change_type 执行不同的逻辑
-            if approval.change_type == "REDIS":
+            if approval.change_type == "REDIS" or instance_type == "redis":
                 # 执行 Redis 命令
                 execute_result = await redis_executor.execute_for_approval(approval, instance)
                 execution_success = sql_executor.check_execution_success(execute_result)

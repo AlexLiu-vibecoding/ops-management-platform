@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import Instance
+from app.models import RDBInstance, RedisInstance
 from app.schemas import MessageResponse
 from app.utils.auth import decrypt_instance_password
 from app.utils.redis_operations import RedisInstanceClient
@@ -16,7 +16,7 @@ from pydantic import BaseModel
 router = APIRouter(prefix="/redis", tags=["Redis管理"])
 
 
-def get_redis_client(instance: Instance) -> RedisInstanceClient:
+def get_redis_client(instance: RedisInstance) -> RedisInstanceClient:
     """获取 Redis 客户端"""
     password = None
     if instance.password_encrypted:
@@ -60,7 +60,7 @@ async def get_redis_info(
     db: Session = Depends(get_db)
 ):
     """获取 Redis 实例信息"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -100,7 +100,7 @@ async def scan_keys(
     db: Session = Depends(get_db)
 ):
     """扫描键列表"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -142,7 +142,7 @@ async def get_key_detail(
     db: Session = Depends(get_db)
 ):
     """获取键详情"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -178,7 +178,7 @@ async def set_key_value(
     db: Session = Depends(get_db)
 ):
     """设置键值"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -207,7 +207,7 @@ async def delete_key(
     db: Session = Depends(get_db)
 ):
     """删除键"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -236,7 +236,7 @@ async def rename_key(
     db: Session = Depends(get_db)
 ):
     """重命名键"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -265,7 +265,7 @@ async def set_key_ttl(
     db: Session = Depends(get_db)
 ):
     """设置键过期时间"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -294,7 +294,7 @@ async def get_slowlog(
     db: Session = Depends(get_db)
 ):
     """获取慢查询日志"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -318,7 +318,7 @@ async def get_clients(
     db: Session = Depends(get_db)
 ):
     """获取客户端列表"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -343,7 +343,7 @@ async def get_config(
     db: Session = Depends(get_db)
 ):
     """获取配置"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     
@@ -367,7 +367,7 @@ async def test_redis_connection(
     db: Session = Depends(get_db)
 ):
     """测试 Redis 连接"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=404, detail="实例不存在")
     

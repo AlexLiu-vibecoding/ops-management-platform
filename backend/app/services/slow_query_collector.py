@@ -12,7 +12,7 @@ from datetime import datetime
 
 from sqlalchemy import text, create_engine
 
-from app.models import Instance
+from app.models import RDBInstance
 from app.utils.auth import aes_cipher
 
 logger = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class SlowQueryCollector:
 
     async def fetch_from_performance_schema(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         limit: int = 100,
         min_exec_time: float = 1.0,
         database_name: Optional[str] = None
@@ -132,7 +132,7 @@ class SlowQueryCollector:
 
     async def fetch_from_statement_analysis(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         limit: int = 100,
         database_name: Optional[str] = None
     ) -> list[dict]:
@@ -254,7 +254,7 @@ class SlowQueryCollector:
             "last_seen": row.last_seen.isoformat() if row.last_seen else None
         }
 
-    async def check_performance_schema_enabled(self, instance: Instance) -> dict:
+    async def check_performance_schema_enabled(self, instance: RDBInstance) -> dict:
         """
         检查 performance_schema 是否启用
 
@@ -327,7 +327,7 @@ class SlowQueryCollector:
 
     async def get_instance_databases(
         self,
-        instance: Instance
+        instance: RDBInstance
     ) -> list[str]:
         """
         获取实例的数据库列表
@@ -358,7 +358,7 @@ class SlowQueryCollector:
 
     async def sync_slow_queries_to_db(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         db_session,
         limit: int = 100
     ) -> dict[str, Any]:

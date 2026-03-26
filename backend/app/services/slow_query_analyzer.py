@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional
 import pymysql
 from pymysql.cursors import DictCursor
 
-from app.models import Instance, SlowQuery
+from app.models import RDBInstance, SlowQuery
 from app.utils.auth import aes_cipher
 from app.services.db_connection import db_manager
 
@@ -25,7 +25,7 @@ class SlowQueryAnalyzer:
     
     async def execute_explain(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         sql: str,
         database_name: Optional[str] = None
     ) -> dict[str, Any]:

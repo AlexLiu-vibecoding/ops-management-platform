@@ -12,7 +12,7 @@ import json
 from app.database import get_db
 from app.models import (
     InspectMetric, InspectResult, InspectionReport, 
-    Instance, User, SlowQuery, IndexAnalysis, 
+    RDBInstance, User, SlowQuery, IndexAnalysis, 
     ReplicationStatus, LongTransaction, LockWait
 )
 from app.schemas import MessageResponse
@@ -200,7 +200,7 @@ async def run_inspection(
     db: Session = Depends(get_db)
 ):
     """执行巡检"""
-    instance = db.query(Instance).filter(Instance.id == data.instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == data.instance_id).first()
     if not instance:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="实例不存在")
     
@@ -246,7 +246,7 @@ async def run_inspection(
     }
 
 
-async def _run_single_check(instance: Instance, metric: InspectMetric, db: Session, check_time: datetime) -> Dict[str, Any]:
+async def _run_single_check(instance: RDBInstance, metric: InspectMetric, db: Session, check_time: datetime) -> Dict[str, Any]:
     """执行单个巡检检查"""
     
     status = "normal"
@@ -448,7 +448,7 @@ async def list_results(
     
     # 获取实例和指标信息
     instance_ids = [r.instance_id for r in results]
-    instances = {i.id: i.name for i in db.query(Instance).filter(Instance.id.in_(instance_ids)).all()} if instance_ids else {}
+    instances = {i.id: i.name for i in db.query(RDBInstance).filter(RDBInstance.id.in_(instance_ids)).all()} if instance_ids else {}
     
     metric_ids = [r.metric_id for r in results]
     metrics = {m.id: {"name": m.metric_name, "module": m.module} for m in db.query(InspectMetric).filter(InspectMetric.id.in_(metric_ids)).all()} if metric_ids else {}
@@ -501,7 +501,7 @@ async def list_reports(
     
     # 获取实例名称
     instance_ids = [r.instance_id for r in reports]
-    instances = {i.id: i.name for i in db.query(Instance).filter(Instance.id.in_(instance_ids)).all()} if instance_ids else {}
+    instances = {i.id: i.name for i in db.query(RDBInstance).filter(RDBInstance.id.in_(instance_ids)).all()} if instance_ids else {}
     
     items = []
     for r in reports:

@@ -9,7 +9,7 @@ from sqlalchemy import desc, func
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.models import ReplicationStatus, LockWait, LongTransaction, Instance, User
+from app.models import ReplicationStatus, LockWait, LongTransaction, RDBInstance, RedisInstance, User
 from app.schemas import MessageResponse
 from app.deps import get_current_user, get_super_admin
 from app.services.db_connection import db_manager
@@ -107,7 +107,7 @@ async def list_replication_status(
     
     # 获取实例名称
     instance_ids = [r.instance_id for r in records]
-    instances = {i.id: i.name for i in db.query(Instance).filter(Instance.id.in_(instance_ids)).all()} if instance_ids else {}
+    instances = {i.id: i.name for i in db.query(RDBInstance).filter(RDBInstance.id.in_(instance_ids)).all()} if instance_ids else {}
     
     items = []
     for r in records:
@@ -140,7 +140,7 @@ async def check_replication_status(
     db: Session = Depends(get_db)
 ):
     """检查实例的主从复制状态"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="实例不存在")
     
@@ -221,7 +221,7 @@ async def list_lock_waits(
     
     # 获取实例名称
     instance_ids = [r.instance_id for r in records]
-    instances = {i.id: i.name for i in db.query(Instance).filter(Instance.id.in_(instance_ids)).all()} if instance_ids else {}
+    instances = {i.id: i.name for i in db.query(RDBInstance).filter(RDBInstance.id.in_(instance_ids)).all()} if instance_ids else {}
     
     items = []
     for r in records:
@@ -253,7 +253,7 @@ async def check_lock_waits(
     db: Session = Depends(get_db)
 ):
     """检查实例的锁等待情况"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="实例不存在")
     
@@ -344,7 +344,7 @@ async def list_long_transactions(
     
     # 获取实例名称
     instance_ids = [r.instance_id for r in records]
-    instances = {i.id: i.name for i in db.query(Instance).filter(Instance.id.in_(instance_ids)).all()} if instance_ids else {}
+    instances = {i.id: i.name for i in db.query(RDBInstance).filter(RDBInstance.id.in_(instance_ids)).all()} if instance_ids else {}
     
     items = []
     for r in records:
@@ -379,7 +379,7 @@ async def check_long_transactions(
     db: Session = Depends(get_db)
 ):
     """检查实例的长事务"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="实例不存在")
     
@@ -461,7 +461,7 @@ async def kill_transaction(
     db: Session = Depends(get_db)
 ):
     """Kill长事务"""
-    instance = db.query(Instance).filter(Instance.id == instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if not instance:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="实例不存在")
     

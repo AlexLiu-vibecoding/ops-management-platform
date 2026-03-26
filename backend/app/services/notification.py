@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import (
     DingTalkChannel, NotificationBinding, ApprovalRecord, 
-    ApprovalStatus, Instance, User, ScheduledTask, ScriptExecution
+    ApprovalStatus, RDBInstance, RedisInstance, User, ScheduledTask, ScriptExecution
 )
 from app.utils.auth import aes_cipher
 
@@ -204,9 +204,20 @@ class NotificationService:
             approval: 审批记录
             notification_type: 通知类型 (new/approved/rejected/executed)
         """
-        # 获取实例信息
-        instance = db.query(Instance).filter(Instance.id == approval.instance_id).first()
-        instance_name = instance.name if instance else "未知实例"
+        # 获取实例信息 - 支持新的拆分表结构
+        instance_name = "未知实例"
+        if approval.rdb_instance_id:
+            instance = db.query(RDBInstance).filter(RDBInstance.id == approval.rdb_instance_id).first()
+            instance_name = instance.name if instance else "未知实例"
+        elif approval.redis_instance_id:
+            instance = db.query(RedisInstance).filter(RedisInstance.id == approval.redis_instance_id).first()
+            instance_name = instance.name if instance else "未知实例"
+        elif approval.instance_id:
+            # 向后兼容
+            instance = db.query(RDBInstance).filter(RDBInstance.id == approval.instance_id).first()
+            if not instance:
+                instance = db.query(RedisInstance).filter(RedisInstance.id == approval.instance_id).first()
+            instance_name = instance.name if instance else "未知实例"
         
         # 获取申请人信息
         requester = db.query(User).filter(User.id == approval.requester_id).first()

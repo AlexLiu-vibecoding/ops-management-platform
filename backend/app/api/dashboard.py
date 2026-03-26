@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
 from app.models import (
-    Instance, ApprovalRecord, ApprovalStatus, User
+    RDBInstance, RedisInstance, ApprovalRecord, ApprovalStatus, User
 )
 from app.deps import get_current_user
 
@@ -21,9 +21,13 @@ async def get_dashboard_stats(
 ):
     """获取仪表盘统计数据"""
     
-    # 1. 数据库实例统计
-    total_instances = db.query(Instance).count()
-    online_instances = db.query(Instance).filter(Instance.status == True).count()
+    # 1. 数据库实例统计 (RDB + Redis)
+    total_rdb = db.query(RDBInstance).count()
+    total_redis = db.query(RedisInstance).count()
+    online_rdb = db.query(RDBInstance).filter(RDBInstance.status == True).count()
+    online_redis = db.query(RedisInstance).filter(RedisInstance.status == True).count()
+    total_instances = total_rdb + total_redis
+    online_instances = online_rdb + online_redis
     
     # 2. 待审批数量
     pending_approvals = db.query(ApprovalRecord).filter(

@@ -10,7 +10,7 @@ import pymysql
 import psycopg2
 import redis
 
-from app.models import ApprovalRecord, Instance
+from app.models import ApprovalRecord, RDBInstance, RedisInstance
 from app.utils.auth import decrypt_instance_password
 from app.services.storage import storage_manager
 
@@ -23,7 +23,7 @@ class SQLExecutor:
     # 查询语句前缀
     QUERY_PREFIXES = ('SELECT', 'SHOW', 'DESC', 'DESCRIBE', 'EXPLAIN', 'WITH')
     
-    async def execute_for_approval(self, approval: ApprovalRecord, instance: Instance) -> Tuple[bool, str, int]:
+    async def execute_for_approval(self, approval: ApprovalRecord, instance: RDBInstance) -> Tuple[bool, str, int]:
         """
         执行审批工单中的SQL
         
@@ -83,7 +83,7 @@ class SQLExecutor:
     
     async def _execute_mysql(
         self, 
-        instance: Instance, 
+        instance: RDBInstance, 
         password: str, 
         database: Optional[str], 
         sql_content: str
@@ -113,7 +113,7 @@ class SQLExecutor:
     
     async def _execute_postgresql(
         self, 
-        instance: Instance, 
+        instance: RDBInstance, 
         password: str, 
         database: Optional[str], 
         sql_content: str
@@ -232,7 +232,7 @@ class SQLExecutor:
 class RedisExecutor:
     """Redis命令执行器"""
     
-    async def execute_for_approval(self, approval: ApprovalRecord, instance: Instance) -> str:
+    async def execute_for_approval(self, approval: ApprovalRecord, instance: RDBInstance) -> str:
         """
         执行审批工单中的Redis命令
         

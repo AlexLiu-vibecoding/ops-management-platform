@@ -15,7 +15,7 @@ import psycopg2
 from psycopg2 import pool as pg_pool
 from dbutils.pooled_db import PooledDB
 
-from app.models import Instance
+from app.models import RDBInstance
 from app.utils.auth import decrypt_instance_password
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ class DatabaseConnectionManager:
     def __init__(self):
         self._instance_cache: dict[int, dict[str, Any]] = {}
 
-    def _get_credentials(self, instance: Instance) -> tuple[str, str, str, int]:
+    def _get_credentials(self, instance: RDBInstance) -> tuple[str, str, str, int]:
         """
         获取实例连接凭证
 
@@ -69,13 +69,13 @@ class DatabaseConnectionManager:
 
         return instance.host, instance.username, password, instance.port
 
-    def _get_pool_key(self, instance: Instance, database: Optional[str] = None) -> tuple:
+    def _get_pool_key(self, instance: RDBInstance, database: Optional[str] = None) -> tuple:
         """生成连接池键"""
         return (instance.id, database or 'default')
 
     # ==================== MySQL 连接管理 ====================
 
-    def _create_mysql_pool(self, instance: Instance, database: Optional[str] = None) -> PooledDB:
+    def _create_mysql_pool(self, instance: RDBInstance, database: Optional[str] = None) -> PooledDB:
         """创建 MySQL 连接池"""
         host, username, password, port = self._get_credentials(instance)
 
@@ -104,7 +104,7 @@ class DatabaseConnectionManager:
 
     def get_mysql_connection(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         database: Optional[str] = None,
         use_pool: bool = True
     ) -> pymysql.Connection:
@@ -141,7 +141,7 @@ class DatabaseConnectionManager:
 
     # ==================== PostgreSQL 连接管理 ====================
 
-    def _create_pg_pool(self, instance: Instance, database: Optional[str] = None) -> pg_pool.ThreadedConnectionPool:
+    def _create_pg_pool(self, instance: RDBInstance, database: Optional[str] = None) -> pg_pool.ThreadedConnectionPool:
         """创建 PostgreSQL 连接池"""
         host, username, password, port = self._get_credentials(instance)
 
@@ -164,7 +164,7 @@ class DatabaseConnectionManager:
 
     def get_postgresql_connection(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         database: Optional[str] = None,
         use_pool: bool = True
     ) -> psycopg2.extensions.connection:
@@ -200,7 +200,7 @@ class DatabaseConnectionManager:
 
     def release_postgresql_connection(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         conn: psycopg2.extensions.connection,
         database: Optional[str] = None
     ):
@@ -213,7 +213,7 @@ class DatabaseConnectionManager:
 
     def get_connection(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         database: Optional[str] = None,
         use_pool: bool = True
     ):
@@ -238,7 +238,7 @@ class DatabaseConnectionManager:
     @contextmanager
     def connection(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         database: Optional[str] = None,
         use_pool: bool = True
     ):
@@ -267,7 +267,7 @@ class DatabaseConnectionManager:
 
     async def test_connection(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         database: Optional[str] = None
     ) -> dict[str, Any]:
         """
@@ -307,7 +307,7 @@ class DatabaseConnectionManager:
 
     async def execute_query(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         sql: str,
         database: Optional[str] = None,
         params: Optional[tuple] = None,
@@ -361,7 +361,7 @@ class DatabaseConnectionManager:
 
     async def execute_script(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         script: str,
         database: Optional[str] = None,
         stop_on_error: bool = False
@@ -418,7 +418,7 @@ class DatabaseConnectionManager:
 
     # ==================== 数据库/表信息获取 ====================
 
-    async def get_databases(self, instance: Instance) -> list[str]:
+    async def get_databases(self, instance: RDBInstance) -> list[str]:
         """获取实例所有数据库列表"""
         db_type = instance.db_type.lower() if instance.db_type else 'mysql'
 
@@ -438,7 +438,7 @@ class DatabaseConnectionManager:
 
     async def get_tables(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         database: str
     ) -> list[dict[str, Any]]:
         """获取数据库所有表"""
@@ -471,7 +471,7 @@ class DatabaseConnectionManager:
 
     async def get_table_structure(
         self,
-        instance: Instance,
+        instance: RDBInstance,
         database: str,
         table: str
     ) -> dict[str, Any]:
@@ -521,7 +521,7 @@ class DatabaseConnectionManager:
 
     # ==================== 连接池管理 ====================
 
-    def close_pool(self, instance: Instance, database: Optional[str] = None):
+    def close_pool(self, instance: RDBInstance, database: Optional[str] = None):
         """关闭指定连接池"""
         pool_key = self._get_pool_key(instance, database)
 

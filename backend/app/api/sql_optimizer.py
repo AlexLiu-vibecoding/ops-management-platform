@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.database import get_db
 from app.models import (
-    Instance, TableSchema, SQLAnalysisHistory, User
+    RDBInstance, TableSchema, SQLAnalysisHistory, User
 )
 from app.schemas import (
     SQLAnalyzeRequest, SQLAnalysisResponse, TableSchemaSyncRequest,
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/sql-optimizer", tags=["SQL优化器"])
 
 # ============ 数据库连接工具 ============
 
-def get_db_connection(instance: Instance, database: str = None):
+def get_db_connection(instance: RDBInstance, database: str = None):
     """获取数据库连接"""
     password = decrypt_instance_password(instance.password_encrypted)
     
@@ -46,7 +46,7 @@ def get_db_connection(instance: Instance, database: str = None):
 
 # ============ 表结构抓取功能 ============
 
-async def fetch_table_structure(instance: Instance, database: str, table_name: str) -> Optional[Dict]:
+async def fetch_table_structure(instance: RDBInstance, database: str, table_name: str) -> Optional[Dict]:
     """抓取单个表的结构信息"""
     conn = None
     try:
@@ -146,7 +146,7 @@ async def fetch_table_structure(instance: Instance, database: str, table_name: s
             conn.close()
 
 
-async def fetch_database_tables(instance: Instance, database: str) -> List[str]:
+async def fetch_database_tables(instance: RDBInstance, database: str) -> List[str]:
     """获取数据库中所有表名"""
     conn = None
     try:
@@ -166,7 +166,7 @@ async def sync_table_schema(
     db: Session = Depends(get_db)
 ):
     """同步表结构到本地数据库"""
-    instance = db.query(Instance).filter(Instance.id == request.instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == request.instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -611,7 +611,7 @@ async def analyze_sql(
     start_time = time.time()
     
     # 获取实例信息
-    instance = db.query(Instance).filter(Instance.id == request.instance_id).first()
+    instance = db.query(RDBInstance).filter(RDBInstance.id == request.instance_id).first()
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
