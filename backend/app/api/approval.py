@@ -347,7 +347,9 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
         "id": approval.id,
         "title": approval.title,
         "change_type": approval.change_type,
-        "instance_id": approval.instance_id,
+        "instance_id": approval.rdb_instance_id or approval.redis_instance_id,
+        "rdb_instance_id": approval.rdb_instance_id,
+        "redis_instance_id": approval.redis_instance_id,
         "database_mode": approval.database_mode,
         "database_name": approval.database_name,
         "database_list": approval.database_list,
@@ -379,7 +381,8 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
         "execute_result": approval.execute_result,
         "created_at": approval.created_at,
         "approved_at": approval.approve_time,
-        "instance_name": approval.instance.name if approval.instance else None
+        "instance_name": (approval.rdb_instance.name if approval.rdb_instance else None) or 
+                         (approval.redis_instance.name if approval.redis_instance else None)
     }
     
     return response
@@ -416,10 +419,9 @@ async def list_approvals(
         query = query.filter(ApprovalRecord.change_type == change_type)
     if exclude_change_type:
         query = query.filter(ApprovalRecord.change_type != exclude_change_type)
-        # 同时排除关联到 Redis 实例的记录
+        # 如果排除 Redis 类型，只查询 rdb_instance_id 不为空的记录
         if exclude_change_type.upper() == 'REDIS':
-            redis_instance_ids = db.query(RDBInstance.id).filter(RDBInstance.db_type == 'redis').subquery()
-            query = query.filter(~ApprovalRecord.instance_id.in_(redis_instance_ids))
+            query = query.filter(ApprovalRecord.rdb_instance_id.isnot(None))
     
     # 普通用户只能看自己的申请
     if current_user.role.value == "readonly":
@@ -467,27 +469,35 @@ async def create_approval(
     db: Session = Depends(get_db)
 ):
     """提交审批申请"""
-    # 检查实例是否存在
-    instance = db.query(RDBInstance).filter(RDBInstance.id == approval_data.instance_id).first()
-    if not instance:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Instance not found"
-        )
+    # 根据 change_type 检查实例是否存在
+    instance = None
+    instance_name = ""
+    environment_id = None
     
-    # 根据 change_type 分析风险等级
     if approval_data.change_type == "REDIS":
-        # Redis 命令风险分析
-        risk_level = analyze_redis_risk(approval_data.sql_content, instance.environment_id, db)
-        # 验证实例类型
-        if instance.db_type != "redis":
+        # Redis 变更 - 查询 Redis 实例
+        instance = db.query(RedisInstance).filter(RedisInstance.id == approval_data.instance_id).first()
+        if not instance:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Redis 变更只能选择 Redis 类型的实例"
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Redis instance not found"
             )
+        instance_name = instance.name
+        environment_id = instance.environment_id
+        # Redis 命令风险分析
+        risk_level = analyze_redis_risk(approval_data.sql_content, environment_id, db)
     else:
+        # SQL 变更 - 查询 RDB 实例
+        instance = db.query(RDBInstance).filter(RDBInstance.id == approval_data.instance_id).first()
+        if not instance:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="RDB instance not found"
+            )
+        instance_name = instance.name
+        environment_id = instance.environment_id
         # SQL 风险分析
-        risk_level = analyze_sql_risk(approval_data.sql_content, instance.environment_id, db)
+        risk_level = analyze_sql_risk(approval_data.sql_content, environment_id, db)
     
     # 极高风险直接拒绝
     if risk_level == "critical":
@@ -543,7 +553,8 @@ async def create_approval(
         approval = ApprovalRecord(
             title=approval_data.title,
             change_type=approval_data.change_type,
-            instance_id=approval_data.instance_id,
+            rdb_instance_id=approval_data.instance_id if approval_data.change_type != "REDIS" else None,
+            redis_instance_id=approval_data.instance_id if approval_data.change_type == "REDIS" else None,
             database_mode=approval_data.database_mode,
             database_name=approval_data.database_name,
             database_list=approval_data.database_list,
@@ -557,7 +568,7 @@ async def create_approval(
             file_storage_type=file_storage_type,
             affected_rows_estimate=approval_data.affected_rows_estimate or 0,
             auto_execute=approval_data.auto_execute or False,
-            environment_id=instance.environment_id,
+            environment_id=environment_id,
             requester_id=current_user.id,
             scheduled_time=approval_data.scheduled_time
         )
@@ -605,7 +616,8 @@ async def create_approval(
         approval = ApprovalRecord(
             title=approval_data.title,
             change_type=approval_data.change_type,
-            instance_id=approval_data.instance_id,
+            rdb_instance_id=approval_data.instance_id if approval_data.change_type != "REDIS" else None,
+            redis_instance_id=approval_data.instance_id if approval_data.change_type == "REDIS" else None,
             database_mode=approval_data.database_mode,
             database_name=approval_data.database_name,
             database_list=approval_data.database_list,
@@ -644,9 +656,9 @@ async def create_approval(
     audit_log = AuditLog(
         user_id=current_user.id,
         username=current_user.username,
-        instance_id=instance.id,
-        instance_name=instance.name,
-        environment_id=instance.environment_id,
+        instance_id=approval_data.instance_id,
+        instance_name=instance_name,
+        environment_id=environment_id,
         operation_type="submit_approval",
         operation_detail=f"Submit approval: {approval_data.title}\nDatabase: {db_target_desc}\nSQL lines: {sql_line_count}lines",
         request_ip="",
@@ -701,8 +713,9 @@ async def approve_or_reject(
     audit_log = AuditLog(
         user_id=current_user.id,
         username=current_user.username,
-        instance_id=approval.instance_id,
-        instance_name=approval.instance.name if approval.instance else None,
+        instance_id=approval.rdb_instance_id or approval.redis_instance_id,
+        instance_name=(approval.rdb_instance.name if approval.rdb_instance else None) or 
+                      (approval.redis_instance.name if approval.redis_instance else None),
         environment_id=approval.environment_id,
         operation_type="approve" if action_data.approved else "reject",
         operation_detail=f"{'Approved' if action_data.approved else 'Rejected'} approval: {approval.title}",
@@ -771,15 +784,15 @@ async def execute_approval(
         )
     
     try:
-        # 获取实例
-        instance = db.query(RDBInstance).filter(RDBInstance.id == approval.instance_id).first()
-        
-        # 根据 change_type 执行不同的逻辑
-        if approval.change_type == "REDIS" and instance:
+        # 获取实例 - 根据变更类型选择正确的实例表
+        instance = None
+        if approval.change_type == "REDIS":
+            instance = db.query(RedisInstance).filter(RedisInstance.id == approval.redis_instance_id).first()
             # 执行 Redis 命令
             execute_result = await redis_executor.execute_for_approval(approval, instance)
             execution_success = sql_executor.check_execution_success(execute_result)
         else:
+            instance = db.query(RDBInstance).filter(RDBInstance.id == approval.rdb_instance_id).first()
             # 执行 SQL
             success, execute_result, affected_rows = await sql_executor.execute_for_approval(approval, instance)
             approval.affected_rows_actual = affected_rows
@@ -815,8 +828,8 @@ async def execute_approval(
     audit_log = AuditLog(
         user_id=current_user.id,
         username=current_user.username,
-        instance_id=approval.instance_id,
-        instance_name=approval.instance.name if approval.instance else None,
+        instance_id=approval.rdb_instance_id or approval.redis_instance_id,
+        instance_name=instance.name if instance else None,
         environment_id=approval.environment_id,
         operation_type="execute_approval",
         operation_detail=f"Execute approval: {approval.title}\nResult: {approval.execute_result}",
