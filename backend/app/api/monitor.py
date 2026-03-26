@@ -520,15 +520,15 @@ async def get_high_cpu_statistics(
     
     # 按实例统计 (只关联 RDB 实例)
     instance_stats = db.query(
-        PerformanceMetric.rdb_instance_id.label('instance_id'),
+        PerformanceMetric.instance_id.label('instance_id'),
         RDBInstance.name.label('instance_name'),
         func.max(PerformanceMetric.cpu_usage).label('max_cpu'),
         func.avg(PerformanceMetric.cpu_usage).label('avg_cpu'),
         func.max(PerformanceMetric.memory_usage).label('max_memory'),
-    ).join(RDBInstance, PerformanceMetric.rdb_instance_id == RDBInstance.id).filter(
+    ).join(RDBInstance, PerformanceMetric.instance_id == RDBInstance.id).filter(
         PerformanceMetric.collect_time >= start_time
     ).group_by(
-        PerformanceMetric.rdb_instance_id, 
+        PerformanceMetric.instance_id, 
         RDBInstance.name
     ).all()
     
