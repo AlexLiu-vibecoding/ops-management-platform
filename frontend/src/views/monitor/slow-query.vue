@@ -589,11 +589,12 @@ const fetchDialog = reactive({
   }
 })
 
-// 获取实例列表
+// 获取实例列表（只显示 MySQL 和 PostgreSQL，Redis 没有慢SQL概念）
 const fetchInstances = async () => {
   try {
     const data = await request.get('/instances', { params: { limit: 100 } })
-    instances.value = data.items || []
+    // 过滤掉 Redis 实例，Redis 使用慢日志(Slow Log)而非慢SQL
+    instances.value = (data.items || []).filter(inst => inst.db_type !== 'redis')
     if (instances.value.length > 0 && !selectedInstance.value) {
       selectedInstance.value = instances.value[0].id
       fetchSlowQueries()
