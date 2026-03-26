@@ -18,6 +18,9 @@ from app.database import get_db
 from app.models import RDBInstance, RedisInstance, InstanceGroup
 from app.deps import get_current_user
 from app.models import User
+from app.utils.auth import decrypt_instance_password
+from app.api.rdb_instances import test_rdb_connection, InstanceTestResult
+from app.api.redis_instances import test_redis_connection
 
 router = APIRouter(prefix="/instances", tags=["实例管理(兼容)"])
 logger = logging.getLogger(__name__)
@@ -212,6 +215,78 @@ async def get_instance(
             "created_at": instance.created_at,
             "updated_at": instance.updated_at,
         }
+    
+    raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="实例不存在"
+    )
+
+
+@router.post("/{instance_id}/check", response_model=InstanceTestResult)
+async def check_instance_status(
+    instance_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """检查实例状态（向后兼容）"""
+    # 先尝试从 RDB 表查找
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
+    if instance:
+        # RDS 实例不检查连接
+        if instance.is_rds:
+            return InstanceTestResult(success=True, message="RDS 实例，跳过连接检查", version=None)
+        
+        # 尝试解密密码
+        try:
+            password = decrypt_instance_password(instance.password_encrypted)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"密码解密失败，请重新保存实例密码: {str(e)}"
+            )
+        
+        result = await test_rdb_connection(
+            instance.db_type,
+            instance.host,
+            instance.port,
+            instance.username,
+            password
+        )
+        
+        # 更新实例状态
+        instance.status = result["success"]
+        instance.last_check_time = datetime.now()
+        db.commit()
+        
+        return InstanceTestResult(**result)
+    
+    # 再尝试从 Redis 表查找
+    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    if instance:
+        # 尝试解密密码
+        password = None
+        if instance.password_encrypted:
+            try:
+                password = decrypt_instance_password(instance.password_encrypted)
+            except ValueError as e:
+                return InstanceTestResult(
+                    success=False,
+                    message=f"密码解密失败: {str(e)}"
+                )
+        
+        result = await test_redis_connection(
+            instance.host,
+            instance.port,
+            password or "",
+            instance.redis_db
+        )
+        
+        # 更新实例状态
+        instance.status = result["success"]
+        instance.last_check_time = datetime.now()
+        db.commit()
+        
+        return InstanceTestResult(**result)
     
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
