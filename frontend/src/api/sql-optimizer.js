@@ -12,9 +12,11 @@ export const sqlOptimizerApi = {
     return request.get(`/sql-optimizer/schemas/${instanceId}`, { params })
   },
 
-  // 分析SQL
+  // 分析SQL（需要更长超时时间，因为包含 LLM 调用）
   analyze(data) {
-    return request.post('/sql-optimizer/analyze', data)
+    return request.post('/sql-optimizer/analyze', data, {
+      timeout: 120000  // 2 分钟超时
+    })
   },
 
   // 获取分析历史

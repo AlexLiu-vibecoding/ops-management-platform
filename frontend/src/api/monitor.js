@@ -108,8 +108,11 @@ export const monitorApi = {
     getStatistics(instanceId, hours = 24) {
       return request.get(`/slow-query/${instanceId}/statistics`, { params: { hours } })
     },
+    // 分析慢查询（需要更长超时时间，因为包含 LLM 调用）
     analyze(instanceId, queryId) {
-      return request.get(`/slow-query/${instanceId}/analysis/${queryId}`)
+      return request.get(`/slow-query/${instanceId}/analysis/${queryId}`, {
+        timeout: 120000  // 2 分钟超时
+      })
     }
   }
 }
