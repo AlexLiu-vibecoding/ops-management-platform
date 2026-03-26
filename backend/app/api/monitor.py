@@ -412,12 +412,12 @@ async def get_slow_query_statistics(
     
     # 按实例统计 (只关联 RDB 实例，因为慢查询只存在于 RDB)
     instance_stats = db.query(
-        SlowQuery.rdb_instance_id.label('instance_id'),
+        SlowQuery.instance_id.label('instance_id'),
         RDBInstance.name.label('instance_name'),
         func.count(SlowQuery.id).label('count')
-    ).join(RDBInstance, SlowQuery.rdb_instance_id == RDBInstance.id).filter(
+    ).join(RDBInstance, SlowQuery.instance_id == RDBInstance.id).filter(
         SlowQuery.last_seen >= start_time
-    ).group_by(SlowQuery.rdb_instance_id, RDBInstance.name).all()
+    ).group_by(SlowQuery.instance_id, RDBInstance.name).all()
     
     return {
         "total_count": stats.total_count or 0,
