@@ -8,6 +8,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
 from sqlalchemy.orm import Session
+import pymysql
+import psycopg2
+import redis as redis_client
+
 from app.database import get_db
 from app.models import (
     ApprovalRecord, ApprovalStatus, RDBInstance, RedisInstance, User, AuditLog
@@ -20,8 +24,12 @@ from app.deps import get_approval_admin, get_current_user
 from app.services.notification import notification_service
 from app.services.scheduler import approval_scheduler
 from app.services.rollback_generator import rollback_generator
+from app.services.enhanced_rollback_generator import (
+    EnhancedRollbackGenerator, enhanced_rollback_generator
+)
 from app.services.storage import storage_manager
 from app.services.sql_executor import sql_executor, redis_executor
+from app.utils.auth import decrypt_instance_password
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +37,195 @@ router = APIRouter(prefix="/approvals", tags=["变更审批"])
 
 # 大文件预览行数限制
 PREVIEW_LINES = 100
+
+
+def _get_instance_type(instance: RDBInstance) -> str:
+    """判断实例类型：mysql 或 postgresql"""
+    if instance.port == 5432:
+        return "postgresql"
+    elif instance.port == 3306:
+        return "mysql"
+    if "pg" in instance.host.lower() or "postgres" in instance.host.lower():
+        return "postgresql"
+    return "mysql"
+
+
+def _get_rdb_connection(instance: RDBInstance, database: str = None):
+    """获取关系型数据库连接"""
+    db_type = _get_instance_type(instance)
+    try:
+        password = decrypt_instance_password(instance.password_encrypted)
+    except ValueError as e:
+        raise ValueError(f"密码解密失败: {str(e)}")
+    
+    if db_type == "postgresql":
+        conn = psycopg2.connect(
+            host=instance.host,
+            port=instance.port,
+            user=instance.username,
+            password=password,
+            database=database or 'postgres',
+            connect_timeout=5
+        )
+        return conn, "postgresql"
+    else:
+        conn = pymysql.connect(
+            host=instance.host,
+            port=instance.port,
+            user=instance.username,
+            password=password,
+            database=database,
+            connect_timeout=5,
+            charset='utf8mb4'
+        )
+        return conn, "mysql"
+
+
+def _get_redis_connection(instance: RedisInstance):
+    """获取Redis连接"""
+    try:
+        password = decrypt_instance_password(instance.password_encrypted) if instance.password_encrypted else None
+    except ValueError:
+        password = instance.password_encrypted
+    
+    r = redis_client.Redis(
+        host=instance.host,
+        port=instance.port,
+        password=password,
+        db=0,
+        decode_responses=True,
+        socket_connect_timeout=5,
+        socket_timeout=5
+    )
+    return r
+
+
+async def _generate_sql_rollback_with_data(
+    instance: RDBInstance, 
+    sql_content: str, 
+    database: str = None
+) -> tuple[str, int]:
+    """
+    连接数据库生成真实的回滚SQL
+    
+    Args:
+        instance: RDB实例
+        sql_content: SQL内容
+        database: 数据库名
+    
+    Returns:
+        (回滚SQL, 受影响行数)
+    """
+    conn = None
+    try:
+        conn, db_type = _get_rdb_connection(instance, database)
+        
+        # 使用增强版回滚生成器
+        generator = EnhancedRollbackGenerator(db_connection=conn, db_type=db_type)
+        results = generator.generate_rollback_sql(sql_content)
+        
+        if not results:
+            return None, 0
+        
+        # 合并所有回滚SQL
+        rollback_parts = []
+        total_affected = 0
+        
+        for result in results:
+            if result.success and result.rollback_sql:
+                rollback_parts.append(f"-- ================================")
+                rollback_parts.append(f"-- SQL类型: {result.sql_type.value}")
+                rollback_parts.append(f"-- 受影响表: {result.affected_table or '未知'}")
+                if result.affected_rows:
+                    rollback_parts.append(f"-- 受影响行数: {result.affected_rows}")
+                    total_affected += result.affected_rows
+                rollback_parts.append(f"-- ================================")
+                rollback_parts.append("")
+                rollback_parts.append(result.rollback_sql)
+                if result.warning:
+                    rollback_parts.append(f"-- 警告: {result.warning}")
+                rollback_parts.append("")
+        
+        if rollback_parts:
+            header = f"""-- ============================================
+-- 自动生成的回滚SQL
+-- 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+-- 实例: {instance.name}
+-- 数据库: {database or '默认'}
+-- 总受影响行数: {total_affected}
+-- ============================================
+
+"""
+            return header + "\n".join(rollback_parts), total_affected
+        
+        return None, 0
+        
+    except Exception as e:
+        logger.error(f"连接数据库生成回滚SQL失败: {e}")
+        raise
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except:
+                pass
+
+
+async def _generate_redis_rollback_with_data(
+    instance: RedisInstance, 
+    commands: str
+) -> tuple[str, list]:
+    """
+    连接Redis生成真实的回滚命令
+    
+    Args:
+        instance: Redis实例
+        commands: Redis命令
+    
+    Returns:
+        (回滚命令, 受影响键列表)
+    """
+    r = None
+    try:
+        r = _get_redis_connection(instance)
+        
+        # 使用增强版回滚生成器
+        generator = EnhancedRollbackGenerator()
+        result = generator.generate_redis_rollback(commands, redis_connection=r)
+        
+        if not result.success:
+            if result.error:
+                logger.warning(f"Redis回滚生成失败: {result.error}")
+            return None, []
+        
+        if not result.rollback_commands:
+            return None, []
+        
+        # 构建回滚命令
+        header = f"""-- ============================================
+-- 自动生成的Redis回滚命令
+-- 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+-- 实例: {instance.name}
+-- 受影响键数量: {len(result.affected_keys)}
+-- ============================================
+
+"""
+        rollback_content = "\n".join(result.rollback_commands)
+        
+        if result.warning:
+            rollback_content += f"\n\n-- 警告: {result.warning}"
+        
+        return header + rollback_content, result.affected_keys
+        
+    except Exception as e:
+        logger.error(f"连接Redis生成回滚命令失败: {e}")
+        raise
+    finally:
+        if r:
+            try:
+                r.close()
+            except:
+                pass
 
 
 @router.get("/preview-databases/{instance_id}")
@@ -511,35 +708,63 @@ async def create_approval(
     if not sql_line_count:
         sql_line_count = len(approval_data.sql_content.split('\n'))
     
-    # 生成回滚SQL（仅对 SQL 类型）
+    # 生成回滚SQL（连接数据库查询真实数据）
     rollback_sql = None
     rollback_generated = False
+    affected_rows_estimate = approval_data.affected_rows_estimate or 0
+    
     if approval_data.change_type != "REDIS":
+        # SQL 变更 - 连接数据库生成回滚SQL
         try:
-            rollback_results = rollback_generator.generate_rollback_sql(approval_data.sql_content)
-            if rollback_results:
-                rollback_parts = []
-                for result in rollback_results:
-                    if result.success and result.rollback_sql:
-                        rollback_parts.append(f"-- 原SQL类型: {result.sql_type.value}")
-                        rollback_parts.append(result.rollback_sql)
-                        if result.warning:
-                            rollback_parts.append(f"-- 警告: {result.warning}")
-                        rollback_parts.append("")
-                if rollback_parts:
-                    rollback_sql = "\n".join(rollback_parts)
-                    rollback_generated = True
+            rollback_sql, affected_rows = await _generate_sql_rollback_with_data(
+                instance, 
+                approval_data.sql_content, 
+                approval_data.database_name
+            )
+            if rollback_sql:
+                rollback_generated = True
+                # 更新预估影响行数
+                if affected_rows > 0:
+                    affected_rows_estimate = affected_rows
         except Exception as e:
-            logger.warning(f"生成回滚SQL失败: {e}")
+            logger.warning(f"生成回滚SQL失败（将使用基础版本）: {e}")
+            # 降级：使用基础版本生成器
+            try:
+                rollback_results = rollback_generator.generate_rollback_sql(approval_data.sql_content)
+                if rollback_results:
+                    rollback_parts = []
+                    for result in rollback_results:
+                        if result.success and result.rollback_sql:
+                            rollback_parts.append(f"-- 原SQL类型: {result.sql_type.value}")
+                            rollback_parts.append(result.rollback_sql)
+                            if result.warning:
+                                rollback_parts.append(f"-- 警告: {result.warning}")
+                            rollback_parts.append("")
+                    if rollback_parts:
+                        rollback_sql = "\n".join(rollback_parts)
+                        rollback_generated = True
+            except Exception as e2:
+                logger.warning(f"基础版本生成回滚SQL也失败: {e2}")
     else:
         # Redis 命令回滚生成
         try:
-            rollback_results = rollback_generator.generate_redis_rollback(approval_data.sql_content)
-            if rollback_results and rollback_results.success and rollback_results.rollback_sql:
-                rollback_sql = rollback_results.rollback_sql
+            rollback_sql, affected_keys = await _generate_redis_rollback_with_data(
+                instance, 
+                approval_data.sql_content
+            )
+            if rollback_sql:
                 rollback_generated = True
+                affected_rows_estimate = len(affected_keys) if affected_keys else 0
         except Exception as e:
-            logger.warning(f"生成Redis回滚命令失败: {e}")
+            logger.warning(f"生成Redis回滚命令失败（将使用基础版本）: {e}")
+            # 降级：使用基础版本
+            try:
+                rollback_results = rollback_generator.generate_redis_rollback(approval_data.sql_content)
+                if rollback_results and rollback_results.success and rollback_results.rollback_sql:
+                    rollback_sql = rollback_results.rollback_sql
+                    rollback_generated = True
+            except Exception as e2:
+                logger.warning(f"基础版本生成Redis回滚也失败: {e2}")
     
     # 判断是否需要存储到文件
     sql_content = approval_data.sql_content
@@ -566,7 +791,7 @@ async def create_approval(
             rollback_sql=None,  # 大文件不存数据库
             rollback_generated=rollback_generated,
             file_storage_type=file_storage_type,
-            affected_rows_estimate=approval_data.affected_rows_estimate or 0,
+            affected_rows_estimate=affected_rows_estimate,
             auto_execute=approval_data.auto_execute or False,
             environment_id=environment_id,
             requester_id=current_user.id,
@@ -629,7 +854,7 @@ async def create_approval(
             rollback_sql=rollback_sql,
             rollback_generated=rollback_generated,
             file_storage_type="database",
-            affected_rows_estimate=approval_data.affected_rows_estimate or 0,
+            affected_rows_estimate=affected_rows_estimate,
             auto_execute=approval_data.auto_execute or False,
             environment_id=instance.environment_id,
             requester_id=current_user.id,
