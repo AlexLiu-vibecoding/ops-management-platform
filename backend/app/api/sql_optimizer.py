@@ -829,14 +829,14 @@ async def analyze_sql(
         conn, actual_db_type = get_db_connection(instance, request.database_name)
         
         if actual_db_type == "postgresql":
-            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            cursor = conn.cursor()
             
             # PostgreSQL: 获取数据库版本
             cursor.execute("SELECT version()")
             version = cursor.fetchone()
-            db_version = version["version"] if version else "15.0"
+            db_version = version[0] if version else "15.0"
             
-            # 执行 EXPLAIN ANALYZE
+            # 执行 EXPLAIN (FORMAT JSON)
             sql_normalized = SQLRuleEngine.normalize_sql(request.sql_text)
             explain_sql = f"EXPLAIN (FORMAT JSON) {sql_normalized}"
             cursor.execute(explain_sql)
@@ -846,10 +846,19 @@ async def analyze_sql(
             explain_rows = []
             if explain_result:
                 try:
-                    plan_data = json.loads(explain_result["QUERY PLAN"]) if isinstance(explain_result["QUERY PLAN"], str) else explain_result["QUERY PLAN"]
+                    # PostgreSQL EXPLAIN JSON 返回的是数组
+                    plan_str = explain_result[0] if isinstance(explain_result, (list, tuple)) else explain_result
+                    plan_data = json.loads(plan_str) if isinstance(plan_str, str) else plan_str
+                    
+                    # plan_data 是数组，取第一个元素
+                    if isinstance(plan_data, list) and len(plan_data) > 0:
+                        plan_data = plan_data[0]
                     
                     def extract_plan_info(plan, depth=0):
                         rows = []
+                        if not isinstance(plan, dict):
+                            return rows
+                        
                         node_type = plan.get("Node Type", "Unknown")
                         
                         rows.append({
@@ -873,8 +882,10 @@ async def analyze_sql(
                         
                         return rows
                     
-                    explain_rows = extract_plan_info(plan_data.get("Plan", plan_data))
-                except (json.JSONDecodeError, KeyError) as e:
+                    if isinstance(plan_data, dict):
+                        explain_rows = extract_plan_info(plan_data.get("Plan", plan_data))
+                        
+                except (json.JSONDecodeError, KeyError, TypeError) as e:
                     # 如果解析失败，返回基本信息
                     explain_rows = [{
                         "id": 1,
@@ -887,7 +898,7 @@ async def analyze_sql(
                         "ref": None,
                         "rows": 0,
                         "filtered": None,
-                        "Extra": str(explain_result)
+                        "Extra": f"Parse error: {str(e)}"
                     }]
         else:
             cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -895,7 +906,11 @@ async def analyze_sql(
             # MySQL: 获取数据库版本
             cursor.execute("SELECT VERSION()")
             version = cursor.fetchone()
-            db_version = version["VERSION()"] if version else "8.0"
+            # 兼容 dict 和 tuple 两种返回类型
+            if version:
+                db_version = version["VERSION()"] if isinstance(version, dict) else version[0]
+            else:
+                db_version = "8.0"
             
             # 执行 EXPLAIN
             sql_normalized = SQLRuleEngine.normalize_sql(request.sql_text)
@@ -906,19 +921,36 @@ async def analyze_sql(
             # 转换 EXPLAIN 结果
             explain_rows = []
             for row in explain_result:
-                explain_rows.append({
-                    "id": row.get("id"),
-                    "select_type": row.get("select_type"),
-                    "table": row.get("table"),
-                    "type": row.get("type"),
-                    "possible_keys": row.get("possible_keys"),
-                    "key": row.get("key"),
-                    "key_len": row.get("key_len"),
-                    "ref": row.get("ref"),
-                    "rows": row.get("rows"),
-                    "filtered": row.get("filtered"),
-                    "Extra": row.get("Extra")
-                })
+                # 安全处理，确保 row 是字典
+                if isinstance(row, dict):
+                    explain_rows.append({
+                        "id": row.get("id"),
+                        "select_type": row.get("select_type"),
+                        "table": row.get("table"),
+                        "type": row.get("type"),
+                        "possible_keys": row.get("possible_keys"),
+                        "key": row.get("key"),
+                        "key_len": row.get("key_len"),
+                        "ref": row.get("ref"),
+                        "rows": row.get("rows"),
+                        "filtered": row.get("filtered"),
+                        "Extra": row.get("Extra")
+                    })
+                elif isinstance(row, (list, tuple)) and len(row) >= 11:
+                    # 如果返回的是 tuple，按顺序映射
+                    explain_rows.append({
+                        "id": row[0],
+                        "select_type": row[1],
+                        "table": row[2],
+                        "type": row[3],
+                        "possible_keys": row[4],
+                        "key": row[5],
+                        "key_len": row[6],
+                        "ref": row[7],
+                        "rows": row[8],
+                        "filtered": row[9],
+                        "Extra": row[10]
+                    })
         
         # 规则引擎分析
         rule_engine = SQLRuleEngine()
