@@ -548,13 +548,8 @@ const handleSubmit = async () => {
         delete formData.password
       }
       
-      // RDS 实例不需要连接信息
-      if (formData.is_rds) {
-        delete formData.host
-        delete formData.port
-        delete formData.username
-        delete formData.password
-      }
+      // RDS 实例：如果填写了 host，保留它让后端解析区域
+      // 如果只填写了 rds_instance_id，后端会通过 AWS API 获取信息
       
       if (dialog.isEdit) {
         await instancesApi.update(formData.id, formData)
