@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import logging
 
 from app.database import get_db
-from app.models import RedisInstance, InstanceGroup, RedisMode, RedisSlowLog, RedisMemoryStats
+from app.models import RedisInstance, InstanceGroup, RedisMode, RedisSlowLog, RedisMemoryStats, Environment
 from app.utils.auth import encrypt_instance_password, decrypt_instance_password
 from app.deps import get_operator, get_current_user
 from app.models import User
@@ -225,13 +225,44 @@ async def list_redis_instances(
     total = query.count()
     instances = query.offset(skip).limit(limit).all()
     
+    # 构建返回数据，包含 environment 信息
+    items = []
+    for i in instances:
+        env_data = None
+        if i.environment_id:
+            env = db.query(Environment).filter(Environment.id == i.environment_id).first()
+            if env:
+                env_data = {"id": env.id, "name": env.name, "color": env.color}
+        
+        items.append({
+            "id": i.id,
+            "name": i.name,
+            "host": i.host,
+            "port": i.port,
+            "redis_mode": i.redis_mode.value if hasattr(i.redis_mode, 'value') else str(i.redis_mode),
+            "redis_db": i.redis_db,
+            "cluster_nodes": i.cluster_nodes,
+            "sentinel_master_name": i.sentinel_master_name,
+            "sentinel_hosts": i.sentinel_hosts,
+            "environment_id": i.environment_id,
+            "environment": env_data,
+            "group_id": i.group_id,
+            "description": i.description,
+            "status": i.status,
+            "slowlog_threshold": i.slowlog_threshold,
+            "enable_monitoring": i.enable_monitoring,
+            "last_check_time": i.last_check_time,
+            "created_at": i.created_at,
+            "updated_at": i.updated_at,
+        })
+    
     return {
         "total": total,
-        "items": [RedisInstanceResponse.model_validate(i) for i in instances]
+        "items": items
     }
 
 
-@router.get("/{instance_id}", response_model=RedisInstanceResponse)
+@router.get("/{instance_id}")
 async def get_redis_instance(
     instance_id: int,
     current_user: User = Depends(get_current_user),
@@ -244,7 +275,35 @@ async def get_redis_instance(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="实例不存在"
         )
-    return RedisInstanceResponse.model_validate(instance)
+    
+    # 获取环境信息
+    env_data = None
+    if instance.environment_id:
+        env = db.query(Environment).filter(Environment.id == instance.environment_id).first()
+        if env:
+            env_data = {"id": env.id, "name": env.name, "color": env.color}
+    
+    return {
+        "id": instance.id,
+        "name": instance.name,
+        "host": instance.host,
+        "port": instance.port,
+        "redis_mode": instance.redis_mode.value if hasattr(instance.redis_mode, 'value') else str(instance.redis_mode),
+        "redis_db": instance.redis_db,
+        "cluster_nodes": instance.cluster_nodes,
+        "sentinel_master_name": instance.sentinel_master_name,
+        "sentinel_hosts": instance.sentinel_hosts,
+        "environment_id": instance.environment_id,
+        "environment": env_data,
+        "group_id": instance.group_id,
+        "description": instance.description,
+        "status": instance.status,
+        "slowlog_threshold": instance.slowlog_threshold,
+        "enable_monitoring": instance.enable_monitoring,
+        "last_check_time": instance.last_check_time,
+        "created_at": instance.created_at,
+        "updated_at": instance.updated_at,
+    }
 
 
 @router.post("/test", response_model=InstanceTestResult)

@@ -194,13 +194,44 @@ async def list_rdb_instances(
     total = query.count()
     instances = query.offset(skip).limit(limit).all()
     
+    # 构建返回数据，包含 environment 信息
+    items = []
+    for i in instances:
+        env_data = None
+        if i.environment_id:
+            env = db.query(Environment).filter(Environment.id == i.environment_id).first()
+            if env:
+                env_data = {"id": env.id, "name": env.name, "color": env.color}
+        
+        items.append({
+            "id": i.id,
+            "name": i.name,
+            "db_type": i.db_type.value if hasattr(i.db_type, 'value') else str(i.db_type),
+            "host": i.host,
+            "port": i.port,
+            "username": i.username,
+            "environment_id": i.environment_id,
+            "environment": env_data,
+            "group_id": i.group_id,
+            "description": i.description,
+            "status": i.status,
+            "is_rds": i.is_rds,
+            "rds_instance_id": i.rds_instance_id,
+            "aws_region": i.aws_region,
+            "slow_query_threshold": i.slow_query_threshold,
+            "enable_monitoring": i.enable_monitoring,
+            "last_check_time": i.last_check_time,
+            "created_at": i.created_at,
+            "updated_at": i.updated_at,
+        })
+    
     return {
         "total": total,
-        "items": [RDBInstanceResponse.model_validate(i) for i in instances]
+        "items": items
     }
 
 
-@router.get("/{instance_id}", response_model=RDBInstanceResponse)
+@router.get("/{instance_id}")
 async def get_rdb_instance(
     instance_id: int,
     current_user: User = Depends(get_current_user),
@@ -213,7 +244,35 @@ async def get_rdb_instance(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="实例不存在"
         )
-    return RDBInstanceResponse.model_validate(instance)
+    
+    # 获取环境信息
+    env_data = None
+    if instance.environment_id:
+        env = db.query(Environment).filter(Environment.id == instance.environment_id).first()
+        if env:
+            env_data = {"id": env.id, "name": env.name, "color": env.color}
+    
+    return {
+        "id": instance.id,
+        "name": instance.name,
+        "db_type": instance.db_type.value if hasattr(instance.db_type, 'value') else str(instance.db_type),
+        "host": instance.host,
+        "port": instance.port,
+        "username": instance.username,
+        "environment_id": instance.environment_id,
+        "environment": env_data,
+        "group_id": instance.group_id,
+        "description": instance.description,
+        "status": instance.status,
+        "is_rds": instance.is_rds,
+        "rds_instance_id": instance.rds_instance_id,
+        "aws_region": instance.aws_region,
+        "slow_query_threshold": instance.slow_query_threshold,
+        "enable_monitoring": instance.enable_monitoring,
+        "last_check_time": instance.last_check_time,
+        "created_at": instance.created_at,
+        "updated_at": instance.updated_at,
+    }
 
 
 @router.post("/test", response_model=InstanceTestResult)

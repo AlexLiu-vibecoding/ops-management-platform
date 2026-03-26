@@ -15,7 +15,7 @@ from datetime import datetime
 import logging
 
 from app.database import get_db
-from app.models import RDBInstance, RedisInstance, InstanceGroup
+from app.models import RDBInstance, RedisInstance, InstanceGroup, Environment
 from app.deps import get_current_user
 from app.models import User
 from app.utils.auth import decrypt_instance_password
@@ -63,6 +63,13 @@ async def list_instances(
         
         rdb_instances = rdb_query.all()
         for i in rdb_instances:
+            # 获取环境信息
+            env_data = None
+            if i.environment_id:
+                env = db.query(Environment).filter(Environment.id == i.environment_id).first()
+                if env:
+                    env_data = {"id": env.id, "name": env.name, "color": env.color}
+            
             items.append({
                 "id": i.id,
                 "name": i.name,
@@ -71,6 +78,7 @@ async def list_instances(
                 "port": i.port,
                 "username": i.username,
                 "environment_id": i.environment_id,
+                "environment": env_data,
                 "group_id": i.group_id,
                 "description": i.description,
                 "status": i.status,
@@ -97,6 +105,13 @@ async def list_instances(
         
         redis_instances = redis_query.all()
         for i in redis_instances:
+            # 获取环境信息
+            env_data = None
+            if i.environment_id:
+                env = db.query(Environment).filter(Environment.id == i.environment_id).first()
+                if env:
+                    env_data = {"id": env.id, "name": env.name, "color": env.color}
+            
             items.append({
                 "id": i.id,
                 "name": i.name,
@@ -105,6 +120,7 @@ async def list_instances(
                 "port": i.port,
                 "username": None,
                 "environment_id": i.environment_id,
+                "environment": env_data,
                 "group_id": i.group_id,
                 "description": i.description,
                 "status": i.status,
@@ -141,6 +157,13 @@ async def get_instance(
     # 先尝试从 RDB 表查找
     instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
     if instance:
+        # 获取环境信息
+        env_data = None
+        if instance.environment_id:
+            env = db.query(Environment).filter(Environment.id == instance.environment_id).first()
+            if env:
+                env_data = {"id": env.id, "name": env.name, "color": env.color}
+        
         return {
             "id": instance.id,
             "name": instance.name,
@@ -149,6 +172,7 @@ async def get_instance(
             "port": instance.port,
             "username": instance.username,
             "environment_id": instance.environment_id,
+            "environment": env_data,
             "group_id": instance.group_id,
             "description": instance.description,
             "status": instance.status,
@@ -165,6 +189,13 @@ async def get_instance(
     # 再尝试从 Redis 表查找
     instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
     if instance:
+        # 获取环境信息
+        env_data = None
+        if instance.environment_id:
+            env = db.query(Environment).filter(Environment.id == instance.environment_id).first()
+            if env:
+                env_data = {"id": env.id, "name": env.name, "color": env.color}
+        
         return {
             "id": instance.id,
             "name": instance.name,
@@ -173,6 +204,7 @@ async def get_instance(
             "port": instance.port,
             "username": None,
             "environment_id": instance.environment_id,
+            "environment": env_data,
             "group_id": instance.group_id,
             "description": instance.description,
             "status": instance.status,
