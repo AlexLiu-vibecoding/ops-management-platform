@@ -700,8 +700,7 @@ async def get_llm_analysis(
     db_version: str = "8.0"
 ) -> str:
     """使用LLM进行深度SQL分析（带超时控制）"""
-    from coze_coding_dev_sdk import LLMClient
-    from langchain_core.messages import SystemMessage, HumanMessage
+    from app.utils.llm_client import get_llm_client
     
     # 构建上下文
     context = {
@@ -747,46 +746,25 @@ async def get_llm_analysis(
 请给出详细的优化建议。"""
 
     try:
-        client = LLMClient()
+        client = get_llm_client()
         
         messages = [
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=user_message)
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
         ]
         
-        # 使用 asyncio.wait_for 添加超时控制
-        async def call_llm():
-            return client.invoke(
-                messages=messages,
-                model="doubao-seed-2-0-lite-260215",
-                temperature=0.3
-            )
-        
         # 使用 asyncio 等待，设置超时
-        loop = asyncio.get_event_loop()
         response = await asyncio.wait_for(
-            loop.run_in_executor(None, lambda: client.invoke(
+            client.ainvoke(
                 messages=messages,
                 model="doubao-seed-2-0-lite-260215",
-                temperature=0.3
-            )),
+                temperature=0.3,
+                max_tokens=4096
+            ),
             timeout=LLM_TIMEOUT
         )
         
-        # 安全处理响应内容
-        if isinstance(response.content, str):
-            return response.content
-        elif isinstance(response.content, list):
-            # 处理列表类型的响应
-            text_parts = []
-            for item in response.content:
-                if isinstance(item, dict) and item.get("type") == "text":
-                    text_parts.append(item.get("text", ""))
-                elif isinstance(item, str):
-                    text_parts.append(item)
-            return " ".join(text_parts)
-        else:
-            return str(response.content)
+        return response
             
     except asyncio.TimeoutError:
         return "LLM分析超时，请稍后重试"

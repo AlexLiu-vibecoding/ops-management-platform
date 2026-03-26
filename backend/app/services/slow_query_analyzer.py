@@ -267,8 +267,7 @@ class SlowQueryAnalyzer:
             大模型分析结果
         """
         try:
-            from coze_coding_dev_sdk import LLMClient
-            from langchain_core.messages import SystemMessage, HumanMessage
+            from app.utils.llm_client import get_llm_client
             
             # 构建 EXPLAIN 结果的文本描述
             explain_text = self._format_explain_text(explain_result)
@@ -280,29 +279,20 @@ class SlowQueryAnalyzer:
             system_prompt = self._get_llm_system_prompt()
             user_prompt = self._get_llm_user_prompt(sql, explain_text, stats_text)
             
-            client = LLMClient()
+            client = get_llm_client()
             
             messages = [
-                SystemMessage(content=system_prompt),
-                HumanMessage(content=user_prompt)
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
             ]
             
             # 调用大模型
-            response = client.invoke(
+            content = await client.ainvoke(
                 messages=messages,
                 model="doubao-seed-2-0-lite-260215",
                 temperature=0.3,
-                max_completion_tokens=4096
+                max_tokens=4096
             )
-            
-            # 处理响应内容
-            content = response.content
-            if isinstance(content, list):
-                text_parts = []
-                for item in content:
-                    if isinstance(item, dict) and item.get("type") == "text":
-                        text_parts.append(item.get("text", ""))
-                content = " ".join(text_parts)
             
             # 尝试解析 JSON
             llm_analysis = self._parse_llm_response(content)
