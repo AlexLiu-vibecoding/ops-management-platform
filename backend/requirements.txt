@@ -17,7 +17,7 @@ aiomysql==0.2.0
 cryptography==41.0.7
 python-dateutil==2.8.2
 apscheduler==3.11.0
-httpx==0.28.1
+httpx==0.25.2
 email-validator==2.1.0
 coze-workload-identity>=0.1.0
 coze-coding-dev-sdk>=0.1.0
@@ -26,4 +26,4 @@ sqlparse==0.4.4
 # 测试依赖
 pytest==7.4.3
 pytest-asyncio==0.21.1
-httpx==0.28.1
+httpx==0.25.2

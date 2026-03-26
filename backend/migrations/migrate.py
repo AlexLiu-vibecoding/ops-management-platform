@@ -10,22 +10,26 @@
   - 001: 添加 instances 表的 redis_mode 和 redis_db 字段
   - 002: 添加 approval_records 表的文件存储字段
   - 003: 添加 global_configs 表（如果不存在）
+  - 004: 创建 aws_regions 表并初始化区域数据
+  - 005: 创建监控扩展相关表（告警记录、锁等待、主从复制状态、巡检指标、巡检结果、长事务）
 """
 
 import sys
 import os
+import logging
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from sqlalchemy import text
 from app.database import engine
-from datetime import datetime
 
-
-def log(message):
-    """打印带时间戳的日志"""
-    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
+# 配置日志格式
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger('migration')
 
 
 def column_exists(table_name, column_name):
@@ -54,63 +58,63 @@ def migration_001():
     """
     迁移 001: 添加 instances 表的 Redis 相关字段
     """
-    log("执行迁移 001: 添加 instances 表的 redis_mode 和 redis_db 字段")
+    logger.info("执行迁移 001: 添加 instances 表的 redis_mode 和 redis_db 字段")
     
     with engine.connect() as conn:
         # 添加 redis_mode 列
         if not column_exists('instances', 'redis_mode'):
             conn.execute(text("ALTER TABLE instances ADD COLUMN redis_mode VARCHAR(50)"))
             conn.commit()
-            log("  ✓ 添加 redis_mode 列")
+            logger.info("  ✓ 添加 redis_mode 列")
         else:
-            log("  - redis_mode 列已存在，跳过")
+            logger.info("  - redis_mode 列已存在，跳过")
         
         # 添加 redis_db 列
         if not column_exists('instances', 'redis_db'):
             conn.execute(text("ALTER TABLE instances ADD COLUMN redis_db INTEGER DEFAULT 0"))
             conn.commit()
-            log("  ✓ 添加 redis_db 列")
+            logger.info("  ✓ 添加 redis_db 列")
         else:
-            log("  - redis_db 列已存在，跳过")
+            logger.info("  - redis_db 列已存在，跳过")
 
 
 def migration_002():
     """
     迁移 002: 添加 approval_records 表的文件存储字段
     """
-    log("执行迁移 002: 添加 approval_records 表的文件存储字段")
+    logger.info("执行迁移 002: 添加 approval_records 表的文件存储字段")
     
     with engine.connect() as conn:
         # 添加 sql_file_path 列
         if not column_exists('approval_records', 'sql_file_path'):
             conn.execute(text("ALTER TABLE approval_records ADD COLUMN sql_file_path VARCHAR(500)"))
             conn.commit()
-            log("  ✓ 添加 sql_file_path 列")
+            logger.info("  ✓ 添加 sql_file_path 列")
         else:
-            log("  - sql_file_path 列已存在，跳过")
+            logger.info("  - sql_file_path 列已存在，跳过")
         
         # 添加 rollback_file_path 列
         if not column_exists('approval_records', 'rollback_file_path'):
             conn.execute(text("ALTER TABLE approval_records ADD COLUMN rollback_file_path VARCHAR(500)"))
             conn.commit()
-            log("  ✓ 添加 rollback_file_path 列")
+            logger.info("  ✓ 添加 rollback_file_path 列")
         else:
-            log("  - rollback_file_path 列已存在，跳过")
+            logger.info("  - rollback_file_path 列已存在，跳过")
         
         # 添加 file_storage_type 列
         if not column_exists('approval_records', 'file_storage_type'):
             conn.execute(text("ALTER TABLE approval_records ADD COLUMN file_storage_type VARCHAR(20) DEFAULT 'database'"))
             conn.commit()
-            log("  ✓ 添加 file_storage_type 列")
+            logger.info("  ✓ 添加 file_storage_type 列")
         else:
-            log("  - file_storage_type 列已存在，跳过")
+            logger.info("  - file_storage_type 列已存在，跳过")
 
 
 def migration_003():
     """
     迁移 003: 确保 global_configs 表存在
     """
-    log("执行迁移 003: 检查 global_configs 表")
+    logger.info("执行迁移 003: 检查 global_configs 表")
     
     if not table_exists('global_configs'):
         with engine.connect() as conn:
@@ -125,16 +129,16 @@ def migration_003():
                 )
             """))
             conn.commit()
-            log("  ✓ 创建 global_configs 表")
+            logger.info("  ✓ 创建 global_configs 表")
     else:
-        log("  - global_configs 表已存在，跳过")
+        logger.info("  - global_configs 表已存在，跳过")
 
 
 def migration_004():
     """
     迁移 004: 创建 aws_regions 表并初始化 AWS 区域数据
     """
-    log("执行迁移 004: 创建 aws_regions 表")
+    logger.info("执行迁移 004: 创建 aws_regions 表")
     
     if not table_exists('aws_regions'):
         with engine.connect() as conn:
@@ -152,7 +156,7 @@ def migration_004():
                 )
             """))
             conn.commit()
-            log("  ✓ 创建 aws_regions 表")
+            logger.info("  ✓ 创建 aws_regions 表")
         
         # 初始化 AWS 区域数据
         aws_regions_data = [
@@ -204,29 +208,205 @@ def migration_004():
                     ON CONFLICT (region_code) DO NOTHING
                 """), {"code": code, "name": name, "geo": geo, "order": order})
             conn.commit()
-            log(f"  ✓ 初始化 {len(aws_regions_data)} 个 AWS 区域")
+            logger.info(f"  ✓ 初始化 {len(aws_regions_data)} 个 AWS 区域")
     else:
-        log("  - aws_regions 表已存在，跳过")
+        logger.info("  - aws_regions 表已存在，跳过")
+
+
+def migration_005():
+    """
+    迁移 005: 创建监控扩展相关表
+    """
+    logger.info("执行迁移 005: 创建监控扩展相关表")
+    
+    # 1. 告警记录表
+    if not table_exists('alert_records'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE alert_records (
+                    id SERIAL PRIMARY KEY,
+                    instance_id INTEGER REFERENCES instances(id) ON DELETE CASCADE,
+                    metric_type VARCHAR(32) NOT NULL,
+                    alert_level VARCHAR(16) NOT NULL,
+                    alert_title VARCHAR(200) NOT NULL,
+                    alert_content TEXT,
+                    alert_source VARCHAR(100),
+                    status VARCHAR(16) DEFAULT 'pending',
+                    acknowledged_by INTEGER REFERENCES users(id),
+                    acknowledged_at TIMESTAMP,
+                    resolved_by INTEGER REFERENCES users(id),
+                    resolved_at TIMESTAMP,
+                    resolve_note TEXT,
+                    notification_sent BOOLEAN DEFAULT FALSE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_alert_records_instance ON alert_records(instance_id)"))
+            conn.execute(text("CREATE INDEX idx_alert_records_status ON alert_records(status)"))
+            conn.execute(text("CREATE INDEX idx_alert_records_created ON alert_records(created_at)"))
+            conn.commit()
+            logger.info("  ✓ 创建 alert_records 表")
+    else:
+        logger.info("  - alert_records 表已存在，跳过")
+    
+    # 2. 锁等待记录表
+    if not table_exists('lock_waits'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE lock_waits (
+                    id SERIAL PRIMARY KEY,
+                    instance_id INTEGER REFERENCES instances(id) ON DELETE CASCADE NOT NULL,
+                    database_name VARCHAR(100),
+                    wait_type VARCHAR(32),
+                    waiting_thread_id INTEGER,
+                    waiting_sql TEXT,
+                    waiting_time INTEGER,
+                    blocking_thread_id INTEGER,
+                    blocking_sql TEXT,
+                    blocking_time INTEGER,
+                    status VARCHAR(16) DEFAULT 'active',
+                    resolved_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_lock_waits_instance ON lock_waits(instance_id)"))
+            conn.execute(text("CREATE INDEX idx_lock_waits_status ON lock_waits(status)"))
+            conn.execute(text("CREATE INDEX idx_lock_waits_created ON lock_waits(created_at)"))
+            conn.commit()
+            logger.info("  ✓ 创建 lock_waits 表")
+    else:
+        logger.info("  - lock_waits 表已存在，跳过")
+    
+    # 3. 主从复制状态表
+    if not table_exists('replication_status'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE replication_status (
+                    id SERIAL PRIMARY KEY,
+                    instance_id INTEGER REFERENCES instances(id) ON DELETE CASCADE NOT NULL,
+                    slave_host VARCHAR(100),
+                    slave_port INTEGER,
+                    slave_io_running VARCHAR(16),
+                    slave_sql_running VARCHAR(16),
+                    seconds_behind_master INTEGER,
+                    master_log_file VARCHAR(100),
+                    read_master_log_pos INTEGER,
+                    relay_master_log_file VARCHAR(100),
+                    exec_master_log_pos INTEGER,
+                    last_io_error TEXT,
+                    last_sql_error TEXT,
+                    check_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_replication_status_instance ON replication_status(instance_id)"))
+            conn.execute(text("CREATE INDEX idx_replication_status_check_time ON replication_status(check_time)"))
+            conn.commit()
+            logger.info("  ✓ 创建 replication_status 表")
+    else:
+        logger.info("  - replication_status 表已存在，跳过")
+    
+    # 4. 巡检指标配置表
+    if not table_exists('inspect_metrics'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE inspect_metrics (
+                    id SERIAL PRIMARY KEY,
+                    module VARCHAR(32) NOT NULL,
+                    metric_name VARCHAR(128) NOT NULL,
+                    metric_code VARCHAR(64) UNIQUE NOT NULL,
+                    check_freq VARCHAR(16) DEFAULT 'daily',
+                    warn_threshold VARCHAR(64),
+                    critical_threshold VARCHAR(64),
+                    collect_sql TEXT,
+                    auto_fix_sql TEXT,
+                    is_enabled BOOLEAN DEFAULT TRUE,
+                    description VARCHAR(500),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.commit()
+            logger.info("  ✓ 创建 inspect_metrics 表")
+    else:
+        logger.info("  - inspect_metrics 表已存在，跳过")
+    
+    # 5. 巡检结果表
+    if not table_exists('inspect_results'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE inspect_results (
+                    id SERIAL PRIMARY KEY,
+                    instance_id INTEGER REFERENCES instances(id) ON DELETE CASCADE NOT NULL,
+                    metric_id INTEGER REFERENCES inspect_metrics(id) NOT NULL,
+                    check_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    status VARCHAR(16) NOT NULL,
+                    actual_value VARCHAR(255),
+                    result_detail JSON,
+                    suggestion TEXT,
+                    is_fixed BOOLEAN DEFAULT FALSE,
+                    fixed_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_inspect_results_instance ON inspect_results(instance_id)"))
+            conn.execute(text("CREATE INDEX idx_inspect_results_check_time ON inspect_results(check_time)"))
+            conn.commit()
+            logger.info("  ✓ 创建 inspect_results 表")
+    else:
+        logger.info("  - inspect_results 表已存在，跳过")
+    
+    # 6. 长事务记录表
+    if not table_exists('long_transactions'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE long_transactions (
+                    id SERIAL PRIMARY KEY,
+                    instance_id INTEGER REFERENCES instances(id) ON DELETE CASCADE NOT NULL,
+                    trx_id VARCHAR(64),
+                    trx_thread_id INTEGER,
+                    database_name VARCHAR(100),
+                    trx_started TIMESTAMP,
+                    trx_duration INTEGER,
+                    trx_state VARCHAR(32),
+                    trx_query TEXT,
+                    trx_rows_locked INTEGER,
+                    trx_tables_locked INTEGER,
+                    "user" VARCHAR(64),
+                    host VARCHAR(100),
+                    status VARCHAR(16) DEFAULT 'active',
+                    killed_at TIMESTAMP,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_long_transactions_instance ON long_transactions(instance_id)"))
+            conn.execute(text("CREATE INDEX idx_long_transactions_status ON long_transactions(status)"))
+            conn.execute(text("CREATE INDEX idx_long_transactions_created ON long_transactions(created_at)"))
+            conn.commit()
+            logger.info("  ✓ 创建 long_transactions 表")
+    else:
+        logger.info("  - long_transactions 表已存在，跳过")
 
 
 def run_migrations():
     """执行所有迁移"""
-    log("=" * 50)
-    log("开始数据库迁移")
-    log("=" * 50)
+    logger.info("=" * 50)
+    logger.info("开始数据库迁移")
+    logger.info("=" * 50)
     
     try:
         migration_001()
         migration_002()
         migration_003()
         migration_004()
+        migration_005()
         
-        log("=" * 50)
-        log("所有迁移执行完成")
-        log("=" * 50)
+        logger.info("=" * 50)
+        logger.info("所有迁移执行完成")
+        logger.info("=" * 50)
         return True
     except Exception as e:
-        log(f"迁移失败: {e}")
+        logger.info(f"迁移失败: {e}")
         import traceback
         traceback.print_exc()
         return False
