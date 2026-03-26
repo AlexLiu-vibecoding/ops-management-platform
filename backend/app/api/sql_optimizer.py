@@ -757,7 +757,6 @@ async def get_llm_analysis(
         response = await asyncio.wait_for(
             client.ainvoke(
                 messages=messages,
-                model="doubao-seed-2-0-lite-260215",
                 temperature=0.3,
                 max_tokens=4096
             ),

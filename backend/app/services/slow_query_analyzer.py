@@ -289,7 +289,6 @@ class SlowQueryAnalyzer:
             # 调用大模型
             content = await client.ainvoke(
                 messages=messages,
-                model="doubao-seed-2-0-lite-260215",
                 temperature=0.3,
                 max_tokens=4096
             )

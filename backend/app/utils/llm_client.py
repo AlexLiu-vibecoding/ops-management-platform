@@ -5,6 +5,7 @@ LLM 客户端工具
 """
 import os
 import json
+import time
 import logging
 from typing import List, Optional, Dict, Any, AsyncGenerator
 from openai import OpenAI, AsyncOpenAI
@@ -16,8 +17,12 @@ DEFAULT_BASE_URL = os.getenv("COZE_INTEGRATION_MODEL_BASE_URL", "https://integra
 DEFAULT_API_KEY = os.getenv("COZE_WORKLOAD_IDENTITY_API_KEY", "")
 
 
+# 默认模型配置
+DEFAULT_MODEL = "doubao-seed-1-6-flash-250615"  # Flash 模型，速度快
+DEFAULT_MODEL_LITE = "doubao-seed-2-0-lite-260215"  # Lite 模型，更精确但较慢
+
+
 def parse_sse_response(response_text: str) -> str:
-    """解析 SSE 格式的响应，提取文本内容"""
     content_parts = []
     for line in response_text.strip().split('\n'):
         if line.startswith('data: '):
@@ -83,7 +88,7 @@ class LLMClient:
         messages: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
-        model: str = "doubao-seed-2-0-lite-260215",
+        model: str = DEFAULT_MODEL,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs
@@ -137,7 +142,7 @@ class LLMClient:
         messages: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
-        model: str = "doubao-seed-2-0-lite-260215",
+        model: str = DEFAULT_MODEL,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs
@@ -156,6 +161,7 @@ class LLMClient:
         Returns:
             模型响应文本
         """
+        start_time = time.time()
         client = self._get_async_client()
         formatted_messages = self._build_messages(
             system_prompt=system_prompt,
@@ -163,8 +169,11 @@ class LLMClient:
             messages=messages
         )
         
+        logger.info(f"[LLM] 开始调用模型: {model}, 消息数: {len(formatted_messages)}")
+        
         try:
             # 使用流式请求来兼容 SSE 响应格式
+            stream_start = time.time()
             stream = await client.chat.completions.create(
                 model=model,
                 messages=formatted_messages,
@@ -173,17 +182,35 @@ class LLMClient:
                 stream=True,
                 **kwargs
             )
+            logger.info(f"[LLM] 流式连接建立耗时: {time.time() - stream_start:.2f}秒")
             
             # 收集流式响应
             content_parts = []
+            first_chunk_time = None
+            last_chunk_time = None
+            chunk_count = 0
+            
             async for chunk in stream:
+                chunk_count += 1
+                if first_chunk_time is None:
+                    first_chunk_time = time.time()
+                    logger.info(f"[LLM] 首个chunk到达，等待时间: {first_chunk_time - stream_start:.2f}秒")
+                
                 if chunk.choices and chunk.choices[0].delta.content:
                     content_parts.append(chunk.choices[0].delta.content)
+                
+                last_chunk_time = time.time()
+            
+            total_time = time.time() - start_time
+            content_length = len(''.join(content_parts))
+            
+            logger.info(f"[LLM] 调用完成 - 总耗时: {total_time:.2f}秒, chunk数: {chunk_count}, 输出长度: {content_length}字符")
+            logger.info(f"[LLM] 时间分解 - 首chunk: {first_chunk_time - stream_start:.2f}秒, 流式传输: {last_chunk_time - first_chunk_time:.2f}秒")
             
             return ''.join(content_parts)
             
         except Exception as e:
-            logger.error(f"LLM 异步调用失败: {e}")
+            logger.error(f"[LLM] 调用失败: {e}, 耗时: {time.time() - start_time:.2f}秒")
             raise
     
     async def astream(
@@ -191,7 +218,7 @@ class LLMClient:
         messages: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
-        model: str = "doubao-seed-2-0-lite-260215",
+        model: str = DEFAULT_MODEL,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs
