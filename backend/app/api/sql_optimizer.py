@@ -6,6 +6,7 @@ import time
 import re
 import json
 import asyncio
+import logging
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -24,6 +25,9 @@ from app.utils.auth import decrypt_instance_password
 import pymysql
 import psycopg2
 import psycopg2.extras
+
+# 配置日志
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sql-optimizer", tags=["SQL优化器"])
 
@@ -200,8 +204,8 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
                 "table_comment": table_info["table_comment"],
                 "columns": columns_json,
                 "indexes": indexes_json,
-                "create_time": table_info["create_time"],
-                "update_time": table_info["update_time"]
+                "create_time": table_info["create_time"] if table_info["create_time"] else None,
+                "update_time": table_info["update_time"] if table_info["update_time"] else None
             }
         else:
             cursor = conn.cursor(pymysql.cursors.DictCursor)
@@ -936,12 +940,117 @@ async def analyze_sql(
         # 提取表名
         tables = rule_engine.extract_tables(request.sql_text)
         
-        # 获取表结构
+        # 获取已同步的表结构
         table_schemas = db.query(TableSchema).filter(
             TableSchema.instance_id == instance.id,
             TableSchema.database_name == request.database_name,
             TableSchema.table_name.in_(tables)
         ).all()
+        
+        # 自动同步未缓存的表结构
+        synced_tables = [schema.table_name for schema in table_schemas]
+        missing_tables = [t for t in tables if t not in synced_tables]
+        
+        # 检查已缓存表是否过期（超过 7 天）
+        STALE_THRESHOLD_DAYS = 7
+        stale_tables = []
+        fresh_schemas = []
+        
+        for schema in table_schemas:
+            if schema.sync_time:
+                days_since_sync = (datetime.now() - schema.sync_time).days
+                if days_since_sync > STALE_THRESHOLD_DAYS:
+                    stale_tables.append(schema.table_name)
+                    logger.info(f"表 {schema.table_name} 的结构已过期（{days_since_sync}天未更新），将重新获取")
+                else:
+                    fresh_schemas.append(schema)
+            else:
+                fresh_schemas.append(schema)
+        
+        auto_sync_info = {"synced": [], "failed": [], "refreshed": []}
+        
+        # 需要获取的表 = 未缓存的表 + 过期的表
+        tables_to_fetch = list(set(missing_tables + stale_tables))
+        
+        if tables_to_fetch:
+            logger.info(f"开始获取表结构: {tables_to_fetch}")
+            
+            # 获取连接
+            try:
+                conn, _ = get_db_connection(instance)
+                cursor = conn.cursor()
+                
+                for table_name in tables_to_fetch:
+                    try:
+                        # 获取表结构
+                        table_data = await fetch_table_structure(instance, request.database_name, table_name)
+                        
+                        if table_data:
+                            # 检查是否已存在（可能是过期的表需要更新）
+                            existing = db.query(TableSchema).filter(
+                                TableSchema.instance_id == instance.id,
+                                TableSchema.database_name == request.database_name,
+                                TableSchema.table_name == table_name
+                            ).first()
+                            
+                            if existing:
+                                # 更新过期表
+                                existing.table_type = table_data["table_type"]
+                                existing.engine = table_data["engine"]
+                                existing.row_format = table_data["row_format"]
+                                existing.row_count = table_data["row_count"]
+                                existing.data_size = table_data["data_size"]
+                                existing.index_size = table_data["index_size"]
+                                existing.table_comment = table_data["table_comment"]
+                                existing.columns_json = table_data["columns"]
+                                existing.indexes_json = table_data["indexes"]
+                                existing.create_time = table_data["create_time"]
+                                existing.update_time = table_data["update_time"]
+                                existing.sync_time = datetime.now()
+                                db.commit()
+                                
+                                fresh_schemas.append(existing)
+                                auto_sync_info["refreshed"].append(table_name)
+                                logger.info(f"刷新过期表结构成功: {table_name}")
+                            else:
+                                # 新增表
+                                new_schema = TableSchema(
+                                    instance_id=instance.id,
+                                    database_name=request.database_name,
+                                    table_name=table_name,
+                                    table_type=table_data["table_type"],
+                                    engine=table_data["engine"],
+                                    row_format=table_data["row_format"],
+                                    row_count=table_data["row_count"],
+                                    data_size=table_data["data_size"],
+                                    index_size=table_data["index_size"],
+                                    table_comment=table_data["table_comment"],
+                                    columns_json=table_data["columns"],
+                                    indexes_json=table_data["indexes"],
+                                    create_time=table_data["create_time"],
+                                    update_time=table_data["update_time"],
+                                    sync_time=datetime.now()
+                                )
+                                db.add(new_schema)
+                                db.commit()
+                                db.refresh(new_schema)
+                                
+                                fresh_schemas.append(new_schema)
+                                auto_sync_info["synced"].append(table_name)
+                                logger.info(f"自动同步表结构成功: {table_name}")
+                        else:
+                            auto_sync_info["failed"].append({"table": table_name, "error": "表不存在或无法获取结构"})
+                    except Exception as e:
+                        auto_sync_info["failed"].append({"table": table_name, "error": str(e)})
+                        logger.error(f"获取表结构失败 {table_name}: {e}")
+            except Exception as e:
+                logger.error(f"连接数据库失败，无法自动同步: {e}")
+            finally:
+                if conn:
+                    conn.close()
+        
+        # 使用最新的表结构列表
+        table_schemas = fresh_schemas
         
         schemas_for_llm = []
         for schema in table_schemas:
@@ -1002,6 +1111,11 @@ async def analyze_sql(
             "total_rows_scanned": sum(row.get("rows") or 0 for row in explain_rows)
         }
         
+        # 判断是否需要返回自动同步信息
+        auto_sync_result = None
+        if auto_sync_info["synced"] or auto_sync_info["refreshed"] or auto_sync_info["failed"]:
+            auto_sync_result = auto_sync_info
+        
         return SQLAnalysisResponse(
             sql_text=request.sql_text,
             sql_normalized=sql_normalized,
@@ -1010,7 +1124,8 @@ async def analyze_sql(
             llm_suggestions=llm_suggestions,
             risk_level=risk_level,
             analysis_time=analysis_time,
-            summary=summary
+            summary=summary,
+            auto_sync_info=auto_sync_result
         )
         
     except Exception as e:

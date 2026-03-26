@@ -329,6 +329,21 @@ const analyzeSql = async () => {
     
     analysisResult.value = result
     
+    // 处理自动同步提示
+    if (result.auto_sync_info) {
+      const { synced, refreshed, failed } = result.auto_sync_info
+      if (synced && synced.length > 0) {
+        ElMessage.success(`已自动同步表结构: ${synced.join(', ')}`)
+      }
+      if (refreshed && refreshed.length > 0) {
+        ElMessage.info(`已刷新过期表结构: ${refreshed.join(', ')}`)
+      }
+      if (failed && failed.length > 0) {
+        const failedMsg = failed.map(f => `${f.table}: ${f.error}`).join('; ')
+        ElMessage.warning(`部分表同步失败: ${failedMsg}`)
+      }
+    }
+    
     // 刷新历史
     loadHistory()
     

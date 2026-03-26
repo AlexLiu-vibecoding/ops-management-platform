@@ -656,3 +656,4 @@ class SQLAnalysisResponse(BaseModel):
     risk_level: str
     analysis_time: float
     summary: Dict[str, Any] = Field(default_factory=dict, description="分析摘要")
+    auto_sync_info: Optional[Dict[str, Any]] = Field(default=None, description="自动同步表结构信息")
