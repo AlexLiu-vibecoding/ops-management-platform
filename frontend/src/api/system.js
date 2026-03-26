@@ -35,6 +35,13 @@ export const systemApi = {
     return request.post('/system/storage-config/test', data)
   },
 
+  // ==================== AWS 配置 ====================
+  
+  // 测试 AWS 连接
+  testAwsConnection(data) {
+    return request.post('/system/test-aws-connection', data)
+  },
+
   // ==================== 安全配置 ====================
   
   // 获取安全配置

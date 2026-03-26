@@ -83,6 +83,102 @@
         </el-card>
       </el-tab-pane>
 
+      <!-- AWS 凭证配置 -->
+      <el-tab-pane label="AWS 配置" name="aws">
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header">
+              <span>AWS 凭证配置</span>
+              <el-tag type="warning" size="small">用于 RDS CloudWatch 指标采集</el-tag>
+            </div>
+          </template>
+
+          <el-alert
+            title="配置说明"
+            type="info"
+            :closable="false"
+            show-icon
+            style="margin-bottom: 20px;"
+          >
+            <template #default>
+              <p>配置 AWS 凭证后，系统可以自动采集 RDS 实例的 CloudWatch 性能指标（CPU、内存、连接数等）。</p>
+              <p style="margin-top: 8px;">凭证配置优先级：<strong>数据库配置 > 环境变量</strong>。配置保存后立即生效。</p>
+            </template>
+          </el-alert>
+
+          <el-form :model="awsConfig" label-width="140px">
+            <el-form-item label="AWS 区域">
+              <el-select v-model="awsConfig.aws_region" placeholder="选择 AWS 区域" style="width: 100%;">
+                <el-option label="美国东部 (弗吉尼亚北部)" value="us-east-1" />
+                <el-option label="美国东部 (俄亥俄)" value="us-east-2" />
+                <el-option label="美国西部 (加利福尼亚)" value="us-west-1" />
+                <el-option label="美国西部 (俄勒冈)" value="us-west-2" />
+                <el-option label="亚太地区 (新加坡)" value="ap-southeast-1" />
+                <el-option label="亚太地区 (悉尼)" value="ap-southeast-2" />
+                <el-option label="亚太地区 (东京)" value="ap-northeast-1" />
+                <el-option label="亚太地区 (首尔)" value="ap-northeast-2" />
+                <el-option label="中国 (北京)" value="cn-north-1" />
+                <el-option label="中国 (宁夏)" value="cn-northwest-1" />
+                <el-option label="欧洲 (法兰克福)" value="eu-central-1" />
+                <el-option label="欧洲 (爱尔兰)" value="eu-west-1" />
+                <el-option label="欧洲 (伦敦)" value="eu-west-2" />
+              </el-select>
+              <div class="hint">选择 RDS 实例所在的 AWS 区域</div>
+            </el-form-item>
+
+            <el-divider content-position="left">AWS 凭证</el-divider>
+
+            <el-row :gutter="20">
+              <el-col :span="12">
+                <el-form-item label="Access Key ID">
+                  <el-input 
+                    v-model="awsConfig.aws_access_key_id" 
+                    placeholder="AKIAIOSFODNN7EXAMPLE"
+                    show-password
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="12">
+                <el-form-item label="Secret Access Key">
+                  <el-input 
+                    v-model="awsConfig.aws_secret_access_key" 
+                    placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                    show-password
+                  />
+                </el-form-item>
+              </el-col>
+            </el-row>
+
+            <div class="hint" style="margin-left: 140px; margin-bottom: 20px;">
+              <el-icon><InfoFilled /></el-icon>
+              建议使用具有 <code>AmazonRDSReadOnlyAccess</code> 和 <code>CloudWatchReadOnlyAccess</code> 权限的 IAM 用户
+            </div>
+
+            <el-form-item>
+              <el-button type="primary" @click="saveAwsConfig" :loading="savingAws">
+                保存配置
+              </el-button>
+              <el-button @click="testAwsConfig" :loading="testingAws">
+                测试连接
+              </el-button>
+              <el-button @click="resetAwsConfig">
+                重置
+              </el-button>
+            </el-form-item>
+          </el-form>
+
+          <el-divider content-position="left">所需权限</el-divider>
+          
+          <el-input
+            type="textarea"
+            :rows="12"
+            readonly
+            :model-value="awsIamPolicy"
+            style="font-family: monospace;"
+          />
+        </el-card>
+      </el-tab-pane>
+
       <!-- 存储配置 -->
       <el-tab-pane label="存储配置" name="storage">
         <el-card shadow="never">
@@ -322,7 +418,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { systemApi } from '@/api/system'
 import { ElMessage } from 'element-plus'
-import { Coin, Folder, Cloudy, Files } from '@element-plus/icons-vue'
+import { Coin, Folder, Cloudy, Files, InfoFilled } from '@element-plus/icons-vue'
 
 const activeTab = ref('overview')
 const saving = ref(false)
@@ -359,6 +455,47 @@ const storageConfig = reactive({
   oss_access_key_id: '',
   oss_access_key_secret: ''
 })
+
+// AWS 配置（用于 RDS 采集）
+const awsConfig = reactive({
+  aws_access_key_id: '',
+  aws_secret_access_key: '',
+  aws_region: 'us-east-1'
+})
+const savingAws = ref(false)
+const testingAws = ref(false)
+
+// AWS IAM 策略示例
+const awsIamPolicy = `{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "rds:DescribeDBInstances",
+        "rds:DescribeDBLogFiles",
+        "rds:DownloadDBLogFilePortion"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:GetMetricStatistics",
+        "cloudwatch:ListMetrics"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "logs:DescribeLogStreams",
+        "logs:GetLogEvents"
+      ],
+      "Resource": "*"
+    }
+  ]
+}`
 
 // 安全配置
 const securityConfig = reactive({
@@ -447,6 +584,10 @@ const loadStorageConfig = async () => {
   try {
     const data = await systemApi.getStorageConfig()
     Object.assign(storageConfig, data)
+    // 同时加载 AWS 配置
+    awsConfig.aws_access_key_id = data.s3_access_key_id || ''
+    awsConfig.aws_secret_access_key = data.s3_secret_access_key || ''
+    awsConfig.aws_region = data.s3_region || 'us-east-1'
   } catch (error) {
     console.error('加载存储配置失败:', error)
   }
@@ -483,6 +624,51 @@ const testStorageConfig = async () => {
   } finally {
     testing.value = false
   }
+}
+
+// 保存 AWS 配置
+const saveAwsConfig = async () => {
+  savingAws.value = true
+  try {
+    await systemApi.updateStorageConfig({
+      s3_access_key_id: awsConfig.aws_access_key_id,
+      s3_secret_access_key: awsConfig.aws_secret_access_key,
+      s3_region: awsConfig.aws_region
+    })
+    ElMessage.success('AWS 凭证配置已保存，RDS 采集功能已生效')
+  } catch (error) {
+    ElMessage.error('保存失败')
+  } finally {
+    savingAws.value = false
+  }
+}
+
+// 测试 AWS 连接
+const testAwsConfig = async () => {
+  testingAws.value = true
+  try {
+    const result = await systemApi.testAwsConnection({
+      aws_access_key_id: awsConfig.aws_access_key_id,
+      aws_secret_access_key: awsConfig.aws_secret_access_key,
+      aws_region: awsConfig.aws_region
+    })
+    if (result.success) {
+      ElMessage.success(result.message)
+    } else {
+      ElMessage.error(result.message)
+    }
+  } catch (error) {
+    ElMessage.error('测试失败: ' + (error.response?.data?.detail || error.message))
+  } finally {
+    testingAws.value = false
+  }
+}
+
+// 重置 AWS 配置
+const resetAwsConfig = () => {
+  awsConfig.aws_access_key_id = ''
+  awsConfig.aws_secret_access_key = ''
+  awsConfig.aws_region = 'us-east-1'
 }
 
 // 加载安全配置

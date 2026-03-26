@@ -310,6 +310,11 @@ async def update_storage_config(
     from app.services.storage import storage_manager
     storage_manager.reload_backend()
     
+    # 重载 RDS 采集器，使 AWS 凭证立即生效
+    if "AWS AK" in updates or "AWS SK" in updates or "S3区域" in updates:
+        from app.utils.aws_rds_collector import reload_rds_collector
+        reload_rds_collector()
+    
     return {
         "success": True,
         "message": f"配置已更新: {', '.join(updates)}，已立即生效。",
@@ -387,6 +392,107 @@ async def test_storage_config(
         return StorageTestResponse(
             success=False,
             message=f"测试失败: {str(e)}"
+        )
+
+
+# ==================== AWS 连接测试 ====================
+
+class AwsConnectionTestRequest(BaseModel):
+    aws_access_key_id: Optional[str] = None
+    aws_secret_access_key: Optional[str] = None
+    aws_region: Optional[str] = None
+
+
+class AwsConnectionTestResponse(BaseModel):
+    success: bool
+    message: str
+    rds_instances_count: Optional[int] = None
+
+
+@router.post("/test-aws-connection", response_model=AwsConnectionTestResponse)
+async def test_aws_connection(
+    request: AwsConnectionTestRequest,
+    current_user: User = Depends(get_super_admin)
+):
+    """
+    测试 AWS RDS 连接
+    
+    用于验证 AWS 凭证是否可以访问 RDS 服务
+    """
+    import boto3
+    from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
+    
+    # 获取凭证：优先使用请求参数，否则使用已保存的配置
+    access_key = request.aws_access_key_id
+    secret_key = request.aws_secret_access_key
+    region = request.aws_region or "us-east-1"
+    
+    # 如果请求中没有凭证，从数据库配置获取
+    if not access_key or not secret_key:
+        settings = get_effective_storage_settings()
+        access_key = access_key or settings.AWS_ACCESS_KEY_ID
+        secret_key = secret_key or settings.AWS_SECRET_ACCESS_KEY
+    
+    if not access_key or not secret_key:
+        return AwsConnectionTestResponse(
+            success=False,
+            message="AWS 凭证未配置，请提供 Access Key ID 和 Secret Access Key"
+        )
+    
+    try:
+        # 创建 RDS 客户端
+        session = boto3.Session(
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name=region
+        )
+        rds_client = session.client("rds")
+        
+        # 测试连接：列出 RDS 实例
+        response = rds_client.describe_db_instances(MaxRecords=100)
+        instances_count = len(response.get("DBInstances", []))
+        
+        return AwsConnectionTestResponse(
+            success=True,
+            message=f"AWS RDS 连接成功，区域: {region}，发现 {instances_count} 个 RDS 实例",
+            rds_instances_count=instances_count
+        )
+        
+    except NoCredentialsError:
+        return AwsConnectionTestResponse(
+            success=False,
+            message="AWS 凭证无效，请检查 Access Key ID 和 Secret Access Key"
+        )
+    except EndpointConnectionError as e:
+        return AwsConnectionTestResponse(
+            success=False,
+            message=f"无法连接到 AWS 端点 ({region})，请检查区域设置"
+        )
+    except ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        if error_code == "UnauthorizedOperation":
+            return AwsConnectionTestResponse(
+                success=False,
+                message="AWS 凭证无权限访问 RDS 服务，请检查 IAM 权限"
+            )
+        elif error_code == "InvalidClientTokenId":
+            return AwsConnectionTestResponse(
+                success=False,
+                message="AWS 凭证无效，请检查 Access Key ID"
+            )
+        elif error_code == "SignatureDoesNotMatch":
+            return AwsConnectionTestResponse(
+                success=False,
+                message="AWS Secret Access Key 不正确"
+            )
+        return AwsConnectionTestResponse(
+            success=False,
+            message=f"AWS 错误: {error_code}"
+        )
+    except Exception as e:
+        return AwsConnectionTestResponse(
+            success=False,
+            message=f"连接测试失败: {str(e)}"
         )
 
 

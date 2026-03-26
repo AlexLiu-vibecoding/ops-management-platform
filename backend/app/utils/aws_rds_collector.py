@@ -418,13 +418,80 @@ class RDSMetricsCollector:
         }
 
 
-# 全局采集器实例（使用环境变量配置）
+# 全局采集器实例
 _collector_instance: Optional[RDSMetricsCollector] = None
 
 
+def get_aws_credentials_from_db() -> dict:
+    """
+    从数据库读取 AWS 凭证配置
+    
+    优先级：数据库配置 > 环境变量
+    
+    Returns:
+        包含 aws_access_key_id, aws_secret_access_key, aws_region 的字典
+    """
+    credentials = {
+        "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID"),
+        "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY"),
+        "aws_region": os.getenv("AWS_DEFAULT_REGION", "us-east-1")
+    }
+    
+    try:
+        from app.database import SessionLocal
+        from app.models import GlobalConfig
+        
+        db = SessionLocal()
+        try:
+            # 从数据库读取 AWS 配置
+            config_keys = ["aws_access_key_id", "aws_secret_access_key", "aws_region"]
+            
+            for key in config_keys:
+                config = db.query(GlobalConfig).filter(
+                    GlobalConfig.config_key == key
+                ).first()
+                if config and config.config_value:
+                    if key == "aws_access_key_id":
+                        credentials["aws_access_key_id"] = config.config_value
+                    elif key == "aws_secret_access_key":
+                        credentials["aws_secret_access_key"] = config.config_value
+                    elif key == "aws_region":
+                        credentials["aws_region"] = config.config_value
+        finally:
+            db.close()
+    except Exception as e:
+        logger.warning(f"从数据库读取 AWS 凭证失败，使用环境变量: {e}")
+    
+    return credentials
+
+
 def get_rds_collector() -> RDSMetricsCollector:
-    """获取全局 RDS 采集器实例"""
+    """
+    获取全局 RDS 采集器实例
+    
+    自动从数据库或环境变量加载 AWS 凭证
+    优先级：数据库配置 > 环境变量
+    """
     global _collector_instance
     if _collector_instance is None:
-        _collector_instance = RDSMetricsCollector()
+        # 从数据库或环境变量获取凭证
+        creds = get_aws_credentials_from_db()
+        _collector_instance = RDSMetricsCollector(
+            aws_access_key_id=creds["aws_access_key_id"],
+            aws_secret_access_key=creds["aws_secret_access_key"],
+            aws_region=creds["aws_region"]
+        )
+        logger.info(f"RDS 采集器已初始化，区域: {creds['aws_region']}")
     return _collector_instance
+
+
+def reload_rds_collector():
+    """
+    重新加载 RDS 采集器
+    
+    当 AWS 凭证配置变更时调用，使新配置生效
+    """
+    global _collector_instance
+    _collector_instance = None
+    logger.info("RDS 采集器已重置，下次调用将使用新配置")
+    return get_rds_collector()
