@@ -22,119 +22,272 @@ from app.schemas import (
 from app.deps import get_current_user
 from app.utils.auth import decrypt_instance_password
 import pymysql
+import psycopg2
+import psycopg2.extras
 
 router = APIRouter(prefix="/sql-optimizer", tags=["SQL优化器"])
+
+# 超时配置
+DB_CONNECT_TIMEOUT = 5  # 数据库连接超时（秒）
+DB_QUERY_TIMEOUT = 30   # 查询超时（秒）
+LLM_TIMEOUT = 60        # LLM调用超时（秒）
 
 
 # ============ 数据库连接工具 ============
 
+def get_instance_type(instance: RDBInstance) -> str:
+    """判断实例类型：mysql 或 postgresql"""
+    # 通过 db_type 枚举判断
+    db_type_str = instance.db_type.value if hasattr(instance.db_type, 'value') else str(instance.db_type)
+    if db_type_str.upper() == 'POSTGRESQL':
+        return "postgresql"
+    return "mysql"
+
+
 def get_db_connection(instance: RDBInstance, database: str = None):
-    """获取数据库连接"""
+    """获取数据库连接（支持 MySQL 和 PostgreSQL）"""
+    db_type = get_instance_type(instance)
     password = decrypt_instance_password(instance.password_encrypted)
     
-    conn = pymysql.connect(
-        host=instance.host,
-        port=instance.port,
-        user=instance.username,
-        password=password,
-        database=database,
-        connect_timeout=10,
-        charset='utf8mb4'
-    )
-    return conn
+    if db_type == "postgresql":
+        conn = psycopg2.connect(
+            host=instance.host,
+            port=instance.port,
+            user=instance.username,
+            password=password,
+            database=database or 'postgres',
+            connect_timeout=DB_CONNECT_TIMEOUT
+        )
+        return conn, "postgresql"
+    else:
+        conn = pymysql.connect(
+            host=instance.host,
+            port=instance.port,
+            user=instance.username,
+            password=password,
+            database=database,
+            connect_timeout=DB_CONNECT_TIMEOUT,
+            read_timeout=DB_QUERY_TIMEOUT,
+            write_timeout=DB_QUERY_TIMEOUT,
+            charset='utf8mb4'
+        )
+        return conn, "mysql"
+
+
+def test_connection(instance: RDBInstance) -> Dict[str, Any]:
+    """测试数据库连接"""
+    try:
+        conn, db_type = get_db_connection(instance)
+        cursor = conn.cursor()
+        
+        if db_type == "postgresql":
+            cursor.execute("SELECT version()")
+            version = cursor.fetchone()[0]
+        else:
+            cursor.execute("SELECT VERSION()")
+            version = cursor.fetchone()[0]
+        
+        cursor.close()
+        conn.close()
+        
+        return {"success": True, "db_type": db_type, "version": version}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 # ============ 表结构抓取功能 ============
 
 async def fetch_table_structure(instance: RDBInstance, database: str, table_name: str) -> Optional[Dict]:
-    """抓取单个表的结构信息"""
+    """抓取单个表的结构信息（支持 MySQL 和 PostgreSQL）"""
     conn = None
     try:
-        conn = get_db_connection(instance, database)
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        conn, db_type = get_db_connection(instance, database)
         
-        # 获取表基本信息
-        cursor.execute("""
-            SELECT 
-                TABLE_NAME, TABLE_TYPE, ENGINE, ROW_FORMAT,
-                TABLE_ROWS, DATA_LENGTH, INDEX_LENGTH, TABLE_COMMENT,
-                CREATE_TIME, UPDATE_TIME
-            FROM information_schema.TABLES 
-            WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
-        """, (database, table_name))
-        table_info = cursor.fetchone()
-        
-        if not table_info:
-            return None
-        
-        # 获取列信息
-        cursor.execute("""
-            SELECT 
-                COLUMN_NAME as name,
-                COLUMN_TYPE as data_type,
-                IS_NULLABLE as nullable,
-                COLUMN_DEFAULT as default_value,
-                COLUMN_COMMENT as comment,
-                COLUMN_KEY as key_type,
-                EXTRA as extra
-            FROM information_schema.COLUMNS 
-            WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
-            ORDER BY ORDINAL_POSITION
-        """, (database, table_name))
-        columns = cursor.fetchall()
-        
-        # 获取索引信息
-        cursor.execute("""
-            SELECT 
-                INDEX_NAME as index_name,
-                GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) as columns,
-                NON_UNIQUE as non_unique,
-                INDEX_TYPE as index_type
-            FROM information_schema.STATISTICS 
-            WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
-            GROUP BY INDEX_NAME, NON_UNIQUE, INDEX_TYPE
-        """, (database, table_name))
-        indexes_raw = cursor.fetchall()
-        
-        # 处理列信息
-        columns_json = []
-        for col in columns:
-            columns_json.append({
-                "name": col["name"],
-                "data_type": col["data_type"],
-                "nullable": col["nullable"] == "YES",
-                "default": col["default_value"],
-                "comment": col["comment"],
-                "is_primary": col["key_type"] == "PRI",
-                "extra": col["extra"]
-            })
-        
-        # 处理索引信息
-        indexes_json = []
-        for idx in indexes_raw:
-            index_name = idx["index_name"]
-            indexes_json.append({
-                "name": index_name,
-                "columns": idx["columns"].split(","),
-                "unique": idx["non_unique"] == 0,
-                "primary": index_name == "PRIMARY",
-                "type": idx["index_type"]
-            })
-        
-        return {
-            "table_name": table_info["TABLE_NAME"],
-            "table_type": table_info["TABLE_TYPE"],
-            "engine": table_info["ENGINE"],
-            "row_format": table_info["ROW_FORMAT"],
-            "row_count": table_info["TABLE_ROWS"] or 0,
-            "data_size": table_info["DATA_LENGTH"] or 0,
-            "index_size": table_info["INDEX_LENGTH"] or 0,
-            "table_comment": table_info["TABLE_COMMENT"],
-            "columns": columns_json,
-            "indexes": indexes_json,
-            "create_time": table_info["CREATE_TIME"],
-            "update_time": table_info["UPDATE_TIME"]
-        }
+        if db_type == "postgresql":
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # PostgreSQL: 获取表基本信息
+            cursor.execute("""
+                SELECT 
+                    c.relname as table_name,
+                    'BASE TABLE' as table_type,
+                    '' as engine,
+                    '' as row_format,
+                    c.reltuples::bigint as table_rows,
+                    pg_relation_size(c.oid) as data_length,
+                    pg_indexes_size(c.oid) as index_length,
+                    obj_description(c.oid) as table_comment,
+                    '' as create_time,
+                    '' as update_time
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = %s AND c.relkind = 'r'
+            """, (table_name,))
+            table_info = cursor.fetchone()
+            
+            if not table_info:
+                return None
+            
+            # PostgreSQL: 获取列信息
+            cursor.execute("""
+                SELECT 
+                    a.attname as name,
+                    pg_catalog.format_type(a.atttypid, a.atttypmod) as data_type,
+                    NOT a.attnotnull as nullable,
+                    pg_catalog.pg_get_expr(d.adbin, d.adrelid) as default_value,
+                    col_description(a.attrelid, a.attnum) as comment,
+                    CASE WHEN pk.contype = 'p' THEN True ELSE False END as is_primary
+                FROM pg_attribute a
+                LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
+                LEFT JOIN pg_constraint pk ON pk.conrelid = a.attrelid AND pk.contype = 'p' AND a.attnum = ANY(pk.conkey)
+                JOIN pg_class c ON c.oid = a.attrelid
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'public' AND c.relname = %s AND a.attnum > 0 AND NOT a.attisdropped
+                ORDER BY a.attnum
+            """, (table_name,))
+            columns = cursor.fetchall()
+            
+            # PostgreSQL: 获取索引信息
+            cursor.execute("""
+                SELECT 
+                    i.relname as index_name,
+                    array_agg(a.attname ORDER BY array_position(ix.indkey, a.attnum)) as columns,
+                    NOT ix.indisunique as non_unique,
+                    'btree' as index_type,
+                    ix.indisprimary as is_primary
+                FROM pg_index ix
+                JOIN pg_class t ON t.oid = ix.indrelid
+                JOIN pg_class i ON i.oid = ix.indexrelid
+                JOIN pg_namespace n ON n.oid = t.relnamespace
+                JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+                WHERE n.nspname = 'public' AND t.relname = %s
+                GROUP BY i.relname, ix.indisunique, ix.indisprimary
+            """, (table_name,))
+            indexes_raw = cursor.fetchall()
+            
+            # 处理列信息
+            columns_json = []
+            for col in columns:
+                columns_json.append({
+                    "name": col["name"],
+                    "data_type": col["data_type"],
+                    "nullable": col["nullable"],
+                    "default": col["default_value"],
+                    "comment": col["comment"],
+                    "is_primary": col["is_primary"] or False,
+                    "extra": ""
+                })
+            
+            # 处理索引信息
+            indexes_json = []
+            for idx in indexes_raw:
+                indexes_json.append({
+                    "name": idx["index_name"],
+                    "columns": list(idx["columns"]) if idx["columns"] else [],
+                    "unique": not idx["non_unique"],
+                    "primary": idx["is_primary"],
+                    "type": idx["index_type"]
+                })
+            
+            return {
+                "table_name": table_info["table_name"],
+                "table_type": table_info["table_type"],
+                "engine": table_info["engine"] or "postgresql",
+                "row_format": table_info["row_format"] or "heap",
+                "row_count": int(table_info["table_rows"] or 0),
+                "data_size": int(table_info["data_length"] or 0),
+                "index_size": int(table_info["index_length"] or 0),
+                "table_comment": table_info["table_comment"],
+                "columns": columns_json,
+                "indexes": indexes_json,
+                "create_time": table_info["create_time"],
+                "update_time": table_info["update_time"]
+            }
+        else:
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            
+            # MySQL: 获取表基本信息
+            cursor.execute("""
+                SELECT 
+                    TABLE_NAME, TABLE_TYPE, ENGINE, ROW_FORMAT,
+                    TABLE_ROWS, DATA_LENGTH, INDEX_LENGTH, TABLE_COMMENT,
+                    CREATE_TIME, UPDATE_TIME
+                FROM information_schema.TABLES 
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+            """, (database, table_name))
+            table_info = cursor.fetchone()
+            
+            if not table_info:
+                return None
+            
+            # MySQL: 获取列信息
+            cursor.execute("""
+                SELECT 
+                    COLUMN_NAME as name,
+                    COLUMN_TYPE as data_type,
+                    IS_NULLABLE as nullable,
+                    COLUMN_DEFAULT as default_value,
+                    COLUMN_COMMENT as comment,
+                    COLUMN_KEY as key_type,
+                    EXTRA as extra
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+                ORDER BY ORDINAL_POSITION
+            """, (database, table_name))
+            columns = cursor.fetchall()
+            
+            # MySQL: 获取索引信息
+            cursor.execute("""
+                SELECT 
+                    INDEX_NAME as index_name,
+                    GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) as columns,
+                    NON_UNIQUE as non_unique,
+                    INDEX_TYPE as index_type
+                FROM information_schema.STATISTICS 
+                WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
+                GROUP BY INDEX_NAME, NON_UNIQUE, INDEX_TYPE
+            """, (database, table_name))
+            indexes_raw = cursor.fetchall()
+            
+            # 处理列信息
+            columns_json = []
+            for col in columns:
+                columns_json.append({
+                    "name": col["name"],
+                    "data_type": col["data_type"],
+                    "nullable": col["nullable"] == "YES",
+                    "default": col["default_value"],
+                    "comment": col["comment"],
+                    "is_primary": col["key_type"] == "PRI",
+                    "extra": col["extra"]
+                })
+            
+            # 处理索引信息
+            indexes_json = []
+            for idx in indexes_raw:
+                index_name = idx["index_name"]
+                indexes_json.append({
+                    "name": index_name,
+                    "columns": idx["columns"].split(",") if idx["columns"] else [],
+                    "unique": idx["non_unique"] == 0,
+                    "primary": index_name == "PRIMARY",
+                    "type": idx["index_type"]
+                })
+            
+            return {
+                "table_name": table_info["TABLE_NAME"],
+                "table_type": table_info["TABLE_TYPE"],
+                "engine": table_info["ENGINE"],
+                "row_format": table_info["ROW_FORMAT"],
+                "row_count": table_info["TABLE_ROWS"] or 0,
+                "data_size": table_info["DATA_LENGTH"] or 0,
+                "index_size": table_info["INDEX_LENGTH"] or 0,
+                "table_comment": table_info["TABLE_COMMENT"],
+                "columns": columns_json,
+                "indexes": indexes_json,
+                "create_time": table_info["CREATE_TIME"],
+                "update_time": table_info["UPDATE_TIME"]
+            }
         
     except Exception as e:
         raise HTTPException(
@@ -147,12 +300,22 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
 
 
 async def fetch_database_tables(instance: RDBInstance, database: str) -> List[str]:
-    """获取数据库中所有表名"""
+    """获取数据库中所有表名（支持 MySQL 和 PostgreSQL）"""
     conn = None
     try:
-        conn = get_db_connection(instance, database)
+        conn, db_type = get_db_connection(instance, database)
         cursor = conn.cursor()
-        cursor.execute("SHOW TABLES")
+        
+        if db_type == "postgresql":
+            cursor.execute("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                ORDER BY table_name
+            """)
+        else:
+            cursor.execute("SHOW TABLES")
+        
         return [row[0] for row in cursor.fetchall()]
     finally:
         if conn:
@@ -173,6 +336,16 @@ async def sync_table_schema(
             detail="实例不存在"
         )
     
+    # 测试连接
+    conn_test = test_connection(instance)
+    if not conn_test["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"无法连接到数据库实例: {conn_test['error']}"
+        )
+    
+    db_type = conn_test["db_type"]
+    
     # 获取要同步的数据库列表
     databases = []
     if request.database_name:
@@ -181,16 +354,23 @@ async def sync_table_schema(
         # 获取所有数据库
         conn = None
         try:
-            conn = get_db_connection(instance)
+            conn, _ = get_db_connection(instance)
             cursor = conn.cursor()
-            cursor.execute("SHOW DATABASES")
-            databases = [row[0] for row in cursor.fetchall() 
-                        if row[0] not in ('information_schema', 'mysql', 'performance_schema', 'sys')]
+            
+            if db_type == "postgresql":
+                cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false")
+                databases = [row[0] for row in cursor.fetchall() 
+                            if row[0] not in ('template0', 'template1', 'postgres')]
+            else:
+                cursor.execute("SHOW DATABASES")
+                databases = [row[0] for row in cursor.fetchall() 
+                            if row[0] not in ('information_schema', 'mysql', 'performance_schema', 'sys')]
         finally:
             if conn:
                 conn.close()
     
     synced_count = 0
+    errors = []
     
     for database in databases:
         # 获取表列表
@@ -519,7 +699,7 @@ async def get_llm_analysis(
     db_type: str = "mysql",
     db_version: str = "8.0"
 ) -> str:
-    """使用LLM进行深度SQL分析"""
+    """使用LLM进行深度SQL分析（带超时控制）"""
     from coze_coding_dev_sdk import LLMClient
     from langchain_core.messages import SystemMessage, HumanMessage
     
@@ -574,10 +754,23 @@ async def get_llm_analysis(
             HumanMessage(content=user_message)
         ]
         
-        response = client.invoke(
-            messages=messages,
-            model="doubao-seed-2-0-lite-260215",
-            temperature=0.3
+        # 使用 asyncio.wait_for 添加超时控制
+        async def call_llm():
+            return client.invoke(
+                messages=messages,
+                model="doubao-seed-2-0-lite-260215",
+                temperature=0.3
+            )
+        
+        # 使用 asyncio 等待，设置超时
+        loop = asyncio.get_event_loop()
+        response = await asyncio.wait_for(
+            loop.run_in_executor(None, lambda: client.invoke(
+                messages=messages,
+                model="doubao-seed-2-0-lite-260215",
+                temperature=0.3
+            )),
+            timeout=LLM_TIMEOUT
         )
         
         # 安全处理响应内容
@@ -595,6 +788,8 @@ async def get_llm_analysis(
         else:
             return str(response.content)
             
+    except asyncio.TimeoutError:
+        return "LLM分析超时，请稍后重试"
     except Exception as e:
         return f"LLM分析失败: {str(e)}"
 
@@ -618,41 +813,112 @@ async def analyze_sql(
             detail="实例不存在"
         )
     
+    # 测试连接
+    conn_test = test_connection(instance)
+    if not conn_test["success"]:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"无法连接到数据库实例: {conn_test['error']}"
+        )
+    
+    db_type = conn_test["db_type"]
+    
     conn = None
     try:
         # 连接数据库
-        conn = get_db_connection(instance, request.database_name)
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        conn, actual_db_type = get_db_connection(instance, request.database_name)
         
-        # 获取数据库版本
-        cursor.execute("SELECT VERSION()")
-        version = cursor.fetchone()
-        db_version = version["VERSION()"] if version else "8.0"
-        
-        # 执行EXPLAIN
-        sql_normalized = SQLRuleEngine.normalize_sql(request.sql_text)
-        
-        # 对于非SELECT语句，使用EXPLAIN格式化
-        explain_sql = f"EXPLAIN {sql_normalized}"
-        cursor.execute(explain_sql)
-        explain_result = cursor.fetchall()
-        
-        # 转换EXPLAIN结果
-        explain_rows = []
-        for row in explain_result:
-            explain_rows.append({
-                "id": row.get("id"),
-                "select_type": row.get("select_type"),
-                "table": row.get("table"),
-                "type": row.get("type"),
-                "possible_keys": row.get("possible_keys"),
-                "key": row.get("key"),
-                "key_len": row.get("key_len"),
-                "ref": row.get("ref"),
-                "rows": row.get("rows"),
-                "filtered": row.get("filtered"),
-                "Extra": row.get("Extra")
-            })
+        if actual_db_type == "postgresql":
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # PostgreSQL: 获取数据库版本
+            cursor.execute("SELECT version()")
+            version = cursor.fetchone()
+            db_version = version["version"] if version else "15.0"
+            
+            # 执行 EXPLAIN ANALYZE
+            sql_normalized = SQLRuleEngine.normalize_sql(request.sql_text)
+            explain_sql = f"EXPLAIN (FORMAT JSON) {sql_normalized}"
+            cursor.execute(explain_sql)
+            explain_result = cursor.fetchone()
+            
+            # 解析 PostgreSQL EXPLAIN JSON 结果
+            explain_rows = []
+            if explain_result:
+                try:
+                    plan_data = json.loads(explain_result["QUERY PLAN"]) if isinstance(explain_result["QUERY PLAN"], str) else explain_result["QUERY PLAN"]
+                    
+                    def extract_plan_info(plan, depth=0):
+                        rows = []
+                        node_type = plan.get("Node Type", "Unknown")
+                        
+                        rows.append({
+                            "id": depth,
+                            "select_type": plan.get("Parent Relationship", "Scan"),
+                            "table": plan.get("Relation Name") or plan.get("Alias", ""),
+                            "type": node_type.replace(" Scan", "").lower() if "Scan" in node_type else node_type.lower(),
+                            "possible_keys": None,
+                            "key": None,
+                            "key_len": None,
+                            "ref": None,
+                            "rows": plan.get("Plan Rows", 0),
+                            "filtered": None,
+                            "Extra": plan.get("Filter", "")
+                        })
+                        
+                        # 处理子计划
+                        if "Plans" in plan:
+                            for sub_plan in plan["Plans"]:
+                                rows.extend(extract_plan_info(sub_plan, depth + 1))
+                        
+                        return rows
+                    
+                    explain_rows = extract_plan_info(plan_data.get("Plan", plan_data))
+                except (json.JSONDecodeError, KeyError) as e:
+                    # 如果解析失败，返回基本信息
+                    explain_rows = [{
+                        "id": 1,
+                        "select_type": "QUERY",
+                        "table": "",
+                        "type": "unknown",
+                        "possible_keys": None,
+                        "key": None,
+                        "key_len": None,
+                        "ref": None,
+                        "rows": 0,
+                        "filtered": None,
+                        "Extra": str(explain_result)
+                    }]
+        else:
+            cursor = conn.cursor(pymysql.cursors.DictCursor)
+            
+            # MySQL: 获取数据库版本
+            cursor.execute("SELECT VERSION()")
+            version = cursor.fetchone()
+            db_version = version["VERSION()"] if version else "8.0"
+            
+            # 执行 EXPLAIN
+            sql_normalized = SQLRuleEngine.normalize_sql(request.sql_text)
+            explain_sql = f"EXPLAIN {sql_normalized}"
+            cursor.execute(explain_sql)
+            explain_result = cursor.fetchall()
+            
+            # 转换 EXPLAIN 结果
+            explain_rows = []
+            for row in explain_result:
+                explain_rows.append({
+                    "id": row.get("id"),
+                    "select_type": row.get("select_type"),
+                    "table": row.get("table"),
+                    "type": row.get("type"),
+                    "possible_keys": row.get("possible_keys"),
+                    "key": row.get("key"),
+                    "key_len": row.get("key_len"),
+                    "ref": row.get("ref"),
+                    "rows": row.get("rows"),
+                    "filtered": row.get("filtered"),
+                    "Extra": row.get("Extra")
+                })
         
         # 规则引擎分析
         rule_engine = SQLRuleEngine()
@@ -685,7 +951,7 @@ async def analyze_sql(
                 sql_normalized,
                 explain_rows,
                 schemas_for_llm,
-                instance.db_type,
+                db_type,  # 使用实际连接检测到的数据库类型
                 db_version
             )
         
