@@ -8,13 +8,7 @@
             <el-tag type="info" size="small" style="margin-left: 10px;">MySQL / PostgreSQL</el-tag>
           </div>
           <div class="header-right">
-            <el-badge v-if="canApprove && pendingCount > 0" :value="pendingCount" class="pending-badge">
-              <el-button type="primary" @click="handleAdd">
-                <el-icon><Plus /></el-icon>
-                提交变更
-              </el-button>
-            </el-badge>
-            <el-button v-else type="primary" @click="handleAdd">
+            <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
               提交变更
             </el-button>
@@ -688,10 +682,6 @@ onMounted(() => {
     .header-left {
       display: flex;
       align-items: center;
-    }
-    
-    .pending-badge {
-      margin-right: 0;
     }
   }
   

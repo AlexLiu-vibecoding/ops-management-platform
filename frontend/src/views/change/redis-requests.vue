@@ -8,13 +8,7 @@
             <el-tag type="danger" size="small" style="margin-left: 10px;">Redis 专用</el-tag>
           </div>
           <div class="header-right">
-            <el-badge v-if="canApprove && pendingCount > 0" :value="pendingCount" class="pending-badge">
-              <el-button type="primary" @click="handleAdd">
-                <el-icon><Plus /></el-icon>
-                提交 Redis 变更
-              </el-button>
-            </el-badge>
-            <el-button v-else type="primary" @click="handleAdd">
+            <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
               提交 Redis 变更
             </el-button>
