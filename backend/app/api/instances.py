@@ -10,7 +10,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import text, literal_column
 from pydantic import BaseModel
 from datetime import datetime
 import logging
@@ -70,91 +69,92 @@ async def list_instances(
     db: Session = Depends(get_db)
 ):
     """获取实例列表（向后兼容）"""
-    # 使用 UNION 查询两个表
-    rdb_query = db.query(
-        RDBInstance.id,
-        RDBInstance.name,
-        RDBInstance.db_type,
-        RDBInstance.host,
-        RDBInstance.port,
-        RDBInstance.username,
-        RDBInstance.environment_id,
-        RDBInstance.group_id,
-        RDBInstance.description,
-        RDBInstance.status,
-        RDBInstance.is_rds,
-        RDBInstance.rds_instance_id,
-        RDBInstance.aws_region,
-        RDBInstance.last_check_time,
-        RDBInstance.created_at,
-        RDBInstance.updated_at,
-    )
-    
-    redis_query = db.query(
-        RedisInstance.id,
-        RedisInstance.name,
-        literal_column("'redis'").label('db_type'),
-        RedisInstance.host,
-        RedisInstance.port,
-        literal_column("NULL").label('username'),
-        RedisInstance.environment_id,
-        RedisInstance.group_id,
-        RedisInstance.description,
-        RedisInstance.status,
-        literal_column("FALSE").label('is_rds'),
-        literal_column("NULL").label('rds_instance_id'),
-        literal_column("NULL").label('aws_region'),
-        RedisInstance.last_check_time,
-        RedisInstance.created_at,
-        RedisInstance.updated_at,
-    )
-    
-    # 合并查询
-    query = rdb_query.union_all(redis_query)
-    
-    # 应用过滤条件
-    if environment_id:
-        query = query.filter(text(f"environment_id = {environment_id}"))
-    if group_id:
-        query = query.filter(text(f"group_id = {group_id}"))
-    if db_type:
-        query = query.filter(text(f"db_type = '{db_type}'"))
-    if status is not None:
-        query = query.filter(text(f"status = {status}"))
-    
-    # 获取总数
-    total = query.count()
-    
-    # 分页
-    instances = query.offset(skip).limit(limit).all()
-    
-    # 转换为响应格式
     items = []
-    for i in instances:
-        items.append({
-            "id": i.id,
-            "name": i.name,
-            "db_type": i.db_type if isinstance(i.db_type, str) else i.db_type.value if hasattr(i.db_type, 'value') else str(i.db_type),
-            "host": i.host,
-            "port": i.port,
-            "username": i.username,
-            "environment_id": i.environment_id,
-            "group_id": i.group_id,
-            "description": i.description,
-            "status": i.status,
-            "is_rds": i.is_rds if hasattr(i, 'is_rds') else False,
-            "rds_instance_id": i.rds_instance_id if hasattr(i, 'rds_instance_id') else None,
-            "aws_region": i.aws_region if hasattr(i, 'aws_region') else None,
-            "redis_mode": None,  # 兼容字段
-            "redis_db": None,
-            "last_check_time": i.last_check_time,
-            "created_at": i.created_at,
-            "updated_at": i.updated_at,
-        })
+    
+    # 如果没有指定 db_type 或指定的是 mysql/postgresql，查询 RDB 实例
+    if not db_type or db_type.lower() in ('mysql', 'postgresql'):
+        rdb_query = db.query(RDBInstance)
+        
+        if environment_id:
+            rdb_query = rdb_query.filter(RDBInstance.environment_id == environment_id)
+        if group_id:
+            rdb_query = rdb_query.filter(RDBInstance.group_id == group_id)
+        if db_type and db_type.lower() in ('mysql', 'postgresql'):
+            # 根据枚举名称或值过滤
+            if db_type.lower() == 'mysql':
+                rdb_query = rdb_query.filter(RDBInstance.db_type == 'MYSQL')
+            elif db_type.lower() == 'postgresql':
+                rdb_query = rdb_query.filter(RDBInstance.db_type == 'POSTGRESQL')
+        if status is not None:
+            rdb_query = rdb_query.filter(RDBInstance.status == status)
+        
+        rdb_instances = rdb_query.all()
+        for i in rdb_instances:
+            items.append({
+                "id": i.id,
+                "name": i.name,
+                "db_type": i.db_type.value if hasattr(i.db_type, 'value') else str(i.db_type),
+                "host": i.host,
+                "port": i.port,
+                "username": i.username,
+                "environment_id": i.environment_id,
+                "group_id": i.group_id,
+                "description": i.description,
+                "status": i.status,
+                "is_rds": i.is_rds,
+                "rds_instance_id": i.rds_instance_id,
+                "aws_region": i.aws_region,
+                "redis_mode": None,
+                "redis_db": None,
+                "last_check_time": i.last_check_time,
+                "created_at": i.created_at,
+                "updated_at": i.updated_at,
+            })
+    
+    # 如果没有指定 db_type 或指定的是 redis，查询 Redis 实例
+    if not db_type or db_type.lower() == 'redis':
+        redis_query = db.query(RedisInstance)
+        
+        if environment_id:
+            redis_query = redis_query.filter(RedisInstance.environment_id == environment_id)
+        if group_id:
+            redis_query = redis_query.filter(RedisInstance.group_id == group_id)
+        if status is not None:
+            redis_query = redis_query.filter(RedisInstance.status == status)
+        
+        redis_instances = redis_query.all()
+        for i in redis_instances:
+            items.append({
+                "id": i.id,
+                "name": i.name,
+                "db_type": "redis",
+                "host": i.host,
+                "port": i.port,
+                "username": None,
+                "environment_id": i.environment_id,
+                "group_id": i.group_id,
+                "description": i.description,
+                "status": i.status,
+                "is_rds": False,
+                "rds_instance_id": None,
+                "aws_region": None,
+                "redis_mode": i.redis_mode.value if hasattr(i.redis_mode, 'value') else str(i.redis_mode),
+                "redis_db": i.redis_db,
+                "last_check_time": i.last_check_time,
+                "created_at": i.created_at,
+                "updated_at": i.updated_at,
+            })
+    
+    # 按 created_at 降序排序
+    items.sort(key=lambda x: x.get('created_at') or datetime.min, reverse=True)
+    
+    # 计算总数和分页
+    total = len(items)
+    paginated_items = items[skip:skip + limit]
     
     return {
         "total": total,
-        "items": items
+        "items": paginated_items
     }
 
 
