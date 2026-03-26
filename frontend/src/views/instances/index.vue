@@ -347,27 +347,6 @@ const parseAwsRegion = (host) => {
   return null
 }
 
-// 监听 host 变化，自动识别 RDS 并填充区域
-watch(() => dialog.form.host, (newHost) => {
-  if (!newHost || dialog.isEdit) return
-  
-  // 检测是否为 RDS endpoint
-  if (isRdsEndpoint(newHost)) {
-    // 自动设置 is_rds
-    if (!dialog.form.is_rds) {
-      dialog.form.is_rds = true
-      ElMessage.success('检测到 AWS RDS 端点，已自动设置为 RDS 实例')
-    }
-    
-    // 自动解析区域
-    const region = parseAwsRegion(newHost)
-    if (region && !dialog.form.aws_region) {
-      dialog.form.aws_region = region
-      ElMessage.success(`已自动识别区域: ${region} (${AWS_REGION_MAP[region]})`)
-    }
-  }
-})
-
 const loading = ref(false)
 const instanceList = ref([])
 const environments = ref([])
@@ -474,6 +453,27 @@ watch(() => dialog.form.db_type, (newType, oldType) => {
   } else if (newType === 'mysql') {
     if (dialog.form.port === 5432 || dialog.form.port === 6379) {
       dialog.form.port = 3306
+    }
+  }
+})
+
+// 监听 host 变化，自动识别 RDS 并填充区域
+watch(() => dialog.form.host, (newHost) => {
+  if (!newHost || dialog.isEdit) return
+  
+  // 检测是否为 RDS endpoint
+  if (isRdsEndpoint(newHost)) {
+    // 自动设置 is_rds
+    if (!dialog.form.is_rds) {
+      dialog.form.is_rds = true
+      ElMessage.success('检测到 AWS RDS 端点，已自动设置为 RDS 实例')
+    }
+    
+    // 自动解析区域
+    const region = parseAwsRegion(newHost)
+    if (region && !dialog.form.aws_region) {
+      dialog.form.aws_region = region
+      ElMessage.success(`已自动识别区域: ${region} (${AWS_REGION_MAP[region]})`)
     }
   }
 })
