@@ -10,7 +10,7 @@
     <!-- 主内容 -->
     <div class="login-container">
       <!-- 左侧品牌区 -->
-      <div class="brand-section">
+      <div class="brand-section" @click="resetToLogin">
         <div class="brand-content">
           <div class="logo-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -131,11 +131,14 @@
 
           <!-- 注册表单 -->
           <div v-if="showRegister" class="form-container register-form">
-            <button type="button" class="back-btn" @click="showRegister = false">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-              </svg>
-            </button>
+            <div class="form-header">
+              <button type="button" class="back-btn" @click="showRegister = false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回登录
+              </button>
+            </div>
             
             <h2 class="form-title">用户注册</h2>
             <p class="form-subtitle">注册申请需超级管理员审批</p>
@@ -244,11 +247,14 @@
 
           <!-- 查询状态 -->
           <div v-if="showStatus" class="form-container">
-            <button type="button" class="back-btn" @click="showStatus = false; registrationStatus = null">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-              </svg>
-            </button>
+            <div class="form-header">
+              <button type="button" class="back-btn" @click="showStatus = false; registrationStatus = null">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M19 12H5M12 19l-7-7 7-7"/>
+                </svg>
+                返回登录
+              </button>
+            </div>
             
             <h2 class="form-title">查询注册状态</h2>
             <p class="form-subtitle">输入用户名查询注册申请状态</p>
@@ -517,6 +523,13 @@ const getStatusTitle = (status) => {
 const formatTime = (time) => {
   return dayjs(time).format('YYYY-MM-DD HH:mm:ss')
 }
+
+// 返回登录页面
+const resetToLogin = () => {
+  showRegister.value = false
+  showStatus.value = false
+  registrationStatus.value = null
+}
 </script>
 
 <style lang="scss" scoped>
@@ -608,9 +621,16 @@ const formatTime = (time) => {
   align-items: center;
   justify-content: center;
   padding: 40px;
+  cursor: pointer;
   
   @media (max-width: 968px) {
     display: none;
+  }
+  
+  &:hover {
+    .brand-content .logo-icon {
+      transform: scale(1.05);
+    }
   }
   
   .brand-content {
@@ -627,6 +647,7 @@ const formatTime = (time) => {
       align-items: center;
       justify-content: center;
       box-shadow: 0 8px 24px rgba(102, 126, 234, 0.4);
+      transition: transform 0.3s ease;
       
       svg {
         width: 44px;
@@ -714,33 +735,31 @@ const formatTime = (time) => {
 .form-container {
   position: relative;
   
+  .form-header {
+    margin-bottom: 16px;
+  }
+  
   .back-btn {
-    position: absolute;
-    top: -8px;
-    left: -8px;
-    width: 36px;
-    height: 36px;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
-    border-radius: 10px;
+    gap: 6px;
+    padding: 8px 14px;
+    border: none;
+    background: rgba(102, 126, 234, 0.1);
+    cursor: pointer;
+    border-radius: 8px;
     transition: all 0.2s ease;
+    font-size: 14px;
+    color: #667eea;
+    font-weight: 500;
     
     svg {
-      width: 20px;
-      height: 20px;
-      color: #666;
+      width: 16px;
+      height: 16px;
     }
     
     &:hover {
-      background: #f0f0f0;
-      
-      svg {
-        color: #333;
-      }
+      background: rgba(102, 126, 234, 0.2);
     }
   }
   
