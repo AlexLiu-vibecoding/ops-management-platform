@@ -30,9 +30,12 @@ request.interceptors.response.use(
   },
   error => {
     if (error.response) {
-      const { status, data } = error.response
+      const { status, data, config } = error.response
       
-      if (status === 401) {
+      // 登录接口返回 401 是正常的业务逻辑，不应触发登出
+      const isLoginRequest = config.url.includes('/auth/login')
+      
+      if (status === 401 && !isLoginRequest) {
         // 未授权，清除登录状态
         const userStore = useUserStore()
         userStore.logout()
@@ -44,6 +47,9 @@ request.interceptors.response.use(
         ElMessage.error('请求的资源不存在')
       } else if (status === 422) {
         ElMessage.error(data.detail || '参数验证失败')
+      } else if (status === 401 && isLoginRequest) {
+        // 登录失败，显示错误信息但不触发登出
+        ElMessage.error(data.detail || '用户名或密码错误')
       } else {
         ElMessage.error(data.detail || '请求失败')
       }
