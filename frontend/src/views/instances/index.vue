@@ -39,9 +39,9 @@
       <el-table :data="instanceList" style="width: 100%" v-loading="loading">
         <el-table-column prop="name" label="实例名称" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
-            <div>
+            <div class="instance-name-cell">
               <span>{{ row.name }}</span>
-              <el-tag v-if="row.is_rds" type="warning" size="small" style="margin-left: 4px;">RDS</el-tag>
+              <el-tag v-if="row.is_rds === true" type="warning" size="small">RDS</el-tag>
             </div>
           </template>
         </el-table-column>
@@ -715,6 +715,12 @@ onMounted(() => {
       margin-top: 20px;
       justify-content: flex-end;
     }
+  }
+  
+  .instance-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
   
   .env-tag {

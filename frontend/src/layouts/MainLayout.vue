@@ -458,6 +458,12 @@ onMounted(() => {
       &.is-active {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       }
+      
+      .el-icon {
+        color: inherit;
+        font-size: 18px;
+        margin-right: 12px;
+      }
     }
   }
 }
