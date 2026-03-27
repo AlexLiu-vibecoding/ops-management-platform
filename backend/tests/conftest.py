@@ -4,11 +4,12 @@
 import pytest
 import sys
 import os
+import asyncio
 
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from fastapi.testclient import TestClient
+import httpx
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -75,9 +76,63 @@ def _init_default_configs(db):
 
 @pytest.fixture(scope="function")
 def client(db_session):
-    """创建测试客户端"""
-    with TestClient(app=app) as c:
-        yield c
+    """创建测试客户端 - 使用同步方式处理异步 ASGI 应用"""
+    transport = httpx.ASGITransport(app=app)
+    
+    class SyncTestClient:
+        """同步测试客户端包装器"""
+        def __init__(self, app, base_url="http://testserver"):
+            self._transport = httpx.ASGITransport(app=app)
+            self._base_url = base_url
+            self._client = None
+        
+        def __enter__(self):
+            return self
+        
+        def __exit__(self, *args):
+            pass
+        
+        def _run_async(self, coro):
+            """在同步上下文中运行异步协程"""
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            
+            if loop and loop.is_running():
+                # 如果已有运行中的事件循环，创建新的
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(asyncio.run, coro)
+                    return future.result()
+            else:
+                return asyncio.run(coro)
+        
+        def get(self, url, **kwargs):
+            async def _get():
+                async with httpx.AsyncClient(transport=self._transport, base_url=self._base_url) as client:
+                    return await client.get(url, **kwargs)
+            return self._run_async(_get())
+        
+        def post(self, url, **kwargs):
+            async def _post():
+                async with httpx.AsyncClient(transport=self._transport, base_url=self._base_url) as client:
+                    return await client.post(url, **kwargs)
+            return self._run_async(_post())
+        
+        def put(self, url, **kwargs):
+            async def _put():
+                async with httpx.AsyncClient(transport=self._transport, base_url=self._base_url) as client:
+                    return await client.put(url, **kwargs)
+            return self._run_async(_put())
+        
+        def delete(self, url, **kwargs):
+            async def _delete():
+                async with httpx.AsyncClient(transport=self._transport, base_url=self._base_url) as client:
+                    return await client.delete(url, **kwargs)
+            return self._run_async(_delete())
+    
+    return SyncTestClient(app)
 
 
 @pytest.fixture(scope="function")
