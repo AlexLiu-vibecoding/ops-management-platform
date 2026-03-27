@@ -55,6 +55,11 @@ output.log
 *.log.*
 logs/
 
+# 部署相关
+releases/
+.deploy.json
+.app.pid
+
 # 视频文件
 *.mp4
 *.avi
