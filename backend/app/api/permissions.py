@@ -9,8 +9,8 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.models.permissions import Permission, RolePermission, PermissionCode, DEFAULT_ROLE_PERMISSIONS
-from app.models.users import User
-from app.utils.auth import get_current_user
+from app.models import User
+from app.deps import get_current_user
 
 router = APIRouter(prefix="/api/v1/permissions", tags=["权限管理"])
 
