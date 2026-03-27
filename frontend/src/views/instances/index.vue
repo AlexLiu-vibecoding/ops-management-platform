@@ -36,7 +36,26 @@
     
     <!-- 实例列表 -->
     <el-card shadow="never" class="table-card">
-      <el-table :data="instanceList" style="width: 100%" v-loading="loading">
+      <!-- 批量操作工具栏 -->
+      <BatchActionBar
+        v-if="canOperate"
+        :selected-count="selectedInstances.length"
+        :total-count="instanceList.length"
+        :loading="batchLoading"
+        @select-all="handleSelectAll"
+        @clear-selection="handleClearSelection"
+        @batch-delete="handleBatchDelete"
+        @batch-enable="handleBatchEnable"
+        @batch-disable="handleBatchDisable"
+      />
+      
+      <el-table 
+        :data="instanceList" 
+        style="width: 100%" 
+        v-loading="loading"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" v-if="canOperate" />
         <el-table-column prop="name" label="实例名称" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="instance-name-cell">
@@ -269,6 +288,7 @@ import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 import { useUserStore } from '@/stores/user'
+import BatchActionBar from '@/components/BatchActionBar.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -278,6 +298,115 @@ const canOperate = computed(() => {
   const role = userStore.user?.role
   return ['super_admin', 'approval_admin', 'operator'].includes(role)
 })
+
+// 批量操作相关
+const selectedInstances = ref([])
+const batchLoading = ref(false)
+const tableRef = ref(null)
+
+// 选择变化处理
+const handleSelectionChange = (selection) => {
+  selectedInstances.value = selection
+}
+
+// 全选
+const handleSelectAll = () => {
+  // Element Plus 表格会自动处理全选
+}
+
+// 清除选择
+const handleClearSelection = () => {
+  selectedInstances.value = []
+}
+
+// 批量删除
+const handleBatchDelete = async () => {
+  if (selectedInstances.value.length === 0) {
+    ElMessage.warning('请选择要删除的实例')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedInstances.value.length} 个实例吗？此操作不可恢复。`,
+      '批量删除确认',
+      { type: 'warning' }
+    )
+    
+    batchLoading.value = true
+    const ids = selectedInstances.value.map(item => item.id)
+    const result = await request.post('/batch/instances/delete', { ids })
+    
+    if (result.success) {
+      ElMessage.success(`成功删除 ${result.success_count} 个实例`)
+      if (result.failed_count > 0) {
+        ElMessage.warning(`${result.failed_count} 个实例删除失败`)
+      }
+      selectedInstances.value = []
+      fetchInstances()
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('批量删除失败')
+    }
+  } finally {
+    batchLoading.value = false
+  }
+}
+
+// 批量启用
+const handleBatchEnable = async () => {
+  if (selectedInstances.value.length === 0) {
+    ElMessage.warning('请选择要启用的实例')
+    return
+  }
+  
+  try {
+    batchLoading.value = true
+    const ids = selectedInstances.value.map(item => item.id)
+    const result = await request.post('/batch/instances/enable', { ids })
+    
+    if (result.success) {
+      ElMessage.success(`成功启用 ${result.success_count} 个实例`)
+      if (result.failed_count > 0) {
+        ElMessage.warning(`${result.failed_count} 个实例启用失败`)
+      }
+      selectedInstances.value = []
+      fetchInstances()
+    }
+  } catch (error) {
+    ElMessage.error('批量启用失败')
+  } finally {
+    batchLoading.value = false
+  }
+}
+
+// 批量禁用
+const handleBatchDisable = async () => {
+  if (selectedInstances.value.length === 0) {
+    ElMessage.warning('请选择要禁用的实例')
+    return
+  }
+  
+  try {
+    batchLoading.value = true
+    const ids = selectedInstances.value.map(item => item.id)
+    const result = await request.post('/batch/instances/disable', { ids })
+    
+    if (result.success) {
+      ElMessage.success(`成功禁用 ${result.success_count} 个实例`)
+      if (result.failed_count > 0) {
+        ElMessage.warning(`${result.failed_count} 个实例禁用失败`)
+      }
+      selectedInstances.value = []
+      fetchInstances()
+    }
+  } catch (error) {
+    ElMessage.error('批量禁用失败')
+  } finally {
+    batchLoading.value = false
+  }
+}
 
 // ============ AWS RDS 自动识别 ============
 

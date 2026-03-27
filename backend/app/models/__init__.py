@@ -137,6 +137,9 @@ class Environment(Base):
     require_approval = Column(Boolean, default=True, comment="是否需要审批")
     status = Column(Boolean, default=True, comment="状态")
     
+    # 保护级别：0-普通，1-重要，2-核心（批量操作受限）
+    protection_level = Column(Integer, default=0, comment="保护级别: 0-普通, 1-重要, 2-核心")
+    
     # AWS 配置（用于 RDS CloudWatch 指标采集）
     aws_region = Column(String(50), comment="AWS 区域")
     aws_access_key_id = Column(String(100), comment="AWS Access Key ID")
@@ -875,4 +878,14 @@ __all__ = [
     
     # AWS 配置
     'AWSRegion',
+    
+    # 权限管理
+    'Permission', 'RolePermission', 'BatchOperationLog',
+    'PermissionCode', 'DEFAULT_ROLE_PERMISSIONS',
 ]
+
+# 导入权限模型
+from app.models.permissions import (
+    Permission, RolePermission, BatchOperationLog,
+    PermissionCode, DEFAULT_ROLE_PERMISSIONS
+)

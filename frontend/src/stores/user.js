@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '@/api/auth'
+import { permissionApi } from '@/api/permissions'
 import router from '@/router'
 
 /**
@@ -50,6 +51,8 @@ clearExpiredAuth()
 export const useUserStore = defineStore('user', () => {
   const token = ref(localStorage.getItem('token') || '')
   const user = ref(JSON.parse(localStorage.getItem('user') || 'null'))
+  const permissions = ref([])
+  const environmentIds = ref([])
 
   const isLoggedIn = computed(() => {
     // 不仅检查 token 是否存在，还要检查是否过期
@@ -64,6 +67,24 @@ export const useUserStore = defineStore('user', () => {
     const role = user.value?.role
     return ['super_admin', 'approval_admin', 'operator'].includes(role)
   })
+  
+  // 审批权限
+  const canApprove = computed(() => {
+    const role = user.value?.role
+    return ['super_admin', 'approval_admin'].includes(role)
+  })
+  
+  // 检查是否有某个权限
+  const hasPermission = (permissionCode) => {
+    if (isAdmin.value) return true
+    return permissions.value.includes(permissionCode)
+  }
+  
+  // 检查是否有环境访问权限
+  const hasEnvironmentAccess = (envId) => {
+    if (isAdmin.value) return true
+    return environmentIds.value.includes(envId)
+  }
 
   async function login(username, password) {
     try {
@@ -72,15 +93,30 @@ export const useUserStore = defineStore('user', () => {
       user.value = res.user
       localStorage.setItem('token', res.access_token)
       localStorage.setItem('user', JSON.stringify(res.user))
+      // 登录成功后获取权限
+      await fetchPermissions()
       return { success: true }
     } catch (error) {
       return { success: false, message: error.response?.data?.detail || '登录失败' }
+    }
+  }
+  
+  // 获取用户权限
+  async function fetchPermissions() {
+    try {
+      const res = await permissionApi.getPermissions()
+      permissions.value = res.permissions || []
+      environmentIds.value = res.environment_ids || []
+    } catch (error) {
+      console.error('获取权限失败:', error)
     }
   }
 
   function logout() {
     token.value = ''
     user.value = null
+    permissions.value = []
+    environmentIds.value = []
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     router.push('/login')
@@ -99,21 +135,32 @@ export const useUserStore = defineStore('user', () => {
         .then(res => {
           user.value = res
           localStorage.setItem('user', JSON.stringify(res))
+          // 获取权限
+          fetchPermissions()
         })
         .catch(() => {
           logout()
         })
+    } else if (token.value && permissions.value.length === 0) {
+      // 有 token 但没有权限信息，获取权限
+      fetchPermissions()
     }
   }
 
   return {
     token,
     user,
+    permissions,
+    environmentIds,
     isLoggedIn,
     isAdmin,
     canOperate,
+    canApprove,
+    hasPermission,
+    hasEnvironmentAccess,
     login,
     logout,
-    checkAuth
+    checkAuth,
+    fetchPermissions
   }
 })
