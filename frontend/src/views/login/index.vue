@@ -442,7 +442,11 @@ const handleLogin = async () => {
     
     loading.value = true
     try {
-      const result = await userStore.login(loginForm.username, loginForm.password)
+      // 去除前后空格，避免输入错误
+      const username = loginForm.username.trim()
+      const password = loginForm.password.trim()
+      
+      const result = await userStore.login(username, password)
       
       if (result.success) {
         ElMessage.success('登录成功')
