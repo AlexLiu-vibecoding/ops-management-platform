@@ -84,7 +84,7 @@ class TaskScheduler:
     
     async def _collect_rds_metrics(self):
         """采集所有 RDS 实例的性能指标"""
-        from app.utils.aws_rds_collector import get_rds_collector
+        from app.utils.aws_rds_collector import get_rds_collector_for_environment
         
         db = SessionLocal()
         try:
@@ -98,8 +98,6 @@ class TaskScheduler:
             if not rds_instances:
                 return
             
-            collector = get_rds_collector()
-            
             for instance in rds_instances:
                 try:
                     # 检查是否启用了性能监控
@@ -111,9 +109,15 @@ class TaskScheduler:
                     if not switch or not switch.enabled:
                         continue
                     
-                    # 使用实例配置的区域
-                    if instance.aws_region:
-                        collector.aws_region = instance.aws_region
+                    # 从环境获取 AWS 凭证
+                    collector = get_rds_collector_for_environment(
+                        environment_id=instance.environment_id,
+                        aws_region=instance.aws_region
+                    )
+                    
+                    if not collector:
+                        logger.warning(f"实例 {instance.id} 所属环境未配置 AWS 凭证，跳过采集")
+                        continue
                     
                     # 采集指标
                     metrics = collector.collect_metrics(instance.rds_instance_id)

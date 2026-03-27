@@ -103,6 +103,10 @@ class EnvironmentCreate(BaseModel):
     color: str = Field("#52C41A", max_length=10)
     description: Optional[str] = Field(None, max_length=200)
     require_approval: bool = True
+    # AWS 配置（可选）
+    aws_region: Optional[str] = Field(None, max_length=50, description="AWS 区域")
+    aws_access_key_id: Optional[str] = Field(None, max_length=100, description="AWS Access Key ID")
+    aws_secret_access_key: Optional[str] = Field(None, description="AWS Secret Access Key")
 
 
 class EnvironmentUpdate(BaseModel):
@@ -112,6 +116,10 @@ class EnvironmentUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=200)
     require_approval: Optional[bool] = None
     status: Optional[bool] = None
+    # AWS 配置（可选）
+    aws_region: Optional[str] = Field(None, max_length=50, description="AWS 区域")
+    aws_access_key_id: Optional[str] = Field(None, max_length=100, description="AWS Access Key ID")
+    aws_secret_access_key: Optional[str] = Field(None, description="AWS Secret Access Key")
 
 
 class EnvironmentResponse(BaseModel):
@@ -123,6 +131,9 @@ class EnvironmentResponse(BaseModel):
     description: Optional[str]
     require_approval: bool
     status: bool
+    # AWS 配置状态
+    aws_region: Optional[str]
+    aws_configured: bool = False
     created_at: datetime
     
     class Config:

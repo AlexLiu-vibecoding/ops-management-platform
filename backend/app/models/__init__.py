@@ -136,6 +136,13 @@ class Environment(Base):
     description = Column(String(200), comment="描述")
     require_approval = Column(Boolean, default=True, comment="是否需要审批")
     status = Column(Boolean, default=True, comment="状态")
+    
+    # AWS 配置（用于 RDS CloudWatch 指标采集）
+    aws_region = Column(String(50), comment="AWS 区域")
+    aws_access_key_id = Column(String(100), comment="AWS Access Key ID")
+    aws_secret_access_key = Column(String(100), comment="AWS Secret Access Key (加密存储)")
+    aws_configured = Column(Boolean, default=False, comment="AWS 凭证是否已配置")
+    
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
     

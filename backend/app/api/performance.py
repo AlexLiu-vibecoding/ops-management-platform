@@ -16,7 +16,7 @@ from app.models import (
 )
 from app.schemas import PerformanceMetricResponse, MessageResponse
 from app.deps import get_current_user
-from app.utils.aws_rds_collector import get_rds_collector, RDSMetricsCollector
+from app.utils.aws_rds_collector import get_rds_collector_for_environment, RDSMetricsCollector
 
 router = APIRouter(prefix="/performance", tags=["性能监控"])
 logger = logging.getLogger(__name__)
@@ -105,49 +105,54 @@ async def get_current_performance(
     # 如果是 AWS RDS 实例，尝试实时采集
     if instance.is_rds and instance.rds_instance_id:
         try:
-            collector = get_rds_collector()
-            if instance.aws_region:
-                # 使用实例配置的区域
-                collector.aws_region = instance.aws_region
+            # 从环境获取 AWS 凭证
+            collector = get_rds_collector_for_environment(
+                environment_id=instance.environment_id,
+                aws_region=instance.aws_region
+            )
             
-            rds_metrics = collector.collect_metrics(instance.rds_instance_id)
-            
-            if rds_metrics.error:
-                # 采集失败，返回数据库中存储的历史数据
-                logger.warning(f"RDS metrics collection failed for {instance.rds_instance_id}: {rds_metrics.error}")
+            if not collector:
+                # 环境未配置 AWS 凭证
+                logger.warning(f"环境 {instance.environment_id} 未配置 AWS 凭证，无法采集 RDS 指标")
             else:
-                # 采集成功，存储到数据库
-                metric_record = PerformanceMetric(
-                    instance_id=instance_id,
-                    collect_time=rds_metrics.collect_time or datetime.now(),
-                    cpu_usage=rds_metrics.cpu_usage,
-                    memory_usage=rds_metrics.memory_usage,
-                    disk_io_read=rds_metrics.read_iops,
-                    disk_io_write=rds_metrics.write_iops,
-                    connections=rds_metrics.connections,
-                    qps=rds_metrics.qps
-                )
-                db.add(metric_record)
-                db.commit()
+                rds_metrics = collector.collect_metrics(instance.rds_instance_id)
                 
-                return {
-                    "enabled": True,
-                    "data": {
-                        "id": metric_record.id,
-                        "instance_id": instance_id,
+                if rds_metrics.error:
+                    # 采集失败，返回数据库中存储的历史数据
+                    logger.warning(f"RDS metrics collection failed for {instance.rds_instance_id}: {rds_metrics.error}")
+                else:
+                    # 采集成功，存储到数据库
+                    metric_record = PerformanceMetric(
+                        instance_id=instance_id,
+                        collect_time=rds_metrics.collect_time or datetime.now(),
+                        cpu_usage=rds_metrics.cpu_usage,
+                        memory_usage=rds_metrics.memory_usage,
+                        disk_io_read=rds_metrics.read_iops,
+                        disk_io_write=rds_metrics.write_iops,
+                        connections=rds_metrics.connections,
+                        qps=rds_metrics.qps
+                    )
+                    db.add(metric_record)
+                    db.commit()
+                    
+                    return {
+                        "enabled": True,
+                        "data": {
+                            "id": metric_record.id,
+                            "instance_id": instance_id,
+                            "collect_time": metric_record.collect_time,
+                            "cpu_usage": metric_record.cpu_usage,
+                            "memory_usage": metric_record.memory_usage,
+                            "disk_io_read": metric_record.disk_io_read,
+                            "disk_io_write": metric_record.disk_io_write,
+                            "connections": metric_record.connections,
+                            "qps": metric_record.qps,
+                            "tps": None,
+                            "lock_wait_count": None
+                        },
                         "collect_time": metric_record.collect_time,
-                        "cpu_usage": metric_record.cpu_usage,
-                        "memory_usage": metric_record.memory_usage,
-                        "disk_io_read": metric_record.disk_io_read,
-                        "disk_io_write": metric_record.disk_io_write,
-                        "connections": metric_record.connections,
-                        "qps": metric_record.qps,
-                        "tps": None,
-                        "lock_wait_count": None
-                    },
-                    "collect_time": metric_record.collect_time,
-                    "source": "aws_cloudwatch"
-                }
+                        "source": "aws_cloudwatch"
+                    }
         except Exception as e:
             logger.error(f"RDS metrics collection error: {e}")
     

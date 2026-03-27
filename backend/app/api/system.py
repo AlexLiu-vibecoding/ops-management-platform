@@ -310,10 +310,8 @@ async def update_storage_config(
     from app.services.storage import storage_manager
     storage_manager.reload_backend()
     
-    # 重载 RDS 采集器，使 AWS 凭证立即生效
-    if "AWS AK" in updates or "AWS SK" in updates or "S3区域" in updates:
-        from app.utils.aws_rds_collector import reload_rds_collector
-        reload_rds_collector()
+    # 注意：AWS 凭证变更不再触发 RDS 采集器重载
+    # RDS 采集现在使用环境级别的 AWS 配置，而非全局配置
     
     return {
         "success": True,
@@ -415,9 +413,10 @@ async def test_aws_connection(
     current_user: User = Depends(get_super_admin)
 ):
     """
-    测试 AWS RDS 连接
+    测试 AWS S3 存储连接
     
-    用于验证 AWS 凭证是否可以访问 RDS 服务
+    ⚠️ 注意：此接口测试的是用于 S3 存储的全局 AWS 凭证。
+    RDS CloudWatch 指标采集请使用环境级别的 AWS 配置（见环境管理页面）。
     """
     import boto3
     from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
@@ -440,22 +439,22 @@ async def test_aws_connection(
         )
     
     try:
-        # 创建 RDS 客户端
+        # 创建 S3 客户端（用于存储）
         session = boto3.Session(
             aws_access_key_id=access_key,
             aws_secret_access_key=secret_key,
             region_name=region
         )
-        rds_client = session.client("rds")
+        s3_client = session.client("s3")
         
-        # 测试连接：列出 RDS 实例
-        response = rds_client.describe_db_instances(MaxRecords=100)
-        instances_count = len(response.get("DBInstances", []))
+        # 测试连接：列出 Buckets
+        response = s3_client.list_buckets()
+        buckets_count = len(response.get("Buckets", []))
         
         return AwsConnectionTestResponse(
             success=True,
-            message=f"AWS RDS 连接成功，区域: {region}，发现 {instances_count} 个 RDS 实例",
-            rds_instances_count=instances_count
+            message=f"AWS S3 连接成功，区域: {region}，发现 {buckets_count} 个 S3 Bucket",
+            rds_instances_count=buckets_count  # 复用字段返回 bucket 数量
         )
         
     except NoCredentialsError:
@@ -473,7 +472,7 @@ async def test_aws_connection(
         if error_code == "UnauthorizedOperation":
             return AwsConnectionTestResponse(
                 success=False,
-                message="AWS 凭证无权限访问 RDS 服务，请检查 IAM 权限"
+                message="AWS 凭证无权限访问 S3 服务，请检查 IAM 权限"
             )
         elif error_code == "InvalidClientTokenId":
             return AwsConnectionTestResponse(

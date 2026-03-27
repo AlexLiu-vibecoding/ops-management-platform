@@ -534,13 +534,95 @@ class RDSMetricsCollector:
         }
 
 
-# 全局采集器实例
+# 全局采集器实例（已废弃，改为按环境动态创建）
 _collector_instance: Optional[RDSMetricsCollector] = None
+
+# 环境级别的采集器缓存
+_environment_collectors: Dict[int, RDSMetricsCollector] = {}
+
+
+def get_aws_credentials_from_environment(environment_id: int) -> Optional[dict]:
+    """
+    从环境配置获取 AWS 凭证
+    
+    用于 RDS CloudWatch 指标采集
+    
+    Args:
+        environment_id: 环境 ID
+        
+    Returns:
+        包含 aws_access_key_id, aws_secret_access_key, aws_region 的字典
+        如果环境未配置 AWS 凭证则返回 None
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models import Environment
+        from app.utils.auth import decrypt_instance_password
+        
+        db = SessionLocal()
+        try:
+            env = db.query(Environment).filter(Environment.id == environment_id).first()
+            if not env or not env.aws_configured:
+                logger.debug(f"环境 {environment_id} 未配置 AWS 凭证")
+                return None
+            
+            # 解密 AWS Secret Access Key
+            secret_key = env.aws_secret_access_key
+            if secret_key:
+                try:
+                    secret_key = decrypt_instance_password(secret_key)
+                except Exception:
+                    # 如果解密失败，可能是未加密的明文（兼容旧数据）
+                    pass
+            
+            return {
+                "aws_access_key_id": env.aws_access_key_id,
+                "aws_secret_access_key": secret_key,
+                "aws_region": env.aws_region or "us-east-1"
+            }
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"从环境 {environment_id} 获取 AWS 凭证失败: {e}")
+        return None
+
+
+def get_rds_collector_for_environment(environment_id: int, aws_region: str = None) -> Optional[RDSMetricsCollector]:
+    """
+    获取指定环境的 RDS 采集器
+    
+    根据环境配置的 AWS 凭证创建采集器实例
+    
+    Args:
+        environment_id: 环境 ID
+        aws_region: 可选的区域覆盖（如果实例有特定区域）
+        
+    Returns:
+        RDSMetricsCollector 实例，如果环境未配置 AWS 则返回 None
+    """
+    # 从环境获取凭证
+    creds = get_aws_credentials_from_environment(environment_id)
+    if not creds:
+        return None
+    
+    # 使用传入的区域覆盖（如实例级别的区域）
+    if aws_region:
+        creds["aws_region"] = aws_region
+    
+    # 创建采集器
+    return RDSMetricsCollector(
+        aws_access_key_id=creds["aws_access_key_id"],
+        aws_secret_access_key=creds["aws_secret_access_key"],
+        aws_region=creds["aws_region"]
+    )
 
 
 def get_aws_credentials_from_db() -> dict:
     """
-    从数据库读取 AWS 凭证配置
+    从数据库读取 AWS 凭证配置（已废弃，保留兼容）
+    
+    注意：此函数现在只用于 S3 存储配置，不用于 RDS 采集
+    RDS 采集请使用 get_aws_credentials_from_environment
     
     优先级：数据库配置 > 环境变量
     
@@ -559,7 +641,7 @@ def get_aws_credentials_from_db() -> dict:
         
         db = SessionLocal()
         try:
-            # 从数据库读取 AWS 配置
+            # 从数据库读取 AWS 配置（用于 S3 存储）
             config_keys = ["aws_access_key_id", "aws_secret_access_key", "aws_region"]
             
             for key in config_keys:
@@ -577,7 +659,7 @@ def get_aws_credentials_from_db() -> dict:
             db.close()
     except Exception as e:
         logger.warning(f"从数据库读取 AWS 凭证失败，使用环境变量: {e}")
-    
+
     return credentials
 
 
