@@ -13,6 +13,12 @@ from fastapi.staticfiles import StaticFiles
 import time
 import logging
 
+# 启动自检
+from app.startup_check import run_startup_check
+if not run_startup_check():
+    print("启动自检失败，服务无法启动！")
+    sys.exit(1)
+
 from app.config import settings
 from app.database import engine, Base
 from app.utils.redis_client import redis_client
