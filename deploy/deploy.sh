@@ -456,32 +456,107 @@ build_frontend() {
 
 # ==================== 服务管理 ====================
 
+# 获取服务 PID
+get_service_pid() {
+    local pid=""
+    
+    # 优先从 PID 文件获取
+    if [ -f "$PID_FILE" ]; then
+        pid=$(cat "$PID_FILE")
+        if ps -p $pid > /dev/null 2>&1; then
+            echo $pid
+            return 0
+        fi
+    fi
+    
+    # 从端口获取
+    pid=$(ss -lptn 'sport = :5000' 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1)
+    if [ -n "$pid" ] && ps -p $pid > /dev/null 2>&1; then
+        echo $pid
+        return 0
+    fi
+    
+    return 1
+}
+
+# 检查服务是否运行
+is_service_running() {
+    local pid=$(get_service_pid)
+    [ -n "$pid" ]
+}
+
+# 优雅重载服务（零中断）
+# 原理：Gunicorn/Uvicorn 收到 HUP 信号后会重新加载 worker
+graceful_reload() {
+    print_step "优雅重载服务..."
+    
+    local pid=$(get_service_pid)
+    
+    if [ -z "$pid" ]; then
+        print_warning "服务未运行，直接启动"
+        start_service
+        return $?
+    fi
+    
+    print_info "发送 HUP 信号到进程 $pid..."
+    
+    # 发送 HUP 信号
+    kill -HUP $pid 2>/dev/null
+    
+    # 等待重载完成
+    sleep 2
+    
+    # 验证服务状态
+    if is_service_running; then
+        print_success "服务优雅重载成功 (PID: $(get_service_pid))"
+        return 0
+    else
+        print_warning "优雅重载失败，尝试正常重启"
+        restart_service
+        return $?
+    fi
+}
+
 stop_service() {
     print_info "停止服务..."
     
-    if [ -f "$PID_FILE" ]; then
-        local pid=$(cat "$PID_FILE")
-        if ps -p $pid > /dev/null 2>&1; then
-            kill $pid
-            sleep 2
-            if ps -p $pid > /dev/null 2>&1; then
-                kill -9 $pid
-            fi
-            print_success "服务已停止 (PID: $pid)"
-        fi
+    local pid=$(get_service_pid)
+    
+    if [ -z "$pid" ]; then
+        print_info "服务未运行"
         rm -f "$PID_FILE"
-    else
-        # 尝试通过端口查找
-        local port_pid=$(ss -lptn 'sport = :5000' 2>/dev/null | grep -oP 'pid=\K[0-9]+' | head -1)
-        if [ -n "$port_pid" ]; then
-            kill $port_pid 2>/dev/null || true
-            print_success "服务已停止 (PID: $port_pid)"
-        fi
+        return 0
     fi
+    
+    # 先尝试优雅停止 (TERM 信号)
+    kill $pid 2>/dev/null
+    
+    # 等待最多 10 秒
+    local wait=0
+    while ps -p $pid > /dev/null 2>&1 && [ $wait -lt 10 ]; do
+        sleep 1
+        wait=$((wait + 1))
+    done
+    
+    # 如果还在运行，强制停止
+    if ps -p $pid > /dev/null 2>&1; then
+        print_warning "服务未响应，强制停止..."
+        kill -9 $pid 2>/dev/null
+        sleep 1
+    fi
+    
+    rm -f "$PID_FILE"
+    print_success "服务已停止 (PID: $pid)"
 }
 
 start_service() {
     print_step "启动服务..."
+    
+    # 检查是否已运行
+    if is_service_running; then
+        print_warning "服务已在运行中 (PID: $(get_service_pid))"
+        return 0
+    fi
     
     # 创建日志目录
     mkdir -p "$LOG_DIR"
@@ -491,21 +566,46 @@ start_service() {
     # 根据环境选择启动方式
     local reload_flag=""
     if [ "$DEPLOY_ENV" = "dev" ]; then
+        # 开发环境：启用热重载
         reload_flag="--reload"
     fi
     
     nohup $PYTHON_CMD -m uvicorn app.main:app --host 0.0.0.0 --port 5000 $reload_flag > "$LOG_DIR/app.log" 2>&1 &
-    echo $! > "$PID_FILE"
+    local new_pid=$!
+    echo $new_pid > "$PID_FILE"
     
     cd "$PROJECT_DIR"
     
-    print_success "服务启动中..."
+    # 等待服务启动
+    sleep 2
+    
+    if ps -p $new_pid > /dev/null 2>&1; then
+        print_success "服务启动成功 (PID: $new_pid)"
+    else
+        print_error "服务启动失败，请检查日志: $LOG_DIR/app.log"
+        return 1
+    fi
 }
 
 restart_service() {
-    stop_service
-    sleep 2
-    start_service
+    local mode=${1:-"graceful"}
+    
+    case "$mode" in
+        graceful)
+            # 优先优雅重载
+            if is_service_running; then
+                graceful_reload
+            else
+                start_service
+            fi
+            ;;
+        hard)
+            # 硬重启（停止再启动）
+            stop_service
+            sleep 2
+            start_service
+            ;;
+    esac
 }
 
 # ==================== 健康检查 ====================
@@ -661,11 +761,13 @@ cmd_deploy() {
     detect_environment "$@"
     
     local force=false
+    local reload_mode="graceful"
     
     # 解析参数
     for arg in "$@"; do
         case $arg in
             --force|-f) force=true ;;
+            --hard-reload) reload_mode="hard" ;;
         esac
     done
     
@@ -699,8 +801,10 @@ cmd_deploy() {
     # 7. 构建前端
     build_frontend
     
-    # 8. 重启服务
-    restart_service
+    # 8. 重启服务（开发环境优雅重载，生产环境默认也是优雅重载）
+    # 使用 --hard-reload 强制硬重启
+    print_info "重载模式: $reload_mode"
+    restart_service "$reload_mode"
     
     # 9. 健康检查
     if health_check; then
@@ -718,16 +822,44 @@ cmd_deploy() {
         
         print_error "部署失败，正在回滚..."
         restore_version "$CURRENT_VERSION"
-        restart_service
+        restart_service "hard"
         
         exit 1
     fi
+}
+
+cmd_reload() {
+    print_banner
+    detect_environment "$@"
+    
+    local mode="graceful"
+    
+    for arg in "$@"; do
+        case $arg in
+            --hard|-h) mode="hard" ;;
+        esac
+    done
+    
+    print_step "重载服务 (模式: $mode)..."
+    
+    restart_service "$mode"
+    health_check
+    
+    print_success "服务重载完成"
 }
 
 cmd_rollback() {
     print_banner
     
     local target_version=$1
+    local mode="graceful"
+    
+    # 解析参数
+    for arg in "$@"; do
+        case $arg in
+            --hard|-h) mode="hard" ;;
+        esac
+    done
     
     if [ -z "$target_version" ]; then
         # 显示可用版本
@@ -738,12 +870,12 @@ cmd_rollback() {
             echo "  - $name (备份时间: $time)"
         done
         echo ""
-        print_info "用法: ./deploy.sh rollback <version>"
+        print_info "用法: ./deploy.sh rollback <version> [--hard]"
         exit 0
     fi
     
     restore_version "$target_version"
-    restart_service
+    restart_service "$mode"
     health_check
     
     print_success "回滚完成"
@@ -757,6 +889,9 @@ case "${1:-help}" in
         ;;
     deploy)
         cmd_deploy "$@"
+        ;;
+    reload)
+        cmd_reload "${@:2}"
         ;;
     rollback)
         cmd_rollback "${@:2}"
@@ -773,18 +908,29 @@ case "${1:-help}" in
         echo ""
         echo "命令:"
         echo "  check              检查更新和环境"
-        echo "  deploy             部署到当前环境"
+        echo "  deploy             部署到当前环境（默认优雅重载）"
+        echo "  reload             重载服务（不更新代码）"
         echo "  rollback [version] 回滚到指定版本"
         echo "  status             查看服务状态"
         echo "  history            查看部署历史"
         echo ""
         echo "选项:"
         echo "  --env=dev|prod     指定部署环境"
-        echo "  --force, -f        强制重新部署"
+        echo "  --force, -f        强制重新部署（即使无更新）"
+        echo "  --hard-reload      硬重启服务（停止再启动）"
+        echo "  --hard, -h         用于 reload/rollback，硬重载"
+        echo ""
+        echo "重载模式说明:"
+        echo "  默认（优雅重载）   kill -HUP，零中断"
+        echo "  --hard-reload      停止再启动，短暂中断"
         echo ""
         echo "示例:"
         echo "  ./deploy/deploy.sh check"
         echo "  ./deploy/deploy.sh deploy --env=prod"
+        echo "  ./deploy/deploy.sh deploy --force            # 强制部署"
+        echo "  ./deploy/deploy.sh deploy --hard-reload      # 硬重启部署"
+        echo "  ./deploy/deploy.sh reload                    # 优雅重载"
+        echo "  ./deploy/deploy.sh reload --hard             # 硬重载"
         echo "  ./deploy/deploy.sh rollback v1.2.3_20240327"
         ;;
     *)
