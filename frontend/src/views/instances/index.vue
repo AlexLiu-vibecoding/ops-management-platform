@@ -37,17 +37,30 @@
     <!-- 实例列表 -->
     <el-card shadow="never" class="table-card">
       <!-- 批量操作工具栏 -->
-      <BatchActionBar
-        v-if="canOperate"
-        :selected-count="selectedInstances.length"
-        :total-count="instanceList.length"
-        :loading="batchLoading"
-        @select-all="handleSelectAll"
-        @clear-selection="handleClearSelection"
-        @batch-delete="handleBatchDelete"
-        @batch-enable="handleBatchEnable"
-        @batch-disable="handleBatchDisable"
-      />
+      <div v-if="selectedInstances.length > 0" class="batch-action-bar">
+        <div class="selection-info">
+          <el-checkbox 
+            :model-value="selectedInstances.length === instanceList.length" 
+            :indeterminate="selectedInstances.length > 0 && selectedInstances.length < instanceList.length"
+          />
+          <span class="count">已选 {{ selectedInstances.length }} 项</span>
+          <el-button text type="primary" @click="selectedInstances = []">清除选择</el-button>
+        </div>
+        <div class="action-buttons">
+          <el-button type="success" plain @click="handleBatchEnable" :loading="batchLoading">
+            <el-icon><CircleCheck /></el-icon>
+            批量启用
+          </el-button>
+          <el-button type="warning" plain @click="handleBatchDisable" :loading="batchLoading">
+            <el-icon><CircleClose /></el-icon>
+            批量禁用
+          </el-button>
+          <el-button type="danger" plain @click="handleBatchDelete" :loading="batchLoading">
+            <el-icon><Delete /></el-icon>
+            批量删除
+          </el-button>
+        </div>
+      </div>
       
       <el-table 
         :data="instanceList" 
@@ -288,7 +301,7 @@ import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 import { useUserStore } from '@/stores/user'
-import BatchActionBar from '@/components/BatchActionBar.vue'
+import { CircleCheck, CircleClose, Delete } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -335,16 +348,14 @@ const handleBatchDelete = async () => {
     
     batchLoading.value = true
     const ids = selectedInstances.value.map(item => item.id)
-    const result = await request.post('/batch/instances/delete', { ids })
+    const result = await request.post('/batch/instances', { action: 'delete', ids })
     
-    if (result.success) {
-      ElMessage.success(`成功删除 ${result.success_count} 个实例`)
-      if (result.failed_count > 0) {
-        ElMessage.warning(`${result.failed_count} 个实例删除失败`)
-      }
-      selectedInstances.value = []
-      fetchInstances()
+    ElMessage.success(`成功删除 ${result.succeeded} 个实例`)
+    if (result.failed > 0) {
+      ElMessage.warning(`${result.failed} 个实例删除失败`)
     }
+    selectedInstances.value = []
+    fetchInstances()
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('批量删除失败')
@@ -364,16 +375,14 @@ const handleBatchEnable = async () => {
   try {
     batchLoading.value = true
     const ids = selectedInstances.value.map(item => item.id)
-    const result = await request.post('/batch/instances/enable', { ids })
+    const result = await request.post('/batch/instances', { action: 'enable', ids })
     
-    if (result.success) {
-      ElMessage.success(`成功启用 ${result.success_count} 个实例`)
-      if (result.failed_count > 0) {
-        ElMessage.warning(`${result.failed_count} 个实例启用失败`)
-      }
-      selectedInstances.value = []
-      fetchInstances()
+    ElMessage.success(`成功启用 ${result.succeeded} 个实例`)
+    if (result.failed > 0) {
+      ElMessage.warning(`${result.failed} 个实例启用失败`)
     }
+    selectedInstances.value = []
+    fetchInstances()
   } catch (error) {
     ElMessage.error('批量启用失败')
   } finally {
@@ -391,16 +400,14 @@ const handleBatchDisable = async () => {
   try {
     batchLoading.value = true
     const ids = selectedInstances.value.map(item => item.id)
-    const result = await request.post('/batch/instances/disable', { ids })
+    const result = await request.post('/batch/instances', { action: 'disable', ids })
     
-    if (result.success) {
-      ElMessage.success(`成功禁用 ${result.success_count} 个实例`)
-      if (result.failed_count > 0) {
-        ElMessage.warning(`${result.failed_count} 个实例禁用失败`)
-      }
-      selectedInstances.value = []
-      fetchInstances()
+    ElMessage.success(`成功禁用 ${result.succeeded} 个实例`)
+    if (result.failed > 0) {
+      ElMessage.warning(`${result.failed} 个实例禁用失败`)
     }
+    selectedInstances.value = []
+    fetchInstances()
   } catch (error) {
     ElMessage.error('批量禁用失败')
   } finally {
@@ -866,6 +873,33 @@ onMounted(() => {
     
     .el-button + .el-button {
       margin-left: 0;
+    }
+  }
+  
+  .batch-action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, #e8f4fd 0%, #f0f7ff 100%);
+    border: 1px solid #b3d8ff;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    
+    .selection-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      
+      .count {
+        font-weight: 500;
+        color: #409eff;
+      }
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 8px;
     }
   }
 }

@@ -33,7 +33,7 @@ class BatchOperationResponse(BaseModel):
     succeeded: int
     failed: int
     no_permission: int
-    results: List[dict]
+    results: List[dict] = []  # 可选的详细结果列表
 
 
 # ==================== 实例批量操作 ====================
@@ -81,7 +81,7 @@ async def batch_instances_operation(
         "succeeded": 0,
         "failed": 0,
         "no_permission": 0,
-        "details": []
+        "results": []
     }
     
     # 4. 逐个处理
@@ -91,7 +91,7 @@ async def batch_instances_operation(
         # 数据权限检查
         if instance.environment_id not in accessible_envs:
             results["no_permission"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": instance.id,
                 "name": instance.name,
                 "type": instance_type,
@@ -106,7 +106,7 @@ async def batch_instances_operation(
         )
         if not allowed:
             results["failed"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": instance.id,
                 "name": instance.name,
                 "type": instance_type,
@@ -125,7 +125,7 @@ async def batch_instances_operation(
                 instance.status = False
             
             results["succeeded"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": instance.id,
                 "name": instance.name,
                 "type": instance_type,
@@ -133,7 +133,7 @@ async def batch_instances_operation(
             })
         except Exception as e:
             results["failed"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": instance.id,
                 "name": instance.name,
                 "type": instance_type,
@@ -210,7 +210,7 @@ async def batch_environments_operation(
         
         if body.action == "delete" and (rdb_count > 0 or redis_count > 0):
             results["failed"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": env.id,
                 "name": env.name,
                 "status": "blocked",
@@ -227,14 +227,14 @@ async def batch_environments_operation(
                 env.status = False
             
             results["succeeded"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": env.id,
                 "name": env.name,
                 "status": "success"
             })
         except Exception as e:
             results["failed"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": env.id,
                 "name": env.name,
                 "status": "failed",
@@ -310,7 +310,7 @@ async def batch_approvals_operation(
         # 数据权限检查（按环境）
         if approval.environment_id and approval.environment_id not in accessible_envs:
             results["no_permission"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": approval.id,
                 "name": approval.title,
                 "status": "no_permission",
@@ -323,7 +323,7 @@ async def batch_approvals_operation(
             # 只有待审批状态可以操作
             if approval.status != ApprovalStatus.PENDING:
                 results["failed"] += 1
-                results["details"].append({
+                results["results"].append({
                     "id": approval.id,
                     "name": approval.title,
                     "status": "blocked",
@@ -339,7 +339,7 @@ async def batch_approvals_operation(
             )
             if not can_delete:
                 results["no_permission"] += 1
-                results["details"].append({
+                results["results"].append({
                     "id": approval.id,
                     "name": approval.title,
                     "status": "no_permission",
@@ -350,7 +350,7 @@ async def batch_approvals_operation(
             # 只能删除已拒绝或已执行的
             if approval.status not in [ApprovalStatus.REJECTED, ApprovalStatus.EXECUTED, ApprovalStatus.FAILED]:
                 results["failed"] += 1
-                results["details"].append({
+                results["results"].append({
                     "id": approval.id,
                     "name": approval.title,
                     "status": "blocked",
@@ -374,14 +374,14 @@ async def batch_approvals_operation(
                 db.delete(approval)
             
             results["succeeded"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": approval.id,
                 "name": approval.title,
                 "status": "success"
             })
         except Exception as e:
             results["failed"] += 1
-            results["details"].append({
+            results["results"].append({
                 "id": approval.id,
                 "name": approval.title,
                 "status": "failed",
