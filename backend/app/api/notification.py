@@ -62,7 +62,8 @@ class BindingCreate(BaseModel):
     channel_id: int
     notification_type: str = Field(..., description="通知类型: approval/alert/scheduled_task/operation")
     environment_id: Optional[int] = None
-    instance_id: Optional[int] = None
+    rdb_instance_id: Optional[int] = None
+    redis_instance_id: Optional[int] = None
     scheduled_task_id: Optional[int] = None
 
 
@@ -376,7 +377,8 @@ async def list_bindings(
             "notification_type": b.notification_type,
             "notification_type_label": NOTIFICATION_TYPE_LABELS.get(b.notification_type, b.notification_type),
             "environment_id": b.environment_id,
-            "instance_id": b.instance_id,
+            "rdb_instance_id": b.rdb_instance_id,
+            "redis_instance_id": b.redis_instance_id,
             "scheduled_task_id": b.scheduled_task_id,
             "created_at": b.created_at.isoformat() if b.created_at else None
         })
@@ -404,7 +406,8 @@ async def create_binding(
         NotificationBinding.channel_id == data.channel_id,
         NotificationBinding.notification_type == data.notification_type,
         NotificationBinding.environment_id == data.environment_id,
-        NotificationBinding.instance_id == data.instance_id,
+        NotificationBinding.rdb_instance_id == data.rdb_instance_id,
+        NotificationBinding.redis_instance_id == data.redis_instance_id,
         NotificationBinding.scheduled_task_id == data.scheduled_task_id
     ).first()
     
@@ -415,7 +418,8 @@ async def create_binding(
         channel_id=data.channel_id,
         notification_type=data.notification_type,
         environment_id=data.environment_id,
-        instance_id=data.instance_id,
+        rdb_instance_id=data.rdb_instance_id,
+        redis_instance_id=data.redis_instance_id,
         scheduled_task_id=data.scheduled_task_id
     )
     db.add(binding)
