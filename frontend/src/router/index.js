@@ -167,6 +167,13 @@ const routes = [
         component: () => import('@/views/users/index.vue'),
         meta: { title: '用户管理', icon: 'User', roles: ['super_admin'] }
       },
+      // 系统管理 - 权限管理
+      {
+        path: 'permissions',
+        name: 'Permissions',
+        component: () => import('@/views/permissions/index.vue'),
+        meta: { title: '权限管理', icon: 'Lock', roles: ['super_admin'] }
+      },
       // 系统管理 - 注册审批
       {
         path: 'registrations',
