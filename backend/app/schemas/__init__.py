@@ -133,7 +133,7 @@ class EnvironmentResponse(BaseModel):
     status: bool
     # AWS 配置状态
     aws_region: Optional[str]
-    aws_configured: bool = False
+    aws_configured: Optional[bool] = False
     created_at: datetime
     
     class Config:

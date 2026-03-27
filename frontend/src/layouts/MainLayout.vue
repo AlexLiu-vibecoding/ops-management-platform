@@ -37,7 +37,7 @@
               </template>
               <el-menu-item
                 v-for="child in item.children"
-                :key="child.path"
+                :key="child.path || child.id"
                 :index="child.path"
               >
                 <el-icon v-if="child.icon"><component :is="child.icon" /></el-icon>
@@ -46,7 +46,7 @@
             </el-sub-menu>
             
             <!-- 无子菜单 -->
-            <el-menu-item v-else :index="item.path">
+            <el-menu-item v-else :index="item.path || ''">
               <el-icon v-if="item.icon"><component :is="item.icon" /></el-icon>
               <template #title>{{ item.name }}</template>
             </el-menu-item>
@@ -204,7 +204,11 @@ const breadcrumbs = computed(() => {
 // 菜单项
 const menuItems = computed(() => {
   if (dynamicMenus.value.length > 0) {
-    return dynamicMenus.value
+    // 处理动态菜单数据，确保 children 是数组
+    return dynamicMenus.value.map(item => ({
+      ...item,
+      children: item.children || undefined
+    }))
   }
   
   const routes = router.options.routes.find(r => r.path === '/')?.children || []
