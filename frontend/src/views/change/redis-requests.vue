@@ -71,21 +71,23 @@
         </el-table-column>
         <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleView(row)">详情</el-button>
-            <!-- 待审批状态：审批人可操作 -->
-            <template v-if="row.status === 'pending' && canApprove">
-              <el-button link type="success" @click="handleApprove(row, true)">通过</el-button>
-              <el-button link type="danger" @click="handleApprove(row, false)">拒绝</el-button>
-            </template>
-            <!-- 已通过且非自动执行：可手动执行 -->
-            <el-button
-              v-if="row.status === 'approved' && !row.auto_execute && !row.scheduled_time"
-              link
-              type="success"
-              @click="handleExecute(row)"
-            >
-              执行
-            </el-button>
+            <div class="table-operations">
+              <el-button link type="primary" @click="handleView(row)">详情</el-button>
+              <!-- 待审批状态：审批人可操作 -->
+              <template v-if="row.status === 'pending' && canApprove">
+                <el-button link type="success" @click="handleApprove(row, true)">通过</el-button>
+                <el-button link type="danger" @click="handleApprove(row, false)">拒绝</el-button>
+              </template>
+              <!-- 已通过且非自动执行：可手动执行 -->
+              <el-button
+                v-if="row.status === 'approved' && !row.auto_execute && !row.scheduled_time"
+                link
+                type="success"
+                @click="handleExecute(row)"
+              >
+                执行
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -517,6 +519,13 @@ onMounted(() => {
   
   .approval-actions {
     margin-top: 15px;
+  }
+  
+  .table-operations {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 8px;
+    justify-content: center;
   }
 }
 </style>
