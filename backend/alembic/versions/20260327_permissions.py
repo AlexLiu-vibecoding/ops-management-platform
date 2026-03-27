@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20260327_permissions'
-down_revision = '20260327_aws_env_config'
+down_revision = 'aws_env_config_001'
 branch_labels = None
 depends_on = None
 
