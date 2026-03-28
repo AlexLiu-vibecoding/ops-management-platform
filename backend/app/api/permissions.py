@@ -184,6 +184,26 @@ ROLES = [
 ]
 
 
+@router.get("/roles/list")
+async def get_roles_list(
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取角色列表（用于前端下拉选择）
+    
+    所有登录用户可访问，返回角色选项列表
+    """
+    result = []
+    for role_info in ROLES:
+        result.append({
+            "value": role_info["role"],
+            "label": role_info["name"],
+            "description": role_info["description"]
+        })
+    
+    return {"items": result}
+
+
 @router.get("/roles")
 async def get_roles(
     db: Session = Depends(get_db),

@@ -5,11 +5,12 @@
       <el-form :inline="true" :model="searchForm">
         <el-form-item label="角色">
           <el-select v-model="searchForm.role" placeholder="全部角色" clearable style="width: 150px;">
-            <el-option label="超级管理员" value="super_admin" />
-            <el-option label="审批管理员" value="approval_admin" />
-            <el-option label="运维人员" value="operator" />
-            <el-option label="开发人员" value="developer" />
-            <el-option label="只读用户" value="readonly" />
+            <el-option
+              v-for="role in roles"
+              :key="role.value"
+              :label="role.label"
+              :value="role.value"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -110,11 +111,15 @@
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="dialog.form.role" placeholder="请选择角色" style="width: 100%;">
-            <el-option label="超级管理员" value="super_admin" />
-            <el-option label="审批管理员" value="approval_admin" />
-            <el-option label="运维人员" value="operator" />
-            <el-option label="开发人员" value="developer" />
-            <el-option label="只读用户" value="readonly" />
+            <el-option
+              v-for="role in roles"
+              :key="role.value"
+              :label="role.label"
+              :value="role.value"
+            >
+              <span>{{ role.label }}</span>
+              <span style="color: #999; font-size: 12px; margin-left: 8px;">{{ role.description }}</span>
+            </el-option>
           </el-select>
         </el-form-item>
         <el-form-item v-if="!dialog.isEdit" label="密码" prop="password">
@@ -200,6 +205,7 @@ const currentUserId = computed(() => userStore.user?.id)
 const loading = ref(false)
 const userList = ref([])
 const environments = ref([])
+const roles = ref([])  // 动态角色列表
 
 const searchForm = reactive({
   role: null,
@@ -270,6 +276,16 @@ const fetchEnvironments = async () => {
     environments.value = data.items || data
   } catch (error) {
     console.error('获取环境列表失败:', error)
+  }
+}
+
+// 获取角色列表
+const fetchRoles = async () => {
+  try {
+    const data = await request.get('/permissions/roles/list')
+    roles.value = data.items || []
+  } catch (error) {
+    console.error('获取角色列表失败:', error)
   }
 }
 
@@ -445,16 +461,10 @@ const formatTime = (time) => {
   return dayjs(time).format('YYYY-MM-DD HH:mm:ss')
 }
 
-// 获取角色名称
+// 获取角色名称（从动态列表获取）
 const getRoleName = (role) => {
-  const roleMap = {
-    super_admin: '超级管理员',
-    approval_admin: '审批管理员',
-    operator: '运维人员',
-    developer: '开发人员',
-    readonly: '只读用户'
-  }
-  return roleMap[role] || role
+  const roleItem = roles.value.find(r => r.value === role)
+  return roleItem?.label || role
 }
 
 // 获取角色标签类型
@@ -470,6 +480,7 @@ const getRoleTagType = (role) => {
 }
 
 onMounted(() => {
+  fetchRoles()
   fetchEnvironments()
   fetchUsers()
 })
