@@ -1,14 +1,19 @@
 """
 用户管理API
+
+注意：环境权限现在由角色控制，不再绑定到单个用户
+用户的环境权限 = 用户所属角色的环境权限
 """
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User, UserRole, UserEnvironment
+from app.models import User, UserRole
 from app.schemas import UserCreate, UserUpdate, UserResponse, MessageResponse
 from app.utils.auth import hash_password
 from app.deps import get_super_admin, get_current_user
+from app.models.permissions import RoleEnvironment
+from sqlalchemy import text
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
 
@@ -167,14 +172,18 @@ async def reset_user_password(
     return MessageResponse(message="密码重置成功")
 
 
-@router.post("/{user_id}/environments", response_model=MessageResponse)
-async def bind_user_environments(
+@router.get("/{user_id}/environments")
+async def get_user_environments(
     user_id: int,
-    environment_ids: List[int],
     current_user: User = Depends(get_super_admin),
     db: Session = Depends(get_db)
 ):
-    """绑定用户环境权限（仅超级管理员）"""
+    """
+    获取用户的环境权限
+    
+    注意：环境权限现在由角色控制
+    用户的环境权限 = 用户所属角色的环境权限
+    """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
@@ -182,14 +191,32 @@ async def bind_user_environments(
             detail="User not found"
         )
     
-    # 删除原有绑定
-    db.query(UserEnvironment).filter(UserEnvironment.user_id == user_id).delete()
+    # 从角色获取环境权限
+    role = user.role.value if isinstance(user.role, UserRole) else user.role
+    role_envs = db.query(RoleEnvironment).filter(RoleEnvironment.role == role).all()
+    environment_ids = [re.environment_id for re in role_envs]
     
-    # 创建新绑定
-    for env_id in environment_ids:
-        binding = UserEnvironment(user_id=user_id, environment_id=env_id)
-        db.add(binding)
+    return {
+        "user_id": user_id,
+        "role": role,
+        "environment_ids": environment_ids,
+        "note": "环境权限由角色控制，如需修改请前往角色管理"
+    }
+
+
+@router.post("/{user_id}/environments", response_model=MessageResponse)
+async def bind_user_environments(
+    user_id: int,
+    environment_ids: List[int],
+    current_user: User = Depends(get_super_admin),
+    db: Session = Depends(get_db)
+):
+    """
+    绑定用户环境权限（已废弃）
     
-    db.commit()
-    
-    return MessageResponse(message="环境权限绑定成功")
+    注意：环境权限现在由角色控制，此接口仅保留兼容性
+    如需修改环境权限，请前往角色管理页面修改角色的环境权限
+    """
+    return MessageResponse(
+        message="环境权限现在由角色控制，请前往角色管理页面修改角色的环境权限"
+    )

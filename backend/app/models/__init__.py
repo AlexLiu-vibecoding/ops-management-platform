@@ -888,5 +888,6 @@ __all__ = [
 # 导入权限模型
 from app.models.permissions import (
     Permission, RolePermission, BatchOperationLog,
-    PermissionCode, DEFAULT_ROLE_PERMISSIONS
+    PermissionCode, DEFAULT_ROLE_PERMISSIONS,
+    RoleEnvironment
 )

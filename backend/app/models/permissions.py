@@ -3,12 +3,31 @@
 
 权限设计：RBAC + 数据权限混合模型
 - 功能权限：菜单、按钮级别的权限控制
-- 数据权限：基于环境的数据访问控制
+- 数据权限：基于环境的数据访问控制（绑定到角色）
+
+核心原则：权限绑定角色，用户继承角色权限
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
+
+
+class RoleEnvironment(Base):
+    """角色-环境关联表：角色能访问哪些环境"""
+    __tablename__ = "role_environments"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    role = Column(String(50), nullable=False, comment="角色")
+    environment_id = Column(Integer, ForeignKey("environments.id", ondelete="CASCADE"), nullable=False, comment="环境ID")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    
+    # 唯一约束：一个角色对一个环境只有一条记录
+    __table_args__ = (
+        UniqueConstraint('role', 'environment_id', name='uq_role_environment'),
+    )
+    
+    environment = relationship("Environment")
 
 
 class Permission(Base):

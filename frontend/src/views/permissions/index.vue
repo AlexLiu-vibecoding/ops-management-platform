@@ -6,10 +6,7 @@
         <el-card shadow="never" class="role-card">
           <template #header>
             <div class="card-header">
-              <span>角色列表</span>
-              <el-button type="primary" size="small" @click="handleResetDefault" :loading="resetLoading">
-                重置默认
-              </el-button>
+              <span>角色管理</span>
             </div>
           </template>
           
@@ -21,63 +18,129 @@
               @click="selectRole(role.role)"
             >
               <div class="role-info">
-                <div class="role-name">{{ role.name }}</div>
+                <div class="role-header">
+                  <span class="role-name">{{ role.name }}</span>
+                  <el-tag size="small" :color="role.color" style="border: none; margin-left: 8px;">
+                    {{ role.user_count }} 人
+                  </el-tag>
+                </div>
                 <div class="role-desc">{{ role.description }}</div>
               </div>
-              <el-tag size="small" type="info">{{ role.permission_count }} 项权限</el-tag>
             </div>
           </div>
         </el-card>
       </el-col>
       
-      <!-- 右侧权限树 -->
+      <!-- 右侧角色详情 -->
       <el-col :span="18">
-        <el-card shadow="never" class="permission-card">
+        <el-card shadow="never" class="detail-card" v-loading="detailLoading">
           <template #header>
             <div class="card-header">
-              <span>{{ currentRoleName }} - 权限配置</span>
-              <div class="header-actions">
-                <el-button @click="handleExpandAll">展开全部</el-button>
-                <el-button @click="handleCollapseAll">收起全部</el-button>
-                <el-button type="primary" @click="handleSave" :loading="saveLoading">
-                  保存配置
-                </el-button>
+              <div class="header-title">
+                <span>{{ currentRoleName }}</span>
+                <el-tag :color="currentRoleColor" style="border: none; margin-left: 8px;">
+                  {{ selectedRole }}
+                </el-tag>
               </div>
+              <el-button type="primary" @click="handleSaveAll" :loading="saveLoading">
+                保存配置
+              </el-button>
             </div>
           </template>
           
-          <div class="permission-tree-container" v-loading="treeLoading">
-            <el-tree
-              ref="treeRef"
-              :data="permissionTree"
-              :props="treeProps"
-              show-checkbox
-              node-key="id"
-              :default-expand-all="false"
-              :default-expanded-keys="expandedKeys"
-              :default-checked-keys="checkedKeys"
-              @check="handleCheck"
-            >
-              <template #default="{ node, data }">
-                <div class="tree-node">
-                  <span class="node-name">{{ data.name }}</span>
-                  <el-tag v-if="data.module" size="small" type="info" class="node-module">
-                    {{ getModuleName(data.module) }}
-                  </el-tag>
-                  <el-tag v-if="data.category" size="small" :type="getCategoryType(data.category)">
-                    {{ getCategoryName(data.category) }}
-                  </el-tag>
-                  <span class="node-code">{{ data.code }}</span>
+          <el-tabs v-model="activeTab" class="detail-tabs">
+            <!-- 环境权限 Tab -->
+            <el-tab-pane label="环境权限" name="environments">
+              <div class="tab-content">
+                <div class="section-header">
+                  <span class="section-title">可访问的环境</span>
+                  <span class="section-tip">用户将继承所属角色的环境权限</span>
                 </div>
-              </template>
-            </el-tree>
-          </div>
-          
-          <!-- 统计信息 -->
-          <div class="permission-stats">
-            <el-statistic title="已选权限" :value="checkedCount" />
-            <el-statistic title="总权限数" :value="totalPermissions" />
-          </div>
+                <div class="environment-grid">
+                  <div
+                    v-for="env in allEnvironments"
+                    :key="env.id"
+                    :class="['env-item', { selected: selectedEnvIds.includes(env.id) }]"
+                    @click="toggleEnvironment(env.id)"
+                  >
+                    <div class="env-checkbox">
+                      <el-icon v-if="selectedEnvIds.includes(env.id)" color="#409eff">
+                        <Select />
+                      </el-icon>
+                    </div>
+                    <div class="env-info">
+                      <div class="env-name">{{ env.name }}</div>
+                      <div class="env-code">{{ env.code }}</div>
+                    </div>
+                    <div class="env-color" :style="{ backgroundColor: env.color }"></div>
+                  </div>
+                </div>
+              </div>
+            </el-tab-pane>
+            
+            <!-- 功能权限 Tab -->
+            <el-tab-pane label="功能权限" name="permissions">
+              <div class="tab-content">
+                <div class="section-header">
+                  <span class="section-title">功能权限配置</span>
+                  <div class="section-actions">
+                    <el-button size="small" @click="handleExpandAll">展开全部</el-button>
+                    <el-button size="small" @click="handleCollapseAll">收起全部</el-button>
+                  </div>
+                </div>
+                <div class="permission-tree-container">
+                  <el-tree
+                    ref="treeRef"
+                    :data="permissionTree"
+                    :props="treeProps"
+                    show-checkbox
+                    node-key="id"
+                    :default-expand-all="false"
+                    :default-expanded-keys="expandedKeys"
+                  >
+                    <template #default="{ node, data }">
+                      <div class="tree-node">
+                        <span class="node-name">{{ data.name }}</span>
+                        <el-tag v-if="data.module" size="small" type="info" class="node-module">
+                          {{ getModuleName(data.module) }}
+                        </el-tag>
+                        <el-tag v-if="data.category" size="small" :type="getCategoryType(data.category)">
+                          {{ getCategoryName(data.category) }}
+                        </el-tag>
+                      </div>
+                    </template>
+                  </el-tree>
+                </div>
+              </div>
+            </el-tab-pane>
+            
+            <!-- 用户列表 Tab -->
+            <el-tab-pane label="用户列表" name="users">
+              <div class="tab-content">
+                <div class="section-header">
+                  <span class="section-title">该角色下的用户</span>
+                  <span class="section-tip">共 {{ roleUsers.length }} 人</span>
+                </div>
+                <el-table :data="roleUsers" stripe style="width: 100%">
+                  <el-table-column prop="username" label="用户名" width="150" />
+                  <el-table-column prop="real_name" label="姓名" width="120" />
+                  <el-table-column prop="email" label="邮箱" />
+                  <el-table-column prop="status" label="状态" width="80">
+                    <template #default="{ row }">
+                      <el-tag :type="row.status ? 'success' : 'danger'" size="small">
+                        {{ row.status ? '正常' : '禁用' }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="last_login_time" label="最后登录" width="180">
+                    <template #default="{ row }">
+                      {{ formatTime(row.last_login_time) }}
+                    </template>
+                  </el-table-column>
+                </el-table>
+              </div>
+            </el-tab-pane>
+          </el-tabs>
         </el-card>
       </el-col>
     </el-row>
@@ -85,23 +148,26 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Select } from '@element-plus/icons-vue'
 
 // 角色列表
 const roles = ref([])
 const selectedRole = ref('')
-const resetLoading = ref(false)
+const detailLoading = ref(false)
 const saveLoading = ref(false)
-const treeLoading = ref(false)
 
-// 权限树
-const treeRef = ref(null)
+// 详情数据
+const activeTab = ref('environments')
+const allEnvironments = ref([])
+const selectedEnvIds = ref([])
+const roleUsers = ref([])
 const permissionTree = ref([])
-const checkedKeys = ref([])
 const expandedKeys = ref([])
 
+const treeRef = ref(null)
 const treeProps = {
   children: 'children',
   label: 'name'
@@ -117,51 +183,34 @@ const moduleNames = {
   system: '系统管理'
 }
 
-// 获取模块名称
-const getModuleName = (module) => {
-  return moduleNames[module] || module
-}
+const getModuleName = (module) => moduleNames[module] || module
 
-// 类别名称和类型映射
+// 类别映射
 const categoryMap = {
   menu: { name: '菜单', type: 'primary' },
   button: { name: '按钮', type: 'success' },
   api: { name: '接口', type: 'warning' }
 }
 
-const getCategoryName = (category) => {
-  return categoryMap[category]?.name || category
-}
+const getCategoryName = (category) => categoryMap[category]?.name || category
+const getCategoryType = (category) => categoryMap[category]?.type || 'info'
 
-const getCategoryType = (category) => {
-  return categoryMap[category]?.type || 'info'
-}
-
-// 当前角色名称
+// 当前角色信息
 const currentRoleName = computed(() => {
   const role = roles.value.find(r => r.role === selectedRole.value)
   return role?.name || ''
 })
 
-// 已选权限数
-const checkedCount = computed(() => {
-  return checkedKeys.value.length
+const currentRoleColor = computed(() => {
+  const role = roles.value.find(r => r.role === selectedRole.value)
+  return role?.color || '#909399'
 })
 
-// 总权限数
-const totalPermissions = computed(() => {
-  let count = 0
-  const countNodes = (nodes) => {
-    nodes.forEach(node => {
-      count++
-      if (node.children?.length) {
-        countNodes(node.children)
-      }
-    })
-  }
-  countNodes(permissionTree.value)
-  return count
-})
+// 格式化时间
+const formatTime = (time) => {
+  if (!time) return '-'
+  return new Date(time).toLocaleString('zh-CN')
+}
 
 // 获取角色列表
 const fetchRoles = async () => {
@@ -177,63 +226,72 @@ const fetchRoles = async () => {
   }
 }
 
-// 获取权限树
-const fetchPermissions = async () => {
-  treeLoading.value = true
+// 获取角色详情
+const fetchRoleDetail = async (role) => {
+  detailLoading.value = true
   try {
-    const data = await request.get('/permissions')
-    permissionTree.value = data.items || []
-    // 默认展开第一级
-    expandedKeys.value = permissionTree.value.map(item => item.id)
+    const data = await request.get(`/permissions/roles/${role}`)
+    
+    // 设置环境权限
+    selectedEnvIds.value = data.environment_ids || []
+    
+    // 设置用户列表
+    roleUsers.value = data.users || []
+    
+    // 设置功能权限
+    await nextTick()
+    if (treeRef.value) {
+      treeRef.value.setCheckedKeys(data.permission_ids || [])
+    }
+    
   } catch (error) {
-    console.error('获取权限树失败:', error)
-    ElMessage.error('获取权限树失败')
+    console.error('获取角色详情失败:', error)
+    ElMessage.error('获取角色详情失败')
   } finally {
-    treeLoading.value = false
+    detailLoading.value = false
   }
 }
 
-// 获取角色权限
-const fetchRolePermissions = async (role) => {
+// 获取所有环境
+const fetchEnvironments = async () => {
   try {
-    const data = await request.get(`/permissions/roles/${role}/permissions`)
-    checkedKeys.value = data.permission_ids || []
-    // 等待树渲染完成后设置选中状态
-    await nextTick()
-    if (treeRef.value) {
-      treeRef.value.setCheckedKeys(checkedKeys.value)
-    }
+    const data = await request.get('/environments')
+    allEnvironments.value = (data.items || []).filter(e => e.status)
   } catch (error) {
-    console.error('获取角色权限失败:', error)
+    console.error('获取环境列表失败:', error)
+  }
+}
+
+// 获取权限树
+const fetchPermissions = async () => {
+  try {
+    const data = await request.get('/permissions')
+    permissionTree.value = data.items || []
+    expandedKeys.value = permissionTree.value.map(item => item.id)
+  } catch (error) {
+    console.error('获取权限树失败:', error)
   }
 }
 
 // 选择角色
 const selectRole = (role) => {
   selectedRole.value = role
-  fetchRolePermissions(role)
+  fetchRoleDetail(role)
 }
 
-// 处理选中变化
-const handleCheck = (data, { checkedKeys }) => {
-  checkedKeys.value = checkedKeys
+// 切换环境选择
+const toggleEnvironment = (envId) => {
+  const index = selectedEnvIds.value.indexOf(envId)
+  if (index === -1) {
+    selectedEnvIds.value.push(envId)
+  } else {
+    selectedEnvIds.value.splice(index, 1)
+  }
 }
 
 // 展开全部
 const handleExpandAll = () => {
   if (!treeRef.value) return
-  const allKeys = []
-  const collectKeys = (nodes) => {
-    nodes.forEach(node => {
-      allKeys.push(node.id)
-      if (node.children?.length) {
-        collectKeys(node.children)
-      }
-    })
-  }
-  collectKeys(permissionTree.value)
-  
-  // 展开所有节点
   Object.keys(treeRef.value.store.nodesMap).forEach(key => {
     treeRef.value.store.nodesMap[key].expanded = true
   })
@@ -247,8 +305,8 @@ const handleCollapseAll = () => {
   })
 }
 
-// 保存权限配置
-const handleSave = async () => {
+// 保存所有配置
+const handleSaveAll = async () => {
   if (!selectedRole.value) {
     ElMessage.warning('请先选择角色')
     return
@@ -256,15 +314,21 @@ const handleSave = async () => {
   
   try {
     await ElMessageBox.confirm(
-      `确定要保存 ${currentRoleName.value} 的权限配置吗？`,
+      `确定要保存 ${currentRoleName.value} 的配置吗？`,
       '确认保存',
       { type: 'warning' }
     )
     
     saveLoading.value = true
-    // 获取选中的权限ID（包含半选的父节点）
-    const checkedIds = treeRef.value.getCheckedKeys()
-    const halfCheckedIds = treeRef.value.getHalfCheckedKeys()
+    
+    // 保存环境权限
+    await request.put(`/permissions/roles/${selectedRole.value}/environments`, {
+      environment_ids: selectedEnvIds.value
+    })
+    
+    // 保存功能权限
+    const checkedIds = treeRef.value?.getCheckedKeys() || []
+    const halfCheckedIds = treeRef.value?.getHalfCheckedKeys() || []
     const allIds = [...checkedIds, ...halfCheckedIds]
     
     await request.put(`/permissions/roles/${selectedRole.value}/permissions`, {
@@ -273,7 +337,7 @@ const handleSave = async () => {
     })
     
     ElMessage.success('保存成功')
-    fetchRoles() // 刷新角色列表以更新权限数量
+    fetchRoles() // 刷新角色列表
   } catch (error) {
     if (error !== 'cancel') {
       console.error('保存失败:', error)
@@ -284,36 +348,9 @@ const handleSave = async () => {
   }
 }
 
-// 重置默认权限
-const handleResetDefault = async () => {
-  try {
-    await ElMessageBox.confirm(
-      '重置后所有角色将恢复为系统默认权限配置，确定要重置吗？',
-      '重置确认',
-      { type: 'warning' }
-    )
-    
-    resetLoading.value = true
-    await request.post('/permissions/roles/reset-default')
-    ElMessage.success('重置成功')
-    
-    // 刷新数据
-    await fetchRoles()
-    if (selectedRole.value) {
-      fetchRolePermissions(selectedRole.value)
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('重置失败:', error)
-      ElMessage.error('重置失败')
-    }
-  } finally {
-    resetLoading.value = false
-  }
-}
-
 onMounted(() => {
   fetchRoles()
+  fetchEnvironments()
   fetchPermissions()
 })
 </script>
@@ -330,10 +367,11 @@ onMounted(() => {
     }
   }
   
-  .permission-card {
+  .detail-card {
     height: calc(100vh - 180px);
     
     :deep(.el-card__body) {
+      padding: 0;
       height: calc(100% - 56px);
       display: flex;
       flex-direction: column;
@@ -345,21 +383,20 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     
-    .header-actions {
+    .header-title {
       display: flex;
-      gap: 8px;
+      align-items: center;
+      font-size: 16px;
+      font-weight: 500;
     }
   }
   
   .role-list {
     .role-item {
-      padding: 12px 16px;
+      padding: 16px;
       border-bottom: 1px solid var(--el-border-color-lighter);
       cursor: pointer;
       transition: all 0.3s;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
       
       &:hover {
         background-color: var(--el-fill-color-light);
@@ -371,23 +408,136 @@ onMounted(() => {
       }
       
       .role-info {
+        .role-header {
+          display: flex;
+          align-items: center;
+          margin-bottom: 8px;
+        }
+        
         .role-name {
-          font-weight: 500;
-          margin-bottom: 4px;
+          font-weight: 600;
+          font-size: 15px;
         }
         
         .role-desc {
-          font-size: 12px;
+          font-size: 13px;
           color: var(--el-text-color-secondary);
         }
       }
     }
   }
   
-  .permission-tree-container {
+  .detail-tabs {
     flex: 1;
-    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    
+    :deep(.el-tabs__content) {
+      flex: 1;
+      overflow-y: auto;
+    }
+    
+    :deep(.el-tab-pane) {
+      height: 100%;
+    }
+  }
+  
+  .tab-content {
     padding: 16px;
+    height: 100%;
+    overflow-y: auto;
+  }
+  
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    
+    .section-title {
+      font-weight: 500;
+      font-size: 15px;
+    }
+    
+    .section-tip {
+      font-size: 13px;
+      color: var(--el-text-color-secondary);
+    }
+    
+    .section-actions {
+      display: flex;
+      gap: 8px;
+    }
+  }
+  
+  .environment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    
+    .env-item {
+      display: flex;
+      align-items: center;
+      padding: 12px 16px;
+      border: 1px solid var(--el-border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+      
+      &:hover {
+        border-color: var(--el-color-primary-light-5);
+        background-color: var(--el-fill-color-light);
+      }
+      
+      &.selected {
+        border-color: var(--el-color-primary);
+        background-color: var(--el-color-primary-light-9);
+      }
+      
+      .env-checkbox {
+        width: 20px;
+        height: 20px;
+        border: 1px solid var(--el-border-color);
+        border-radius: 4px;
+        margin-right: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      
+      &.selected .env-checkbox {
+        border-color: var(--el-color-primary);
+        background-color: var(--el-color-primary-light-8);
+      }
+      
+      .env-info {
+        flex: 1;
+        
+        .env-name {
+          font-weight: 500;
+          margin-bottom: 2px;
+        }
+        
+        .env-code {
+          font-size: 12px;
+          color: var(--el-text-color-secondary);
+        }
+      }
+      
+      .env-color {
+        width: 4px;
+        height: 40px;
+        border-radius: 2px;
+      }
+    }
+  }
+  
+  .permission-tree-container {
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 8px;
+    padding: 16px;
+    max-height: 500px;
+    overflow-y: auto;
     
     .tree-node {
       display: flex;
@@ -401,23 +551,7 @@ onMounted(() => {
       .node-module {
         margin-left: 8px;
       }
-      
-      .node-code {
-        margin-left: auto;
-        font-size: 12px;
-        color: var(--el-text-color-secondary);
-        font-family: monospace;
-      }
     }
-  }
-  
-  .permission-stats {
-    display: flex;
-    justify-content: flex-end;
-    gap: 40px;
-    padding: 16px;
-    border-top: 1px solid var(--el-border-color-lighter);
-    background-color: var(--el-fill-color-light);
   }
 }
 </style>

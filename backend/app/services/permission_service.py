@@ -2,14 +2,19 @@
 权限服务
 
 提供功能权限和数据权限的检查与管理
+
+权限模型：RBAC + 数据权限混合模型
+- 功能权限：通过 Permission + RolePermission 管理
+- 数据权限（环境权限）：通过 RoleEnvironment 管理
+- 用户继承角色的所有权限
 """
 from typing import List, Optional, Set
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
-from app.models import User, UserRole, Environment, UserEnvironment
+from app.models import User, UserRole, Environment
 from app.models.permissions import (
-    Permission, RolePermission, BatchOperationLog,
+    Permission, RolePermission, BatchOperationLog, RoleEnvironment,
     PermissionCode, DEFAULT_ROLE_PERMISSIONS
 )
 
@@ -96,6 +101,8 @@ class PermissionService:
         """
         获取用户可访问的环境ID列表
         
+        用户的环境权限 = 用户所属角色的环境权限
+        
         Args:
             user: 用户对象
         
@@ -107,11 +114,12 @@ class PermissionService:
             envs = self.db.query(Environment.id).filter(Environment.status == True).all()
             return {env.id for env in envs}
         
-        # 普通用户按关联获取
-        user_envs = self.db.query(UserEnvironment.environment_id).filter(
-            UserEnvironment.user_id == user.id
+        # 从 RoleEnvironment 获取角色的环境权限
+        role = user.role.value if isinstance(user.role, UserRole) else user.role
+        role_envs = self.db.query(RoleEnvironment.environment_id).filter(
+            RoleEnvironment.role == role
         ).all()
-        return {ue.environment_id for ue in user_envs}
+        return {re.environment_id for re in role_envs}
     
     def has_environment_access(self, user: User, environment_id: int) -> bool:
         """
