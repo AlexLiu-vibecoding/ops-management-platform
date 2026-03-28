@@ -40,6 +40,7 @@ class UserRole(str, enum.Enum):
     SUPER_ADMIN = "super_admin"
     APPROVAL_ADMIN = "approval_admin"
     OPERATOR = "operator"
+    DEVELOPER = "developer"
     READONLY = "readonly"
 
 

@@ -198,6 +198,21 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.SCRIPT_VIEW,
         PermissionCode.SCRIPT_EXECUTE,
     ],
+    "developer": [
+        # 实例管理 - 仅查看
+        PermissionCode.INSTANCE_VIEW,
+        PermissionCode.INSTANCE_TEST,
+        # 环境管理 - 仅查看
+        PermissionCode.ENVIRONMENT_VIEW,
+        # 变更管理 - 申请、撤回（开发人员需要提交SQL变更）
+        PermissionCode.APPROVAL_VIEW,
+        PermissionCode.APPROVAL_CREATE,
+        PermissionCode.APPROVAL_REVOKE,
+        # 监控管理 - 查看
+        PermissionCode.MONITOR_VIEW,
+        # 脚本管理 - 仅查看
+        PermissionCode.SCRIPT_VIEW,
+    ],
     "readonly": [
         # 实例管理 - 仅查看
         PermissionCode.INSTANCE_VIEW,

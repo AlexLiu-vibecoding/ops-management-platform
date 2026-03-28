@@ -178,7 +178,8 @@ async def delete_permission(
 ROLES = [
     {"role": "super_admin", "name": "超级管理员", "description": "系统最高权限，可管理所有功能"},
     {"role": "approval_admin", "name": "审批管理员", "description": "负责审批变更请求，可执行SQL"},
-    {"role": "operator", "name": "运维人员", "description": "可创建变更请求，查看监控"},
+    {"role": "operator", "name": "运维人员", "description": "可创建变更请求，查看监控，管理实例"},
+    {"role": "developer", "name": "开发人员", "description": "可查看监控、SQL编辑器、申请变更"},
     {"role": "readonly", "name": "只读用户", "description": "仅查看权限，无操作权限"}
 ]
 
