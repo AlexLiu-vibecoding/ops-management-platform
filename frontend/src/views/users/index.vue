@@ -8,6 +8,7 @@
             <el-option label="超级管理员" value="super_admin" />
             <el-option label="审批管理员" value="approval_admin" />
             <el-option label="运维人员" value="operator" />
+            <el-option label="开发人员" value="developer" />
             <el-option label="只读用户" value="readonly" />
           </el-select>
         </el-form-item>
@@ -112,6 +113,7 @@
             <el-option label="超级管理员" value="super_admin" />
             <el-option label="审批管理员" value="approval_admin" />
             <el-option label="运维人员" value="operator" />
+            <el-option label="开发人员" value="developer" />
             <el-option label="只读用户" value="readonly" />
           </el-select>
         </el-form-item>
@@ -449,6 +451,7 @@ const getRoleName = (role) => {
     super_admin: '超级管理员',
     approval_admin: '审批管理员',
     operator: '运维人员',
+    developer: '开发人员',
     readonly: '只读用户'
   }
   return roleMap[role] || role
@@ -460,6 +463,7 @@ const getRoleTagType = (role) => {
     super_admin: 'danger',
     approval_admin: 'warning',
     operator: 'primary',
+    developer: 'success',
     readonly: 'info'
   }
   return typeMap[role] || 'info'
