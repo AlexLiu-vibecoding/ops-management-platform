@@ -508,15 +508,9 @@ const handleFileSelect = async (file) => {
       sqlStats.totalLines = lineCount
       sqlStats.isLargeFile = lineCount > 1000
       
-      if (lineCount > 100) {
-        const lines = content.split('\n').slice(0, 100)
-        dialog.form.sql_content = lines.join('\n')
-        ElMessage.warning(`文件共 ${lineCount.toLocaleString()} 行，已截取前100行显示预览`)
-      } else {
-        dialog.form.sql_content = content
-      }
+      dialog.form.sql_content = content
       
-      ElMessage.success(`文件加载成功: ${rawFile.name}`)
+      ElMessage.success(`文件加载成功: ${rawFile.name}，共 ${lineCount.toLocaleString()} 行`)
     }
     reader.readAsText(rawFile)
   } catch (error) {

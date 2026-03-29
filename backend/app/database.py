@@ -138,7 +138,7 @@ def get_database_url():
 # 获取数据库URL
 try:
     DATABASE_URL = get_database_url()
-    logger.info(f"最终数据库URL: {DATABASE_URL[:80]}...")
+    logger.info(f"最终数据库URL: {DATABASE_URL}")
 except ValueError as e:
     logger.error(str(e))
     # 不再使用 SQLite fallback，直接抛出错误

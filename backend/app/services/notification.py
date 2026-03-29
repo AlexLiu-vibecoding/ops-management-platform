@@ -175,7 +175,7 @@ class NotificationService:
                 message["markdown"]["text"] += f"\n\n{keywords[0]}"
                 logger.info(f"添加关键词到消息: {keywords[0]}")
         
-        logger.info(f"发送钉钉消息: webhook={webhook[:50]}..., auth_type={auth_type}")
+        logger.info(f"发送钉钉消息: webhook={webhook}, auth_type={auth_type}")
         
         try:
             async with httpx.AsyncClient(timeout=10) as client:
@@ -460,14 +460,10 @@ class NotificationService:
 - 结束时间: {execution.end_time.strftime('%m-%d %H:%M:%S') if execution.end_time else '未知'}"""
         
         if not success and execution.error_output:
-            # 截取错误信息前500字符
-            error_preview = execution.error_output[:500]
-            if len(execution.error_output) > 500:
-                error_preview += "..."
             content += f"""
 
 **错误信息**
-{error_preview}"""
+{execution.error_output}"""
         
         # 获取通知绑定 - 定时任务类型
         bindings = db.query(NotificationBinding).filter(

@@ -1153,7 +1153,7 @@ async def get_analysis_history(
     return [{
         "id": h.id,
         "database_name": h.database_name,
-        "sql_text": h.sql_text[:100] + "..." if len(h.sql_text) > 100 else h.sql_text,
+        "sql_text": h.sql_text,
         "risk_level": h.risk_level,
         "issues_count": len(h.rule_issues) if h.rule_issues else 0,
         "analysis_time": h.analysis_time,

@@ -490,7 +490,7 @@ class EnhancedRollbackGenerator:
         # 生成回滚UPDATE语句
         rollback_statements = []
         rollback_statements.append(f"-- UPDATE回滚SQL (共 {len(data)} 行受影响)")
-        rollback_statements.append(f"-- 原始UPDATE: {original_sql[:200]}...")
+        rollback_statements.append(f"-- 原始UPDATE: {original_sql}")
         rollback_statements.append("")
         
         for row in data:
@@ -566,7 +566,7 @@ class EnhancedRollbackGenerator:
         # 生成INSERT语句作为回滚
         rollback_statements = []
         rollback_statements.append(f"-- DELETE回滚SQL (共 {len(data)} 行将被删除)")
-        rollback_statements.append(f"-- 原始DELETE: {original_sql[:200]}...")
+        rollback_statements.append(f"-- 原始DELETE: {original_sql}")
         rollback_statements.append("")
         
         for row in data:

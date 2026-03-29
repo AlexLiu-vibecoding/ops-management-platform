@@ -256,7 +256,7 @@ async def execute_sql(
         instance_name=instance.name,
         environment_id=instance.environment_id,
         operation_type="execute_sql",
-        operation_detail=f"Execute SQL: {request.sql[:500]}...",
+        operation_detail=f"Execute SQL: {request.sql}",
         request_ip="",
         request_method="POST",
         request_path="/api/sql/execute",

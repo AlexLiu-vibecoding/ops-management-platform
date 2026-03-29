@@ -171,11 +171,7 @@ async def send_script_notification(
 """
     
     if execution.error_output:
-        # 截取错误信息，避免消息过长
-        error_preview = execution.error_output[:500]
-        if len(execution.error_output) > 500:
-            error_preview += "..."
-        content += f"\n错误信息：\n{error_preview}"
+        content += f"\n错误信息：\n{execution.error_output}"
     
     # 发送通知
     for channel in channels:
