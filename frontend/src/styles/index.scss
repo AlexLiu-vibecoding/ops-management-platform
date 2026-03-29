@@ -3,29 +3,22 @@
 // ========================================
 
 // 强制覆盖 Element Plus 表格截断样式 - 必须在最前面
-// Element Plus 默认在 .el-table__cell 和 .cell 两个类都设置了 text-overflow:ellipsis
-// 并且会动态给单元格添加 .el-tooltip 类设置 white-space: nowrap
-.el-table {
-  .el-table__cell {
-    text-overflow: unset !important;
-    overflow: visible !important;
-  }
+// 使用最高优先级选择器，直接覆盖 Element Plus 的样式
+.el-table .el-table__cell {
+  text-overflow: unset !important;
+  overflow: visible !important;
+}
 
-  .cell {
-    text-overflow: unset !important;
-    overflow: visible !important;
-    white-space: normal !important;
-    word-break: break-word;
-    line-height: 1.5;
-    
-    // 覆盖 Element Plus 动态添加的 .el-tooltip 类
-    // 保持 nowrap 不换行，但取消截断
-    &.el-tooltip {
-      white-space: nowrap !important;
-      overflow: visible !important;
-      text-overflow: unset !important;
-    }
-  }
+.el-table .cell {
+  text-overflow: unset !important;
+  overflow: visible !important;
+}
+
+.el-table .cell.el-tooltip {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+  min-width: auto !important;
 }
 
 // CSS Variables - Design Tokens
