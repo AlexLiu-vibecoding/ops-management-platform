@@ -142,7 +142,7 @@
                       {{ formatTime(row.last_login_time) }}
                     </template>
                   </el-table-column>
-                  <el-table-column label="操作" width="120" fixed="right">
+                  <el-table-column label="操作" width="140" fixed="right">
                     <template #default="{ row }">
                       <el-button 
                         link 

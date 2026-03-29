@@ -60,7 +60,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="description" label="描述" min-width="100" show-overflow-tooltip />
-        <el-table-column label="操作" width="120" v-if="isAdmin" fixed="right" align="center">
+        <el-table-column label="操作" width="160" v-if="isAdmin" fixed="right" align="center">
           <template #default="{ row }">
             <TableActions 
               :row="row" 

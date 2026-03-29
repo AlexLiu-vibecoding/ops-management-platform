@@ -34,7 +34,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right" align="center">
+        <el-table-column label="操作" width="180" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleTestChannel(row)">测试</el-button>

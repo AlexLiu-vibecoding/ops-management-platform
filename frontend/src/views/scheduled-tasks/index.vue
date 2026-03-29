@@ -49,7 +49,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_by" label="创建人" width="80" show-overflow-tooltip />
-        <el-table-column label="操作" width="140" fixed="right" align="center">
+        <el-table-column label="操作" width="180" fixed="right" align="center">
           <template #default="{ row }">
             <TableActions 
               :row="row" 
