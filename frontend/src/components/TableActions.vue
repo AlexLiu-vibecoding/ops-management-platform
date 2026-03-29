@@ -16,6 +16,8 @@
     <el-dropdown 
       v-if="secondaryActions.length > 0" 
       trigger="click"
+      teleported
+      :popper-options="{ modifiers: [{ name: 'flip', enabled: true }] }"
       @command="(cmd) => $emit(cmd, row)"
     >
       <el-button link type="primary" size="small" class="more-btn">
