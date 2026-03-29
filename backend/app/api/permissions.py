@@ -58,6 +58,16 @@ class RoleEnvironmentUpdate(BaseModel):
     environment_ids: List[int]
 
 
+class RoleUsersUpdate(BaseModel):
+    """角色用户更新"""
+    user_ids: List[int]
+
+
+class BatchAddUsersToRole(BaseModel):
+    """批量添加用户到角色"""
+    user_ids: List[int]
+
+
 # ==================== 角色定义（集中管理） ====================
 
 ROLES = [
@@ -552,3 +562,198 @@ async def check_permission(
     ).first()
     
     return {"has_permission": role_perm is not None}
+
+
+# ==================== 角色用户管理 API ====================
+
+@router.get("/roles/{role}/available-users")
+async def get_available_users_for_role(
+    role: str,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取可添加到该角色的用户列表（不属于该角色的用户）"""
+    if current_user.role not in ["super_admin"]:
+        raise HTTPException(status_code=403, detail="无权限访问")
+    
+    # 验证角色
+    role_info = get_role_info(role)
+    if not role_info:
+        raise HTTPException(status_code=400, detail="无效的角色")
+    
+    # 查询不属于该角色的用户
+    query = db.query(User).filter(User.role != UserRole(role))
+    
+    if search:
+        query = query.filter(
+            (User.username.ilike(f"%{search}%")) |
+            (User.real_name.ilike(f"%{search}%")) |
+            (User.email.ilike(f"%{search}%"))
+        )
+    
+    users = query.order_by(User.id).limit(100).all()
+    
+    return {
+        "items": [
+            {
+                "id": u.id,
+                "username": u.username,
+                "real_name": u.real_name,
+                "email": u.email,
+                "role": u.role.value if isinstance(u.role, UserRole) else u.role,
+                "status": u.status
+            }
+            for u in users
+        ],
+        "total": len(users)
+    }
+
+
+@router.post("/roles/{role}/users")
+async def add_users_to_role(
+    role: str,
+    data: BatchAddUsersToRole,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """批量添加用户到角色"""
+    if current_user.role not in ["super_admin"]:
+        raise HTTPException(status_code=403, detail="无权限访问")
+    
+    # 验证角色
+    role_info = get_role_info(role)
+    if not role_info:
+        raise HTTPException(status_code=400, detail="无效的角色")
+    
+    if not data.user_ids:
+        raise HTTPException(status_code=400, detail="请选择要添加的用户")
+    
+    # 更新用户角色
+    updated_count = 0
+    for user_id in data.user_ids:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user and user.role != UserRole(role):
+            user.role = UserRole(role)
+            updated_count += 1
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"成功添加 {updated_count} 个用户到角色",
+        "updated_count": updated_count
+    }
+
+
+@router.put("/roles/{role}/users")
+async def update_role_users(
+    role: str,
+    data: RoleUsersUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """设置角色的用户列表（替换模式）"""
+    if current_user.role not in ["super_admin"]:
+        raise HTTPException(status_code=403, detail="无权限访问")
+    
+    # 验证角色
+    role_info = get_role_info(role)
+    if not role_info:
+        raise HTTPException(status_code=400, detail="无效的角色")
+    
+    # 获取当前属于该角色的用户
+    current_users = db.query(User).filter(User.role == UserRole(role)).all()
+    current_user_ids = {u.id for u in current_users}
+    
+    # 新用户ID集合
+    new_user_ids = set(data.user_ids)
+    
+    # 需要移除的用户（从角色移除，设为只读用户）
+    to_remove = current_user_ids - new_user_ids
+    for user_id in to_remove:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.role = UserRole.READONLY
+    
+    # 需要添加的用户
+    to_add = new_user_ids - current_user_ids
+    for user_id in to_add:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            user.role = UserRole(role)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"已更新用户列表：添加 {len(to_add)} 人，移除 {len(to_remove)} 人"
+    }
+
+
+@router.delete("/roles/{role}/users/{user_id}")
+async def remove_user_from_role(
+    role: str,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """从角色中移除用户"""
+    if current_user.role not in ["super_admin"]:
+        raise HTTPException(status_code=403, detail="无权限访问")
+    
+    # 验证角色
+    role_info = get_role_info(role)
+    if not role_info:
+        raise HTTPException(status_code=400, detail="无效的角色")
+    
+    # 查找用户
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    # 检查用户是否属于该角色
+    if user.role != UserRole(role):
+        raise HTTPException(status_code=400, detail="该用户不属于此角色")
+    
+    # 将用户角色改为只读
+    user.role = UserRole.READONLY
+    db.commit()
+    
+    return {"success": True, "message": "已将用户从角色中移除"}
+
+
+@router.put("/users/{user_id}/role")
+async def change_user_role(
+    user_id: int,
+    role: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """修改单个用户的角色"""
+    if current_user.role not in ["super_admin"]:
+        raise HTTPException(status_code=403, detail="无权限访问")
+    
+    # 验证角色
+    role_info = get_role_info(role)
+    if not role_info:
+        raise HTTPException(status_code=400, detail="无效的角色")
+    
+    # 查找用户
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    # 不能修改自己的角色
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="不能修改自己的角色")
+    
+    # 修改用户角色
+    old_role = user.role.value if isinstance(user.role, UserRole) else user.role
+    user.role = UserRole(role)
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"用户角色已从 {old_role} 改为 {role}"
+    }

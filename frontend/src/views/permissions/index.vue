@@ -119,7 +119,12 @@
               <div class="tab-content">
                 <div class="section-header">
                   <span class="section-title">该角色下的用户</span>
-                  <span class="section-tip">共 {{ roleUsers.length }} 人</span>
+                  <div class="section-actions">
+                    <el-button type="primary" size="small" @click="openAddUserDialog">
+                      <el-icon><Plus /></el-icon>
+                      添加用户
+                    </el-button>
+                  </div>
                 </div>
                 <el-table :data="roleUsers" stripe style="width: 100%">
                   <el-table-column prop="username" label="用户名" width="150" />
@@ -137,6 +142,18 @@
                       {{ formatTime(row.last_login_time) }}
                     </template>
                   </el-table-column>
+                  <el-table-column label="操作" width="120" fixed="right">
+                    <template #default="{ row }">
+                      <el-button 
+                        link 
+                        type="danger" 
+                        @click="handleRemoveUser(row)"
+                        :disabled="row.id === currentUserId"
+                      >
+                        移除
+                      </el-button>
+                    </template>
+                  </el-table-column>
                 </el-table>
               </div>
             </el-tab-pane>
@@ -144,14 +161,85 @@
         </el-card>
       </el-col>
     </el-row>
+    
+    <!-- 添加用户对话框 -->
+    <el-dialog 
+      v-model="addUserDialogVisible" 
+      title="添加用户到角色" 
+      width="600px"
+      @close="closeAddUserDialog"
+    >
+      <div class="add-user-dialog">
+        <!-- 搜索框 -->
+        <el-input
+          v-model="userSearchKeyword"
+          placeholder="搜索用户名、姓名或邮箱"
+          clearable
+          @keyup.enter="searchAvailableUsers"
+          @clear="searchAvailableUsers"
+          class="search-input"
+        >
+          <template #append>
+            <el-button @click="searchAvailableUsers">搜索</el-button>
+          </template>
+        </el-input>
+        
+        <!-- 用户列表 -->
+        <div class="user-list-container" v-loading="userListLoading">
+          <div v-if="availableUsers.length === 0" class="empty-tip">
+            暂无可添加的用户
+          </div>
+          <el-checkbox-group v-else v-model="selectedUserIds" class="user-checkbox-group">
+            <div 
+              v-for="user in availableUsers" 
+              :key="user.id" 
+              class="user-item"
+            >
+              <el-checkbox :value="user.id">
+                <div class="user-info">
+                  <span class="username">{{ user.username }}</span>
+                  <span class="real-name" v-if="user.real_name">({{ user.real_name }})</span>
+                  <el-tag 
+                    v-if="user.role" 
+                    size="small" 
+                    type="info"
+                    class="current-role"
+                  >
+                    {{ getRoleName(user.role) }}
+                  </el-tag>
+                </div>
+                <div class="user-email" v-if="user.email">{{ user.email }}</div>
+              </el-checkbox>
+            </div>
+          </el-checkbox-group>
+        </div>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="addUserDialogVisible = false">取消</el-button>
+          <el-button 
+            type="primary" 
+            :disabled="selectedUserIds.length === 0"
+            :loading="addUserLoading"
+            @click="handleAddUsers"
+          >
+            添加 ({{ selectedUserIds.length }})
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Select } from '@element-plus/icons-vue'
+import { Select, Plus } from '@element-plus/icons-vue'
+import { useUserStore } from '@/stores/user'
+
+const userStore = useUserStore()
+const currentUserId = computed(() => userStore.user?.id)
 
 // 角色列表
 const roles = ref([])
@@ -172,6 +260,14 @@ const treeProps = {
   children: 'children',
   label: 'name'
 }
+
+// 添加用户对话框
+const addUserDialogVisible = ref(false)
+const userSearchKeyword = ref('')
+const availableUsers = ref([])
+const selectedUserIds = ref([])
+const userListLoading = ref(false)
+const addUserLoading = ref(false)
 
 // 模块名称映射
 const moduleNames = {
@@ -194,6 +290,17 @@ const categoryMap = {
 
 const getCategoryName = (category) => categoryMap[category]?.name || category
 const getCategoryType = (category) => categoryMap[category]?.type || 'info'
+
+// 角色名称映射
+const roleNames = {
+  super_admin: '超级管理员',
+  approval_admin: '审批管理员',
+  operator: '运维人员',
+  developer: '开发人员',
+  readonly: '只读用户'
+}
+
+const getRoleName = (role) => roleNames[role] || role
 
 // 当前角色信息
 const currentRoleName = computed(() => {
@@ -345,6 +452,91 @@ const handleSaveAll = async () => {
     }
   } finally {
     saveLoading.value = false
+  }
+}
+
+// 打开添加用户对话框
+const openAddUserDialog = async () => {
+  addUserDialogVisible.value = true
+  userSearchKeyword.value = ''
+  selectedUserIds.value = []
+  await searchAvailableUsers()
+}
+
+// 关闭添加用户对话框
+const closeAddUserDialog = () => {
+  addUserDialogVisible.value = false
+  userSearchKeyword.value = ''
+  selectedUserIds.value = []
+  availableUsers.value = []
+}
+
+// 搜索可添加的用户
+const searchAvailableUsers = async () => {
+  userListLoading.value = true
+  try {
+    const params = {}
+    if (userSearchKeyword.value) {
+      params.search = userSearchKeyword.value
+    }
+    const data = await request.get(`/permissions/roles/${selectedRole.value}/available-users`, { params })
+    availableUsers.value = data.items || []
+  } catch (error) {
+    console.error('获取可用用户列表失败:', error)
+    ElMessage.error('获取用户列表失败')
+  } finally {
+    userListLoading.value = false
+  }
+}
+
+// 添加用户到角色
+const handleAddUsers = async () => {
+  if (selectedUserIds.value.length === 0) {
+    ElMessage.warning('请选择要添加的用户')
+    return
+  }
+  
+  addUserLoading.value = true
+  try {
+    const data = await request.post(`/permissions/roles/${selectedRole.value}/users`, {
+      user_ids: selectedUserIds.value
+    })
+    
+    ElMessage.success(data.message || '添加成功')
+    addUserDialogVisible.value = false
+    
+    // 刷新角色详情和列表
+    fetchRoleDetail(selectedRole.value)
+    fetchRoles()
+  } catch (error) {
+    console.error('添加用户失败:', error)
+    ElMessage.error('添加用户失败')
+  } finally {
+    addUserLoading.value = false
+  }
+}
+
+// 从角色移除用户
+const handleRemoveUser = async (user) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要将用户 "${user.username}" 从角色 "${currentRoleName.value}" 中移除吗？移除后用户将变为只读用户。`,
+      '确认移除',
+      { type: 'warning' }
+    )
+    
+    await request.delete(`/permissions/roles/${selectedRole.value}/users/${user.id}`)
+    
+    ElMessage.success('移除成功')
+    
+    // 刷新角色详情和列表
+    fetchRoleDetail(selectedRole.value)
+    fetchRoles()
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('移除用户失败:', error)
+      ElMessage.error('移除用户失败')
+    }
   }
 }
 
@@ -550,6 +742,77 @@ onMounted(() => {
       
       .node-module {
         margin-left: 8px;
+      }
+    }
+  }
+  
+  .add-user-dialog {
+    .search-input {
+      margin-bottom: 16px;
+    }
+    
+    .user-list-container {
+      max-height: 400px;
+      overflow-y: auto;
+      border: 1px solid var(--el-border-color-lighter);
+      border-radius: 8px;
+      padding: 12px;
+      
+      .empty-tip {
+        text-align: center;
+        color: var(--el-text-color-secondary);
+        padding: 20px;
+      }
+      
+      .user-checkbox-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        
+        .user-item {
+          padding: 12px;
+          border-radius: 6px;
+          transition: background-color 0.2s;
+          
+          &:hover {
+            background-color: var(--el-fill-color-light);
+          }
+          
+          :deep(.el-checkbox) {
+            width: 100%;
+            align-items: flex-start;
+            
+            .el-checkbox__label {
+              flex: 1;
+            }
+          }
+          
+          .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            
+            .username {
+              font-weight: 500;
+            }
+            
+            .real-name {
+              color: var(--el-text-color-secondary);
+              font-size: 13px;
+            }
+            
+            .current-role {
+              margin-left: auto;
+            }
+          }
+          
+          .user-email {
+            margin-top: 4px;
+            font-size: 12px;
+            color: var(--el-text-color-secondary);
+            padding-left: 0;
+          }
+        }
       }
     }
   }
