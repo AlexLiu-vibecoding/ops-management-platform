@@ -3,11 +3,20 @@
 // ========================================
 
 // 强制覆盖 Element Plus 表格截断样式 - 必须在最前面
-.el-table .cell {
-  overflow: visible !important;
-  text-overflow: unset !important;
-  white-space: normal !important;
-  word-break: break-all;
+// Element Plus 默认在 .el-table__cell 和 .cell 两个类都设置了 text-overflow:ellipsis
+.el-table {
+  .el-table__cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+  }
+
+  .cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    word-break: break-word;
+    line-height: 1.5;
+  }
 }
 
 // CSS Variables - Design Tokens
