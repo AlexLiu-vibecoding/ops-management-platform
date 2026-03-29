@@ -89,6 +89,8 @@
             <el-table-column prop="trx_rows_locked" label="锁定行数" width="100" align="center" />
             <el-table-column prop="user" label="用户" width="100" />
             <el-table-column prop="status" label="状态" min-width="70" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.status === 'active' ? 'danger' : 'info'" size="small">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="操作" min-width="80" fixed="right" align="center">

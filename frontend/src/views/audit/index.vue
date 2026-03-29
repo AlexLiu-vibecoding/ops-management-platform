@@ -61,7 +61,7 @@
     
     <!-- 数据表格 -->
     <el-card shadow="never" class="table-card">
-      <el-table :data="logList" style="width: 100%" v-loading="loading">
+      <el-table :data="logList" style="width: 100%" :show-overflow-tooltip="false" v-loading="loading">
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="username" label="操作用户" width="120">
           <template #default="{ row }">

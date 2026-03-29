@@ -1,0 +1,76 @@
+// ========================================
+// Element Plus 表格截断样式覆盖
+// 必须使用最高优先级的选择器
+// ========================================
+
+// 方案1: 使用属性选择器提高优先级
+.el-table[class*="el-table"] {
+  table-layout: auto !important;
+  
+  // 表格单元格
+  .el-table__cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+  }
+  
+  // 单元格内容容器
+  .cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    min-width: 0 !important;
+    
+    // Element Plus 动态添加的 tooltip 类
+    &.el-tooltip {
+      white-space: nowrap !important;
+      overflow: visible !important;
+      text-overflow: unset !important;
+      min-width: 0 !important;
+      width: auto !important;
+    }
+  }
+  
+  // 表格行
+  tr {
+    overflow: visible !important;
+  }
+  
+  // 表格体
+  .el-table__body-wrapper,
+  .el-table__header-wrapper {
+    overflow: visible !important;
+  }
+  
+  .el-table__body,
+  .el-table__header {
+    overflow: visible !important;
+  }
+}
+
+// 方案2: 使用多类选择器进一步提高优先级
+table.el-table {
+  .el-table__cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+  }
+  
+  .cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
+  }
+}
+
+// 方案3: 针对 tag 元素确保不截断
+.el-table .el-tag {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  text-overflow: unset !important;
+}
+
+// 方案4: 针对风险标签
+.el-table .risk-tag {
+  white-space: nowrap !important;
+  overflow: visible !important;
+  display: inline-block !important;
+}

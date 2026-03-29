@@ -24,7 +24,7 @@
         </template>
       </el-alert>
       
-      <el-table :data="environments" style="width: 100%">
+      <el-table :data="environments" style="width: 100%" :show-overflow-tooltip="false">
         <el-table-column prop="name" label="环境名称" min-width="100" />
         <el-table-column prop="code" label="环境编码" min-width="80" />
         <el-table-column label="颜色标记" width="100" align="center">

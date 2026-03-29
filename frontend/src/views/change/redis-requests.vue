@@ -490,6 +490,33 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+// 强制覆盖 Element Plus 表格截断样式 - 组件级别
+:deep(.el-table) {
+  .el-table__cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+  }
+  
+  .cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    
+    &.el-tooltip {
+      white-space: nowrap !important;
+      overflow: visible !important;
+      text-overflow: unset !important;
+      min-width: 0 !important;
+      width: auto !important;
+    }
+  }
+  
+  .el-tag {
+    white-space: nowrap !important;
+    overflow: visible !important;
+  }
+}
+
 .redis-requests-page {
   .card-header {
     display: flex;

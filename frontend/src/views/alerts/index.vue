@@ -82,7 +82,7 @@
 
     <!-- 告警列表 -->
     <el-card shadow="never" class="table-card">
-      <el-table :data="alerts" v-loading="loading" style="width: 100%">
+      <el-table :data="alerts" v-loading="loading" style="width: 100%" :show-overflow-tooltip="false">
         <el-table-column prop="instance_name" label="实例" min-width="120" />
         <el-table-column prop="metric_type_label" label="指标类型" width="100" align="center">
           <template #default="{ row }">

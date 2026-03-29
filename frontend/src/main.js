@@ -8,6 +8,8 @@ import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
 import './styles/index.scss'
+// 表格截断样式覆盖 - 必须最后加载
+import './styles/table-override.scss'
 import { setupPermissionDirectives } from './directives/permission'
 
 const app = createApp(App)

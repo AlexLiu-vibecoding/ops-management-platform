@@ -700,6 +700,32 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+// 强制覆盖 Element Plus 表格截断样式
+:deep(.el-table) {
+  .el-table__cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+  }
+  
+  .cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    
+    &.el-tooltip {
+      white-space: nowrap !important;
+      overflow: visible !important;
+      text-overflow: unset !important;
+      min-width: 0 !important;
+    }
+  }
+  
+  .el-tag {
+    white-space: nowrap !important;
+    overflow: visible !important;
+  }
+}
+
 .dingtalk-page {
   .section-card {
     margin-bottom: 20px;

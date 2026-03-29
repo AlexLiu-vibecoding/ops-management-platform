@@ -19,7 +19,7 @@
         </div>
       </template>
       
-      <el-table :data="registrations" style="width: 100%" v-loading="loading">
+      <el-table :data="registrations" style="width: 100%" v-loading="loading" :show-overflow-tooltip="false">
         <el-table-column prop="username" label="用户名" min-width="100" />
         <el-table-column prop="real_name" label="姓名" min-width="80" />
         <el-table-column prop="email" label="邮箱" min-width="150" />
@@ -191,6 +191,32 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+// 强制覆盖 Element Plus 表格截断样式
+:deep(.el-table) {
+  .el-table__cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+  }
+  
+  .cell {
+    text-overflow: unset !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    
+    &.el-tooltip {
+      white-space: nowrap !important;
+      overflow: visible !important;
+      text-overflow: unset !important;
+      min-width: 0 !important;
+    }
+  }
+  
+  .el-tag {
+    white-space: nowrap !important;
+    overflow: visible !important;
+  }
+}
+
 .registrations-page {
   .card-header {
     display: flex;
