@@ -81,7 +81,7 @@
             <span class="risk-tag" :class="row.sql_risk_level">{{ getRiskLabel(row.sql_risk_level) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" min-width="120" align="center">
+        <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ getStatusLabel(row.status) }}
@@ -744,6 +744,12 @@ onMounted(() => {
   .title-cell {
     display: flex;
     align-items: center;
+  }
+  
+  // 强制覆盖表格单元格截断
+  :deep(.el-table__cell .cell) {
+    overflow: visible !important;
+    text-overflow: unset !important;
   }
   
   .sql-input-wrapper {

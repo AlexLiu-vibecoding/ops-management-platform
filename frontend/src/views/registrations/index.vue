@@ -202,5 +202,11 @@ onMounted(() => {
       gap: 10px;
     }
   }
+  
+  // 强制覆盖表格单元格截断
+  :deep(.el-table__cell .cell) {
+    overflow: visible !important;
+    text-overflow: unset !important;
+  }
 }
 </style>
