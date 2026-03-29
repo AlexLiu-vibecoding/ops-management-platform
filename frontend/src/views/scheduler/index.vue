@@ -232,7 +232,7 @@ let refreshTimer = null
 const fetchOverview = async () => {
   loading.value = true
   try {
-    const res = await request.get('/api/v1/scheduler/overview')
+    const res = await request.get('/scheduler/overview')
     overview.value = res.data || {}
     jobs.value = res.data?.approval_scheduler?.jobs || []
     // 合并任务调度器的任务
@@ -269,7 +269,7 @@ const handleJobAction = async (job, action) => {
   
   job._actionLoading = true
   try {
-    await request.post(`/api/v1/scheduler/jobs/${job.id}/action`, { action })
+    await request.post(`/scheduler/jobs/${job.id}/action`, { action })
     ElMessage.success(`任务已${actionLabels[action]}`)
     // 刷新状态
     await fetchOverview()
