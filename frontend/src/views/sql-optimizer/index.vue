@@ -67,9 +67,21 @@
         <div class="panel-card history-panel">
           <div class="panel-header">
             <span class="panel-title">分析历史</span>
-            <el-button text size="small" @click="loadHistory" :loading="loadingHistory">
-              刷新
-            </el-button>
+            <div class="panel-actions">
+              <el-button text size="small" @click="loadHistory" :loading="loadingHistory">
+                刷新
+              </el-button>
+              <el-button 
+                text 
+                size="small" 
+                type="danger" 
+                @click="handleClearHistory" 
+                :disabled="history.length === 0 || !selectedInstance"
+                :loading="clearingHistory"
+              >
+                清空
+              </el-button>
+            </div>
           </div>
           
           <div class="history-list" v-loading="loadingHistory">
@@ -242,7 +254,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Refresh, Document, InfoFilled, Cpu, Operation
 } from '@element-plus/icons-vue'
@@ -264,6 +276,7 @@ const analysisResult = ref(null)
 // 历史记录
 const history = ref([])
 const loadingHistory = ref(false)
+const clearingHistory = ref(false)
 
 // 同步对话框
 const showSyncDialog = ref(false)
@@ -389,6 +402,35 @@ const loadHistoryDetail = async (item) => {
     }
   } catch (error) {
     ElMessage.error('加载详情失败')
+  }
+}
+
+// 清空历史记录
+const handleClearHistory = async () => {
+  if (!selectedInstance.value) return
+  
+  try {
+    await ElMessageBox.confirm(
+      '确定要清空该实例的所有分析历史吗？此操作不可恢复。',
+      '确认清空',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    clearingHistory.value = true
+    const result = await sqlOptimizerApi.clearHistory(selectedInstance.value)
+    ElMessage.success(result.message)
+    history.value = []
+    analysisResult.value = null
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('清空失败: ' + (error.response?.data?.detail || error.message))
+    }
+  } finally {
+    clearingHistory.value = false
   }
 }
 

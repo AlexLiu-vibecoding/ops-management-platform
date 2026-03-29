@@ -1211,3 +1211,28 @@ async def get_analysis_detail(
         "summary": summary,
         "created_at": history.created_at.isoformat()
     }
+
+
+@router.delete("/history/{instance_id}")
+async def clear_analysis_history(
+    instance_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """清空指定实例的分析历史"""
+    # 验证实例存在
+    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    # 删除该实例的所有历史记录
+    deleted_count = db.query(SQLAnalysisHistory).filter(
+        SQLAnalysisHistory.instance_id == instance_id
+    ).delete()
+    
+    db.commit()
+    
+    return {"message": f"已清空 {deleted_count} 条历史记录"}

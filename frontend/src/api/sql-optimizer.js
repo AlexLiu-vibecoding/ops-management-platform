@@ -24,6 +24,11 @@ export const sqlOptimizerApi = {
     return request.get(`/sql-optimizer/history/${instanceId}`, { params: { limit } })
   },
 
+  // 清空分析历史
+  clearHistory(instanceId) {
+    return request.delete(`/sql-optimizer/history/${instanceId}`)
+  },
+
   // 获取分析详情
   getHistoryDetail(historyId) {
     return request.get(`/sql-optimizer/history/detail/${historyId}`)
