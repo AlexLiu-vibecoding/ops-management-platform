@@ -49,15 +49,15 @@
         <el-button @click="fetchApprovals">刷新</el-button>
       </div>
       
-      <el-table :data="approvalList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="title" label="标题" min-width="150">
+      <el-table :data="approvalList" style="width: 100%" v-loading="loading" :show-overflow-tooltip="false">
+        <el-table-column prop="title" label="标题" min-width="200">
           <template #default="{ row }">
             <span>{{ row.title }}</span>
             <el-tag v-if="row.auto_execute" type="success" size="small" style="margin-left: 6px;">自动</el-tag>
             <el-tag v-if="row.scheduled_time" type="warning" size="small" style="margin-left: 6px;">定时</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="change_type" label="类型" width="90" align="center">
+        <el-table-column prop="change_type" label="类型" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag size="small">{{ row.change_type }}</el-tag>
           </template>
@@ -74,12 +74,12 @@
             <span v-else>{{ row.database_name || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="sql_risk_level" label="风险" width="60" align="center">
+        <el-table-column prop="sql_risk_level" label="风险" min-width="70" align="center">
           <template #default="{ row }">
             <span class="risk-tag" :class="row.sql_risk_level">{{ getRiskLabel(row.sql_risk_level) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" min-width="100" align="center">
+        <el-table-column prop="status" label="状态" min-width="110" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ getStatusLabel(row.status) }}

@@ -48,7 +48,7 @@
         <el-button @click="fetchApprovals">刷新</el-button>
       </div>
       
-      <el-table :data="approvalList" style="width: 100%" v-loading="loading">
+      <el-table :data="approvalList" style="width: 100%" v-loading="loading" :show-overflow-tooltip="false">
         <el-table-column prop="title" label="标题" min-width="150" />
         <el-table-column prop="instance_name" label="Redis 实例" min-width="120" />
         <el-table-column prop="sql_line_count" label="命令行数" width="90" align="center" />

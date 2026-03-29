@@ -4,21 +4,53 @@
 
 // 强制覆盖 Element Plus 表格截断样式 - 必须在最前面
 // 使用最高优先级选择器，直接覆盖 Element Plus 的样式
+
+// 1. 表格单元格本身不截断
 .el-table .el-table__cell {
   text-overflow: unset !important;
   overflow: visible !important;
 }
 
+// 2. 单元格内的 .cell 容器不截断
 .el-table .cell {
   text-overflow: unset !important;
   overflow: visible !important;
+  white-space: normal !important;
 }
 
+// 3. 当 Element Plus 动态添加 .el-tooltip 类时，仍然不截断
 .el-table .cell.el-tooltip {
   white-space: nowrap !important;
   overflow: visible !important;
   text-overflow: unset !important;
-  min-width: auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+}
+
+// 4. 禁用 Element Plus 的 tooltip 内容截断
+.el-table .el-tooltip__trigger {
+  overflow: visible !important;
+  text-overflow: unset !important;
+}
+
+// 5. 确保表格使用自动布局
+.el-table {
+  table-layout: auto !important;
+}
+
+// 6. 表格内部容器也不截断
+.el-table .el-table__body-wrapper,
+.el-table .el-table__header-wrapper {
+  overflow: visible !important;
+}
+
+.el-table .el-table__body,
+.el-table .el-table__header {
+  overflow: visible !important;
+}
+
+.el-table tr {
+  overflow: visible !important;
 }
 
 // CSS Variables - Design Tokens
