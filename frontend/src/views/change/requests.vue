@@ -53,7 +53,7 @@
         <el-table-column prop="title" label="标题" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">
             <div class="title-cell">
-              <span class="title-text">{{ row.title }}</span>
+              <span>{{ row.title }}</span>
               <el-tag v-if="row.auto_execute" type="success" size="small" style="margin-left: 6px;">自动</el-tag>
               <el-tag v-if="row.scheduled_time" type="warning" size="small" style="margin-left: 6px;">定时</el-tag>
             </div>
@@ -81,14 +81,14 @@
             <span class="risk-tag" :class="row.sql_risk_level">{{ getRiskLabel(row.sql_risk_level) }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80" align="center">
+        <el-table-column prop="status" label="状态" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="提交时间" width="160">
+        <el-table-column prop="created_at" label="提交时间" min-width="170">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
@@ -744,12 +744,6 @@ onMounted(() => {
   .title-cell {
     display: flex;
     align-items: center;
-    
-    .title-text {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
   }
   
   .sql-input-wrapper {

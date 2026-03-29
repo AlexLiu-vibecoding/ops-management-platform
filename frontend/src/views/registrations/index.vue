@@ -202,13 +202,5 @@ onMounted(() => {
       gap: 10px;
     }
   }
-  
-  .reason-text {
-    display: inline-block;
-    max-width: 150px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 }
 </style>
