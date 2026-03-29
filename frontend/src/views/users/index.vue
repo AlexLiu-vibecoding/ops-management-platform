@@ -41,7 +41,7 @@
         <el-table-column prop="real_name" label="姓名" min-width="70" />
         <el-table-column prop="email" label="邮箱" min-width="120" />
         <el-table-column prop="phone" label="电话" width="110" />
-        <el-table-column prop="role" label="角色" width="100" align="center">
+        <el-table-column prop="role" label="角色" min-width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getRoleTagType(row.role)" size="small">
               {{ getRoleName(row.role) }}

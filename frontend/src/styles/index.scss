@@ -454,6 +454,13 @@ html, body {
     .cell {
       overflow: visible !important;
       text-overflow: unset !important;
+      
+      // 覆盖 Element Plus 动态添加的 .el-tooltip 类
+      &.el-tooltip {
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+      }
     }
   }
   
@@ -463,6 +470,13 @@ html, body {
     .cell {
       overflow: visible !important;
       text-overflow: unset !important;
+      
+      // 覆盖 Element Plus 动态添加的 .el-tooltip 类
+      &.el-tooltip {
+        white-space: nowrap !important;
+        overflow: visible !important;
+        text-overflow: unset !important;
+      }
     }
   }
   

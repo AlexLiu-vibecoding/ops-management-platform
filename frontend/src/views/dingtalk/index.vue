@@ -14,7 +14,7 @@
       
       <el-table :data="channels" style="width: 100%" v-loading="channelLoading">
         <el-table-column prop="name" label="通道名称" width="150" />
-        <el-table-column prop="auth_type" label="验证方式" width="120">
+        <el-table-column prop="auth_type" label="验证方式" min-width="120">
           <template #default="{ row }">
             <el-tag :type="getAuthTypeTag(row.auth_type)" size="small">
               {{ getAuthTypeName(row.auth_type) }}
