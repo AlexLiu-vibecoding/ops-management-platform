@@ -1,0 +1,366 @@
+"""
+变更时间窗口API - 变更时间窗口管理
+"""
+from datetime import datetime, time
+from typing import List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import desc
+from pydantic import BaseModel, Field
+
+from app.database import get_db
+from app.models import (
+    ChangeWindow, Environment, User
+)
+from app.schemas import MessageResponse
+from app.deps import get_current_user, get_operator
+
+router = APIRouter(prefix="/change-windows", tags=["变更时间窗口"])
+
+
+# ==================== Schemas ====================
+
+class ChangeWindowCreate(BaseModel):
+    """创建变更时间窗口"""
+    name: str = Field(..., description="窗口名称")
+    description: Optional[str] = Field(None, description="描述")
+    environment_ids: Optional[List[int]] = Field(None, description="应用环境ID列表")
+    start_time: str = Field(..., description="开始时间 HH:MM")
+    end_time: str = Field(..., description="结束时间 HH:MM")
+    weekdays: Optional[List[int]] = Field(None, description="允许的星期 0-6")
+    allow_emergency: bool = Field(False, description="允许紧急变更")
+    require_approval: bool = Field(True, description="需要审批")
+    min_approvers: int = Field(1, description="最小审批人数")
+    auto_reject_outside: bool = Field(False, description="自动拒绝窗口外变更")
+
+
+class ChangeWindowUpdate(BaseModel):
+    """更新变更时间窗口"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+    environment_ids: Optional[List[int]] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    weekdays: Optional[List[int]] = None
+    allow_emergency: Optional[bool] = None
+    require_approval: Optional[bool] = None
+    min_approvers: Optional[int] = None
+    auto_reject_outside: Optional[bool] = None
+    is_enabled: Optional[bool] = None
+
+
+# ==================== APIs ====================
+
+@router.get("", response_model=dict)
+async def list_change_windows(
+    is_enabled: Optional[bool] = None,
+    search: Optional[str] = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取变更时间窗口列表"""
+    query = db.query(ChangeWindow)
+    
+    if is_enabled is not None:
+        query = query.filter(ChangeWindow.is_enabled == is_enabled)
+    if search:
+        query = query.filter(ChangeWindow.name.ilike(f"%{search}%"))
+    
+    total = query.count()
+    items = query.order_by(desc(ChangeWindow.created_at)).offset((page - 1) * limit).limit(limit).all()
+    
+    # 获取创建人名称
+    user_ids = [w.created_by for w in items if w.created_by]
+    users = {u.id: u.real_name or u.username for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+    
+    return {
+        "total": total,
+        "items": [{
+            "id": w.id,
+            "name": w.name,
+            "description": w.description,
+            "environment_ids": w.environment_ids,
+            "start_time": w.start_time,
+            "end_time": w.end_time,
+            "weekdays": w.weekdays,
+            "weekdays_label": _get_weekdays_label(w.weekdays),
+            "allow_emergency": w.allow_emergency,
+            "require_approval": w.require_approval,
+            "min_approvers": w.min_approvers,
+            "auto_reject_outside": w.auto_reject_outside,
+            "is_enabled": w.is_enabled,
+            "created_by": w.created_by,
+            "created_by_name": users.get(w.created_by),
+            "created_at": w.created_at.isoformat() if w.created_at else None
+        } for w in items]
+    }
+
+
+@router.post("", response_model=MessageResponse)
+async def create_change_window(
+    data: ChangeWindowCreate,
+    current_user: User = Depends(get_operator),
+    db: Session = Depends(get_db)
+):
+    """创建变更时间窗口"""
+    # 验证时间格式
+    try:
+        start_time = datetime.strptime(data.start_time, "%H:%M").time()
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="开始时间格式错误，应为 HH:MM")
+    
+    try:
+        end_time = datetime.strptime(data.end_time, "%H:%M").time()
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="结束时间格式错误，应为 HH:MM")
+    
+    # 验证星期
+    if data.weekdays:
+        for wd in data.weekdays:
+            if wd < 0 or wd > 6:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="星期值应在 0-6 之间")
+    
+    window = ChangeWindow(
+        name=data.name,
+        description=data.description,
+        environment_ids=data.environment_ids,
+        start_time=data.start_time,
+        end_time=data.end_time,
+        weekdays=data.weekdays,
+        allow_emergency=data.allow_emergency,
+        require_approval=data.require_approval,
+        min_approvers=data.min_approvers,
+        auto_reject_outside=data.auto_reject_outside,
+        created_by=current_user.id
+    )
+    
+    db.add(window)
+    db.commit()
+    
+    return MessageResponse(message="创建成功")
+
+
+@router.get("/{window_id}", response_model=dict)
+async def get_change_window(
+    window_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取变更时间窗口详情"""
+    window = db.query(ChangeWindow).filter(ChangeWindow.id == window_id).first()
+    if not window:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="时间窗口不存在")
+    
+    created_by_name = None
+    if window.created_by:
+        user = db.query(User).filter(User.id == window.created_by).first()
+        created_by_name = user.real_name or user.username if user else None
+    
+    # 获取环境名称
+    environment_names = []
+    if window.environment_ids:
+        environments = db.query(Environment).filter(Environment.id.in_(window.environment_ids)).all()
+        environment_names = [{"id": e.id, "name": e.name} for e in environments]
+    
+    return {
+        "id": window.id,
+        "name": window.name,
+        "description": window.description,
+        "environment_ids": window.environment_ids,
+        "environment_names": environment_names,
+        "start_time": window.start_time,
+        "end_time": window.end_time,
+        "weekdays": window.weekdays,
+        "weekdays_label": _get_weekdays_label(window.weekdays),
+        "allow_emergency": window.allow_emergency,
+        "require_approval": window.require_approval,
+        "min_approvers": window.min_approvers,
+        "auto_reject_outside": window.auto_reject_outside,
+        "is_enabled": window.is_enabled,
+        "created_by": window.created_by,
+        "created_by_name": created_by_name,
+        "created_at": window.created_at.isoformat() if window.created_at else None,
+        "updated_at": window.updated_at.isoformat() if window.updated_at else None
+    }
+
+
+@router.put("/{window_id}", response_model=MessageResponse)
+async def update_change_window(
+    window_id: int,
+    data: ChangeWindowUpdate,
+    current_user: User = Depends(get_operator),
+    db: Session = Depends(get_db)
+):
+    """更新变更时间窗口"""
+    window = db.query(ChangeWindow).filter(ChangeWindow.id == window_id).first()
+    if not window:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="时间窗口不存在")
+    
+    if data.name is not None:
+        window.name = data.name
+    if data.description is not None:
+        window.description = data.description
+    if data.environment_ids is not None:
+        window.environment_ids = data.environment_ids
+    if data.start_time is not None:
+        try:
+            datetime.strptime(data.start_time, "%H:%M")
+            window.start_time = data.start_time
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="开始时间格式错误，应为 HH:MM")
+    if data.end_time is not None:
+        try:
+            datetime.strptime(data.end_time, "%H:%M")
+            window.end_time = data.end_time
+        except ValueError:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="结束时间格式错误，应为 HH:MM")
+    if data.weekdays is not None:
+        for wd in data.weekdays:
+            if wd < 0 or wd > 6:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="星期值应在 0-6 之间")
+        window.weekdays = data.weekdays
+    if data.allow_emergency is not None:
+        window.allow_emergency = data.allow_emergency
+    if data.require_approval is not None:
+        window.require_approval = data.require_approval
+    if data.min_approvers is not None:
+        window.min_approvers = data.min_approvers
+    if data.auto_reject_outside is not None:
+        window.auto_reject_outside = data.auto_reject_outside
+    if data.is_enabled is not None:
+        window.is_enabled = data.is_enabled
+    
+    db.commit()
+    return MessageResponse(message="更新成功")
+
+
+@router.delete("/{window_id}", response_model=MessageResponse)
+async def delete_change_window(
+    window_id: int,
+    current_user: User = Depends(get_operator),
+    db: Session = Depends(get_db)
+):
+    """删除变更时间窗口"""
+    window = db.query(ChangeWindow).filter(ChangeWindow.id == window_id).first()
+    if not window:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="时间窗口不存在")
+    
+    db.delete(window)
+    db.commit()
+    return MessageResponse(message="删除成功")
+
+
+@router.post("/{window_id}/toggle", response_model=MessageResponse)
+async def toggle_change_window(
+    window_id: int,
+    current_user: User = Depends(get_operator),
+    db: Session = Depends(get_db)
+):
+    """启用/禁用变更时间窗口"""
+    window = db.query(ChangeWindow).filter(ChangeWindow.id == window_id).first()
+    if not window:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="时间窗口不存在")
+    
+    window.is_enabled = not window.is_enabled
+    db.commit()
+    
+    return MessageResponse(message=f"时间窗口已{'禁用' if not window.is_enabled else '启用'}")
+
+
+@router.post("/check", response_model=dict)
+async def check_change_window(
+    environment_id: int,
+    check_time: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """检查指定时间是否在变更窗口内"""
+    # 解析检查时间
+    if check_time:
+        try:
+            dt = datetime.fromisoformat(check_time)
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="时间格式错误")
+    else:
+        dt = datetime.now()
+    
+    # 查找该环境的变更窗口
+    windows = db.query(ChangeWindow).filter(
+        ChangeWindow.is_enabled == True,
+        ChangeWindow.environment_ids.contains([environment_id])
+    ).all()
+    
+    if not windows:
+        return {
+            "in_window": True,
+            "message": "未配置变更窗口，允许变更",
+            "windows": []
+        }
+    
+    result_windows = []
+    in_window = False
+    
+    for window in windows:
+        # 检查星期
+        weekday = dt.weekday()  # 0-6, Monday=0
+        if window.weekdays and weekday not in window.weekdays:
+            result_windows.append({
+                "id": window.id,
+                "name": window.name,
+                "in_window": False,
+                "reason": f"星期{['一', '二', '三', '四', '五', '六', '日'][weekday]}不在允许范围内"
+            })
+            continue
+        
+        # 检查时间
+        check_time_obj = dt.time()
+        start_time = datetime.strptime(window.start_time, "%H:%M").time()
+        end_time = datetime.strptime(window.end_time, "%H:%M").time()
+        
+        if start_time <= end_time:
+            # 不跨天
+            time_in_window = start_time <= check_time_obj <= end_time
+        else:
+            # 跨天
+            time_in_window = check_time_obj >= start_time or check_time_obj <= end_time
+        
+        if time_in_window:
+            in_window = True
+            result_windows.append({
+                "id": window.id,
+                "name": window.name,
+                "in_window": True,
+                "reason": "在变更窗口内"
+            })
+        else:
+            result_windows.append({
+                "id": window.id,
+                "name": window.name,
+                "in_window": False,
+                "reason": f"当前时间不在 {window.start_time}-{window.end_time} 范围内"
+            })
+    
+    return {
+        "in_window": in_window,
+        "message": "在变更窗口内" if in_window else "不在任何变更窗口内",
+        "windows": result_windows
+    }
+
+
+def _get_weekdays_label(weekdays: Optional[List[int]]) -> str:
+    """获取星期标签"""
+    if not weekdays:
+        return "每天"
+    
+    weekday_names = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+    selected = [weekday_names[i] for i in sorted(weekdays)]
+    
+    # 简化显示
+    if weekdays == [0, 1, 2, 3, 4]:
+        return "工作日"
+    elif weekdays == [5, 6]:
+        return "周末"
+    else:
+        return ", ".join(selected)

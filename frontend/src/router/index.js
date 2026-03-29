@@ -89,6 +89,12 @@ const routes = [
             name: 'RedisChangeRequests',
             component: () => import('@/views/change/redis-requests.vue'),
             meta: { title: 'Redis变更', icon: 'Key' }
+          },
+          {
+            path: 'windows',
+            name: 'ChangeWindows',
+            component: () => import('@/views/change/windows/index.vue'),
+            meta: { title: '变更窗口', icon: 'Clock' }
           }
         ]
       },
@@ -135,6 +141,18 @@ const routes = [
             name: 'Inspection',
             component: () => import('@/views/inspection/index.vue'),
             meta: { title: '巡检报告', icon: 'DocumentChecked' }
+          },
+          {
+            path: 'scheduled-inspection',
+            name: 'ScheduledInspection',
+            component: () => import('@/views/inspection/scheduled/index.vue'),
+            meta: { title: '定时巡检', icon: 'Timer' }
+          },
+          {
+            path: 'alert-rules',
+            name: 'AlertRules',
+            component: () => import('@/views/alerts/rules/index.vue'),
+            meta: { title: '告警规则', icon: 'Warning' }
           },
           {
             path: 'settings',

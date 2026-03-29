@@ -786,6 +786,8 @@ class TableSchema(Base):
     rdb_instance = relationship("RDBInstance", back_populates="table_schemas")
 
 
+# ==================== SQL分析历史表 - 仅适用于 RDB 实例 ====================
+
 class SQLAnalysisHistory(Base):
     """SQL分析历史表 - 仅适用于 RDB 实例"""
     __tablename__ = "sql_analysis_history"
@@ -883,6 +885,15 @@ __all__ = [
     # 权限管理
     'Permission', 'RolePermission', 'BatchOperationLog',
     'PermissionCode', 'DEFAULT_ROLE_PERMISSIONS',
+    
+    # 定时巡检
+    'ScheduledInspection', 'InspectionExecution',
+    
+    # 告警规则
+    'AlertRule', 'RULE_TYPE_LABELS', 'OPERATOR_LABELS', 'AGGREGATION_LABELS', 'SEVERITY_CONFIG',
+    
+    # 变更时间窗口
+    'ChangeWindow', 'WEEKDAY_LABELS', 'WINDOW_TYPE_LABELS',
 ]
 
 # 导入权限模型
@@ -891,3 +902,12 @@ from app.models.permissions import (
     PermissionCode, DEFAULT_ROLE_PERMISSIONS,
     RoleEnvironment
 )
+
+# 导入定时巡检模型
+from app.models.inspection_schedule import ScheduledInspection, InspectionExecution
+
+# 导入告警规则模型
+from app.models.alert_rule import AlertRule, RULE_TYPE_LABELS, OPERATOR_LABELS, AGGREGATION_LABELS, SEVERITY_CONFIG
+
+# 导入变更时间窗口模型
+from app.models.change_window import ChangeWindow, WEEKDAY_LABELS, WINDOW_TYPE_LABELS

@@ -64,7 +64,7 @@
         </div>
       </div>
 
-      <div class="stat-card gradient-orange clickable" @click="navigateTo('approvals')">
+      <div class="stat-card gradient-orange clickable" @click="navigateTo('/change/requests?tab=pendingApproval')">
         <div class="stat-card-content">
           <div class="stat-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -88,7 +88,7 @@
         </div>
       </div>
 
-      <div class="stat-card gradient-red clickable" @click="navigateTo('alerts')">
+      <div class="stat-card gradient-red clickable" @click="navigateTo('/monitor/alerts')">
         <div class="stat-card-content">
           <div class="stat-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -119,7 +119,7 @@
       
       <div class="quick-actions-grid">
         <!-- 提交变更 -->
-        <div class="quick-action-card" @click="navigateTo('/approvals?tab=myRequests&action=create')">
+        <div class="quick-action-card" @click="navigateTo('/change/requests?action=create')">
           <div class="action-icon gradient-blue">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -421,7 +421,7 @@ const refreshTodoItems = async () => {
           instance: approval.instance_name,
           time: dayjs(approval.created_at).fromNow(),
           priority: approval.sql_risk_level === 'high' ? 'high' : 'normal',
-          route: '/approvals?tab=pendingApproval'
+          route: '/change/requests?tab=pendingApproval'
         })
       })
     }
