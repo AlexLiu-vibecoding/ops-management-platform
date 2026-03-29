@@ -13,14 +13,10 @@
           <el-icon><DocumentCopy /></el-icon>
           复制
         </el-button>
-        <el-button text size="small" @click="toggleExpand" v-if="canExpand">
-          <el-icon><View v-if="!expanded" /><Hide v-else /></el-icon>
-          {{ expanded ? '收起' : '展开' }}
-        </el-button>
       </div>
     </div>
-    <div class="sql-content" :class="{ 'is-collapsed': !expanded && canExpand }">
-      <pre><code>{{ displaySql }}</code></pre>
+    <div class="sql-content">
+      <pre><code>{{ sql }}</code></pre>
     </div>
     <div v-if="warning" class="sql-warning">
       <el-icon><WarningFilled /></el-icon>
@@ -30,9 +26,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { DocumentCopy, View, Hide, WarningFilled } from '@element-plus/icons-vue'
+import { DocumentCopy, WarningFilled } from '@element-plus/icons-vue'
 
 const props = defineProps({
   title: {
@@ -47,10 +42,6 @@ const props = defineProps({
     type: String,
     default: ''
   },
-  previewLines: {
-    type: Number,
-    default: 20
-  },
   riskLevel: {
     type: String,
     default: ''
@@ -58,22 +49,7 @@ const props = defineProps({
   warning: {
     type: String,
     default: ''
-  },
-  maxHeight: {
-    type: String,
-    default: '400px'
   }
-})
-
-const expanded = ref(false)
-
-const lines = computed(() => props.sql.split('\n'))
-const canExpand = computed(() => lines.value.length > props.previewLines)
-const displaySql = computed(() => {
-  if (expanded.value || !canExpand.value) {
-    return props.sql
-  }
-  return lines.value.slice(0, props.previewLines).join('\n') + '\n...'
 })
 
 const getRiskTagType = (level) => {
@@ -94,10 +70,6 @@ const getRiskLabel = (level) => {
     critical: '极高风险'
   }
   return labels[level] || level
-}
-
-const toggleExpand = () => {
-  expanded.value = !expanded.value
 }
 
 const copySql = async () => {
