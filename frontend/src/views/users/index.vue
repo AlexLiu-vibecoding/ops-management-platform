@@ -60,12 +60,11 @@
             {{ row.last_login_time ? formatTime(row.last_login_time) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right" align="center">
+        <el-table-column label="操作" width="160" fixed="right" align="center">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
               <el-button link type="primary" size="small" @click="handleResetPwd(row)" :disabled="row.id === currentUserId">重置密码</el-button>
-              <el-button link type="primary" size="small" @click="handleBindEnv(row)">环境权限</el-button>
               <el-button link type="danger" size="small" @click="handleDelete(row)" :disabled="row.id === currentUserId">删除</el-button>
             </div>
           </template>
@@ -164,28 +163,17 @@
       </template>
     </el-dialog>
     
-    <!-- 环境权限绑定对话框 -->
-    <el-dialog v-model="envDialog.visible" title="环境权限绑定" width="500px">
-      <el-form label-width="80px">
-        <el-form-item label="用户">
-          <el-input :value="envDialog.username" disabled />
-        </el-form-item>
-        <el-form-item label="环境">
-          <el-checkbox-group v-model="envDialog.selectedEnvs">
-            <el-checkbox
-              v-for="env in environments"
-              :key="env.id"
-              :label="env.id"
-              :value="env.id"
-            >
-              <span :style="{ color: env.color }">{{ env.name }}</span>
-            </el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-      </el-form>
+    <!-- 提示：环境权限由角色控制 -->
+    <el-dialog v-model="envDialog.visible" title="环境权限说明" width="400px">
+      <el-alert
+        title="环境权限由角色控制"
+        type="info"
+        description="用户的环境权限由其所属角色决定，如需修改请前往角色管理页面配置角色的环境权限。"
+        show-icon
+        :closable="false"
+      />
       <template #footer>
-        <el-button @click="envDialog.visible = false">取消</el-button>
-        <el-button type="primary" @click="submitBindEnv" :loading="envDialog.loading">保存</el-button>
+        <el-button type="primary" @click="envDialog.visible = false">我知道了</el-button>
       </template>
     </el-dialog>
   </div>
@@ -195,7 +183,6 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { usersApi } from '@/api/users'
-import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 
@@ -204,7 +191,6 @@ const currentUserId = computed(() => userStore.user?.id)
 
 const loading = ref(false)
 const userList = ref([])
-const environments = ref([])
 const roles = ref([])  // 动态角色列表
 
 const searchForm = reactive({
@@ -260,24 +246,10 @@ const resetPwdDialog = reactive({
 })
 
 const envDialog = reactive({
-  visible: false,
-  loading: false,
-  userId: null,
-  username: '',
-  selectedEnvs: []
+  visible: false
 })
 
 const userFormRef = ref(null)
-
-// 获取环境列表
-const fetchEnvironments = async () => {
-  try {
-    const data = await request.get('/environments')
-    environments.value = data.items || data
-  } catch (error) {
-    console.error('获取环境列表失败:', error)
-  }
-}
 
 // 获取角色列表
 const fetchRoles = async () => {
@@ -350,18 +322,6 @@ const handleResetPwd = (row) => {
   resetPwdDialog.visible = true
 }
 
-// 环境权限
-const handleBindEnv = async (row) => {
-  envDialog.userId = row.id
-  envDialog.username = row.username
-  
-  // 获取用户已绑定的环境
-  // TODO: 后端需要添加接口获取用户环境绑定
-  
-  envDialog.selectedEnvs = []
-  envDialog.visible = true
-}
-
 // 删除用户
 const handleDelete = async (row) => {
   try {
@@ -429,20 +389,6 @@ const submitResetPwd = async () => {
   }
 }
 
-// 提交环境绑定
-const submitBindEnv = async () => {
-  envDialog.loading = true
-  try {
-    await usersApi.bindEnvironments(envDialog.userId, envDialog.selectedEnvs)
-    ElMessage.success('环境权限绑定成功')
-    envDialog.visible = false
-  } catch (error) {
-    console.error('绑定失败:', error)
-  } finally {
-    envDialog.loading = false
-  }
-}
-
 // 重置表单
 const resetForm = () => {
   dialog.form = {
@@ -481,7 +427,6 @@ const getRoleTagType = (role) => {
 
 onMounted(() => {
   fetchRoles()
-  fetchEnvironments()
   fetchUsers()
 })
 </script>
