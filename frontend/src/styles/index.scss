@@ -19,8 +19,9 @@
     line-height: 1.5;
     
     // 覆盖 Element Plus 动态添加的 .el-tooltip 类
+    // 保持 nowrap 不换行，但取消截断
     &.el-tooltip {
-      white-space: normal !important;
+      white-space: nowrap !important;
       overflow: visible !important;
       text-overflow: unset !important;
     }
