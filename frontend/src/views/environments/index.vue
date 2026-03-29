@@ -116,28 +116,23 @@
         </el-alert>
         
         <el-form-item label="AWS 区域">
-          <el-select v-model="dialog.form.aws_region" placeholder="选择 AWS 区域" style="width: 100%;">
-            <el-option-group label="美国">
-              <el-option label="美国东部 (弗吉尼亚北部)" value="us-east-1" />
-              <el-option label="美国东部 (俄亥俄)" value="us-east-2" />
-              <el-option label="美国西部 (加利福尼亚)" value="us-west-1" />
-              <el-option label="美国西部 (俄勒冈)" value="us-west-2" />
-            </el-option-group>
-            <el-option-group label="亚太">
-              <el-option label="亚太地区 (新加坡)" value="ap-southeast-1" />
-              <el-option label="亚太地区 (悉尼)" value="ap-southeast-2" />
-              <el-option label="亚太地区 (东京)" value="ap-northeast-1" />
-              <el-option label="亚太地区 (首尔)" value="ap-northeast-2" />
-              <el-option label="亚太地区 (香港)" value="ap-east-1" />
-            </el-option-group>
-            <el-option-group label="中国">
-              <el-option label="中国 (北京)" value="cn-north-1" />
-              <el-option label="中国 (宁夏)" value="cn-northwest-1" />
-            </el-option-group>
-            <el-option-group label="欧洲">
-              <el-option label="欧洲 (法兰克福)" value="eu-central-1" />
-              <el-option label="欧洲 (爱尔兰)" value="eu-west-1" />
-              <el-option label="欧洲 (伦敦)" value="eu-west-2" />
+          <el-select 
+            v-model="dialog.form.aws_region" 
+            placeholder="选择 AWS 区域" 
+            style="width: 100%;"
+            :loading="awsRegionsLoading"
+          >
+            <el-option-group 
+              v-for="group in awsRegionGroups" 
+              :key="group.geo_group" 
+              :label="group.geo_group"
+            >
+              <el-option 
+                v-for="region in group.regions" 
+                :key="region.region_code" 
+                :label="region.region_name" 
+                :value="region.region_code" 
+              />
             </el-option-group>
           </el-select>
         </el-form-item>
@@ -190,6 +185,23 @@ import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Cloudy, Connection, SuccessFilled, CircleCloseFilled, Edit, DeleteFilled } from '@element-plus/icons-vue'
 import TableActions from '@/components/TableActions.vue'
+import { getAwsRegionsGrouped } from '@/api/awsRegions'
+
+// AWS 区域数据（从 API 获取）
+const awsRegionGroups = ref([])
+const awsRegionsLoading = ref(false)
+
+const fetchAwsRegions = async () => {
+  awsRegionsLoading.value = true
+  try {
+    const data = await getAwsRegionsGrouped(true)
+    awsRegionGroups.value = data
+  } catch (error) {
+    console.error('获取 AWS 区域失败:', error)
+  } finally {
+    awsRegionsLoading.value = false
+  }
+}
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -370,6 +382,7 @@ const handleSubmit = async () => {
 
 onMounted(() => {
   fetchEnvironments()
+  fetchAwsRegions()
 })
 </script>
 

@@ -306,6 +306,7 @@ import dayjs from 'dayjs'
 import { useUserStore } from '@/stores/user'
 import { CircleCheck, CircleClose, Delete, View, Edit, Connection, DeleteFilled } from '@element-plus/icons-vue'
 import TableActions from '@/components/TableActions.vue'
+import { isRdsEndpoint, parseAwsRegion } from '@/constants/aws'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -453,78 +454,20 @@ const handleBatchDisable = async () => {
   }
 }
 
-// ============ AWS RDS 自动识别 ============
-
-// AWS 区域映射表
-const AWS_REGION_MAP = {
-  'us-east-1': '美国东部 (弗吉尼亚北部)',
-  'us-east-2': '美国东部 (俄亥俄)',
-  'us-west-1': '美国西部 (加利福尼亚)',
-  'us-west-2': '美国西部 (俄勒冈)',
-  'ap-east-1': '亚太地区 (香港)',
-  'ap-northeast-1': '亚太地区 (东京)',
-  'ap-northeast-2': '亚太地区 (首尔)',
-  'ap-northeast-3': '亚太地区 (大阪)',
-  'ap-southeast-1': '亚太地区 (新加坡)',
-  'ap-southeast-2': '亚太地区 (悉尼)',
-  'ap-southeast-3': '亚太地区 (雅加达)',
-  'ap-south-1': '亚太地区 (孟买)',
-  'cn-north-1': '中国 (北京)',
-  'cn-northwest-1': '中国 (宁夏)',
-  'eu-central-1': '欧洲 (法兰克福)',
-  'eu-west-1': '欧洲 (爱尔兰)',
-  'eu-west-2': '欧洲 (伦敦)',
-  'eu-west-3': '欧洲 (巴黎)',
-  'eu-north-1': '欧洲 (斯德哥尔摩)',
-  'sa-east-1': '南美洲 (圣保罗)',
-  'ca-central-1': '加拿大 (中部)',
-}
-
-// 检测是否为 RDS endpoint
-const isRdsEndpoint = (host) => {
-  if (!host) return false
-  const patterns = [
-    /\.rds\.amazonaws\.com$/i,
-    /\.rds\.amazonaws\.com\.cn$/i,
-  ]
-  return patterns.some(pattern => pattern.test(host))
-}
-
-// 从 RDS endpoint 解析 AWS 区域
-const parseAwsRegion = (host) => {
-  if (!host) return null
-  
-  // 匹配格式: xxx.{region}.rds.amazonaws.com 或 xxx.{region}.rds.amazonaws.com.cn
-  const patterns = [
-    /\.([a-z]{2}-[a-z]+-\d+)\.rds\.amazonaws\.com$/i,
-    /\.([a-z]{2}-[a-z]+-\d+)\.rds\.amazonaws\.com\.cn$/i,
-  ]
-  
-  for (const pattern of patterns) {
-    const match = host.match(pattern)
-    if (match && AWS_REGION_MAP[match[1]]) {
-      return match[1]
-    }
-  }
-  
-  // 宽松匹配
-  const loosePattern = /([a-z]{2}-[a-z]+-\d+)/gi
-  const matches = host.match(loosePattern)
-  if (matches) {
-    for (const region of matches) {
-      if (AWS_REGION_MAP[region.toLowerCase()]) {
-        return region.toLowerCase()
-      }
-    }
-  }
-  
-  return null
-}
-
 const loading = ref(false)
 const instanceList = ref([])
 const environments = ref([])
 const awsRegions = ref([])  // AWS 区域列表
+
+// 根据区域代码获取区域名称
+const getAwsRegionName = (regionCode) => {
+  if (!regionCode || !awsRegions.value.length) return regionCode
+  for (const group of awsRegions.value) {
+    const region = group.regions?.find(r => r.region_code === regionCode)
+    if (region) return region.region_name
+  }
+  return regionCode
+}
 
 const searchForm = reactive({
   environment_id: null,
@@ -647,7 +590,7 @@ watch(() => dialog.form.host, (newHost) => {
     const region = parseAwsRegion(newHost)
     if (region && !dialog.form.aws_region) {
       dialog.form.aws_region = region
-      ElMessage.success(`已自动识别区域: ${region} (${AWS_REGION_MAP[region]})`)
+      ElMessage.success(`已自动识别区域: ${region} (${getAwsRegionName(region)})`)
     }
   }
 })
