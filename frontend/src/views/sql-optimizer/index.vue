@@ -376,6 +376,17 @@ const loadHistoryDetail = async (item) => {
     const detail = await sqlOptimizerApi.getHistoryDetail(item.id)
     analysisResult.value = detail
     sqlText.value = detail.sql_text
+    
+    // 如果历史记录的实例与当前选择不一致，更新选择
+    if (detail.instance_id && detail.instance_id !== selectedInstance.value) {
+      selectedInstance.value = detail.instance_id
+      // 加载该实例的数据库列表
+      onInstanceChange()
+    }
+    // 设置数据库选择
+    if (detail.database_name) {
+      selectedDatabase.value = detail.database_name
+    }
   } catch (error) {
     ElMessage.error('加载详情失败')
   }

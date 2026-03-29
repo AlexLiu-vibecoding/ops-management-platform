@@ -1178,6 +1178,25 @@ async def get_analysis_detail(
             detail="分析记录不存在"
         )
     
+    # 从存储的数据中计算 summary
+    rule_issues = history.rule_issues or []
+    explain_rows = history.explain_json or []
+    
+    # 提取涉及的表
+    tables = set()
+    for row in explain_rows:
+        if row.get("table"):
+            tables.add(row.get("table"))
+    
+    summary = {
+        "tables_involved": list(tables),
+        "issues_count": len(rule_issues),
+        "critical_count": sum(1 for i in rule_issues if i.get("severity") == "critical"),
+        "warning_count": sum(1 for i in rule_issues if i.get("severity") == "warning"),
+        "info_count": sum(1 for i in rule_issues if i.get("severity") == "info"),
+        "total_rows_scanned": sum(row.get("rows") or 0 for row in explain_rows)
+    }
+    
     return {
         "id": history.id,
         "instance_id": history.instance_id,
@@ -1189,5 +1208,6 @@ async def get_analysis_detail(
         "llm_suggestions": history.llm_suggestions,
         "risk_level": history.risk_level,
         "analysis_time": history.analysis_time,
+        "summary": summary,
         "created_at": history.created_at.isoformat()
     }
