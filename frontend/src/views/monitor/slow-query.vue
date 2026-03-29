@@ -109,7 +109,7 @@
         <el-table-column prop="database_name" label="数据库" width="100" show-overflow-tooltip />
         <el-table-column label="SQL指纹" min-width="200" show-overflow-tooltip>
           <template #default="{ row }">
-            <div class="sql-fingerprint">{{ truncateSQL(row.sql_fingerprint) }}</div>
+            <div class="sql-fingerprint">{{ row.sql_fingerprint || '-' }}</div>
           </template>
         </el-table-column>
         <el-table-column prop="query_time" label="耗时" width="80" sortable align="right">
@@ -675,12 +675,6 @@ const copySQL = async () => {
       ElMessage.error('复制失败')
     }
   }
-}
-
-// 截断SQL显示
-const truncateSQL = (sql) => {
-  if (!sql) return '-'
-  return sql.length > 80 ? sql.substring(0, 80) + '...' : sql
 }
 
 // 格式化数字
@@ -1270,9 +1264,7 @@ onMounted(() => {
     font-family: monospace;
     font-size: 12px;
     color: #606266;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    word-break: break-all;
   }
 }
 </style>

@@ -919,9 +919,6 @@ onMounted(() => {
       font-size: 14px;
       font-weight: 500;
       color: var(--text-primary);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
     }
     
     .todo-meta {

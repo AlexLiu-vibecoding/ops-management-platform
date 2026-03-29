@@ -689,10 +689,8 @@ onMounted(() => {
     font-family: monospace;
     font-size: 12px;
     color: var(--text-primary);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     margin-bottom: 8px;
+    word-break: break-all;
   }
   
   .history-meta {

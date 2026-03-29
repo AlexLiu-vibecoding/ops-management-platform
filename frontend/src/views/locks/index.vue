@@ -23,11 +23,9 @@
             <el-table-column prop="database_name" label="数据库" width="100" />
             <el-table-column prop="wait_type" label="等待类型" width="100" align="center" />
             <el-table-column prop="waiting_thread_id" label="等待线程" width="100" align="center" />
-            <el-table-column prop="waiting_sql" label="等待SQL" min-width="200">
+            <el-table-column prop="waiting_sql" label="等待SQL" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">
-                <el-tooltip :content="row.waiting_sql" placement="top" :disabled="!row.waiting_sql || row.waiting_sql.length < 50">
-                  <span class="sql-text">{{ truncate(row.waiting_sql, 50) }}</span>
-                </el-tooltip>
+                <span class="sql-text">{{ row.waiting_sql || '-' }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="waiting_time" label="等待时间(秒)" width="100" align="center">
@@ -83,11 +81,9 @@
               </template>
             </el-table-column>
             <el-table-column prop="trx_state" label="状态" width="100" align="center" />
-            <el-table-column prop="trx_query" label="当前SQL" min-width="200">
+            <el-table-column prop="trx_query" label="当前SQL" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">
-                <el-tooltip :content="row.trx_query" placement="top" :disabled="!row.trx_query || row.trx_query.length < 50">
-                  <span class="sql-text">{{ truncate(row.trx_query, 50) }}</span>
-                </el-tooltip>
+                <span class="sql-text">{{ row.trx_query || '-' }}</span>
               </template>
             </el-table-column>
             <el-table-column prop="trx_rows_locked" label="锁定行数" width="100" align="center" />
@@ -212,11 +208,6 @@ const killTransaction = (row) => {
       ElMessage.error(error.response?.data?.detail || 'Kill失败')
     }
   }).catch(() => {})
-}
-
-const truncate = (text, length) => {
-  if (!text) return '-'
-  return text.length > length ? text.slice(0, length) + '...' : text
 }
 
 const formatTime = (time) => {

@@ -96,7 +96,7 @@
                 :type="stmtStatus[idx] || 'info'"
                 class="statement-tag"
               >
-                {{ idx + 1 }}. {{ stmt.substring(0, 30) }}{{ stmt.length > 30 ? '...' : '' }}
+                {{ idx + 1 }}. {{ stmt }}
               </el-tag>
             </div>
           </div>
@@ -194,7 +194,7 @@
                       {{ item.success ? '成功' : '失败' }}
                     </el-tag>
                     <span class="history-time">{{ item.time }}</span>
-                    <span class="history-sql">{{ item.sql.substring(0, 50) }}...</span>
+                    <span class="history-sql">{{ item.sql }}</span>
                   </div>
                 </template>
                 <div class="history-detail">
@@ -527,13 +527,6 @@ onMounted(() => {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
-        
-        .statement-tag {
-          max-width: 200px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
       }
     }
     
