@@ -296,7 +296,15 @@ const handleDbClick = async (data) => {
   if (data.children) {
     // 点击的是数据库节点
     selectedDatabase.value = data.value
-    sqlContent.value = `USE ${data.value};`
+    
+    // 获取实例类型，决定是否自动填入 USE 语句
+    const instance = instances.value.find(i => i.id === selectedInstance.value)
+    const dbType = instance?.db_type || 'mysql'
+    
+    // PostgreSQL 不支持 USE 语句，不自动填入
+    // MySQL/MariaDB 可以使用 USE 语句，但也不需要，因为已经通过连接指定了数据库
+    // 清空 SQL 内容，让用户直接输入查询
+    sqlContent.value = ''
     
     // 加载该数据库的表
     if (!data.children.length || data.children.length === 0) {
