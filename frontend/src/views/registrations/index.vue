@@ -19,7 +19,7 @@
         </div>
       </template>
       
-      <el-table :data="registrations" v-loading="loading">
+      <el-table :data="registrations" style="width: 100%" v-loading="loading">
         <el-table-column prop="username" label="用户名" min-width="100" />
         <el-table-column prop="real_name" label="姓名" min-width="80" />
         <el-table-column prop="email" label="邮箱" min-width="150" />
