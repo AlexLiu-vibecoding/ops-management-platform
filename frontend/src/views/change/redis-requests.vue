@@ -49,8 +49,8 @@
       </div>
       
       <el-table :data="approvalList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="title" label="标题" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="instance_name" label="Redis 实例" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="title" label="标题" min-width="150" />
+        <el-table-column prop="instance_name" label="Redis 实例" min-width="120" />
         <el-table-column prop="sql_line_count" label="命令行数" width="90" align="center" />
         <el-table-column prop="sql_risk_level" label="风险等级" width="90" align="center">
           <template #default="{ row }">

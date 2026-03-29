@@ -118,7 +118,7 @@
         />
         <el-table :data="filteredVariables" style="width: 100%" max-height="500">
           <el-table-column prop="name" label="参数名" width="300" />
-          <el-table-column prop="value" label="值" show-overflow-tooltip />
+          <el-table-column prop="value" label="值" />
         </el-table>
       </el-tab-pane>
     </el-tabs>

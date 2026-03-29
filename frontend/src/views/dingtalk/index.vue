@@ -27,7 +27,7 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" show-overflow-tooltip />
+        <el-table-column prop="description" label="描述" />
         <el-table-column prop="is_enabled" label="状态" min-width="80">
           <template #default="{ row }">
             <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">

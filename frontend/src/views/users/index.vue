@@ -37,10 +37,10 @@
     <!-- 用户列表 -->
     <el-card shadow="never" class="table-card">
       <el-table :data="userList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="username" label="用户名" min-width="80" show-overflow-tooltip />
-        <el-table-column prop="real_name" label="姓名" min-width="70" show-overflow-tooltip />
-        <el-table-column prop="email" label="邮箱" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="phone" label="电话" width="110" show-overflow-tooltip />
+        <el-table-column prop="username" label="用户名" min-width="80" />
+        <el-table-column prop="real_name" label="姓名" min-width="70" />
+        <el-table-column prop="email" label="邮箱" min-width="120" />
+        <el-table-column prop="phone" label="电话" width="110" />
         <el-table-column prop="role" label="角色" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getRoleTagType(row.role)" size="small">

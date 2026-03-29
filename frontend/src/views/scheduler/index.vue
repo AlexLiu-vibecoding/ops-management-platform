@@ -78,7 +78,7 @@
       </template>
       
       <el-table :data="jobs" v-loading="loading" style="width: 100%">
-        <el-table-column prop="id" label="任务ID" width="200" show-overflow-tooltip>
+        <el-table-column prop="id" label="任务ID" width="200">
           <template #default="{ row }">
             <code class="job-id">{{ row.id }}</code>
           </template>
@@ -125,7 +125,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="handler" label="处理器" min-width="180" show-overflow-tooltip>
+        <el-table-column prop="handler" label="处理器" min-width="180">
           <template #default="{ row }">
             <code class="handler-name">{{ row.handler || '-' }}</code>
           </template>

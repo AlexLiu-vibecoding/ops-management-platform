@@ -40,7 +40,7 @@
       <!-- 数据表格 -->
       <el-table v-loading="loading" :data="tableData" stripe>
         <el-table-column prop="name" label="窗口名称" min-width="150" />
-        <el-table-column prop="description" label="描述" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="description" label="描述" min-width="150" />
         <el-table-column label="时间范围" width="150">
           <template #default="{ row }">
             {{ row.start_time }} - {{ row.end_time }}

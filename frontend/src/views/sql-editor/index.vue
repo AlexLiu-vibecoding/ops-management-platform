@@ -166,7 +166,7 @@
                   :key="col"
                   :prop="col"
                   :label="col"
-                  show-overflow-tooltip
+                 
                   min-width="120"
                 />
               </el-table>

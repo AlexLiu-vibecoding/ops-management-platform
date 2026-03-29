@@ -69,7 +69,7 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" v-if="canOperate" />
-        <el-table-column prop="name" label="实例名称" min-width="120" show-overflow-tooltip>
+        <el-table-column prop="name" label="实例名称" min-width="120">
           <template #default="{ row }">
             <div class="instance-name-cell">
               <span>{{ row.name }}</span>
@@ -87,7 +87,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="地址" min-width="150" show-overflow-tooltip>
+        <el-table-column label="地址" min-width="150">
           <template #default="{ row }">
             <span v-if="row.is_rds && row.rds_instance_id">
               {{ row.rds_instance_id }}
@@ -115,7 +115,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="description" label="描述" min-width="100" />
         <el-table-column prop="created_at" label="创建时间" width="160">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}

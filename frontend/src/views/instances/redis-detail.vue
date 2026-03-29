@@ -97,7 +97,7 @@
             highlight-current-row
             class="keys-table"
           >
-            <el-table-column prop="key" label="键名" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="key" label="键名" min-width="150" />
             <el-table-column prop="type" label="类型" width="80" align="center">
               <template #default="{ row }">
                 <el-tag size="small" :type="getTypeTagType(row.type)">{{ row.type }}</el-tag>
@@ -184,7 +184,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="command" label="命令" show-overflow-tooltip />
+          <el-table-column prop="command" label="命令" />
         </el-table>
       </el-tab-pane>
       
@@ -213,7 +213,7 @@
         />
         <el-table :data="filteredConfig" style="width: 100%" max-height="500">
           <el-table-column prop="name" label="配置项" width="300" />
-          <el-table-column prop="value" label="值" show-overflow-tooltip />
+          <el-table-column prop="value" label="值" />
         </el-table>
       </el-tab-pane>
     </el-tabs>

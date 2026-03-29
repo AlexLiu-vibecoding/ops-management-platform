@@ -40,7 +40,7 @@
       <!-- 数据表格 -->
       <el-table v-loading="loading" :data="tableData" stripe>
         <el-table-column prop="name" label="任务名称" min-width="150" />
-        <el-table-column prop="description" label="描述" min-width="150" show-overflow-tooltip />
+        <el-table-column prop="description" label="描述" min-width="150" />
         <el-table-column prop="cron_expression" label="Cron表达式" width="130" />
         <el-table-column label="下次执行" width="160">
           <template #default="{ row }">

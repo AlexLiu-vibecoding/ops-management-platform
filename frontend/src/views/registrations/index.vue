@@ -20,15 +20,15 @@
       </template>
       
       <el-table :data="registrations" style="width: 100%" v-loading="loading">
-        <el-table-column prop="username" label="用户名" min-width="80" show-overflow-tooltip />
-        <el-table-column prop="real_name" label="姓名" min-width="70" show-overflow-tooltip />
-        <el-table-column prop="email" label="邮箱" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="username" label="用户名" min-width="80" />
+        <el-table-column prop="real_name" label="姓名" min-width="70" />
+        <el-table-column prop="email" label="邮箱" min-width="120" />
         <el-table-column prop="phone" label="手机号" width="110">
           <template #default="{ row }">
             {{ row.phone || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="reason" label="申请理由" min-width="120" show-overflow-tooltip>
+        <el-table-column prop="reason" label="申请理由" min-width="120">
           <template #default="{ row }">
             {{ row.reason || '-' }}
           </template>
@@ -45,7 +45,7 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column prop="reviewer_name" label="审批人" width="80" show-overflow-tooltip>
+        <el-table-column prop="reviewer_name" label="审批人" width="80">
           <template #default="{ row }">
             {{ row.reviewer_name || '-' }}
           </template>

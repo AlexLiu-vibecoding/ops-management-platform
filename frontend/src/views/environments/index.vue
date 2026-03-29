@@ -25,8 +25,8 @@
       </el-alert>
       
       <el-table :data="environments" style="width: 100%">
-        <el-table-column prop="name" label="环境名称" min-width="100" show-overflow-tooltip />
-        <el-table-column prop="code" label="环境编码" min-width="80" show-overflow-tooltip />
+        <el-table-column prop="name" label="环境名称" min-width="100" />
+        <el-table-column prop="code" label="环境编码" min-width="80" />
         <el-table-column label="颜色标记" width="100" align="center">
           <template #default="{ row }">
             <span class="env-tag" :style="{ backgroundColor: row.color, color: '#FFFFFF' }">
@@ -59,7 +59,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="description" label="描述" min-width="100" />
         <el-table-column label="操作" min-width="160" v-if="isAdmin" fixed="right" align="center">
           <template #default="{ row }">
             <TableActions 

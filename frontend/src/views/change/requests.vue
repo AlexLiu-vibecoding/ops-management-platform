@@ -50,7 +50,7 @@
       </div>
       
       <el-table :data="approvalList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="title" label="标题" min-width="120" show-overflow-tooltip>
+        <el-table-column prop="title" label="标题" min-width="120">
           <template #default="{ row }">
             <div class="title-cell">
               <span>{{ row.title }}</span>
@@ -64,8 +64,8 @@
             <el-tag size="small">{{ row.change_type }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="instance_name" label="实例" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="database_target" label="目标" min-width="100" show-overflow-tooltip>
+        <el-table-column prop="instance_name" label="实例" min-width="120" />
+        <el-table-column prop="database_target" label="目标" min-width="100">
           <template #default="{ row }">
             <span v-if="row.database_mode === 'all'">
               <el-tag type="warning" size="small">全部</el-tag>

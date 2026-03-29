@@ -23,7 +23,7 @@
             <el-table-column prop="database_name" label="数据库" width="100" />
             <el-table-column prop="wait_type" label="等待类型" width="100" align="center" />
             <el-table-column prop="waiting_thread_id" label="等待线程" width="100" align="center" />
-            <el-table-column prop="waiting_sql" label="等待SQL" min-width="200" show-overflow-tooltip>
+            <el-table-column prop="waiting_sql" label="等待SQL" min-width="200">
               <template #default="{ row }">
                 <span class="sql-text">{{ row.waiting_sql || '-' }}</span>
               </template>
@@ -81,7 +81,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="trx_state" label="状态" min-width="100" align="center" />
-            <el-table-column prop="trx_query" label="当前SQL" min-width="200" show-overflow-tooltip>
+            <el-table-column prop="trx_query" label="当前SQL" min-width="200">
               <template #default="{ row }">
                 <span class="sql-text">{{ row.trx_query || '-' }}</span>
               </template>

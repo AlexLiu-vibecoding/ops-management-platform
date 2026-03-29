@@ -186,10 +186,10 @@
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="possible_keys" label="可能索引" min-width="120" show-overflow-tooltip>
+              <el-table-column prop="possible_keys" label="可能索引" min-width="120">
                 <template #default="{ row }">{{ row.possible_keys || '-' }}</template>
               </el-table-column>
-              <el-table-column prop="key" label="使用索引" width="120" show-overflow-tooltip>
+              <el-table-column prop="key" label="使用索引" width="120">
                 <template #default="{ row }">{{ row.key || '-' }}</template>
               </el-table-column>
               <el-table-column prop="rows" label="扫描行" width="90">
@@ -199,7 +199,7 @@
                   </span>
                 </template>
               </el-table-column>
-              <el-table-column prop="Extra" label="Extra" min-width="200" show-overflow-tooltip>
+              <el-table-column prop="Extra" label="Extra" min-width="200">
                 <template #default="{ row }">{{ row.Extra || '-' }}</template>
               </el-table-column>
             </el-table>

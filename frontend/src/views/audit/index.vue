@@ -75,7 +75,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="operation_detail" label="操作详情" min-width="250" show-overflow-tooltip>
+        <el-table-column prop="operation_detail" label="操作详情" min-width="250">
           <template #default="{ row }">
             <span class="detail-text">{{ row.operation_detail }}</span>
           </template>
@@ -85,7 +85,7 @@
             {{ row.instance_name || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="request_path" label="请求路径" width="180" show-overflow-tooltip />
+        <el-table-column prop="request_path" label="请求路径" width="180" />
         <el-table-column prop="response_code" label="响应码" width="90">
           <template #default="{ row }">
             <el-tag :type="row.response_code === 200 ? 'success' : 'danger'" size="small">

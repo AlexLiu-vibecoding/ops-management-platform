@@ -23,8 +23,8 @@
       
       <!-- 任务列表 -->
       <el-table :data="tasks" v-loading="loading" style="width: 100%">
-        <el-table-column prop="name" label="任务名称" min-width="120" show-overflow-tooltip />
-        <el-table-column prop="script_name" label="关联脚本" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="name" label="任务名称" min-width="120" />
+        <el-table-column prop="script_name" label="关联脚本" min-width="100" />
         <el-table-column prop="cron_expression" label="Cron表达式" width="130">
           <template #default="{ row }">
             <code style="font-size: 12px;">{{ row.cron_expression }}</code>
@@ -48,7 +48,7 @@
             <span style="color: #f56c6c;">{{ row.fail_count }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="created_by" label="创建人" width="80" show-overflow-tooltip />
+        <el-table-column prop="created_by" label="创建人" width="80" />
         <el-table-column label="操作" min-width="160" fixed="right" align="center">
           <template #default="{ row }">
             <TableActions 

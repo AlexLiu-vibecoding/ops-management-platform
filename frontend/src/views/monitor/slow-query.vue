@@ -106,8 +106,8 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="database_name" label="数据库" width="100" show-overflow-tooltip />
-        <el-table-column label="SQL指纹" min-width="200" show-overflow-tooltip>
+        <el-table-column prop="database_name" label="数据库" width="100" />
+        <el-table-column label="SQL指纹" min-width="200">
           <template #default="{ row }">
             <div class="sql-fingerprint">{{ row.sql_fingerprint || '-' }}</div>
           </template>
