@@ -59,14 +59,14 @@ def get_job_info(job, task_type: str) -> JobInfo:
     # 确定触发器类型
     if hasattr(trigger, 'fields'):
         trigger_type = "cron"
-        # 构建 cron 表达式
-        fields = trigger.fields
+        # fields 是一个列表，需要转换为字典
+        fields_dict = {f.name: str(f) for f in trigger.fields}
         parts = [
-            str(fields.get('minute', '*')),
-            str(fields.get('hour', '*')),
-            str(fields.get('day', '*')),
-            str(fields.get('month', '*')),
-            str(fields.get('day_of_week', '*')),
+            fields_dict.get('minute', '*'),
+            fields_dict.get('hour', '*'),
+            fields_dict.get('day', '*'),
+            fields_dict.get('month', '*'),
+            fields_dict.get('day_of_week', '*'),
         ]
         trigger_config = ' '.join(parts)
     elif hasattr(trigger, 'interval'):
