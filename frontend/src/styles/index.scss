@@ -407,13 +407,23 @@ html, body {
 // Tables
 .el-table {
   border-radius: var(--radius-lg) !important;
-  overflow: hidden !important;
+  overflow: visible !important;
+  
+  .el-table__body-wrapper,
+  .el-table__header-wrapper {
+    overflow: visible !important;
+  }
   
   th.el-table__cell {
     background: var(--bg-grouped) !important;
     font-weight: 600 !important;
     color: var(--text-secondary) !important;
     border-bottom: 0.5px solid var(--separator) !important;
+    
+    .cell {
+      overflow: visible !important;
+      text-overflow: unset !important;
+    }
   }
   
   td.el-table__cell {
@@ -422,6 +432,7 @@ html, body {
     .cell {
       overflow: visible !important;
       text-overflow: unset !important;
+      white-space: unset !important;
     }
   }
   
