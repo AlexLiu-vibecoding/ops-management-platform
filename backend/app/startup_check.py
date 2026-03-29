@@ -114,8 +114,8 @@ class StartupCheck:
                 parts = db_url.split("@")
                 safe_url = parts[0].rsplit(":", 1)[0] + ":***@" + parts[1]
             else:
-                safe_url = db_url
-            self.passed.append(f"数据库配置: {safe_url}")
+                safe_url = db_url[:50] + "..."
+            self.passed.append(f"数据库配置: {safe_url[:60]}...")
             return True
         else:
             self.errors.append("未配置数据库连接 (DATABASE_URL 或 PGDATABASE_URL)")
