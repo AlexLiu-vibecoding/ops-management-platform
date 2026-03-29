@@ -335,6 +335,8 @@ html, body {
   font-weight: 600 !important;
   padding: 4px 12px !important;
   font-size: 12px !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
   
   &--success {
     background: #D1F4E0 !important;
