@@ -62,10 +62,13 @@
         <el-table-column prop="description" label="描述" min-width="100" show-overflow-tooltip />
         <el-table-column label="操作" width="120" v-if="isAdmin" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
-            </div>
+            <TableActions 
+              :row="row" 
+              :actions="envActions"
+              :max-primary="2"
+              @edit="handleEdit"
+              @delete="handleDelete"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -185,10 +188,29 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import request from '@/api/index'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Cloudy, Connection, SuccessFilled, CircleCloseFilled } from '@element-plus/icons-vue'
+import { Plus, Cloudy, Connection, SuccessFilled, CircleCloseFilled, Edit, DeleteFilled } from '@element-plus/icons-vue'
+import TableActions from '@/components/TableActions.vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
+
+// 环境操作配置
+const envActions = computed(() => [
+  { 
+    key: 'edit', 
+    label: '编辑', 
+    event: 'edit', 
+    primary: true,
+    icon: Edit
+  },
+  { 
+    key: 'delete', 
+    label: '删除', 
+    event: 'delete', 
+    danger: true,
+    icon: DeleteFilled
+  }
+])
 
 const environments = ref([])
 const formRef = ref(null)

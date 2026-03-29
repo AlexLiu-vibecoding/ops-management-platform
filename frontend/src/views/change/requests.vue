@@ -93,25 +93,17 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right" align="center">
+        <el-table-column label="操作" width="140" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" @click="handleView(row)">详情</el-button>
-              <!-- 待审批状态：审批人可操作 -->
-              <template v-if="row.status === 'pending' && canApprove">
-                <el-button link type="success" @click="handleApprove(row, true)">通过</el-button>
-                <el-button link type="danger" @click="handleApprove(row, false)">拒绝</el-button>
-              </template>
-              <!-- 已通过且非自动执行：可手动执行 -->
-              <el-button
-                v-if="row.status === 'approved' && !row.auto_execute && !row.scheduled_time"
-                link
-                type="success"
-                @click="handleExecute(row)"
-              >
-                执行
-              </el-button>
-            </div>
+            <TableActions 
+              :row="row" 
+              :actions="getChangeActions(row)"
+              :max-primary="2"
+              @view="handleView"
+              @approve="handleApprove($event, true)"
+              @reject="handleApprove($event, false)"
+              @execute="handleExecute"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -281,8 +273,9 @@ import request from '@/api/index'
 import { instancesApi } from '@/api/instances'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Upload, MagicStick, Delete } from '@element-plus/icons-vue'
+import { Plus, Upload, MagicStick, Delete, View, CircleCheck, CircleClose, VideoPlay } from '@element-plus/icons-vue'
 import ApprovalDetailCard from '@/components/ApprovalDetailCard.vue'
+import TableActions from '@/components/TableActions.vue'
 import dayjs from 'dayjs'
 
 const userStore = useUserStore()
@@ -291,6 +284,49 @@ const userRole = computed(() => userStore.user?.role)
 
 // 是否有审批权限
 const canApprove = computed(() => ['super_admin', 'approval_admin'].includes(userRole.value))
+
+// 获取变更操作配置
+const getChangeActions = (row) => {
+  const actions = [
+    { 
+      key: 'view', 
+      label: '详情', 
+      event: 'view', 
+      primary: true,
+      icon: View
+    }
+  ]
+  
+  // 待审批状态：审批人可操作
+  if (row.status === 'pending' && canApprove.value) {
+    actions.push({ 
+      key: 'approve', 
+      label: '通过', 
+      event: 'approve', 
+      primary: true,
+      icon: CircleCheck
+    })
+    actions.push({ 
+      key: 'reject', 
+      label: '拒绝', 
+      event: 'reject', 
+      danger: true,
+      icon: CircleClose
+    })
+  }
+  
+  // 已通过且非自动执行：可手动执行
+  if (row.status === 'approved' && !row.auto_execute && !row.scheduled_time) {
+    actions.push({ 
+      key: 'execute', 
+      label: '执行', 
+      event: 'execute', 
+      icon: VideoPlay
+    })
+  }
+  
+  return actions
+}
 
 const loading = ref(false)
 const approvalList = ref([])

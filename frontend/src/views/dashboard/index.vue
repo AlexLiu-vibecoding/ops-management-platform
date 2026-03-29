@@ -111,6 +111,119 @@
       </div>
     </div>
 
+    <!-- 快捷操作区 -->
+    <div class="quick-actions-section">
+      <div class="section-header">
+        <h2 class="section-title">快捷操作</h2>
+      </div>
+      
+      <div class="quick-actions-grid">
+        <!-- 提交变更 -->
+        <div class="quick-action-card" @click="navigateTo('/approvals?tab=myRequests&action=create')">
+          <div class="action-icon gradient-blue">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <line x1="12" y1="18" x2="12" y2="12"/>
+              <line x1="9" y1="15" x2="15" y2="15"/>
+            </svg>
+          </div>
+          <div class="action-content">
+            <div class="action-title">提交变更</div>
+            <div class="action-desc">提交 SQL 变更申请</div>
+          </div>
+        </div>
+        
+        <!-- 实例管理 -->
+        <div class="quick-action-card" @click="navigateTo('/instances')">
+          <div class="action-icon gradient-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+          </div>
+          <div class="action-content">
+            <div class="action-title">实例管理</div>
+            <div class="action-desc">管理数据库实例</div>
+          </div>
+        </div>
+        
+        <!-- 性能监控 -->
+        <div class="quick-action-card" @click="navigateTo('/monitor/performance')">
+          <div class="action-icon gradient-purple">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          </div>
+          <div class="action-content">
+            <div class="action-title">性能监控</div>
+            <div class="action-desc">查看实例性能指标</div>
+          </div>
+        </div>
+        
+        <!-- 脚本执行 -->
+        <div class="quick-action-card" @click="navigateTo('/scripts')">
+          <div class="action-icon gradient-orange">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"/>
+              <polyline points="8 6 2 12 8 18"/>
+            </svg>
+          </div>
+          <div class="action-content">
+            <div class="action-title">脚本执行</div>
+            <div class="action-desc">运行运维脚本</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 待办事项区 -->
+    <div class="todo-section" v-if="todoItems.length > 0">
+      <div class="section-header">
+        <h2 class="section-title">待办事项</h2>
+        <span class="todo-count">{{ todoItems.length }}</span>
+      </div>
+      
+      <div class="todo-list">
+        <div 
+          v-for="item in todoItems" 
+          :key="item.id" 
+          class="todo-item"
+          :class="item.priority"
+          @click="handleTodoClick(item)"
+        >
+          <div class="todo-icon">
+            <svg v-if="item.type === 'approval'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <svg v-else-if="item.type === 'alert'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div class="todo-content">
+            <div class="todo-title">{{ item.title }}</div>
+            <div class="todo-meta">
+              <span class="todo-instance" v-if="item.instance">{{ item.instance }}</span>
+              <span class="todo-time">{{ item.time }}</span>
+            </div>
+          </div>
+          <div class="todo-action">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 性能概览卡片 -->
     <div class="performance-section">
       <div class="section-header">
@@ -228,6 +341,9 @@ import { useUserStore } from '@/stores/user'
 import { monitorApi } from '@/api/monitor'
 import { dashboardApi } from '@/api/dashboard'
 import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+
+dayjs.extend(relativeTime)
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -250,6 +366,7 @@ const animatedStats = reactive({
 })
 
 const performanceData = ref([])
+const todoItems = ref([])
 
 const userName = computed(() => {
   return userStore.user?.real_name || userStore.user?.username || '用户'
@@ -281,10 +398,65 @@ const refreshAll = async () => {
   loading.value = true
   try {
     // 并行获取统计数据和性能数据
-    await Promise.all([refreshStats(), refreshPerformance()])
+    await Promise.all([refreshStats(), refreshPerformance(), refreshTodoItems()])
     lastUpdateTime.value = `${dayjs().format('HH:mm:ss')} 已更新`
   } finally {
     loading.value = false
+  }
+}
+
+// 刷新待办事项
+const refreshTodoItems = async () => {
+  const items = []
+  
+  try {
+    // 获取待审批的变更（仅审批人可见）
+    if (['super_admin', 'approval_admin'].includes(userStore.user?.role)) {
+      const pendingApprovals = await dashboardApi.getPendingApprovals()
+      pendingApprovals.forEach(approval => {
+        items.push({
+          id: `approval-${approval.id}`,
+          type: 'approval',
+          title: approval.title,
+          instance: approval.instance_name,
+          time: dayjs(approval.created_at).fromNow(),
+          priority: approval.sql_risk_level === 'high' ? 'high' : 'normal',
+          route: '/approvals?tab=pendingApproval'
+        })
+      })
+    }
+    
+    // 获取告警信息（如果有的话）
+    // const alerts = await dashboardApi.getActiveAlerts()
+    // alerts.forEach(alert => {
+    //   items.push({
+    //     id: `alert-${alert.id}`,
+    //     type: 'alert',
+    //     title: alert.message,
+    //     instance: alert.instance_name,
+    //     time: dayjs(alert.created_at).fromNow(),
+    //     priority: 'high',
+    //     route: '/monitor/performance'
+    //   })
+    // })
+    
+    // 按优先级排序
+    items.sort((a, b) => {
+      if (a.priority === 'high' && b.priority !== 'high') return -1
+      if (a.priority !== 'high' && b.priority === 'high') return 1
+      return 0
+    })
+    
+    todoItems.value = items.slice(0, 5) // 最多显示5条
+  } catch (error) {
+    console.error('获取待办事项失败:', error)
+  }
+}
+
+// 点击待办事项
+const handleTodoClick = (item) => {
+  if (item.route) {
+    router.push(item.route)
   }
 }
 
@@ -337,16 +509,15 @@ const viewInstance = (id) => {
 }
 
 // 导航到对应功能页面
-const navigateTo = (type) => {
+const navigateTo = (typeOrPath) => {
   const routes = {
     instances: '/instances',
     approvals: '/approvals?tab=pending',
     alerts: '/monitor/performance'
   }
   
-  if (routes[type]) {
-    router.push(routes[type])
-  }
+  const path = routes[typeOrPath] || typeOrPath
+  router.push(path)
 }
 
 onMounted(() => {
@@ -545,6 +716,236 @@ onMounted(() => {
       width: 20px;
       height: 20px;
       color: rgba(255, 255, 255, 0.8);
+    }
+  }
+}
+
+// ========================================
+// Quick Actions Section
+// ========================================
+.quick-actions-section {
+  margin-bottom: 24px;
+  
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+}
+
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  
+  @media (max-width: 1200px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quick-action-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--glass-bg);
+  border-radius: 16px;
+  border: 0.5px solid var(--separator);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    border-color: var(--primary);
+  }
+  
+  .action-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    svg {
+      width: 24px;
+      height: 24px;
+      color: white;
+    }
+    
+    &.gradient-blue {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    &.gradient-green {
+      background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    }
+    
+    &.gradient-purple {
+      background: linear-gradient(135deg, #8E2DE2 0%, #4A00E0 100%);
+    }
+    
+    &.gradient-orange {
+      background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    }
+  }
+  
+  .action-content {
+    .action-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    
+    .action-desc {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 2px;
+    }
+  }
+}
+
+// ========================================
+// Todo Section
+// ========================================
+.todo-section {
+  margin-bottom: 24px;
+  background: var(--glass-bg);
+  border-radius: 20px;
+  padding: 24px;
+  backdrop-filter: blur(10px);
+  border: 0.5px solid var(--separator);
+  
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  
+  .section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0;
+  }
+  
+  .todo-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 24px;
+    height: 24px;
+    padding: 0 8px;
+    background: var(--primary);
+    color: white;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 12px;
+  }
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-secondary);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover {
+    background: var(--bg-tertiary);
+    transform: translateX(4px);
+  }
+  
+  &.high {
+    border-left: 3px solid var(--danger);
+  }
+  
+  &.normal {
+    border-left: 3px solid var(--primary);
+  }
+  
+  .todo-icon {
+    width: 36px;
+    height: 36px;
+    background: var(--bg-tertiary);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    svg {
+      width: 18px;
+      height: 18px;
+      color: var(--text-secondary);
+    }
+  }
+  
+  &.high .todo-icon {
+    background: rgba(var(--danger-rgb), 0.1);
+    
+    svg {
+      color: var(--danger);
+    }
+  }
+  
+  .todo-content {
+    flex: 1;
+    min-width: 0;
+    
+    .todo-title {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .todo-meta {
+      display: flex;
+      gap: 12px;
+      margin-top: 4px;
+      
+      .todo-instance {
+        font-size: 12px;
+        color: var(--text-secondary);
+      }
+      
+      .todo-time {
+        font-size: 12px;
+        color: var(--text-tertiary);
+      }
+    }
+  }
+  
+  .todo-action {
+    svg {
+      width: 16px;
+      height: 16px;
+      color: var(--text-secondary);
     }
   }
 }

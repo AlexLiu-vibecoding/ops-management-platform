@@ -49,16 +49,19 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_by" label="创建人" width="80" show-overflow-tooltip />
-        <el-table-column label="操作" width="240" fixed="right" align="center">
+        <el-table-column label="操作" width="140" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" size="small" @click="handleTrigger(row)" :disabled="row.status !== 'enabled'">执行</el-button>
-              <el-button v-if="row.status === 'enabled'" link type="warning" size="small" @click="handlePause(row)">暂停</el-button>
-              <el-button v-else link type="success" size="small" @click="handleResume(row)">恢复</el-button>
-              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-              <el-button link type="primary" size="small" @click="handleHistory(row)">历史</el-button>
-              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
-            </div>
+            <TableActions 
+              :row="row" 
+              :actions="getTaskActions(row)"
+              :max-primary="2"
+              @trigger="handleTrigger"
+              @pause="handlePause"
+              @resume="handleResume"
+              @edit="handleEdit"
+              @history="handleHistory"
+              @delete="handleDelete"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -199,7 +202,8 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, VideoPlay, VideoPause, RefreshRight, Edit, Timer, DeleteFilled } from '@element-plus/icons-vue'
+import TableActions from '@/components/TableActions.vue'
 import request from '@/api/index'
 import dayjs from 'dayjs'
 
@@ -212,6 +216,66 @@ const getBrowserTimezone = () => {
   }
 }
 const serverTimezone = ref(getBrowserTimezone())
+
+// 定时任务操作配置
+const getTaskActions = (row) => {
+  const actions = []
+  
+  // 执行按钮（仅启用状态可用）
+  actions.push({ 
+    key: 'trigger', 
+    label: '执行', 
+    event: 'trigger', 
+    primary: true,
+    visible: row.status === 'enabled',
+    icon: VideoPlay
+  })
+  
+  // 暂停/恢复按钮
+  if (row.status === 'enabled') {
+    actions.push({ 
+      key: 'pause', 
+      label: '暂停', 
+      event: 'pause', 
+      icon: VideoPause
+    })
+  } else {
+    actions.push({ 
+      key: 'resume', 
+      label: '恢复', 
+      event: 'resume', 
+      icon: RefreshRight
+    })
+  }
+  
+  // 编辑
+  actions.push({ 
+    key: 'edit', 
+    label: '编辑', 
+    event: 'edit', 
+    icon: Edit
+  })
+  
+  // 历史记录
+  actions.push({ 
+    key: 'history', 
+    label: '历史', 
+    event: 'history', 
+    icon: Timer
+  })
+  
+  // 删除
+  actions.push({ 
+    key: 'delete', 
+    label: '删除', 
+    event: 'delete', 
+    danger: true,
+    divided: true,
+    icon: DeleteFilled
+  })
+  
+  return actions
+}
 
 const loading = ref(false)
 const tasks = ref([])

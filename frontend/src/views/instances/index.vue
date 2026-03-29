@@ -121,14 +121,17 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right" align="center">
+        <el-table-column label="操作" width="140" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" size="small" @click="handleView(row)">详情</el-button>
-              <el-button link type="primary" size="small" @click="handleEdit(row)" v-if="canOperate">编辑</el-button>
-              <el-button link type="primary" size="small" @click="handleTest(row)">测试</el-button>
-              <el-button link type="danger" size="small" @click="handleDelete(row)" v-if="canOperate">删除</el-button>
-            </div>
+            <TableActions 
+              :row="row" 
+              :actions="instanceActions"
+              :max-primary="2"
+              @view="handleView"
+              @edit="handleEdit"
+              @test="handleTest"
+              @delete="handleDelete"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -301,7 +304,8 @@ import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 import { useUserStore } from '@/stores/user'
-import { CircleCheck, CircleClose, Delete } from '@element-plus/icons-vue'
+import { CircleCheck, CircleClose, Delete, View, Edit, Connection, DeleteFilled } from '@element-plus/icons-vue'
+import TableActions from '@/components/TableActions.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -311,6 +315,40 @@ const canOperate = computed(() => {
   const role = userStore.user?.role
   return ['super_admin', 'approval_admin', 'operator'].includes(role)
 })
+
+// 实例操作配置
+const instanceActions = computed(() => [
+  { 
+    key: 'view', 
+    label: '详情', 
+    event: 'view', 
+    primary: true,
+    icon: View
+  },
+  { 
+    key: 'edit', 
+    label: '编辑', 
+    event: 'edit', 
+    primary: true,
+    visible: canOperate.value,
+    icon: Edit
+  },
+  { 
+    key: 'test', 
+    label: '测试连接', 
+    event: 'test', 
+    icon: Connection
+  },
+  { 
+    key: 'delete', 
+    label: '删除', 
+    event: 'delete', 
+    visible: canOperate.value,
+    danger: true,
+    divided: true,
+    icon: DeleteFilled
+  }
+])
 
 // 批量操作相关
 const selectedInstances = ref([])

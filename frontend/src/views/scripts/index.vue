@@ -52,14 +52,17 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" width="140" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" size="small" @click="handleExecute(row)">执行</el-button>
-              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-              <el-button link type="primary" size="small" @click="handleDuplicate(row)">复制</el-button>
-              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
-            </div>
+            <TableActions 
+              :row="row" 
+              :actions="scriptActions"
+              :max-primary="2"
+              @execute="handleExecute"
+              @edit="handleEdit"
+              @duplicate="handleDuplicate"
+              @delete="handleDelete"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -237,13 +240,46 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, ArrowDown, Edit, CopyDocument, Delete } from '@element-plus/icons-vue'
+import { Plus, ArrowDown, Edit, CopyDocument, DeleteFilled, VideoPlay } from '@element-plus/icons-vue'
+import TableActions from '@/components/TableActions.vue'
 import request from '@/api/index'
 import dayjs from 'dayjs'
 
 const loading = ref(false)
 const scripts = ref([])
 const formRef = ref(null)
+
+// 脚本操作配置
+const scriptActions = [
+  { 
+    key: 'execute', 
+    label: '执行', 
+    event: 'execute', 
+    primary: true,
+    icon: VideoPlay
+  },
+  { 
+    key: 'edit', 
+    label: '编辑', 
+    event: 'edit', 
+    primary: true,
+    icon: Edit
+  },
+  { 
+    key: 'duplicate', 
+    label: '复制', 
+    event: 'duplicate', 
+    icon: CopyDocument
+  },
+  { 
+    key: 'delete', 
+    label: '删除', 
+    event: 'delete', 
+    danger: true,
+    divided: true,
+    icon: DeleteFilled
+  }
+]
 
 const filters = reactive({
   script_type: '',

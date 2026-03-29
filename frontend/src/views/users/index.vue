@@ -60,13 +60,16 @@
             {{ row.last_login_time ? formatTime(row.last_login_time) : '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right" align="center">
+        <el-table-column label="操作" width="140" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-              <el-button link type="primary" size="small" @click="handleResetPwd(row)" :disabled="row.id === currentUserId">重置密码</el-button>
-              <el-button link type="danger" size="small" @click="handleDelete(row)" :disabled="row.id === currentUserId">删除</el-button>
-            </div>
+            <TableActions 
+              :row="row" 
+              :actions="userActions"
+              :max-primary="2"
+              @edit="handleEdit"
+              @resetPwd="handleResetPwd"
+              @delete="handleDelete"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -184,10 +187,40 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { usersApi } from '@/api/users'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Edit, Key, DeleteFilled } from '@element-plus/icons-vue'
+import TableActions from '@/components/TableActions.vue'
 import dayjs from 'dayjs'
+import request from '@/api/index'
 
 const userStore = useUserStore()
 const currentUserId = computed(() => userStore.user?.id)
+
+// 用户操作配置
+const userActions = computed(() => [
+  { 
+    key: 'edit', 
+    label: '编辑', 
+    event: 'edit', 
+    primary: true,
+    icon: Edit
+  },
+  { 
+    key: 'resetPwd', 
+    label: '重置密码', 
+    event: 'resetPwd', 
+    visible: (row) => row.id !== currentUserId.value,
+    icon: Key
+  },
+  { 
+    key: 'delete', 
+    label: '删除', 
+    event: 'delete', 
+    visible: (row) => row.id !== currentUserId.value,
+    danger: true,
+    divided: true,
+    icon: DeleteFilled
+  }
+])
 
 const loading = ref(false)
 const userList = ref([])
