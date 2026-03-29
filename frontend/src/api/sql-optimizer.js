@@ -20,7 +20,7 @@ export const sqlOptimizerApi = {
   },
 
   // 获取分析历史
-  getHistory(instanceId, limit = 20) {
+  getHistory(instanceId, limit = 10) {
     return request.get(`/sql-optimizer/history/${instanceId}`, { params: { limit } })
   },
 
