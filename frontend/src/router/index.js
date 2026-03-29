@@ -220,6 +220,13 @@ const routes = [
         component: () => import('@/views/audit/index.vue'),
         meta: { title: '审计日志', icon: 'Tickets', roles: ['super_admin'] }
       },
+      // 系统管理 - 后台任务
+      {
+        path: 'scheduler',
+        name: 'Scheduler',
+        component: () => import('@/views/scheduler/index.vue'),
+        meta: { title: '后台任务', icon: 'Timer', roles: ['super_admin', 'approval_admin'] }
+      },
       // 系统管理 - 系统设置
       {
         path: 'system',

@@ -128,6 +128,10 @@ class PermissionCode:
     ROLE_MANAGE = "system:role_manage"
     SYSTEM_CONFIG = "system:config"
     AUDIT_LOG = "system:audit_log"
+    
+    # 调度器管理
+    SCHEDULER_VIEW = "scheduler:view"
+    SCHEDULER_MANAGE = "scheduler:manage"
 
 
 # ==================== 默认角色权限配置 ====================
@@ -172,6 +176,9 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.ROLE_MANAGE,
         PermissionCode.SYSTEM_CONFIG,
         PermissionCode.AUDIT_LOG,
+        # 调度器管理
+        PermissionCode.SCHEDULER_VIEW,
+        PermissionCode.SCHEDULER_MANAGE,
     ],
     "approval_admin": [
         # 实例管理 - 查看、测试
@@ -198,6 +205,9 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.SCRIPT_EXECUTE,
         # 审计日志
         PermissionCode.AUDIT_LOG,
+        # 调度器管理
+        PermissionCode.SCHEDULER_VIEW,
+        PermissionCode.SCHEDULER_MANAGE,
     ],
     "operator": [
         # 实例管理 - 查看、创建、编辑、测试
@@ -216,6 +226,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         # 脚本管理 - 查看、执行
         PermissionCode.SCRIPT_VIEW,
         PermissionCode.SCRIPT_EXECUTE,
+        # 调度器管理 - 查看
+        PermissionCode.SCHEDULER_VIEW,
     ],
     "developer": [
         # 实例管理 - 仅查看
@@ -231,6 +243,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.MONITOR_VIEW,
         # 脚本管理 - 仅查看
         PermissionCode.SCRIPT_VIEW,
+        # 调度器管理 - 查看
+        PermissionCode.SCHEDULER_VIEW,
     ],
     "readonly": [
         # 实例管理 - 仅查看
@@ -243,5 +257,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.MONITOR_VIEW,
         # 脚本管理 - 仅查看
         PermissionCode.SCRIPT_VIEW,
+        # 调度器管理 - 仅查看
+        PermissionCode.SCHEDULER_VIEW,
     ]
 }

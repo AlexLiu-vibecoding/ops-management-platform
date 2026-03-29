@@ -247,8 +247,9 @@ async def init_default_menus(
         {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
         {"name": "通知管理", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
         {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
-        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
-        {"name": "系统设置", "path": "/system", "icon": "Setting", "sort_order": 14, "roles": "super_admin"},
+        {"name": "后台任务", "path": "/scheduler", "icon": "Timer", "sort_order": 13, "roles": "super_admin,approval_admin"},
+        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 14, "roles": "super_admin"},
+        {"name": "系统设置", "path": "/system", "icon": "Setting", "sort_order": 15, "roles": "super_admin"},
     ]
     
     # Sub-menu configuration
@@ -298,8 +299,9 @@ async def add_missing_menus(
         {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
         {"name": "通知管理", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
         {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
-        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 13, "roles": "super_admin"},
-        {"name": "系统设置", "path": "/system", "icon": "Setting", "sort_order": 14, "roles": "super_admin"},
+        {"name": "后台任务", "path": "/scheduler", "icon": "Timer", "sort_order": 13, "roles": "super_admin,approval_admin"},
+        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 14, "roles": "super_admin"},
+        {"name": "系统设置", "path": "/system", "icon": "Setting", "sort_order": 15, "roles": "super_admin"},
     ]
     
     added_count = 0
