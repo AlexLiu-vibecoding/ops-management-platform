@@ -67,7 +67,7 @@
           <el-table :data="inspectionResult.results" style="width: 100%">
             <el-table-column prop="module_label" label="模块" width="100" />
             <el-table-column prop="metric_name" label="指标" min-width="150" />
-            <el-table-column prop="status_label" label="状态" width="80" align="center">
+            <el-table-column prop="status_label" label="状态" min-width="80" align="center">
               <template #default="{ row }">
                 <el-tag :type="getStatusType(row.status)" size="small">{{ row.status_label }}</el-tag>
               </template>
@@ -134,7 +134,7 @@
             <el-table-column prop="instance_name" label="实例" min-width="120" />
             <el-table-column prop="module_label" label="模块" width="100" />
             <el-table-column prop="metric_name" label="指标" min-width="150" />
-            <el-table-column prop="status_label" label="状态" width="80" align="center">
+            <el-table-column prop="status_label" label="状态" min-width="80" align="center">
               <template #default="{ row }">
                 <el-tag :type="getStatusType(row.status)" size="small">{{ row.status_label }}</el-tag>
               </template>

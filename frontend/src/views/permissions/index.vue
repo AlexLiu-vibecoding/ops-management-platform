@@ -130,7 +130,7 @@
                   <el-table-column prop="username" label="用户名" width="150" />
                   <el-table-column prop="real_name" label="姓名" width="120" />
                   <el-table-column prop="email" label="邮箱" />
-                  <el-table-column prop="status" label="状态" width="80">
+                  <el-table-column prop="status" label="状态" min-width="80">
                     <template #default="{ row }">
                       <el-tag :type="row.status ? 'success' : 'danger'" size="small">
                         {{ row.status ? '正常' : '禁用' }}

@@ -298,7 +298,7 @@
                 />
               </template>
             </el-table-column>
-            <el-table-column prop="enabled" label="状态" width="80">
+            <el-table-column prop="enabled" label="状态" min-width="80">
               <template #default="{ row }">
                 <el-switch v-model="row.enabled" :disabled="!isAdmin" />
               </template>

@@ -48,7 +48,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80" align="center">
+        <el-table-column prop="status" label="状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status ? 'success' : 'danger'" size="small">
               {{ row.status ? '启用' : '禁用' }}

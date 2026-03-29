@@ -30,7 +30,7 @@
             <code style="font-size: 12px;">{{ row.cron_expression }}</code>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80" align="center">
+        <el-table-column prop="status" label="状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'enabled' ? 'success' : 'info'" size="small">
               {{ row.status === 'enabled' ? '启用' : '禁用' }}
@@ -169,7 +169,7 @@
     <el-dialog v-model="historyDialog.visible" title="执行历史" width="900px">
       <el-table :data="historyDialog.items" v-loading="historyDialog.loading">
         <el-table-column prop="script_name" label="脚本" width="150" />
-        <el-table-column prop="status" label="状态" width="80">
+        <el-table-column prop="status" label="状态" min-width="80">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ row.status }}

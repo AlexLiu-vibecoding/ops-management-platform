@@ -44,7 +44,7 @@
                 {{ getMonitorTypeLabel(row.monitor_type) }}
               </template>
             </el-table-column>
-            <el-table-column prop="enabled" label="状态" width="100">
+            <el-table-column prop="enabled" label="状态" min-width="100">
               <template #default="{ row }">
                 <el-switch
                   v-model="row.enabled"

@@ -36,7 +36,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="blocking_thread_id" label="阻塞线程" width="100" align="center" />
-            <el-table-column prop="status" label="状态" width="80" align="center">
+            <el-table-column prop="status" label="状态" min-width="70" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.status === 'active' ? 'danger' : 'success'" size="small">
                   {{ row.status }}
@@ -80,7 +80,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="trx_state" label="状态" width="100" align="center" />
+            <el-table-column prop="trx_state" label="状态" min-width="100" align="center" />
             <el-table-column prop="trx_query" label="当前SQL" min-width="200" show-overflow-tooltip>
               <template #default="{ row }">
                 <span class="sql-text">{{ row.trx_query || '-' }}</span>
@@ -88,11 +88,7 @@
             </el-table-column>
             <el-table-column prop="trx_rows_locked" label="锁定行数" width="100" align="center" />
             <el-table-column prop="user" label="用户" width="100" />
-            <el-table-column prop="status" label="状态" width="80" align="center">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 'active' ? 'danger' : 'success'" size="small">
-                  {{ row.status }}
-                </el-tag>
+            <el-table-column prop="status" label="状态" min-width="70" align="center">
               </template>
             </el-table-column>
             <el-table-column label="操作" min-width="80" fixed="right" align="center">

@@ -52,7 +52,7 @@
             <el-tag v-else type="info" size="small">未配置</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80" align="center">
+        <el-table-column prop="status" label="状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status ? 'success' : 'info'" size="small">
               {{ row.status ? '启用' : '禁用' }}

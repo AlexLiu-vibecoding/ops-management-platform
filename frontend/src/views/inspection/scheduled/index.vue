@@ -52,7 +52,7 @@
             {{ formatDateTime(row.last_run_time) }}
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="80">
+        <el-table-column prop="status" label="状态" min-width="80">
           <template #default="{ row }">
             <el-tag :type="row.status === 'enabled' ? 'success' : 'info'">
               {{ row.status === 'enabled' ? '启用' : '禁用' }}

@@ -97,7 +97,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="alert_title" label="告警标题" min-width="200" />
-        <el-table-column prop="status_label" label="状态" width="90" align="center">
+        <el-table-column prop="status_label" label="状态" min-width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.status)" size="small">
               {{ row.status_label }}

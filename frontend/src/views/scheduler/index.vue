@@ -117,7 +117,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column prop="status" label="状态" width="100" align="center">
+        <el-table-column prop="status" label="状态" min-width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'running' ? 'success' : row.status === 'paused' ? 'warning' : 'info'" size="small">
               {{ row.status === 'running' ? '运行中' : row.status === 'paused' ? '已暂停' : '待执行' }}
