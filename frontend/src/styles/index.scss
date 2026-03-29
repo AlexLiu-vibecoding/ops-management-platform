@@ -2,6 +2,14 @@
 // iOS-Style Modern UI Design System
 // ========================================
 
+// 强制覆盖 Element Plus 表格截断样式 - 必须在最前面
+.el-table .cell {
+  overflow: visible !important;
+  text-overflow: unset !important;
+  white-space: normal !important;
+  word-break: break-all;
+}
+
 // CSS Variables - Design Tokens
 :root {
   // Primary Colors - 适中饱和度的蓝色
@@ -424,23 +432,19 @@ html, body {
     font-weight: 600 !important;
     color: var(--text-secondary) !important;
     border-bottom: 0.5px solid var(--separator) !important;
-    overflow: visible !important;
     
     .cell {
       overflow: visible !important;
       text-overflow: unset !important;
-      white-space: nowrap !important;
     }
   }
   
   td.el-table__cell {
     border-bottom: 0.5px solid var(--separator) !important;
-    overflow: visible !important;
     
     .cell {
       overflow: visible !important;
       text-overflow: unset !important;
-      white-space: nowrap !important;
     }
   }
   
@@ -941,12 +945,9 @@ html, body {
     // 最小宽度保证
     min-width: fit-content !important;
     
-    // 操作列内部不换行
+    // 操作列内部
     .el-table__cell {
-      white-space: nowrap;
-      
       .cell {
-        white-space: nowrap;
         overflow: visible;
         min-width: fit-content;
       }
