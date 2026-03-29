@@ -50,13 +50,11 @@
       </div>
       
       <el-table :data="approvalList" style="width: 100%" v-loading="loading">
-        <el-table-column prop="title" label="标题" min-width="120">
+        <el-table-column prop="title" label="标题" min-width="150">
           <template #default="{ row }">
-            <div class="title-cell">
-              <span>{{ row.title }}</span>
-              <el-tag v-if="row.auto_execute" type="success" size="small" style="margin-left: 6px;">自动</el-tag>
-              <el-tag v-if="row.scheduled_time" type="warning" size="small" style="margin-left: 6px;">定时</el-tag>
-            </div>
+            <span>{{ row.title }}</span>
+            <el-tag v-if="row.auto_execute" type="success" size="small" style="margin-left: 6px;">自动</el-tag>
+            <el-tag v-if="row.scheduled_time" type="warning" size="small" style="margin-left: 6px;">定时</el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="change_type" label="类型" width="90" align="center">
@@ -88,7 +86,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="created_at" label="提交时间" min-width="170">
+        <el-table-column prop="created_at" label="提交时间" width="160">
           <template #default="{ row }">
             {{ formatTime(row.created_at) }}
           </template>
@@ -372,7 +370,7 @@ const dialog = reactive({
     title: '',
     instance_id: null,
     database_name: '',
-    change_type: 'DML',  // 默认 DML
+    change_type: 'DML',
     sql_content: '',
     remark: '',
     affected_rows_estimate: 0,
@@ -401,10 +399,9 @@ const fetchApprovals = async () => {
     const params = {
       skip: (pagination.page - 1) * pagination.pageSize,
       limit: pagination.pageSize,
-      exclude_change_type: 'REDIS'  // 所有 Tab 都排除 REDIS 类型
+      exclude_change_type: 'REDIS'
     }
     
-    // 根据 Tab 设置不同的查询参数
     if (activeTab.value === 'myRequests') {
       params.requester_id = currentUserId.value
     } else if (activeTab.value === 'pendingApproval') {
@@ -420,7 +417,6 @@ const fetchApprovals = async () => {
     approvalList.value = data.items || []
     pagination.total = data.total || 0
     
-    // 更新待审批数量
     if (activeTab.value === 'pendingApproval') {
       pendingCount.value = data.total || 0
     }
@@ -446,7 +442,6 @@ const fetchPendingCount = async () => {
 const fetchInstances = async () => {
   try {
     const data = await instancesApi.getList({ limit: 100 })
-    // 过滤掉 Redis 实例，只显示 MySQL/PostgreSQL
     instances.value = (data.items || []).filter(i => i.db_type !== 'redis')
   } catch (error) {
     console.error('获取实例列表失败:', error)
@@ -464,14 +459,13 @@ const handleAdd = () => {
     title: '',
     instance_id: null,
     database_name: '',
-    change_type: 'DML',  // 默认 DML
+    change_type: 'DML',
     sql_content: '',
     remark: '',
     affected_rows_estimate: 0,
     execution_mode: 'auto',
     scheduled_time: null
   }
-  // 重置文件状态
   fullSqlContent.value = ''
   sqlStats.totalLines = 0
   sqlStats.fileSize = 0
@@ -479,9 +473,6 @@ const handleAdd = () => {
   dialog.visible = true
 }
 
-/**
- * 处理文件选择
- */
 const handleFileSelect = async (file) => {
   const rawFile = file.raw
   
@@ -527,9 +518,6 @@ const handleFileSelect = async (file) => {
   }
 }
 
-/**
- * 重置文件状态
- */
 const resetFileState = () => {
   fullSqlContent.value = ''
   sqlStats.totalLines = 0
@@ -537,9 +525,6 @@ const resetFileState = () => {
   sqlStats.isLargeFile = false
 }
 
-/**
- * 格式化SQL内容
- */
 const formatSQLContent = () => {
   if (!dialog.form.sql_content.trim()) return
   let formatted = dialog.form.sql_content.replace(/\s+/g, ' ').trim()
@@ -552,9 +537,6 @@ const formatSQLContent = () => {
   ElMessage.success('SQL已格式化')
 }
 
-/**
- * 清空SQL内容
- */
 const clearSQLContent = () => {
   dialog.form.sql_content = ''
   fullSqlContent.value = ''
@@ -563,9 +545,6 @@ const clearSQLContent = () => {
   sqlStats.isLargeFile = false
 }
 
-/**
- * 格式化文件大小
- */
 const formatFileSize = (bytes) => {
   if (bytes === 0) return '0 B'
   const k = 1024
@@ -578,7 +557,6 @@ const handleInstanceSelect = async (instanceId) => {
   dialog.form.database_name = ''
   dialog.databases = []
   
-  // 获取数据库列表
   dialog.dbLoading = true
   try {
     const data = await request.get(`/sql/databases/${instanceId}`)
@@ -599,7 +577,6 @@ const handleSubmit = async () => {
     
     dialog.submitting = true
     try {
-      // 如果是大文件，使用完整内容提交
       const sqlToSubmit = fullSqlContent.value || dialog.form.sql_content
       
       const submitData = {
@@ -699,7 +676,7 @@ const getStatusLabel = (status) => {
   return labels[status] || status
 }
 
-const formatTime = (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-'
+const formatTime = (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-'
 
 onMounted(() => {
   fetchApprovals()
@@ -728,28 +705,18 @@ onMounted(() => {
   .filter-bar {
     display: flex;
     gap: 10px;
-    margin-bottom: 15px;
+    margin-bottom: 16px;
   }
   
   .risk-tag {
     padding: 2px 8px;
     border-radius: 4px;
     font-size: 12px;
+    
     &.low { background: #f0f9eb; color: #67c23a; }
     &.medium { background: #fdf6ec; color: #e6a23c; }
     &.high { background: #fef0f0; color: #f56c6c; }
     &.critical { background: #fde2e2; color: #f56c6c; font-weight: bold; }
-  }
-  
-  .title-cell {
-    display: flex;
-    align-items: center;
-  }
-  
-  // 强制覆盖表格单元格截断
-  :deep(.el-table__cell .cell) {
-    overflow: visible !important;
-    text-overflow: unset !important;
   }
   
   .sql-input-wrapper {
@@ -801,23 +768,6 @@ onMounted(() => {
         }
       }
     }
-  }
-  
-  .sql-preview {
-    background: #f5f7fa;
-    padding: 10px;
-    border-radius: 4px;
-    font-family: monospace;
-    font-size: 12px;
-    max-height: 200px;
-    overflow: auto;
-    white-space: pre-wrap;
-    margin: 0;
-  }
-  
-  .table-operations {
-    display: flex;
-    gap: 8px;
   }
   
   .approval-actions {
