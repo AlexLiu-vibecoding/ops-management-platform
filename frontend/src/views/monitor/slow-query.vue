@@ -133,7 +133,7 @@
             {{ formatTime(row.last_seen) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="90" fixed="right" align="center">
+        <el-table-column label="操作" min-width="90" fixed="right" align="center">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click.stop="analyzeQuery(row)">EXPLAIN</el-button>
           </template>

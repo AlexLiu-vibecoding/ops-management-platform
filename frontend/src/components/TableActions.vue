@@ -62,7 +62,7 @@ const props = defineProps({
   }
 })
 
-defineEmits(['view', 'edit', 'delete', 'test', 'enable', 'disable', 'export', 'copy', 'approve', 'reject', 'execute', 'revoke'])
+defineEmits(['view', 'edit', 'delete', 'test', 'enable', 'disable', 'export', 'copy', 'approve', 'reject', 'execute', 'revoke', 'trigger', 'pause', 'resume', 'history', 'duplicate'])
 
 // 过滤可见的操作
 const visibleActions = computed(() => {
@@ -92,12 +92,25 @@ const secondaryActions = computed(() => {
 .table-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: 2px;
+  min-width: fit-content;
+  
+  :deep(.el-button) {
+    padding: 4px 8px;
+    margin: 0;
+    
+    & + .el-button {
+      margin-left: 0;
+    }
+  }
   
   .more-btn {
     display: flex;
     align-items: center;
     gap: 2px;
+    flex-shrink: 0;
     
     .el-icon--right {
       font-size: 12px;

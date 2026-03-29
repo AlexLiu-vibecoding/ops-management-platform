@@ -50,7 +50,7 @@
             {{ row.reviewer_name || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right" align="center">
+        <el-table-column label="操作" min-width="140" fixed="right" align="center">
           <template #default="{ row }">
             <template v-if="row.status === 'pending'">
               <el-button type="success" size="small" @click="handleReview(row, true)">

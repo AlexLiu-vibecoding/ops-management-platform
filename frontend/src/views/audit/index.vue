@@ -103,7 +103,7 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" min-width="80" fixed="right">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" size="small" @click="handleViewDetail(row)">详情</el-button>

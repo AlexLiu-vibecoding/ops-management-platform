@@ -105,7 +105,7 @@
             </el-table-column>
             <el-table-column prop="length" label="长度" width="80" align="right" />
             <el-table-column prop="ttl_human" label="TTL" width="100" align="center" />
-            <el-table-column label="操作" width="160" fixed="right" align="center">
+            <el-table-column label="操作" min-width="160" fixed="right" align="center">
               <template #default="{ row }">
                 <div class="table-operations">
                   <el-button link type="primary" size="small" @click.stop="viewKeyDetail(row)">查看</el-button>

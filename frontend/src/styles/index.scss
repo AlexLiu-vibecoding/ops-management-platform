@@ -907,3 +907,36 @@ html, body {
     }
   }
 }
+
+// ========================================
+// Table Fixed 操作列样式 - 防止被压缩
+// ========================================
+.el-table {
+  // 确保固定列不被压缩
+  .el-table__fixed-right {
+    // 最小宽度保证
+    min-width: fit-content !important;
+    
+    // 操作列内部不换行
+    .el-table__cell {
+      white-space: nowrap;
+      
+      .cell {
+        white-space: nowrap;
+        overflow: visible;
+        min-width: fit-content;
+      }
+    }
+  }
+  
+  // 操作列样式
+  .action-column {
+    .cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: fit-content;
+      padding: 0 8px;
+    }
+  }
+}

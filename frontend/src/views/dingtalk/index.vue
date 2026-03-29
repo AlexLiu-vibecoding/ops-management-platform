@@ -40,7 +40,7 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
+        <el-table-column label="操作" min-width="140" fixed="right">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="primary" @click="handleEditChannel(row)">编辑</el-button>
@@ -103,7 +103,7 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" min-width="100" fixed="right">
           <template #default="{ row }">
             <div class="table-operations">
               <el-button link type="danger" size="small" @click="handleDeleteBinding(row)">删除</el-button>

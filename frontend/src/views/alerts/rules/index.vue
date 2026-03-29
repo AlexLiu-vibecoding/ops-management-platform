@@ -75,7 +75,7 @@
             {{ row.trigger_count || 0 }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" min-width="220" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
             <el-button link :type="row.is_enabled ? 'warning' : 'success'" @click="handleToggle(row)">

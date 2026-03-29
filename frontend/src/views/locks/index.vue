@@ -99,7 +99,7 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="80" fixed="right" align="center">
+            <el-table-column label="操作" min-width="80" fixed="right" align="center">
               <template #default="{ row }">
                 <el-button v-if="row.status === 'active'" link type="danger" size="small" @click="killTransaction(row)">Kill</el-button>
               </template>

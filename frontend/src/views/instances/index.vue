@@ -121,7 +121,7 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" min-width="160" fixed="right" align="center">
           <template #default="{ row }">
             <TableActions 
               :row="row" 
