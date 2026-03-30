@@ -144,8 +144,10 @@
           </el-table-column>
           <el-table-column label="操作" width="120" v-if="isAdmin" fixed="right" align="center">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="handleEditRegion(row)">编辑</el-button>
-              <el-button link type="danger" size="small" @click="handleDeleteRegion(row)">删除</el-button>
+              <div class="action-buttons">
+                <el-button link type="primary" size="small" @click="handleEditRegion(row)">编辑</el-button>
+                <el-button link type="danger" size="small" @click="handleDeleteRegion(row)">删除</el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -656,6 +658,14 @@ onMounted(() => {
     padding: 2px 6px;
     border-radius: 4px;
     font-family: monospace;
+  }
+  
+  .action-buttons {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
   }
 }
 </style>
