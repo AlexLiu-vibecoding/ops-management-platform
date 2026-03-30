@@ -233,10 +233,11 @@ const fetchOverview = async () => {
   loading.value = true
   try {
     const res = await request.get('/scheduler/overview')
-    overview.value = res.data || {}
-    jobs.value = res.data?.approval_scheduler?.jobs || []
+    // 拦截器已经返回 response.data，所以 res 就是数据本身
+    overview.value = res || {}
+    jobs.value = res?.approval_scheduler?.jobs || []
     // 合并任务调度器的任务
-    const taskJobs = res.data?.task_scheduler?.jobs || []
+    const taskJobs = res?.task_scheduler?.jobs || []
     jobs.value = [...jobs.value, ...taskJobs]
   } catch (error) {
     console.error('获取调度器状态失败:', error)
