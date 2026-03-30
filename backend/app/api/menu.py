@@ -234,22 +234,21 @@ async def init_default_menus(
         )
     
     # Default menu configuration (top-level menus)
+    # 已整合功能: 用户管理(含注册审批)、环境管理(含AWS区域管理)、系统设置(含后台任务、通知管理)
     parent_menus = [
         {"name": "仪表盘", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
         {"name": "实例管理", "path": "/instances", "icon": "Server", "sort_order": 2, "roles": "super_admin,approval_admin,operator"},
         {"name": "环境管理", "path": "/environments", "icon": "Collection", "sort_order": 3, "roles": "super_admin,approval_admin,operator"},
         {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
-        {"name": "变更审批", "path": "/approvals", "icon": "Stamp", "sort_order": 5},
+        {"name": "变更管理", "path": "/change", "icon": "Stamp", "sort_order": 5},
         {"name": "监控中心", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
         {"name": "脚本管理", "path": "/scripts", "icon": "DocumentCopy", "sort_order": 7, "roles": "super_admin,approval_admin,operator"},
         {"name": "定时任务", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
         {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
-        {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
-        {"name": "通知管理", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
-        {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
-        {"name": "后台任务", "path": "/scheduler", "icon": "Timer", "sort_order": 13, "roles": "super_admin,approval_admin"},
-        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 14, "roles": "super_admin"},
-        {"name": "系统设置", "path": "/system", "icon": "Setting", "sort_order": 15, "roles": "super_admin"},
+        {"name": "权限管理", "path": "/permissions", "icon": "Lock", "sort_order": 10, "roles": "super_admin"},
+        {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 11},
+        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 12, "roles": "super_admin"},
+        {"name": "系统设置", "path": "/system", "icon": "Tools", "sort_order": 13, "roles": "super_admin"},
     ]
     
     # Sub-menu configuration
@@ -286,22 +285,21 @@ async def add_missing_menus(
 ):
     """Add missing menus (used for version upgrades)"""
     # Required top-level menus
+    # 已整合功能: 用户管理(含注册审批)、环境管理(含AWS区域管理)、系统设置(含后台任务、通知管理)
     required_menus = [
         {"name": "仪表盘", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
         {"name": "实例管理", "path": "/instances", "icon": "Server", "sort_order": 2, "roles": "super_admin,approval_admin,operator"},
         {"name": "环境管理", "path": "/environments", "icon": "Collection", "sort_order": 3, "roles": "super_admin,approval_admin,operator"},
         {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 4},
-        {"name": "变更管理", "path": "/change", "icon": "Stamp", "sort_order": 5},  # Group menu, no direct access
+        {"name": "变更管理", "path": "/change", "icon": "Stamp", "sort_order": 5},
         {"name": "监控中心", "path": "/monitor", "icon": "Monitor", "sort_order": 6},
         {"name": "脚本管理", "path": "/scripts", "icon": "DocumentCopy", "sort_order": 7, "roles": "super_admin,approval_admin,operator"},
         {"name": "定时任务", "path": "/scheduled-tasks", "icon": "Timer", "sort_order": 8, "roles": "super_admin,approval_admin,operator"},
         {"name": "用户管理", "path": "/users", "icon": "User", "sort_order": 9, "roles": "super_admin"},
-        {"name": "注册审批", "path": "/registrations", "icon": "UserFilled", "sort_order": 10, "roles": "super_admin"},
-        {"name": "通知管理", "path": "/notification", "icon": "ChatDotRound", "sort_order": 11, "roles": "super_admin"},
-        {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 12},
-        {"name": "后台任务", "path": "/scheduler", "icon": "Timer", "sort_order": 13, "roles": "super_admin,approval_admin"},
-        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 14, "roles": "super_admin"},
-        {"name": "系统设置", "path": "/system", "icon": "Setting", "sort_order": 15, "roles": "super_admin"},
+        {"name": "权限管理", "path": "/permissions", "icon": "Lock", "sort_order": 10, "roles": "super_admin"},
+        {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 11},
+        {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 12, "roles": "super_admin"},
+        {"name": "系统设置", "path": "/system", "icon": "Tools", "sort_order": 13, "roles": "super_admin"},
     ]
     
     added_count = 0
@@ -350,8 +348,14 @@ async def add_missing_menus(
                 db.add(menu)
                 added_count += 1
     
-    # Remove old menu entries that are no longer needed
-    old_paths = ["/approvals"]  # Old single approval menu
+    # Remove old menu entries that are no longer needed (merged into other pages)
+    old_paths = [
+        "/approvals",        # Old single approval menu (merged into /change)
+        "/registrations",    # Merged into /users
+        "/notification",     # Merged into /system
+        "/scheduler",        # Merged into /system
+        "/aws-regions",      # Merged into /environments
+    ]
     for old_path in old_paths:
         old_menu = db.query(MenuConfig).filter(MenuConfig.path == old_path).first()
         if old_menu:

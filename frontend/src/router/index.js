@@ -178,7 +178,7 @@ const routes = [
         meta: { title: '定时任务', icon: 'AlarmClock', roles: ['super_admin', 'approval_admin', 'operator'] }
       },
       
-      // 系统管理 - 用户管理
+      // 系统管理 - 用户管理（含注册审批）
       {
         path: 'users',
         name: 'Users',
@@ -192,26 +192,12 @@ const routes = [
         component: () => import('@/views/permissions/index.vue'),
         meta: { title: '权限管理', icon: 'Lock', roles: ['super_admin'] }
       },
-      // 系统管理 - 注册审批
-      {
-        path: 'registrations',
-        name: 'Registrations',
-        component: () => import('@/views/registrations/index.vue'),
-        meta: { title: '注册审批', icon: 'UserFilled', roles: ['super_admin'] }
-      },
       // 系统管理 - 菜单配置
       {
         path: 'menu-config',
         name: 'MenuConfig',
         component: () => import('@/views/menu-config/index.vue'),
         meta: { title: '菜单配置', icon: 'Menu', roles: ['super_admin'] }
-      },
-      // 系统管理 - 通知管理
-      {
-        path: 'notification',
-        name: 'Notification',
-        component: () => import('@/views/notification/index.vue'),
-        meta: { title: '通知管理', icon: 'ChatDotRound', roles: ['super_admin'] }
       },
       // 系统管理 - 审计日志
       {
@@ -220,26 +206,12 @@ const routes = [
         component: () => import('@/views/audit/index.vue'),
         meta: { title: '审计日志', icon: 'Tickets', roles: ['super_admin'] }
       },
-      // 系统管理 - 后台任务
-      {
-        path: 'scheduler',
-        name: 'Scheduler',
-        component: () => import('@/views/scheduler/index.vue'),
-        meta: { title: '后台任务', icon: 'Timer', roles: ['super_admin', 'approval_admin'] }
-      },
-      // 系统管理 - 系统设置
+      // 系统管理 - 系统设置（含后台任务、通知管理、AWS区域管理）
       {
         path: 'system',
         name: 'SystemSettings',
         component: () => import('@/views/system/index.vue'),
         meta: { title: '系统设置', icon: 'Tools', roles: ['super_admin'] }
-      },
-      // 系统管理 - AWS区域管理
-      {
-        path: 'aws-regions',
-        name: 'AwsRegions',
-        component: () => import('@/views/system/aws-regions.vue'),
-        meta: { title: 'AWS区域管理', icon: 'Location', roles: ['super_admin'] }
       }
     ]
   }
