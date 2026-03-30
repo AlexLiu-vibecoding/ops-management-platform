@@ -206,12 +206,28 @@ const routes = [
         component: () => import('@/views/audit/index.vue'),
         meta: { title: '审计日志', icon: 'Tickets', roles: ['super_admin'] }
       },
-      // 系统管理 - 系统设置（含后台任务、通知管理、AWS区域管理）
+      // 系统管理 - 系统设置（含后台任务、AWS区域管理等）
       {
         path: 'system',
         name: 'SystemSettings',
         component: () => import('@/views/system/index.vue'),
         meta: { title: '系统设置', icon: 'Tools', roles: ['super_admin'] }
+      },
+      
+      // 配置管理
+      {
+        path: 'config',
+        name: 'Config',
+        redirect: '/config/notification',
+        meta: { title: '配置管理', icon: 'Setting' },
+        children: [
+          {
+            path: 'notification',
+            name: 'NotificationConfig',
+            component: () => import('@/views/config/notification.vue'),
+            meta: { title: '通知管理', icon: 'Bell' }
+          }
+        ]
       }
     ]
   }
