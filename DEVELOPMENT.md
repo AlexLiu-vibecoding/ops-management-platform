@@ -22,11 +22,248 @@
 | 存储 | 本地文件系统 / AWS S3 / 阿里云 OSS |
 | 测试 | pytest |
 
+### 1.3 服务端口
+
+| 服务 | 端口 | 说明 |
+|------|------|------|
+| 后端 API | 5000 | FastAPI 服务 |
+| 前端开发 | 3000 | Vite 开发服务器（热更新） |
+
 ---
 
-## 二、分支管理
+## 二、AI 协作开发指南
 
-### 2.1 分支策略
+> ⚠️ **重要**：本节专门针对 AI 辅助开发场景，确保高效协作，减少 token 消耗。
+
+### 2.1 AI 启动开发前必做
+
+AI 在开始任何开发任务前，**必须按顺序执行以下检查**：
+
+```
+1. 读取上下文
+   - 检查是否有压缩摘要 (last_compress_result)
+   - 了解当前项目状态和最近的修改
+   
+2. 确认项目结构
+   - 执行 `ls -la` 确认工作目录
+   - 检查关键配置文件是否存在 (.coze, package.json, requirements.txt)
+   
+3. 检查服务状态
+   - 后端：curl -I http://localhost:5000
+   - 前端：curl -I http://localhost:3000
+   - 如果服务未启动，查看 .coze 或 package.json 中的启动命令
+   
+4. 明确需求范围
+   - 确认具体要做什么，不要擅自扩展范围
+   - 不确定的地方先问用户
+```
+
+### 2.2 AI 开发工作流程
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     开发任务开始                              │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  1. 需求确认                                                 │
+│     - 明确要做什么，不要猜测                                  │
+│     - 涉及多个文件时，先列出修改清单                          │
+│     - 复杂任务创建 TODO 列表跟踪进度                          │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  2. 先读后写                                                 │
+│     - 修改文件前必须先 read_file 读取当前内容                 │
+│     - 了解文件结构后再进行修改                                │
+│     - 避免覆盖已有功能                                       │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  3. 代码修改                                                 │
+│     - 优先使用 edit_file 精准修改                            │
+│     - 大改动考虑 write_file 覆盖                             │
+│     - 保持代码风格一致                                       │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  4. 验证测试                                                 │
+│     - 前端：利用 Vite 热更新，刷新页面查看                    │
+│     - 后端：检查日志 tail -n 20 /app/work/logs/bypass/app.log│
+│     - API：curl 测试接口                                     │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│  5. 确认完成                                                 │
+│     - 向用户展示修改内容                                      │
+│     - 等待用户确认或反馈                                      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 2.3 常见错误与避坑指南
+
+#### ❌ 错误做法 → ✅ 正确做法
+
+| 场景 | ❌ 错误 | ✅ 正确 |
+|------|---------|---------|
+| 端口检测 | `lsof -i:5000` | `curl -I http://localhost:5000` 或 `ss -tuln \| grep :5000` |
+| 文件下载 | `<a href=url download>` | `fetch + blob + createObjectURL` |
+| 读取文件 | `cat file.txt` | `read_file` 工具 |
+| 搜索内容 | `grep "xxx" file` | `grep_file` 工具 |
+| 修改文件 | 直接 write_file 覆盖 | 先 read_file 再 edit_file |
+| 需求理解 | 猜测用户意图，擅自扩展 | 先确认，再开发 |
+| 服务重启 | 每次改代码都重启 | 利用热更新，无需重启 |
+| 批量操作 | 多次调用工具 | 并行调用无依赖的工具 |
+
+### 2.4 减少 Token 消耗技巧
+
+```
+1. 精准定位
+   - 使用 grep_file 搜索关键字定位文件
+   - 读取文件时指定行范围，不要全文件读取
+   - 例：read_file(file_path, start_line=100, end_line=150)
+
+2. 避免重复操作
+   - 记住已读取过的文件内容
+   - 同一文件的多次修改合并为一次 edit_file
+
+3. 减少无效对话
+   - 不确定的地方一次性问清楚
+   - 避免来回确认多次
+
+4. 合理使用工具
+   - 简单任务直接执行，不创建 TODO
+   - 复杂任务创建 TODO，避免遗漏步骤
+```
+
+---
+
+## 三、开发经验总结
+
+### 3.1 前端开发经验
+
+#### 表格操作列统一化
+所有表格操作列使用 `TableActions` 组件，避免换行和样式不一致：
+
+```vue
+<!-- ✅ 正确 -->
+<el-table-column label="操作" width="180" fixed="right" align="center">
+  <template #default="{ row }">
+    <TableActions :row="row" :actions="actions" :max-primary="3"
+      @edit="handleEdit" @delete="handleDelete" @test="handleTest" />
+  </template>
+</el-table-column>
+
+<!-- ❌ 错误 - 自定义按钮容易换行 -->
+<el-table-column label="操作" width="160">
+  <template #default="{ row }">
+    <el-button link @click="handleEdit(row)">编辑</el-button>
+    <el-button link @click="handleDelete(row)">删除</el-button>
+  </template>
+</el-table-column>
+```
+
+#### 筛选区域布局
+使用 `el-form inline` 布局，统一控件宽度和间距：
+
+```vue
+<el-form :inline="true" class="filter-form">
+  <el-form-item label="名称">
+    <el-input v-model="filter.name" placeholder="请输入" style="width: 200px" />
+  </el-form-item>
+  <el-form-item label="状态">
+    <el-select v-model="filter.status" style="width: 150px">
+      <el-option label="全部" value="" />
+      <el-option label="启用" value="1" />
+    </el-select>
+  </el-form-item>
+  <el-form-item>
+    <el-button type="primary" @click="handleSearch">查询</el-button>
+  </el-form-item>
+</el-form>
+```
+
+#### 路由和菜单联动
+**新增菜单必须同时修改三处：**
+1. 后端：`backend/app/api/menu.py` - 菜单初始化数据
+2. 前端：`frontend/src/router/index.js` - 路由配置
+3. 数据库：调用 `/api/v1/menu/add-missing` API 或手动添加
+
+```javascript
+// router/index.js 示例
+{
+  path: 'notification',
+  name: 'NotificationManage',
+  component: () => import('@/views/config/notification.vue'),
+  meta: { title: '通知管理', icon: 'Bell' }
+}
+```
+
+### 3.2 后端开发经验
+
+#### API 路由注册
+新 API 必须在 `main.py` 中注册：
+
+```python
+# main.py
+from app.api import new_module
+
+app.include_router(new_module.router, prefix="/api/v1")
+```
+
+#### 数据库模型修改
+1. 修改 `models/` 下的模型文件
+2. 创建迁移脚本或直接执行 DDL
+3. 重启服务生效
+
+#### 环境变量使用
+```python
+# ✅ 正确 - 从环境变量读取
+import os
+port = int(os.getenv("DEPLOY_RUN_PORT", "5000"))
+
+# ❌ 错误 - 硬编码
+port = 5000
+```
+
+### 3.3 调试技巧
+
+#### 日志查看
+```bash
+# 查看最新日志
+tail -n 50 /app/work/logs/bypass/app.log
+
+# 搜索错误
+grep -iE "error|exception|warn" /app/work/logs/bypass/app.log | tail -n 20
+
+# 查看前端控制台日志（如果有的话）
+tail -n 50 /app/work/logs/bypass/console.log
+```
+
+#### API 测试
+```bash
+# GET 请求
+curl -s http://localhost:5000/api/v1/users | jq
+
+# POST 请求
+curl -s -X POST http://localhost:5000/api/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{"name": "test"}' | jq
+
+# 带 Token
+curl -s -H "Authorization: Bearer xxx" http://localhost:5000/api/v1/users
+```
+
+---
+
+## 四、分支管理
+
+### 4.1 分支策略
 采用 **master + develop** 双分支模式：
 
 ```
@@ -39,7 +276,7 @@ master (生产环境)
           └── refactor/xxx (重构分支)
 ```
 
-### 2.2 分支说明
+### 4.2 分支说明
 
 | 分支 | 用途 | 保护 |
 |------|------|------|
@@ -49,18 +286,11 @@ master (生产环境)
 | `fix/*` | Bug 修复 | 完成后合并到 develop |
 | `refactor/*` | 代码重构 | 完成后合并到 develop |
 
-### 2.3 工作流程
-
-1. 从 `develop` 创建功能分支
-2. 开发完成后提交 PR 到 `develop`
-3. Code Review 通过后合并
-4. 发布时从 `develop` 合并到 `master`
-
 ---
 
-## 三、代码规范
+## 五、代码规范
 
-### 3.1 Python 代码规范
+### 5.1 Python 代码规范
 
 使用 **Ruff** 作为代码格式化和检查工具。
 
@@ -70,46 +300,11 @@ master (生产环境)
 - 导入排序：标准库 → 第三方库 → 本地模块
 - 类型注解：函数参数和返回值必须添加类型注解
 
-**示例：**
-```python
-from typing import List, Optional
-
-from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
-
-from app.database import get_db
-from app.models import User
-
-
-def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
-    """根据ID获取用户"""
-    return db.query(User).filter(User.id == user_id).first()
-```
-
-**命名规范：**
-- 函数/变量：`snake_case`
-- 类名：`PascalCase`
-- 常量：`UPPER_SNAKE_CASE`
-- 私有方法：`_leading_underscore`
-
-### 3.2 Vue 代码规范
+### 5.2 Vue 代码规范
 
 **组件命名：**
 - 组件文件：`PascalCase.vue`（如 `UserList.vue`）
 - 组件注册：`PascalCase`
-
-**目录结构：**
-```
-frontend/src/
-├── api/           # API 请求封装
-├── assets/        # 静态资源
-├── components/    # 公共组件
-├── layouts/       # 布局组件
-├── router/        # 路由配置
-├── stores/        # Pinia 状态管理
-├── views/         # 页面组件
-└── utils/         # 工具函数
-```
 
 **Vue 3 组合式 API 规范：**
 ```vue
@@ -140,9 +335,9 @@ onMounted(() => {
 
 ---
 
-## 四、API 设计规范
+## 六、API 设计规范
 
-### 4.1 RESTful 风格
+### 6.1 RESTful 风格
 
 | 操作 | 方法 | 路径 | 说明 |
 |------|------|------|------|
@@ -150,10 +345,9 @@ onMounted(() => {
 | 详情查询 | GET | `/api/v1/users/{id}` | 单条记录 |
 | 创建 | POST | `/api/v1/users` | 创建资源 |
 | 更新 | PUT | `/api/v1/users/{id}` | 全量更新 |
-| 部分更新 | PATCH | `/api/v1/users/{id}` | 部分更新 |
 | 删除 | DELETE | `/api/v1/users/{id}` | 删除资源 |
 
-### 4.2 响应格式
+### 6.2 响应格式
 
 **成功响应：**
 ```json
@@ -164,104 +358,12 @@ onMounted(() => {
 }
 ```
 
-**列表响应：**
-```json
-{
-  "items": [...],
-  "total": 100,
-  "page": 1,
-  "page_size": 20
-}
-```
-
 **错误响应：**
 ```json
 {
   "error": "VALIDATION_ERROR",
-  "message": "参数验证失败",
-  "detail": {
-    "field": "name",
-    "reason": "名称不能为空"
-  }
+  "message": "参数验证失败"
 }
-```
-
-### 4.3 状态码规范
-
-| 状态码 | 说明 |
-|--------|------|
-| 200 | 成功 |
-| 201 | 创建成功 |
-| 400 | 请求参数错误 |
-| 401 | 未认证 |
-| 403 | 无权限 |
-| 404 | 资源不存在 |
-| 409 | 资源冲突 |
-| 422 | 业务逻辑错误 |
-| 500 | 服务器内部错误 |
-
----
-
-## 五、前端 UI 规范
-
-### 5.1 组件库
-使用 **Element Plus** 作为 UI 组件库。
-
-### 5.2 表格操作列统一化
-所有表格的操作列使用 `TableActions` 组件，确保样式一致：
-
-```vue
-<template>
-  <el-table-column label="操作" width="160" fixed="right" align="center">
-    <template #default="{ row }">
-      <TableActions :row="row" :actions="actions" :max-primary="2"
-        @edit="handleEdit" @delete="handleDelete" />
-    </template>
-  </el-table-column>
-</template>
-
-<script setup>
-import TableActions from '@/components/TableActions.vue'
-
-const actions = [
-  { key: 'edit', label: '编辑', event: 'edit', primary: true },
-  { key: 'delete', label: '删除', event: 'delete', danger: true }
-]
-</script>
-```
-
-### 5.3 表单布局
-- 筛选区域：使用 `el-form inline` 布局
-- 弹窗表单：使用 `el-form` + `label-width="100px"`
-- 统一间距：`margin-bottom: 16px`
-
----
-
-## 六、数据库规范
-
-### 6.1 表命名
-- 使用 `snake_case`
-- 多对多关联表：`user_roles`（用户-角色）
-- 表名使用复数形式：`users`、`instances`
-
-### 6.2 字段规范
-- 主键：`id` (自增 INT 或 UUID)
-- 外键：`{table}_id`（如 `user_id`）
-- 时间字段：`created_at`、`updated_at`
-- 软删除：`is_deleted` + `deleted_at`
-
-### 6.3 SQLAlchemy 模型示例
-```python
-class User(Base):
-    __tablename__ = "users"
-    
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String(50), unique=True, nullable=False, index=True)
-    email = Column(String(100), unique=True)
-    role = Column(Enum(UserRole), default=UserRole.VIEWER)
-    is_enabled = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 ```
 
 ---
@@ -272,8 +374,6 @@ class User(Base):
 
 ```
 <type>(<scope>): <subject>
-
-<body>
 ```
 
 ### 7.2 Type 类型
@@ -284,46 +384,15 @@ class User(Base):
 | `fix` | Bug 修复 |
 | `refactor` | 代码重构 |
 | `docs` | 文档更新 |
-| `style` | 代码格式（不影响功能） |
+| `style` | 代码格式 |
 | `test` | 测试相关 |
 | `chore` | 构建/工具变更 |
-| `perf` | 性能优化 |
-
-### 7.3 示例
-
-```bash
-feat(notification): 新增飞书通知渠道支持
-
-- 添加飞书 Webhook 配置
-- 支持签名验证
-- 更新通知管理页面 UI
-```
 
 ---
 
-## 八、部署规范
+## 八、权限模型
 
-### 8.1 部署方式
-- 容器内热更新，支持优雅重载 (`kill -HUP`)
-- 使用 Docker Compose 管理服务
-
-### 8.2 环境变量
-敏感配置通过环境变量管理：
-- 数据库连接串
-- JWT 密钥
-- AWS 凭证
-- 存储配置
-
-### 8.3 日志规范
-- 日志级别：DEBUG / INFO / WARNING / ERROR
-- 日志格式：JSON 结构化日志
-- 日志目录：`/app/work/logs/`
-
----
-
-## 九、权限模型
-
-### 9.1 角色定义
+### 8.1 角色定义
 
 | 角色 | 权限范围 |
 |------|----------|
@@ -332,37 +401,9 @@ feat(notification): 新增飞书通知渠道支持
 | `operator` | 运维人员，执行操作 |
 | `developer` | 开发人员，查看+申请 |
 
-### 9.2 数据权限
-- 环境权限：基于环境隔离数据访问
-- 实例权限：基于实例级别控制操作
-
 ---
 
-## 十、工作模式
-
-### 10.1 需求处理流程
-1. 需求分析 → 确认技术方案
-2. 创建功能分支 → 开发实现
-3. 自测通过 → 提交 PR
-4. Code Review → 修改完善
-5. 合并到 develop → 验证测试
-6. 发布到 master → 生产部署
-
-### 10.2 沟通协作
-- 功能设计先讨论再开发
-- 不确定的技术方案先确认
-- 遇到阻塞问题及时反馈
-
-### 10.3 代码审查重点
-- 功能是否完整实现
-- 是否有安全风险
-- 代码是否符合规范
-- 是否有性能问题
-- 是否有足够的错误处理
-
----
-
-## 十一、常见问题
+## 九、常见问题 FAQ
 
 ### Q1: 如何添加新的 API 接口？
 1. 在 `backend/app/schemas/` 定义请求/响应模型
@@ -371,16 +412,54 @@ feat(notification): 新增飞书通知渠道支持
 4. 在 `frontend/src/api/` 封装请求方法
 
 ### Q2: 如何添加新的菜单？
-1. 数据库 `menu_configs` 表添加记录
+1. 后端 `menu.py` 的 `required_menus` 数组添加菜单配置
 2. 前端 `router/index.js` 添加路由配置
 3. 创建对应的页面组件
+4. 调用 `/api/v1/menu/add-missing` API 更新数据库
 
-### Q3: 如何添加新的通知渠道？
-1. 后端 `notification.py` 添加发送逻辑
-2. 前端 `notification.vue` 添加配置选项
-3. 更新通道类型枚举
+### Q3: 前端修改后页面没变化？
+- Vite 支持热更新，保存后自动刷新
+- 如果没变化，检查浏览器控制台是否有报错
+- 尝试手动刷新页面
+
+### Q4: 后端修改后接口没生效？
+- FastAPI 使用 uvicorn，默认热重载
+- 检查日志 `tail -n 20 /app/work/logs/bypass/app.log`
+- 确认修改的文件已保存
 
 ---
 
-*文档版本：v1.0*
+## 十、快速参考
+
+### 常用命令
+
+```bash
+# 查看服务状态
+curl -I http://localhost:5000    # 后端
+curl -I http://localhost:3000    # 前端
+
+# 查看日志
+tail -n 50 /app/work/logs/bypass/app.log
+
+# Git 操作
+git status
+git add .
+git commit -m "feat(xxx): 描述"
+git push origin develop
+```
+
+### 文件快速定位
+
+| 功能 | 文件路径 |
+|------|----------|
+| 后端路由注册 | `backend/app/main.py` |
+| 前端路由配置 | `frontend/src/router/index.js` |
+| 菜单配置 | `backend/app/api/menu.py` |
+| 公共组件 | `frontend/src/components/` |
+| API 封装 | `frontend/src/api/index.js` |
+| 数据库模型 | `backend/app/models/` |
+
+---
+
+*文档版本：v2.0*
 *最后更新：2024年*
