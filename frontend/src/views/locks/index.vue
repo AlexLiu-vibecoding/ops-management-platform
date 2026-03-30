@@ -93,9 +93,9 @@
                 <el-tag :type="row.status === 'active' ? 'danger' : 'info'" size="small">{{ row.status }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" min-width="80" fixed="right" align="center">
+            <el-table-column label="操作" min-width="60" fixed="right" align="center">
               <template #default="{ row }">
-                <el-button v-if="row.status === 'active'" link type="danger" size="small" @click="killTransaction(row)">Kill</el-button>
+                <TableActions :row="row" :actions="transactionActions" @kill="killTransaction" />
               </template>
             </el-table-column>
           </el-table>
@@ -106,9 +106,26 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@/api/index'
+import TableActions from '@/components/TableActions.vue'
+
+// 操作列配置
+const lockActions = [
+  { key: 'kill', label: 'Kill', event: 'kill', danger: true, primary: true }
+]
+
+const transactionActions = computed(() => [
+  { 
+    key: 'kill', 
+    label: 'Kill', 
+    event: 'kill', 
+    danger: true, 
+    primary: true,
+    visible: (row) => row.status === 'active'
+  }
+])
 
 const activeTab = ref('locks')
 const instances = ref([])

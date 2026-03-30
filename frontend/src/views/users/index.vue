@@ -78,11 +78,9 @@
               {{ row.last_login_time ? formatTime(row.last_login_time) : '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" min-width="140" fixed="right" align="center">
+          <el-table-column label="操作" min-width="100" fixed="right" align="center">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="handleEditUser(row)">编辑</el-button>
-              <el-button v-if="row.id !== currentUserId" link type="warning" size="small" @click="handleResetPwd(row)">重置密码</el-button>
-              <el-button v-if="row.id !== currentUserId" link type="danger" size="small" @click="handleDeleteUser(row)">删除</el-button>
+              <TableActions :row="row" :actions="userActions" @edit="handleEditUser" @resetPwd="handleResetPwd" @delete="handleDeleteUser" />
             </template>
           </el-table-column>
         </el-table>
@@ -243,6 +241,7 @@ import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, UserFilled, Plus, Search, Refresh } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+import TableActions from '@/components/TableActions.vue'
 
 const userStore = useUserStore()
 const currentUserId = computed(() => userStore.user?.id)
@@ -251,6 +250,26 @@ const currentUserId = computed(() => userStore.user?.id)
 const activeTab = ref('users')
 const userCount = ref(0)
 const pendingCount = ref(0)
+
+// 用户操作列配置
+const userActions = computed(() => [
+  { key: 'edit', label: '编辑', event: 'edit', primary: true },
+  { 
+    key: 'resetPwd', 
+    label: '重置密码', 
+    event: 'resetPwd', 
+    primary: false,
+    visible: (row) => row.id !== currentUserId.value 
+  },
+  { 
+    key: 'delete', 
+    label: '删除', 
+    event: 'delete', 
+    danger: true, 
+    primary: false,
+    visible: (row) => row.id !== currentUserId.value 
+  }
+])
 
 // ==================== 用户管理 ====================
 const usersLoading = ref(false)

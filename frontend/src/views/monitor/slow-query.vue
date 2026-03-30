@@ -133,9 +133,9 @@
             {{ formatTime(row.last_seen) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="90" fixed="right" align="center">
+        <el-table-column label="操作" min-width="80" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click.stop="analyzeQuery(row)">EXPLAIN</el-button>
+            <TableActions :row="row" :actions="slowQueryActions" @explain="analyzeQuery" />
           </template>
         </el-table-column>
       </el-table>
@@ -544,6 +544,12 @@ import { ElMessage } from 'element-plus'
 import { Timer, DataAnalysis, Warning, TrendCharts, CircleClose, CircleCheck, InfoFilled, Download } from '@element-plus/icons-vue'
 import request from '@/api/index'
 import dayjs from 'dayjs'
+import TableActions from '@/components/TableActions.vue'
+
+// 操作列配置
+const slowQueryActions = [
+  { key: 'explain', label: 'EXPLAIN', event: 'explain', primary: true }
+]
 
 const loading = ref(false)
 const instances = ref([])

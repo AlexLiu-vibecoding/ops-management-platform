@@ -65,14 +65,9 @@
             <span class="text-danger">{{ row.fail_count }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="220" fixed="right">
+        <el-table-column label="操作" min-width="140" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleRun(row)">执行</el-button>
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button link :type="row.status === 'enabled' ? 'warning' : 'success'" @click="handleToggle(row)">
-              {{ row.status === 'enabled' ? '禁用' : '启用' }}
-            </el-button>
-            <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+            <TableActions :row="row" :actions="taskActions" @run="handleRun" @edit="handleEdit" @toggle="handleToggle" @delete="handleDelete" />
           </template>
         </el-table-column>
       </el-table>
@@ -175,8 +170,22 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { scheduledInspectionApi } from '@/api/inspection'
 import request from '@/api/index'
+import TableActions from '@/components/TableActions.vue'
 
 defineOptions({ name: 'ScheduledInspection' })
+
+// 操作列配置
+const taskActions = computed(() => [
+  { key: 'run', label: '执行', event: 'run', primary: true },
+  { key: 'edit', label: '编辑', event: 'edit', primary: true },
+  { 
+    key: 'toggle', 
+    label: (row) => row.status === 'enabled' ? '禁用' : '启用',
+    event: 'toggle',
+    primary: false
+  },
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false }
+])
 
 // 格式化日期时间
 const formatDateTime = (dateStr) => {

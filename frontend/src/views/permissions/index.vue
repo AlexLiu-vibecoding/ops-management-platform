@@ -142,16 +142,9 @@
                       {{ formatTime(row.last_login_time) }}
                     </template>
                   </el-table-column>
-                  <el-table-column label="操作" min-width="140" fixed="right">
+                  <el-table-column label="操作" min-width="80" fixed="right" align="center">
                     <template #default="{ row }">
-                      <el-button 
-                        link 
-                        type="danger" 
-                        @click="handleRemoveUser(row)"
-                        :disabled="row.id === currentUserId"
-                      >
-                        移除
-                      </el-button>
+                      <TableActions :row="row" :actions="userActions" @remove="handleRemoveUser" />
                     </template>
                   </el-table-column>
                 </el-table>
@@ -237,9 +230,22 @@ import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Select, Plus } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import TableActions from '@/components/TableActions.vue'
 
 const userStore = useUserStore()
 const currentUserId = computed(() => userStore.user?.id)
+
+// 操作列配置
+const userActions = computed(() => [
+  { 
+    key: 'remove', 
+    label: '移除', 
+    event: 'remove', 
+    danger: true, 
+    primary: true,
+    visible: (row) => row.id !== currentUserId.value
+  }
+])
 
 // 角色列表
 const roles = ref([])

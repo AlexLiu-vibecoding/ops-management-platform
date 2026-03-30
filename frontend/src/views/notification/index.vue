@@ -34,13 +34,9 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="180" fixed="right" align="center">
+        <el-table-column label="操作" min-width="120" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" size="small" @click="handleTestChannel(row)">测试</el-button>
-              <el-button link type="primary" size="small" @click="handleEditChannel(row)">编辑</el-button>
-              <el-button link type="danger" size="small" @click="handleDeleteChannel(row)">删除</el-button>
-            </div>
+            <TableActions :row="row" :actions="channelActions" @test="handleTestChannel" @edit="handleEditChannel" @delete="handleDeleteChannel" />
           </template>
         </el-table-column>
       </el-table>
@@ -86,11 +82,9 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="80" fixed="right" align="center">
+        <el-table-column label="操作" min-width="60" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="danger" size="small" @click="handleDeleteBinding(row)">删除</el-button>
-            </div>
+            <TableActions :row="row" :actions="bindingActions" @delete="handleDeleteBinding" />
           </template>
         </el-table-column>
       </el-table>
@@ -207,6 +201,18 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import request from '@/api/index'
+import TableActions from '@/components/TableActions.vue'
+
+// 操作列配置
+const channelActions = [
+  { key: 'test', label: '测试', event: 'test', primary: true },
+  { key: 'edit', label: '编辑', event: 'edit', primary: true },
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false }
+]
+
+const bindingActions = [
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: true }
+]
 
 // 数据
 const channels = ref([])

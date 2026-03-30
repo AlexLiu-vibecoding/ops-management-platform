@@ -75,13 +75,9 @@
             {{ row.trigger_count || 0 }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="220" fixed="right">
+        <el-table-column label="操作" min-width="120" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button link :type="row.is_enabled ? 'warning' : 'success'" @click="handleToggle(row)">
-              {{ row.is_enabled ? '禁用' : '启用' }}
-            </el-button>
-            <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
+            <TableActions :row="row" :actions="ruleActions" @edit="handleEdit" @toggle="handleToggle" @delete="handleDelete" />
           </template>
         </el-table-column>
       </el-table>
@@ -194,8 +190,21 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Plus } from '@element-plus/icons-vue'
 import { alertRulesApi } from '@/api/inspection'
 import request from '@/api/index'
+import TableActions from '@/components/TableActions.vue'
 
 defineOptions({ name: 'AlertRules' })
+
+// 操作列配置
+const ruleActions = computed(() => [
+  { key: 'edit', label: '编辑', event: 'edit', primary: true },
+  { 
+    key: 'toggle', 
+    label: (row) => row.is_enabled ? '禁用' : '启用',
+    event: 'toggle',
+    primary: false
+  },
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false }
+])
 
 // 数据
 const loading = ref(false)

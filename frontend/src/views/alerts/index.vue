@@ -109,13 +109,9 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="180" fixed="right" align="center">
+        <el-table-column label="操作" min-width="100" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" size="small" @click="viewDetail(row)">详情</el-button>
-              <el-button v-if="row.status === 'pending'" link type="warning" size="small" @click="acknowledgeAlert(row)">确认</el-button>
-              <el-button v-if="row.status !== 'resolved' && row.status !== 'ignored'" link type="success" size="small" @click="resolveAlert(row)">解决</el-button>
-            </div>
+            <TableActions :row="row" :actions="alertActions" @view="viewDetail" @acknowledge="acknowledgeAlert" @resolve="resolveAlert" />
           </template>
         </el-table-column>
       </el-table>
@@ -192,10 +188,30 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { WarningFilled, Warning, Clock, CircleCheck } from '@element-plus/icons-vue'
 import request from '@/api/index'
+import TableActions from '@/components/TableActions.vue'
+
+// 告警操作列配置
+const alertActions = computed(() => [
+  { key: 'view', label: '详情', event: 'view', primary: true },
+  { 
+    key: 'acknowledge', 
+    label: '确认', 
+    event: 'acknowledge', 
+    primary: false,
+    visible: (row) => row.status === 'pending'
+  },
+  { 
+    key: 'resolve', 
+    label: '解决', 
+    event: 'resolve', 
+    primary: false,
+    visible: (row) => row.status !== 'resolved' && row.status !== 'ignored'
+  }
+])
 
 // 数据
 const alerts = ref([])

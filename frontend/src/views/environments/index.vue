@@ -80,10 +80,9 @@
             </template>
           </el-table-column>
           <el-table-column prop="description" label="描述" min-width="100" />
-          <el-table-column label="操作" min-width="120" v-if="isAdmin" fixed="right" align="center">
+          <el-table-column label="操作" min-width="100" v-if="isAdmin" fixed="right" align="center">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="handleEditEnv(row)">编辑</el-button>
-              <el-button link type="danger" size="small" @click="handleDeleteEnv(row)">删除</el-button>
+              <TableActions :row="row" :actions="envActions" @edit="handleEditEnv" @delete="handleDeleteEnv" />
             </template>
           </el-table-column>
         </el-table>
@@ -142,12 +141,9 @@
               <span v-else style="color: #999;">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="120" v-if="isAdmin" fixed="right" align="center">
+          <el-table-column label="操作" min-width="100" v-if="isAdmin" fixed="right" align="center">
             <template #default="{ row }">
-              <div class="action-buttons">
-                <el-button link type="primary" size="small" @click="handleEditRegion(row)">编辑</el-button>
-                <el-button link type="danger" size="small" @click="handleDeleteRegion(row)">删除</el-button>
-              </div>
+              <TableActions :row="row" :actions="regionActions" @edit="handleEditRegion" @delete="handleDeleteRegion" />
             </template>
           </el-table-column>
         </el-table>
@@ -270,12 +266,24 @@ import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Cloudy, Connection, SuccessFilled, CircleCloseFilled, Collection, Location } from '@element-plus/icons-vue'
 import { getAwsRegionsGrouped } from '@/api/awsRegions'
+import TableActions from '@/components/TableActions.vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
 
 // Tab 状态
 const activeTab = ref('environments')
+
+// 操作列配置
+const envActions = [
+  { key: 'edit', label: '编辑', event: 'edit', primary: true },
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false }
+]
+
+const regionActions = [
+  { key: 'edit', label: '编辑', event: 'edit', primary: true },
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false }
+]
 
 // ==================== 环境管理 ====================
 const environments = ref([])
@@ -658,14 +666,6 @@ onMounted(() => {
     padding: 2px 6px;
     border-radius: 4px;
     font-family: monospace;
-  }
-  
-  .action-buttons {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px;
-    white-space: nowrap;
   }
 }
 </style>

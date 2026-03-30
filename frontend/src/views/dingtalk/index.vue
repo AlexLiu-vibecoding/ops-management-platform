@@ -40,26 +40,9 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="140" fixed="right">
+        <el-table-column label="操作" min-width="100" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" @click="handleEditChannel(row)">编辑</el-button>
-              <el-dropdown trigger="click" @command="(cmd) => handleChannelCommand(cmd, row)">
-                <el-button link type="primary">
-                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="test">
-                      <el-icon><Connection /></el-icon>测试
-                    </el-dropdown-item>
-                    <el-dropdown-item command="delete" divided style="color: #F56C6C;">
-                      <el-icon><Delete /></el-icon>删除
-                    </el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </div>
+            <TableActions :row="row" :actions="channelActions" @edit="handleEditChannel" @test="(row) => handleChannelCommand('test', row)" @delete="(row) => handleChannelCommand('delete', row)" />
           </template>
         </el-table-column>
       </el-table>
@@ -103,11 +86,9 @@
             {{ formatTime(row.created_at) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="100" fixed="right">
+        <el-table-column label="操作" min-width="60" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="danger" size="small" @click="handleDeleteBinding(row)">删除</el-button>
-            </div>
+            <TableActions :row="row" :actions="bindingActions" @delete="handleDeleteBinding" />
           </template>
         </el-table-column>
       </el-table>
@@ -308,6 +289,18 @@ import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowDown, Connection, Delete } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+import TableActions from '@/components/TableActions.vue'
+
+// 操作列配置
+const channelActions = [
+  { key: 'edit', label: '编辑', event: 'edit', primary: true },
+  { key: 'test', label: '测试', event: 'test', primary: false },
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false }
+]
+
+const bindingActions = [
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: true }
+]
 
 // 通道相关
 const channelLoading = ref(false)

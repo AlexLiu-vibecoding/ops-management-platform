@@ -50,9 +50,9 @@
             {{ formatTime(row.check_time) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="100" fixed="right" align="center">
+        <el-table-column label="操作" min-width="60" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="viewDetail(row)">详情</el-button>
+            <TableActions :row="row" :actions="replicationActions" @view="viewDetail" />
           </template>
         </el-table-column>
       </el-table>
@@ -111,6 +111,12 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import request from '@/api/index'
+import TableActions from '@/components/TableActions.vue'
+
+// 操作列配置
+const replicationActions = [
+  { key: 'view', label: '详情', event: 'view', primary: true }
+]
 
 const instances = ref([])
 const replications = ref([])

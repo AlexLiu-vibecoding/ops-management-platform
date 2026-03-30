@@ -77,13 +77,9 @@
             <span v-else>所有用户</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="160" fixed="right" align="center">
+        <el-table-column label="操作" min-width="120" fixed="right" align="center">
           <template #default="{ row }">
-            <div class="table-operations">
-              <el-button link type="primary" size="small" @click="handleAdd(row)">添加</el-button>
-              <el-button link type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-              <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
-            </div>
+            <TableActions :row="row" :actions="menuActions" @add="handleAdd" @edit="handleEdit" @delete="handleDelete" />
           </template>
         </el-table-column>
       </el-table>
@@ -183,11 +179,19 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, RefreshRight } from '@element-plus/icons-vue'
+import TableActions from '@/components/TableActions.vue'
 
 const loading = ref(false)
 const menuList = ref([])
 const hasMenus = ref(false)
 const formRef = ref(null)
+
+// 操作列配置
+const menuActions = [
+  { key: 'add', label: '添加', event: 'add', primary: true },
+  { key: 'edit', label: '编辑', event: 'edit', primary: true },
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false }
+]
 
 // 可用图标列表
 const iconOptions = [
