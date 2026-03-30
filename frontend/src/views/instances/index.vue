@@ -92,7 +92,7 @@
           <template #default="{ row }">
             <span v-if="row.is_rds && row.rds_instance_id">
               {{ row.rds_instance_id }}
-              <span v-if="row.aws_region" style="color: #999;">({{ row.aws_region }})</span>
+              <span v-if="row.aws_region" style="color: #999;">({{ getAwsRegionName(row.aws_region) }})</span>
             </span>
             <span v-else>{{ row.host }}:{{ row.port }}</span>
           </template>

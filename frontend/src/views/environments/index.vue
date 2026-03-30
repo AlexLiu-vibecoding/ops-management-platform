@@ -43,7 +43,7 @@
         </el-table-column>
         <el-table-column label="AWS 配置" width="120" align="center">
           <template #default="{ row }">
-            <el-tooltip v-if="row.aws_configured" :content="`区域: ${row.aws_region || '-'}`" placement="top">
+            <el-tooltip v-if="row.aws_configured" :content="`区域: ${getRegionName(row.aws_region)}`" placement="top">
               <el-tag type="success" size="small">
                 <el-icon><Connection /></el-icon>
                 已配置
@@ -190,6 +190,16 @@ import { getAwsRegionsGrouped } from '@/api/awsRegions'
 // AWS 区域数据（从 API 获取）
 const awsRegionGroups = ref([])
 const awsRegionsLoading = ref(false)
+
+// 根据 region_code 获取区域中文名称
+const getRegionName = (regionCode) => {
+  if (!regionCode) return '-'
+  for (const group of awsRegionGroups.value) {
+    const region = group.regions?.find(r => r.region_code === regionCode)
+    if (region) return region.region_name
+  }
+  return regionCode  // 如果找不到，返回原始代码
+}
 
 const fetchAwsRegions = async () => {
   awsRegionsLoading.value = true

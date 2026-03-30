@@ -233,6 +233,13 @@ const routes = [
         name: 'SystemSettings',
         component: () => import('@/views/system/index.vue'),
         meta: { title: '系统设置', icon: 'Tools', roles: ['super_admin'] }
+      },
+      // 系统管理 - AWS区域管理
+      {
+        path: 'aws-regions',
+        name: 'AwsRegions',
+        component: () => import('@/views/system/aws-regions.vue'),
+        meta: { title: 'AWS区域管理', icon: 'Location', roles: ['super_admin'] }
       }
     ]
   }
