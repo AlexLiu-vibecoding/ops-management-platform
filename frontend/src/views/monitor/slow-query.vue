@@ -50,9 +50,9 @@
     
     <!-- 实例选择和筛选 -->
     <el-card shadow="never" class="filter-card">
-      <el-row :gutter="20" align="middle">
-        <el-col :span="6">
-          <el-select v-model="selectedInstance" placeholder="选择实例" @change="fetchSlowQueries" style="width: 100%;">
+      <el-form :inline="true" :model="filters" class="filter-form">
+        <el-form-item label="实例">
+          <el-select v-model="selectedInstance" placeholder="选择实例" @change="fetchSlowQueries" style="width: 200px;">
             <el-option
               v-for="inst in instances"
               :key="inst.id"
@@ -60,32 +60,31 @@
               :value="inst.id"
             />
           </el-select>
-        </el-col>
-        <el-col :span="4">
-          <div class="filter-item">
-            <span class="filter-label">耗时阈值</span>
-            <el-input-number v-model="minTime" :min="0.1" :max="3600" :step="0.1" :precision="1" style="width: 100%;">
-              <template #suffix>秒</template>
-            </el-input-number>
-          </div>
-        </el-col>
-        <el-col :span="4">
-          <el-select v-model="timeRange" placeholder="时间范围" @change="fetchSlowQueries" style="width: 100%;">
+        </el-form-item>
+        <el-form-item label="耗时阈值">
+          <el-input-number v-model="minTime" :min="0.1" :max="3600" :step="0.1" :precision="1" style="width: 120px;" />
+          <span class="unit-label">秒</span>
+        </el-form-item>
+        <el-form-item label="时间范围">
+          <el-select v-model="timeRange" placeholder="时间范围" @change="fetchSlowQueries" style="width: 140px;">
             <el-option label="最近1小时" :value="1" />
             <el-option label="最近6小时" :value="6" />
             <el-option label="最近24小时" :value="24" />
             <el-option label="最近7天" :value="168" />
           </el-select>
-        </el-col>
-        <el-col :span="6">
-          <el-button type="primary" @click="fetchSlowQueries" :loading="loading">查询</el-button>
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="fetchSlowQueries" :loading="loading">
+            <el-icon><Search /></el-icon>
+            查询
+          </el-button>
           <el-button @click="resetFilters">重置</el-button>
           <el-button type="success" @click="openFetchDialog" :disabled="!selectedInstance">
             <el-icon><Download /></el-icon>
             从 RDS 抓取
           </el-button>
-        </el-col>
-      </el-row>
+        </el-form-item>
+      </el-form>
     </el-card>
     
     <!-- 慢查询列表 -->
@@ -541,7 +540,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Timer, DataAnalysis, Warning, TrendCharts, CircleClose, CircleCheck, InfoFilled, Download } from '@element-plus/icons-vue'
+import { Timer, DataAnalysis, Warning, TrendCharts, CircleClose, CircleCheck, InfoFilled, Download, Search } from '@element-plus/icons-vue'
 import request from '@/api/index'
 import dayjs from 'dayjs'
 import TableActions from '@/components/TableActions.vue'
@@ -557,6 +556,13 @@ const selectedInstance = ref(null)
 const minTime = ref(1.0)
 const timeRange = ref(24)
 const slowQueries = ref([])
+
+// 筛选表单（用于 el-form 绑定）
+const filters = reactive({
+  instance: null,
+  minTime: 1.0,
+  timeRange: 24
+})
 const stats = ref({
   total_count: 0,
   total_executions: 0,
@@ -945,6 +951,36 @@ onMounted(() => {
   
   .filter-card {
     margin-bottom: 20px;
+    
+    :deep(.inline-form) {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: 16px;
+      
+      .el-form-item {
+        margin-bottom: 0;
+        margin-right: 0;
+      }
+      
+      .el-form-item__label {
+        font-size: 13px;
+        color: #606266;
+        font-weight: 500;
+      }
+      
+      .el-select, .el-input-number {
+        width: 100%;
+      }
+      
+      .form-actions {
+        margin-left: auto;
+        
+        .el-button {
+          min-width: 80px;
+        }
+      }
+    }
     
     .filter-item {
       display: flex;
