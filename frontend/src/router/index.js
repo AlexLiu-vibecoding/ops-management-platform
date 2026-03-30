@@ -214,12 +214,20 @@ const routes = [
         meta: { title: '系统设置', icon: 'Tools', roles: ['super_admin'] }
       },
       
-      // 通知管理
+      // 配置管理
       {
-        path: 'notification',
-        name: 'NotificationManage',
-        component: () => import('@/views/config/notification.vue'),
-        meta: { title: '通知管理', icon: 'Bell' }
+        path: 'config',
+        name: 'Config',
+        redirect: '/config/notification',
+        meta: { title: '配置管理', icon: 'Setting' },
+        children: [
+          {
+            path: 'notification',
+            name: 'NotificationManage',
+            component: () => import('@/views/config/notification.vue'),
+            meta: { title: '通知管理', icon: 'Bell' }
+          }
+        ]
       }
     ]
   }

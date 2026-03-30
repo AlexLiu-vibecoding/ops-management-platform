@@ -28,7 +28,7 @@ MENU_MIGRATIONS = [
     ("Scheduled Tasks", "定时任务", "/scheduled-tasks"),
     ("Users", "用户管理", "/users"),
     ("Registrations", "注册审批", "/registrations"),
-    ("Notification", "通知管理", "/notification"),
+    ("Config", "配置管理", "/config"),
     ("Audit Logs", "审计日志", "/audit"),
     ("Menu Config", "菜单配置", "/menu-config"),
     
