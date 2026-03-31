@@ -1,5 +1,57 @@
 <template>
   <div class="app-container">
+    <!-- 当前状态卡片 -->
+    <el-card shadow="never" class="mb-4">
+      <template #header>
+        <div class="flex justify-between items-center">
+          <span class="font-semibold">当前变更状态</span>
+          <el-button text @click="checkCurrentWindow">
+            <el-icon><Refresh /></el-icon>
+            刷新状态
+          </el-button>
+        </div>
+      </template>
+      <div class="current-status">
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <div class="status-item">
+              <span class="status-label">全局默认策略</span>
+              <span class="status-value">
+                <el-tag v-if="!hasEnabledWindows" type="success">无限制</el-tag>
+                <el-tag v-else type="warning">已配置变更窗口</el-tag>
+              </span>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="status-item">
+              <span class="status-label">已启用窗口数</span>
+              <span class="status-value">{{ enabledWindowsCount }} 个</span>
+            </div>
+          </el-col>
+          <el-col :span="8">
+            <div class="status-item">
+              <span class="status-label">允许紧急变更</span>
+              <span class="status-value">
+                <el-tag :type="allowEmergencyCount > 0 ? 'success' : 'info'">
+                  {{ allowEmergencyCount }} 个窗口支持
+                </el-tag>
+              </span>
+            </div>
+          </el-col>
+        </el-row>
+        <el-divider />
+        <div class="policy-tips">
+          <el-icon><InfoFilled /></el-icon>
+          <span v-if="!hasEnabledWindows">
+            未配置变更窗口时，所有变更申请将不受时间限制，直接进入审批流程。
+          </span>
+          <span v-else>
+            已配置变更窗口后，只有在窗口内的变更才能提交。如需在窗口外变更，请确保窗口开启"允许紧急变更"选项。
+          </span>
+        </div>
+      </div>
+    </el-card>
+
     <!-- 搜索栏 -->
     <el-card shadow="never" class="mb-4">
       <el-form :inline="true" :model="queryParams" @submit.prevent="handleQuery">
@@ -138,27 +190,38 @@
           </el-checkbox-group>
           <div class="text-gray-500 text-sm mt-1">不选择则每天都可以</div>
         </el-form-item>
+        
+        <!-- 审批配置 -->
+        <el-divider content-position="left">审批配置</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="允许紧急变更">
-              <el-switch v-model="form.allow_emergency" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="需要审批">
               <el-switch v-model="form.require_approval" />
+              <span class="ml-2 text-gray-500 text-sm">窗口内的变更是否需要审批</span>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="最小审批人" prop="min_approvers">
-              <el-input-number v-model="form.min_approvers" :min="1" :max="10" class="w-full" />
+              <el-input-number v-model="form.min_approvers" :min="1" :max="10" />
+              <span class="ml-2 text-gray-500 text-sm">人</span>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="自动拒绝">
-          <el-switch v-model="form.auto_reject_outside" />
-          <span class="ml-2 text-gray-500">自动拒绝窗口外的变更申请</span>
-        </el-form-item>
+        
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="允许紧急变更">
+              <el-switch v-model="form.allow_emergency" />
+              <span class="ml-2 text-gray-500 text-sm">窗口外可提交紧急变更</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="自动拒绝">
+              <el-switch v-model="form.auto_reject_outside" />
+              <span class="ml-2 text-gray-500 text-sm">自动拒绝窗口外的变更申请</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -171,7 +234,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, InfoFilled } from '@element-plus/icons-vue'
 import { changeWindowsApi } from '@/api/inspection'
 import request from '@/api/index'
 import TableActions from '@/components/TableActions.vue'
@@ -195,6 +258,24 @@ const loading = ref(false)
 const tableData = ref([])
 const total = ref(0)
 const environmentList = ref([])
+
+// 计算属性
+const hasEnabledWindows = computed(() => {
+  return tableData.value.some(w => w.is_enabled)
+})
+
+const enabledWindowsCount = computed(() => {
+  return tableData.value.filter(w => w.is_enabled).length
+})
+
+const allowEmergencyCount = computed(() => {
+  return tableData.value.filter(w => w.is_enabled && w.allow_emergency).length
+})
+
+// 检查当前窗口状态
+const checkCurrentWindow = () => {
+  loadData()
+}
 
 // 星期名称
 const weekdayNames = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -419,3 +500,39 @@ function resetForm() {
   formRef.value?.resetFields()
 }
 </script>
+
+<style lang="scss" scoped>
+.current-status {
+  .status-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    
+    .status-label {
+      font-size: 13px;
+      color: #909399;
+    }
+    
+    .status-value {
+      font-size: 18px;
+      font-weight: 500;
+      color: #303133;
+    }
+  }
+  
+  .policy-tips {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: #f4f4f5;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #606266;
+    
+    .el-icon {
+      color: #909399;
+    }
+  }
+}
+</style>

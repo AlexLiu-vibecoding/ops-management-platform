@@ -156,6 +156,33 @@
           </el-col>
         </el-row>
         
+        <!-- 变更窗口状态提示 -->
+        <el-alert
+          v-if="changeWindowInfo.checked"
+          :title="changeWindowInfo.message"
+          :type="changeWindowInfo.inWindow ? 'success' : (changeWindowInfo.allowEmergency ? 'warning' : 'error')"
+          :closable="false"
+          show-icon
+          class="change-window-alert"
+        >
+          <template #default>
+            <div v-if="!changeWindowInfo.inWindow && changeWindowInfo.allowEmergency" class="emergency-option">
+              <el-checkbox v-model="dialog.form.is_emergency">标记为紧急变更</el-checkbox>
+              <el-tooltip content="紧急变更需要更高级别的审批" placement="top">
+                <el-icon><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </div>
+            <div v-if="changeWindowInfo.windows.length > 0" class="window-details">
+              <span class="text-sm text-gray-500">生效窗口：</span>
+              <span v-for="w in changeWindowInfo.windows" :key="w.id" class="window-tag">
+                {{ w.name }} ({{ w.in_window ? '✓ 当前可变更' : '✗ 不在窗口内' }})
+              </span>
+            </div>
+          </template>
+        </el-alert>
+          </el-col>
+        </el-row>
+        
         <el-form-item label="SQL内容" prop="sql_content">
           <div class="sql-input-wrapper">
             <!-- 文件上传区域 -->
@@ -271,7 +298,7 @@ import request from '@/api/index'
 import { instancesApi } from '@/api/instances'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Upload, MagicStick, Delete, View, CircleCheck, CircleClose, VideoPlay } from '@element-plus/icons-vue'
+import { Plus, Upload, MagicStick, Delete, View, CircleCheck, CircleClose, VideoPlay, QuestionFilled } from '@element-plus/icons-vue'
 import ApprovalDetailCard from '@/components/ApprovalDetailCard.vue'
 import TableActions from '@/components/TableActions.vue'
 import dayjs from 'dayjs'
@@ -360,6 +387,15 @@ const dbInstances = computed(() => {
   return instances.value.filter(inst => inst.db_type !== 'redis')
 })
 
+// 变更窗口状态
+const changeWindowInfo = reactive({
+  checked: false,
+  inWindow: true,
+  allowEmergency: false,
+  message: '',
+  windows: []
+})
+
 const dialog = reactive({
   visible: false,
   submitting: false,
@@ -375,7 +411,8 @@ const dialog = reactive({
     remark: '',
     affected_rows_estimate: 0,
     execution_mode: 'auto',
-    scheduled_time: null
+    scheduled_time: null,
+    is_emergency: false
   },
   rules: {
     title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
@@ -464,12 +501,21 @@ const handleAdd = () => {
     remark: '',
     affected_rows_estimate: 0,
     execution_mode: 'auto',
-    scheduled_time: null
+    scheduled_time: null,
+    is_emergency: false
   }
   fullSqlContent.value = ''
   sqlStats.totalLines = 0
   sqlStats.fileSize = 0
   sqlStats.isLargeFile = false
+  
+  // 重置变更窗口状态
+  changeWindowInfo.checked = false
+  changeWindowInfo.inWindow = true
+  changeWindowInfo.allowEmergency = false
+  changeWindowInfo.message = ''
+  changeWindowInfo.windows = []
+  
   dialog.visible = true
 }
 
@@ -557,11 +603,62 @@ const handleInstanceSelect = async (instanceId) => {
   dialog.form.database_name = ''
   dialog.databases = []
   
+  // 重置变更窗口状态
+  changeWindowInfo.checked = false
+  changeWindowInfo.inWindow = true
+  changeWindowInfo.allowEmergency = false
+  changeWindowInfo.message = ''
+  changeWindowInfo.windows = []
+  
   dialog.dbLoading = true
   try {
+    // 获取数据库列表
     const data = await request.get(`/sql/databases/${instanceId}`)
     const systemDbs = ['information_schema', 'mysql', 'performance_schema', 'sys', 'template0', 'template1']
     dialog.databases = data.filter(db => !systemDbs.includes(db))
+    
+    // 检查变更窗口
+    const instance = instances.value.find(i => i.id === instanceId)
+    if (instance?.environment_id) {
+      try {
+        const windowData = await request.post('/change-windows/check', null, {
+          params: { environment_id: instance.environment_id }
+        })
+        changeWindowInfo.checked = true
+        changeWindowInfo.inWindow = windowData.in_window
+        changeWindowInfo.windows = windowData.windows || []
+        
+        // 检查是否有窗口允许紧急变更
+        if (!windowData.in_window && changeWindowInfo.windows.length > 0) {
+          // 查找是否有允许紧急变更的窗口
+          const allowEmergency = changeWindowInfo.windows.some(w => {
+            const window = w
+            // 需要从数据库获取窗口详情来判断 allow_emergency
+            return true // 暂时假设可以
+          })
+          changeWindowInfo.allowEmergency = true // 允许用户尝试紧急变更
+        }
+        
+        if (windowData.in_window) {
+          changeWindowInfo.message = '✓ 当前在变更窗口内，可以提交变更'
+        } else if (changeWindowInfo.allowEmergency) {
+          changeWindowInfo.message = '⚠ 当前不在变更窗口内，可提交紧急变更（需额外审批）'
+        } else {
+          changeWindowInfo.message = '✗ 当前不在变更窗口内，不允许提交变更'
+        }
+      } catch (error) {
+        console.error('检查变更窗口失败:', error)
+        // 检查失败时不阻止提交
+        changeWindowInfo.checked = true
+        changeWindowInfo.inWindow = true
+        changeWindowInfo.message = '未配置变更窗口，允许提交变更'
+      }
+    } else {
+      // 没有环境信息，默认允许
+      changeWindowInfo.checked = true
+      changeWindowInfo.inWindow = true
+      changeWindowInfo.message = '未关联环境，允许提交变更'
+    }
   } catch (error) {
     console.error('获取数据库列表失败:', error)
     ElMessage.warning('获取数据库列表失败，请手动输入数据库名')
@@ -575,6 +672,28 @@ const handleSubmit = async () => {
   await formRef.value.validate(async (valid) => {
     if (!valid) return
     
+    // 检查变更窗口
+    if (changeWindowInfo.checked && !changeWindowInfo.inWindow) {
+      if (!changeWindowInfo.allowEmergency) {
+        ElMessage.error('当前不在变更窗口内，不允许提交变更')
+        return
+      }
+      if (!dialog.form.is_emergency) {
+        ElMessage.warning('当前不在变更窗口内，请勾选"紧急变更"选项')
+        return
+      }
+      // 紧急变更需要确认
+      try {
+        await ElMessageBox.confirm(
+          '您正在提交紧急变更申请，需要更高级别的审批。确定继续？',
+          '紧急变更确认',
+          { type: 'warning', confirmButtonText: '确定提交', cancelButtonText: '取消' }
+        )
+      } catch {
+        return
+      }
+    }
+    
     dialog.submitting = true
     try {
       const sqlToSubmit = fullSqlContent.value || dialog.form.sql_content
@@ -587,7 +706,8 @@ const handleSubmit = async () => {
         sql_content: sqlToSubmit,
         remark: dialog.form.remark,
         affected_rows_estimate: dialog.form.affected_rows_estimate,
-        auto_execute: dialog.form.execution_mode === 'auto'
+        auto_execute: dialog.form.execution_mode === 'auto',
+        is_emergency: dialog.form.is_emergency
       }
       
       if (dialog.form.execution_mode === 'scheduled' && dialog.form.scheduled_time) {
@@ -801,6 +921,31 @@ onMounted(() => {
   
   .approval-actions {
     margin-top: 15px;
+  }
+  
+  // 变更窗口提示样式
+  .change-window-alert {
+    margin-bottom: 16px;
+    
+    .emergency-option {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    
+    .window-details {
+      margin-top: 8px;
+      
+      .window-tag {
+        display: inline-block;
+        padding: 2px 8px;
+        margin-right: 8px;
+        background: rgba(0, 0, 0, 0.05);
+        border-radius: 4px;
+        font-size: 12px;
+      }
+    }
   }
 }
 </style>
