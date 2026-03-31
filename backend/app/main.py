@@ -29,7 +29,7 @@ from app.core import register_exception_handlers
 # 导入路由
 from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions, alerts, monitor_ext, inspection
 from app.api import rdb_instances, redis_instances, batch_operations, permissions
-from app.api import scheduled_inspection, alert_rules, change_windows, scheduler
+from app.api import scheduled_inspection, alert_rules, change_windows, scheduler, sql_optimization
 
 # 配置日志（统一配置，确保只调用一次）
 logging.basicConfig(
@@ -313,6 +313,7 @@ app.include_router(scheduled_inspection.router, prefix="/api/v1")  # 定时巡�
 app.include_router(alert_rules.router, prefix="/api/v1")  # 告警规则
 app.include_router(change_windows.router, prefix="/api/v1")  # 变更时间窗口
 app.include_router(scheduler.router, prefix="/api/v1")  # 调度器管理
+app.include_router(sql_optimization.router)  # SQL 优化闭环
 
 
 # 健康检查

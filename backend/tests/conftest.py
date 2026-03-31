@@ -203,3 +203,40 @@ def test_environment(db_session):
     db_session.commit()
     db_session.refresh(env)
     return env
+
+
+@pytest.fixture(scope="function")
+def readonly_token(db_session):
+    """创建只读用户并返回 token"""
+    user = User(
+        username="readonly",
+        password_hash=hash_password("readonly123"),
+        real_name="只读用户",
+        email="readonly@test.com",
+        role=UserRole.READONLY,
+        status=True
+    )
+    db_session.add(user)
+    db_session.commit()
+    
+    token = create_access_token({"sub": user.id})
+    return token
+
+
+@pytest.fixture(scope="function")
+def test_rdb_instance(db_session, test_environment):
+    """创建测试 RDB 实例"""
+    from app.models import RDBInstance, RDBType
+    
+    instance = RDBInstance(
+        name="test-mysql-instance",
+        host="localhost",
+        port=3306,
+        db_type=RDBType.MYSQL,
+        environment_id=test_environment.id,
+        status=True
+    )
+    db_session.add(instance)
+    db_session.commit()
+    db_session.refresh(instance)
+    return instance

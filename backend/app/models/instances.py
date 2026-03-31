@@ -88,6 +88,8 @@ class RDBInstance(Base):
     inspection_reports = relationship("InspectionReport", back_populates="rdb_instance")
     index_analyses = relationship("IndexAnalysis", back_populates="rdb_instance")
     high_cpu_sqls = relationship("HighCPUSQL", back_populates="rdb_instance")
+    optimization_suggestions = relationship("OptimizationSuggestion", back_populates="rdb_instance")
+    collection_tasks = relationship("SlowQueryCollectionTask", back_populates="rdb_instance")
 
 
 class RedisInstance(Base):

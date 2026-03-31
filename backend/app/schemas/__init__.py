@@ -668,3 +668,184 @@ class SQLAnalysisResponse(BaseModel):
     analysis_time: float
     summary: Dict[str, Any] = Field(default_factory=dict, description="分析摘要")
     auto_sync_info: Optional[Dict[str, Any]] = Field(default=None, description="自动同步表结构信息")
+
+
+# ============ SQL 优化闭环相关 ============
+
+# ==================== 优化建议 ====================
+
+class OptimizationSuggestionItem(BaseModel):
+    """单个优化建议"""
+    type: str = Field(..., description="建议类型: add_index/rewrite_sql/parameter/config")
+    description: str = Field(..., description="建议描述")
+    sql: Optional[str] = Field(None, description="相关SQL（如CREATE INDEX）")
+    reason: str = Field(..., description="建议原因")
+    priority: str = Field("medium", description="优先级: high/medium/low")
+
+
+class OptimizationIssueItem(BaseModel):
+    """发现的问题"""
+    type: str = Field(..., description="问题类型")
+    description: str = Field(..., description="问题描述")
+    severity: str = Field("warning", description="严重级别: critical/warning/info")
+
+
+class OptimizationSuggestionCreate(BaseModel):
+    """创建优化建议"""
+    instance_id: int
+    database_name: Optional[str] = None
+    slow_query_id: Optional[int] = None
+    sql_fingerprint: str
+    sql_sample: Optional[str] = None
+    issues: List[Dict[str, Any]]
+    suggestions: List[Dict[str, Any]]
+    suggested_sql: Optional[str] = None
+    index_ddl: Optional[str] = None
+    rollback_sql: Optional[str] = None
+    risk_level: str = "low"
+    confidence: Optional[float] = None
+    expected_improvement: Optional[str] = None
+    table_schemas_used: Optional[List[Dict]] = None
+    analysis_time: Optional[float] = None
+    llm_model: Optional[str] = None
+
+
+class OptimizationSuggestionUpdate(BaseModel):
+    """更新优化建议"""
+    status: Optional[str] = None
+    before_avg_time: Optional[float] = None
+    after_avg_time: Optional[float] = None
+    actual_improvement: Optional[float] = None
+
+
+class OptimizationSuggestionResponse(BaseModel):
+    """优化建议响应"""
+    id: int
+    instance_id: int
+    instance_name: Optional[str] = None
+    database_name: Optional[str]
+    slow_query_id: Optional[int]
+    sql_fingerprint: str
+    sql_sample: Optional[str]
+    issues: List[Dict[str, Any]]
+    suggestions: List[Dict[str, Any]]
+    suggested_sql: Optional[str]
+    index_ddl: Optional[str]
+    rollback_sql: Optional[str]
+    risk_level: str
+    confidence: Optional[float]
+    expected_improvement: Optional[str]
+    status: str
+    approval_id: Optional[int]
+    adopted_by: Optional[int]
+    adopted_at: Optional[datetime]
+    before_avg_time: Optional[float]
+    after_avg_time: Optional[float]
+    actual_improvement: Optional[float]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+# ==================== 采集任务 ====================
+
+class CollectionTaskCreate(BaseModel):
+    """创建采集任务"""
+    instance_id: int
+    enabled: bool = True
+    cron_expression: str = "0 */5 * * *"
+    min_exec_time: float = Field(1.0, ge=0.1, le=3600, description="最小执行时间阈值")
+    top_n: int = Field(100, ge=1, le=1000, description="每次采集Top N")
+    auto_analyze: bool = True
+    analyze_threshold: int = Field(3, ge=1, le=100, description="执行次数超过阈值才分析")
+    llm_analysis: bool = True
+
+
+class CollectionTaskUpdate(BaseModel):
+    """更新采集任务"""
+    enabled: Optional[bool] = None
+    cron_expression: Optional[str] = None
+    min_exec_time: Optional[float] = Field(None, ge=0.1, le=3600)
+    top_n: Optional[int] = Field(None, ge=1, le=1000)
+    auto_analyze: Optional[bool] = None
+    analyze_threshold: Optional[int] = Field(None, ge=1, le=100)
+    llm_analysis: Optional[bool] = None
+
+
+class CollectionTaskResponse(BaseModel):
+    """采集任务响应"""
+    id: int
+    instance_id: int
+    instance_name: Optional[str] = None
+    enabled: bool
+    cron_expression: str
+    min_exec_time: float
+    top_n: int
+    auto_analyze: bool
+    analyze_threshold: int
+    llm_analysis: bool
+    last_run_at: Optional[datetime]
+    last_run_status: Optional[str]
+    last_collected_count: int
+    total_collected_count: int
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class CollectionTaskListResponse(BaseModel):
+    """采集任务列表响应"""
+    items: List[CollectionTaskResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class SuggestionListResponse(BaseModel):
+    """优化建议列表响应"""
+    items: List[OptimizationSuggestionResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class AdoptSuggestionResponse(BaseModel):
+    """采用建议响应"""
+    id: int
+    status: str
+    approval_id: int
+    approval_url: str
+    message: str
+
+
+class RejectSuggestionRequest(BaseModel):
+    """拒绝建议请求"""
+    reason: Optional[str] = Field(None, max_length=500, description="拒绝原因")
+
+
+class VerifySuggestionResponse(BaseModel):
+    """验证效果响应"""
+    id: int
+    before_avg_time: Optional[float]
+    after_avg_time: Optional[float]
+    actual_improvement: Optional[float]
+    message: str
+
+
+class ManualAnalyzeRequest(BaseModel):
+    """手动分析SQL请求"""
+    instance_id: int = Field(..., description="实例ID")
+    sql_text: str = Field(..., description="待分析的SQL")
+    database_name: Optional[str] = Field(None, description="数据库名")
+
+
+class ManualCollectionResponse(BaseModel):
+    """手动触发采集响应"""
+    task_id: int
+    instance_id: int
+    instance_name: str
+    collected_count: int
+    analyzed_count: int
+    message: str

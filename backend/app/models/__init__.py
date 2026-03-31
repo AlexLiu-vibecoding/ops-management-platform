@@ -303,6 +303,7 @@ class ApprovalRecord(Base):
     approver = relationship("User", back_populates="approval_actions", foreign_keys=[approver_id])
     rdb_instance = relationship("RDBInstance", back_populates="approval_records")
     redis_instance = relationship("RedisInstance", back_populates="approval_records")
+    optimization_suggestions = relationship("OptimizationSuggestion", back_populates="approval")
 
 
 # ==================== RDB 性能监控 ====================
@@ -347,6 +348,7 @@ class SlowQuery(Base):
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     
     rdb_instance = relationship("RDBInstance", back_populates="slow_queries")
+    optimization_suggestions = relationship("OptimizationSuggestion", back_populates="slow_query")
 
 
 class HighCPUSQL(Base):
@@ -894,6 +896,9 @@ __all__ = [
     
     # 变更时间窗口
     'ChangeWindow', 'WEEKDAY_LABELS', 'WINDOW_TYPE_LABELS',
+    
+    # SQL 优化闭环
+    'OptimizationSuggestion', 'SlowQueryCollectionTask',
 ]
 
 # 导入权限模型
@@ -911,3 +916,6 @@ from app.models.alert_rule import AlertRule, RULE_TYPE_LABELS, OPERATOR_LABELS, 
 
 # 导入变更时间窗口模型
 from app.models.change_window import ChangeWindow, WEEKDAY_LABELS, WINDOW_TYPE_LABELS
+
+# 导入 SQL 优化闭环模型
+from app.models.sql_optimization import OptimizationSuggestion, SlowQueryCollectionTask
