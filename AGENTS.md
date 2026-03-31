@@ -95,7 +95,7 @@
 | **SQL 优化闭环** | `views/monitor/slow-query/` | 慢查询列表、优化建议、采集任务、分析历史 |
 | **告警规则** | `views/alerts/rules/` | 规则配置、通知关联 |
 | **定时巡检** | `views/inspection/scheduled/` | 定时任务、自动报告 |
-| **变更窗口** | `views/change/windows/` | 窗口定义、自动审批 |
+| **变更窗口** | `views/change/windows/` | 窗口定义、全局策略、紧急变更支持 |
 
 ---
 

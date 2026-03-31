@@ -8,6 +8,7 @@ SQL 优化闭环服务
 - 一键提交变更
 - 效果验证
 """
+import asyncio
 import json
 import logging
 import time
@@ -540,12 +541,35 @@ class SQLOptimizationService:
 
         start_time = time.time()
 
-        # 执行 EXPLAIN 分析
-        explain_result = self.analyzer.execute_explain(
-            instance=instance,
-            sql=sql_text,
-            database_name=database_name
-        )
+        # 执行 EXPLAIN 分析（异步调用需要用 asyncio.run）
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # 如果事件循环正在运行，创建一个新的线程来运行
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(
+                        asyncio.run,
+                        self.analyzer.execute_explain(
+                            instance=instance,
+                            sql=sql_text,
+                            database_name=database_name
+                        )
+                    )
+                    explain_result = future.result()
+            else:
+                explain_result = asyncio.run(self.analyzer.execute_explain(
+                    instance=instance,
+                    sql=sql_text,
+                    database_name=database_name
+                ))
+        except RuntimeError:
+            # 如果没有事件循环，创建一个新的
+            explain_result = asyncio.run(self.analyzer.execute_explain(
+                instance=instance,
+                sql=sql_text,
+                database_name=database_name
+            ))
 
         # 规则检测
         rule_issues = self._detect_rule_issues(explain_result)
