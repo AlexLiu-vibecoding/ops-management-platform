@@ -228,6 +228,11 @@ const routes = [
             meta: { title: '通知管理', icon: 'Bell' }
           }
         ]
+      },
+      // 兼容旧路径 /notification，重定向到 /config/notification
+      {
+        path: 'notification',
+        redirect: '/config/notification'
       }
     ]
   }
