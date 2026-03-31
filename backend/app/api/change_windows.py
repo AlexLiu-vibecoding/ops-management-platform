@@ -24,6 +24,7 @@ class ChangeWindowCreate(BaseModel):
     """创建变更时间窗口"""
     name: str = Field(..., description="窗口名称")
     description: Optional[str] = Field(None, description="描述")
+    window_type: str = Field("allowed", description="窗口类型: forbidden(封禁) 或 allowed(允许)")
     environment_ids: Optional[List[int]] = Field(None, description="应用环境ID列表")
     # 日期范围
     start_date: Optional[str] = Field(None, description="生效开始日期 YYYY-MM-DD")
@@ -42,6 +43,7 @@ class ChangeWindowUpdate(BaseModel):
     """更新变更时间窗口"""
     name: Optional[str] = None
     description: Optional[str] = None
+    window_type: Optional[str] = Field(None, description="窗口类型: forbidden(封禁) 或 allowed(允许)")
     environment_ids: Optional[List[int]] = None
     start_date: Optional[str] = Field(None, description="生效开始日期 YYYY-MM-DD")
     end_date: Optional[str] = Field(None, description="生效结束日期 YYYY-MM-DD")
@@ -87,6 +89,7 @@ async def list_change_windows(
             "id": w.id,
             "name": w.name,
             "description": w.description,
+            "window_type": w.window_type or "allowed",
             "environment_ids": w.environment_ids,
             "start_date": w.start_date.isoformat() if w.start_date else None,
             "end_date": w.end_date.isoformat() if w.end_date else None,
@@ -147,6 +150,7 @@ async def create_change_window(
     window = ChangeWindow(
         name=data.name,
         description=data.description,
+        window_type=data.window_type,
         environment_ids=data.environment_ids,
         start_date=start_date,
         end_date=end_date,
@@ -228,6 +232,10 @@ async def update_change_window(
         window.name = data.name
     if data.description is not None:
         window.description = data.description
+    if data.window_type is not None:
+        if data.window_type not in ["forbidden", "allowed"]:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="窗口类型必须为 forbidden 或 allowed")
+        window.window_type = data.window_type
     if data.environment_ids is not None:
         window.environment_ids = data.environment_ids
     if data.start_date is not None:
@@ -415,8 +423,9 @@ def _check_single_window(window: ChangeWindow, dt: datetime) -> dict:
     time_matched = True
     if window.start_time and window.end_time:
         check_time_str = dt.strftime("%H:%M")
-        start_time = window.start_time
-        end_time = window.end_time
+        # 将时间对象转换为字符串格式
+        start_time = window.start_time.strftime("%H:%M") if hasattr(window.start_time, 'strftime') else str(window.start_time)
+        end_time = window.end_time.strftime("%H:%M") if hasattr(window.end_time, 'strftime') else str(window.end_time)
         
         if start_time <= end_time:
             # 不跨天
@@ -426,7 +435,7 @@ def _check_single_window(window: ChangeWindow, dt: datetime) -> dict:
             time_matched = check_time_str >= start_time or check_time_str <= end_time
         
         if not time_matched:
-            result["reason"] = f"当前时间不在 {window.start_time}-{window.end_time} 范围内"
+            result["reason"] = f"当前时间不在 {start_time}-{end_time} 范围内"
             return result
     
     # 检查日期范围

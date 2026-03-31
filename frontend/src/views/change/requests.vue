@@ -81,9 +81,14 @@
         </el-table-column>
         <el-table-column prop="status" label="状态" min-width="110" align="center">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)" size="small">
-              {{ getStatusLabel(row.status) }}
-            </el-tag>
+            <div class="status-cell">
+              <el-tag :type="getStatusType(row.status)" size="small">
+                {{ getStatusLabel(row.status) }}
+              </el-tag>
+              <el-tag v-if="row.is_emergency" type="danger" size="small" class="emergency-tag">
+                紧急
+              </el-tag>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="提交时间" width="160">
@@ -948,6 +953,18 @@ onMounted(() => {
           color: #909399;
         }
       }
+    }
+  }
+  
+  // 状态单元格
+  .status-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+    
+    .emergency-tag {
+      font-size: 10px;
     }
   }
 }

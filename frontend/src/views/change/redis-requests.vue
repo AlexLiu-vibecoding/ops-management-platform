@@ -59,9 +59,14 @@
         </el-table-column>
         <el-table-column prop="status" label="状态" min-width="100" align="center">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)" size="small">
-              {{ getStatusLabel(row.status) }}
-            </el-tag>
+            <div class="status-cell">
+              <el-tag :type="getStatusType(row.status)" size="small">
+                {{ getStatusLabel(row.status) }}
+              </el-tag>
+              <el-tag v-if="row.is_emergency" type="danger" size="small" class="emergency-tag">
+                紧急
+              </el-tag>
+            </div>
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="提交时间" width="160">
@@ -104,10 +109,44 @@
         </el-form-item>
         
         <el-form-item label="Redis 实例" prop="instance_id">
-          <el-select v-model="dialog.form.instance_id" placeholder="请选择 Redis 实例" style="width: 100%;">
+          <el-select 
+            v-model="dialog.form.instance_id" 
+            placeholder="请选择 Redis 实例" 
+            style="width: 100%;"
+            @change="handleInstanceSelect"
+          >
             <el-option v-for="inst in redisInstances" :key="inst.id" :label="inst.name" :value="inst.id" />
           </el-select>
         </el-form-item>
+        
+        <!-- 变更窗口状态提示 -->
+        <el-alert
+          v-if="changeWindowInfo.checked"
+          :title="changeWindowInfo.message"
+          :type="changeWindowInfo.canChange ? 'success' : (changeWindowInfo.allowEmergency ? 'warning' : 'error')"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 16px;"
+        >
+          <template #default>
+            <div v-if="!changeWindowInfo.canChange && changeWindowInfo.allowEmergency" class="emergency-option">
+              <el-checkbox v-model="dialog.form.is_emergency">标记为紧急变更</el-checkbox>
+              <el-tooltip content="紧急变更需要更高级别的审批" placement="top">
+                <el-icon><QuestionFilled /></el-icon>
+              </el-tooltip>
+            </div>
+            <div v-if="changeWindowInfo.windows.length > 0" class="window-details">
+              <span class="text-sm text-gray-500">窗口状态：</span>
+              <span v-for="w in changeWindowInfo.windows" :key="w.id" class="window-tag">
+                <el-tag :type="w.window_type === 'forbidden' ? 'danger' : 'success'" size="small">
+                  {{ w.window_type === 'forbidden' ? '封禁' : '允许' }}
+                </el-tag>
+                {{ w.name }}
+                <span class="status">({{ w.in_window ? '✓ 生效中' : '○ 未生效' }})</span>
+              </span>
+            </div>
+          </template>
+        </el-alert>
         
         <el-form-item label="Redis 命令" prop="sql_content">
           <div class="cmd-input-wrapper">
@@ -201,7 +240,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import request from '@/api/index'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, View, CircleCheck, CircleClose, VideoPlay } from '@element-plus/icons-vue'
+import { Plus, View, CircleCheck, CircleClose, VideoPlay, QuestionFilled } from '@element-plus/icons-vue'
 import TableActions from '@/components/TableActions.vue'
 import dayjs from 'dayjs'
 
@@ -278,13 +317,24 @@ const dialog = reactive({
     sql_content: '',
     remark: '',
     execution_mode: 'auto',  // 默认审批后自动执行
-    scheduled_time: null
+    scheduled_time: null,
+    is_emergency: false
   },
   rules: {
     title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
     instance_id: [{ required: true, message: '请选择实例', trigger: 'change' }],
     sql_content: [{ required: true, message: '请输入 Redis 命令', trigger: 'blur' }]
   }
+})
+
+// 变更窗口状态
+const changeWindowInfo = reactive({
+  checked: false,
+  canChange: true,
+  allowEmergency: false,
+  inForbidden: false,
+  message: '',
+  windows: []
 })
 
 const detailDialog = reactive({
@@ -371,15 +421,88 @@ const handleAdd = () => {
     sql_content: '',
     remark: '',
     execution_mode: 'auto',  // 默认审批后自动执行
-    scheduled_time: null
+    scheduled_time: null,
+    is_emergency: false
   }
+  // 重置变更窗口状态
+  changeWindowInfo.checked = false
+  changeWindowInfo.canChange = true
+  changeWindowInfo.allowEmergency = false
+  changeWindowInfo.inForbidden = false
+  changeWindowInfo.message = ''
+  changeWindowInfo.windows = []
   dialog.visible = true
+}
+
+// 实例选择变更 - 检查变更窗口
+const handleInstanceSelect = async (instanceId) => {
+  // 重置变更窗口状态
+  changeWindowInfo.checked = false
+  changeWindowInfo.canChange = true
+  changeWindowInfo.allowEmergency = false
+  changeWindowInfo.inForbidden = false
+  changeWindowInfo.message = ''
+  changeWindowInfo.windows = []
+  
+  if (!instanceId) return
+  
+  const instance = redisInstances.value.find(i => i.id === instanceId)
+  if (instance?.environment_id) {
+    try {
+      const windowData = await request.post('/change-windows/check', null, {
+        params: { environment_id: instance.environment_id }
+      })
+      
+      changeWindowInfo.checked = true
+      changeWindowInfo.canChange = windowData.can_change
+      changeWindowInfo.allowEmergency = windowData.allow_emergency
+      changeWindowInfo.inForbidden = windowData.in_forbidden
+      changeWindowInfo.windows = windowData.windows || []
+      
+      if (windowData.can_change) {
+        changeWindowInfo.message = '✓ ' + windowData.message
+      } else {
+        changeWindowInfo.message = '✗ ' + windowData.message
+      }
+    } catch (error) {
+      console.error('检查变更窗口失败:', error)
+      changeWindowInfo.checked = true
+      changeWindowInfo.canChange = true
+      changeWindowInfo.message = '未配置变更窗口，允许提交变更'
+    }
+  } else {
+    changeWindowInfo.checked = true
+    changeWindowInfo.canChange = true
+    changeWindowInfo.message = '未关联环境，允许提交变更'
+  }
 }
 
 const handleSubmit = async () => {
   if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
     if (!valid) return
+    
+    // 检查变更窗口
+    if (changeWindowInfo.checked && !changeWindowInfo.canChange) {
+      if (!changeWindowInfo.allowEmergency) {
+        ElMessage.error('当前不允许提交变更')
+        return
+      }
+      if (!dialog.form.is_emergency) {
+        ElMessage.warning('当前不允许提交变更，请勾选"紧急变更"选项')
+        return
+      }
+      // 紧急变更需要确认
+      try {
+        await ElMessageBox.confirm(
+          '您正在提交紧急变更申请，需要更高级别的审批。确定继续？',
+          '紧急变更确认',
+          { type: 'warning', confirmButtonText: '确定提交', cancelButtonText: '取消' }
+        )
+      } catch {
+        return
+      }
+    }
     
     dialog.submitting = true
     try {
@@ -389,7 +512,8 @@ const handleSubmit = async () => {
         instance_id: dialog.form.instance_id,
         sql_content: dialog.form.sql_content,
         remark: dialog.form.remark,
-        auto_execute: dialog.form.execution_mode === 'auto'
+        auto_execute: dialog.form.execution_mode === 'auto',
+        is_emergency: dialog.form.is_emergency
       }
       
       if (dialog.form.execution_mode === 'scheduled' && dialog.form.scheduled_time) {
@@ -582,6 +706,46 @@ onMounted(() => {
   
   .approval-actions {
     margin-top: 15px;
+  }
+  
+  // 紧急变更选项
+  .emergency-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  // 变更窗口详情
+  .window-details {
+    margin-top: 8px;
+    
+    .window-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      margin-right: 8px;
+      background: rgba(0, 0, 0, 0.05);
+      border-radius: 4px;
+      font-size: 12px;
+      
+      .status {
+        color: #909399;
+      }
+    }
+  }
+  
+  // 状态单元格
+  .status-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: center;
+    
+    .emergency-tag {
+      font-size: 10px;
+    }
   }
   
   .table-operations {
