@@ -236,7 +236,6 @@ async def init_default_menus(
     # Default menu configuration (top-level menus)
     parent_menus = [
         {"name": "仪表盘", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
-        {"name": "配置管理", "path": "/config", "icon": "Setting", "sort_order": 9},
         {"name": "实例管理", "path": "/instances", "icon": "Server", "sort_order": 10, "roles": "super_admin,approval_admin,operator"},
         {"name": "环境管理", "path": "/environments", "icon": "Collection", "sort_order": 11, "roles": "super_admin,approval_admin,operator"},
         {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 20},
@@ -249,12 +248,11 @@ async def init_default_menus(
         {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 62},
         {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 63, "roles": "super_admin"},
         {"name": "系统设置", "path": "/system", "icon": "Tools", "sort_order": 64, "roles": "super_admin"},
+        {"name": "通知管理", "path": "/notification", "icon": "Bell", "sort_order": 65, "roles": "super_admin"},
     ]
     
     # Sub-menu configuration
     child_menus = [
-        # 配置管理子菜单
-        {"name": "通知管理", "path": "/config/notification", "icon": "Bell", "sort_order": 1, "parent_path": "/config"},
         # 监控中心子菜单
         {"name": "性能监控", "path": "/monitor/performance", "icon": "TrendCharts", "sort_order": 1, "parent_path": "/monitor"},
         {"name": "慢查询监控", "path": "/monitor/slow-query", "icon": "Timer", "sort_order": 2, "parent_path": "/monitor"},
@@ -290,7 +288,6 @@ async def add_missing_menus(
     # Required top-level menus
     required_menus = [
         {"name": "仪表盘", "path": "/dashboard", "icon": "DataAnalysis", "sort_order": 1},
-        {"name": "配置管理", "path": "/config", "icon": "Setting", "sort_order": 9},
         {"name": "实例管理", "path": "/instances", "icon": "Server", "sort_order": 10, "roles": "super_admin,approval_admin,operator"},
         {"name": "环境管理", "path": "/environments", "icon": "Collection", "sort_order": 11, "roles": "super_admin,approval_admin,operator"},
         {"name": "SQL编辑器", "path": "/sql-editor", "icon": "Document", "sort_order": 20},
@@ -303,6 +300,7 @@ async def add_missing_menus(
         {"name": "审计日志", "path": "/audit", "icon": "Tickets", "sort_order": 62},
         {"name": "菜单配置", "path": "/menu-config", "icon": "Menu", "sort_order": 63, "roles": "super_admin"},
         {"name": "系统设置", "path": "/system", "icon": "Tools", "sort_order": 64, "roles": "super_admin"},
+        {"name": "通知管理", "path": "/notification", "icon": "Bell", "sort_order": 65, "roles": "super_admin"},
     ]
     
     added_count = 0
@@ -358,27 +356,14 @@ async def add_missing_menus(
                 db.add(menu)
                 added_count += 1
     
-    # Check config sub-menus
-    config_parent = db.query(MenuConfig).filter(MenuConfig.path == "/config").first()
-    if config_parent:
-        config_child_menus = [
-            {"name": "通知管理", "path": "/config/notification", "icon": "Bell", "sort_order": 1},
-        ]
-        
-        for menu_data in config_child_menus:
-            existing = db.query(MenuConfig).filter(MenuConfig.path == menu_data["path"]).first()
-            if not existing:
-                menu = MenuConfig(**menu_data, parent_id=config_parent.id)
-                db.add(menu)
-                added_count += 1
-    
-    # Remove old menu entries that are no longer needed (merged into other pages)
+    # Remove old menu entries that are no longer needed
     old_paths = [
         "/approvals",        # Old single approval menu (merged into /change)
         "/registrations",    # Merged into /users
         "/scheduler",        # Merged into /system
         "/aws-regions",      # Merged into /environments
-        "/notification",     # Moved to /config/notification
+        "/config",           # Removed, no longer used
+        "/config/notification",  # Moved to /notification
     ]
     for old_path in old_paths:
         old_menu = db.query(MenuConfig).filter(MenuConfig.path == old_path).first()
