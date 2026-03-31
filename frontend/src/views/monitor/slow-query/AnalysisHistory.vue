@@ -299,6 +299,7 @@ const fetchInstances = async () => {
     instances.value = (data.items || []).filter(inst => inst.db_type !== 'redis')
   } catch (error) {
     console.error('获取实例列表失败:', error)
+    // 不显示错误消息，因为这个错误不是致命的
   }
 }
 
@@ -322,7 +323,7 @@ const fetchData = async () => {
     pagination.total = data.total || 0
   } catch (error) {
     console.error('获取分析历史失败:', error)
-    ElMessage.error('获取分析历史失败')
+    ElMessage.error(error.response?.data?.message || '获取分析历史失败，请刷新页面重试')
   } finally {
     loading.value = false
   }

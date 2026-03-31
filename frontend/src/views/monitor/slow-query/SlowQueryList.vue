@@ -400,10 +400,11 @@ const fetchInstances = async () => {
     instances.value = (data.items || []).filter(inst => inst.db_type !== 'redis')
     if (instances.value.length > 0 && !selectedInstance.value) {
       selectedInstance.value = instances.value[0].id
-      fetchSlowQueries()
+      await fetchSlowQueries()
     }
   } catch (error) {
     console.error('获取实例列表失败:', error)
+    ElMessage.error('获取实例列表失败，请刷新页面重试')
   }
 }
 

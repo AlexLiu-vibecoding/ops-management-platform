@@ -21,11 +21,21 @@
         <AnalysisHistory ref="historyRef" />
       </el-tab-pane>
     </el-tabs>
+    
+    <!-- 错误提示 -->
+    <el-alert
+      v-if="error"
+      :title="error"
+      type="error"
+      :closable="true"
+      @close="error = null"
+      style="position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onErrorCaptured } from 'vue'
 import { useRouter } from 'vue-router'
 import SlowQueryList from './SlowQueryList.vue'
 import OptimizationSuggestions from './OptimizationSuggestions.vue'
@@ -34,6 +44,7 @@ import AnalysisHistory from './AnalysisHistory.vue'
 
 const router = useRouter()
 const activeTab = ref('list')
+const error = ref(null)
 
 // 子组件引用
 const slowQueryListRef = ref(null)
@@ -41,22 +52,33 @@ const suggestionsRef = ref(null)
 const tasksRef = ref(null)
 const historyRef = ref(null)
 
+// 捕获子组件错误
+onErrorCaptured((err) => {
+  console.error('组件错误:', err)
+  error.value = `页面加载出错: ${err.message}`
+  return false // 阻止错误继续传播
+})
+
 // 标签页切换
 const handleTabChange = (name) => {
   // 切换标签页时刷新数据
-  switch (name) {
-    case 'list':
-      slowQueryListRef.value?.fetchData()
-      break
-    case 'suggestions':
-      suggestionsRef.value?.fetchData()
-      break
-    case 'tasks':
-      tasksRef.value?.fetchData()
-      break
-    case 'history':
-      historyRef.value?.fetchData()
-      break
+  try {
+    switch (name) {
+      case 'list':
+        slowQueryListRef.value?.fetchData()
+        break
+      case 'suggestions':
+        suggestionsRef.value?.fetchData()
+        break
+      case 'tasks':
+        tasksRef.value?.fetchData()
+        break
+      case 'history':
+        historyRef.value?.fetchData()
+        break
+    }
+  } catch (err) {
+    console.error('切换标签页失败:', err)
   }
 }
 
@@ -68,9 +90,13 @@ const handleAnalyze = (row) => {
 
 onMounted(() => {
   // 从 URL 参数恢复标签页状态
-  const tab = router.currentRoute.value.query.tab
-  if (tab && ['list', 'suggestions', 'tasks', 'history'].includes(tab)) {
-    activeTab.value = tab
+  try {
+    const tab = router.currentRoute.value.query.tab
+    if (tab && ['list', 'suggestions', 'tasks', 'history'].includes(tab)) {
+      activeTab.value = tab
+    }
+  } catch (err) {
+    console.error('初始化标签页失败:', err)
   }
 })
 </script>

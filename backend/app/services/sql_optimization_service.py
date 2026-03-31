@@ -15,7 +15,7 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 from sqlalchemy import select, and_, desc
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 from app.models import (
     RDBInstance, SlowQuery, ApprovalRecord, ApprovalStatus,
@@ -36,26 +36,26 @@ logger = logging.getLogger(__name__)
 class SQLOptimizationService:
     """SQL 优化闭环服务"""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: Session):
         self.db = db
         self.collector = SlowQueryCollector()
         self.analyzer = SlowQueryAnalyzer()
 
     # ==================== 采集任务管理 ====================
 
-    async def create_collection_task(
+    def create_collection_task(
         self,
         task_data: CollectionTaskCreate,
         current_user: User
     ) -> SlowQueryCollectionTask:
         """创建采集任务"""
         # 检查实例是否存在
-        instance = await self._get_instance(task_data.instance_id)
+        instance = self._get_instance(task_data.instance_id)
         if not instance:
             raise ValueError(f"实例不存在: {task_data.instance_id}")
 
         # 检查是否已存在任务
-        existing = await self._get_task_by_instance(task_data.instance_id)
+        existing = self._get_task_by_instance(task_data.instance_id)
         if existing:
             raise ValueError(f"实例 {instance.name} 已存在采集任务")
 
@@ -71,19 +71,19 @@ class SQLOptimizationService:
         )
 
         self.db.add(task)
-        await self.db.commit()
-        await self.db.refresh(task)
+        self.db.commit()
+        self.db.refresh(task)
 
         logger.info(f"创建采集任务: instance_id={task.instance_id}, task_id={task.id}")
         return task
 
-    async def update_collection_task(
+    def update_collection_task(
         self,
         task_id: int,
         task_data: CollectionTaskUpdate
     ) -> Optional[SlowQueryCollectionTask]:
         """更新采集任务"""
-        task = await self._get_task(task_id)
+        task = self._get_task(task_id)
         if not task:
             return None
 
@@ -91,25 +91,25 @@ class SQLOptimizationService:
         for key, value in update_data.items():
             setattr(task, key, value)
 
-        await self.db.commit()
-        await self.db.refresh(task)
+        self.db.commit()
+        self.db.refresh(task)
 
         logger.info(f"更新采集任务: task_id={task_id}")
         return task
 
-    async def delete_collection_task(self, task_id: int) -> bool:
+    def delete_collection_task(self, task_id: int) -> bool:
         """删除采集任务"""
-        task = await self._get_task(task_id)
+        task = self._get_task(task_id)
         if not task:
             return False
 
-        await self.db.delete(task)
-        await self.db.commit()
+        self.db.delete(task)
+        self.db.commit()
 
         logger.info(f"删除采集任务: task_id={task_id}")
         return True
 
-    async def list_collection_tasks(
+    def list_collection_tasks(
         self,
         instance_id: Optional[int] = None,
         enabled: Optional[bool] = None,
@@ -133,30 +133,30 @@ class SQLOptimizationService:
 
         from sqlalchemy import func
         total_query = select(func.count()).select_from(count_query.subquery())
-        total_result = await self.db.execute(total_query)
+        total_result = self.db.execute(total_query)
         total = total_result.scalar() or 0
 
         # 分页查询
         query = query.order_by(desc(SlowQueryCollectionTask.created_at))
         query = query.offset((page - 1) * page_size).limit(page_size)
 
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         tasks = result.scalars().all()
 
         return list(tasks), total
 
     # ==================== 慢 SQL 采集 ====================
 
-    async def run_collection(
+    def run_collection(
         self,
         task_id: int
     ) -> Dict[str, Any]:
         """执行采集任务"""
-        task = await self._get_task(task_id)
+        task = self._get_task(task_id)
         if not task:
             raise ValueError(f"任务不存在: {task_id}")
 
-        instance = await self._get_instance(task.instance_id)
+        instance = self._get_instance(task.instance_id)
         if not instance:
             raise ValueError(f"实例不存在: {task.instance_id}")
 
@@ -167,7 +167,7 @@ class SQLOptimizationService:
 
         try:
             # 采集慢查询
-            slow_queries = await self.collector.fetch_from_performance_schema(
+            slow_queries = self.collector.fetch_from_performance_schema(
                 instance=instance,
                 limit=task.top_n,
                 min_exec_time=float(task.min_exec_time)
@@ -177,7 +177,7 @@ class SQLOptimizationService:
             for sq_data in slow_queries:
                 try:
                     # 检查是否已存在
-                    existing = await self._find_existing_slow_query(
+                    existing = self._find_existing_slow_query(
                         instance.id,
                         sq_data.get("digest_text", "")
                     )
@@ -210,11 +210,11 @@ class SQLOptimizationService:
                     logger.error(f"存储慢查询失败: {e}")
                     errors.append(str(e))
 
-            await self.db.commit()
+            self.db.commit()
 
             # 自动分析
             if task.auto_analyze:
-                analyzed_count = await self._auto_analyze_slow_queries(
+                analyzed_count = self._auto_analyze_slow_queries(
                     instance=instance,
                     task=task
                 )
@@ -224,7 +224,7 @@ class SQLOptimizationService:
             task.last_run_status = "success" if not errors else "partial"
             task.last_collected_count = collected_count
             task.total_collected_count += collected_count
-            await self.db.commit()
+            self.db.commit()
 
             duration = time.time() - start_time
 
@@ -249,12 +249,12 @@ class SQLOptimizationService:
             # 更新任务失败状态
             task.last_run_at = datetime.now()
             task.last_run_status = "failed"
-            await self.db.commit()
+            self.db.commit()
 
             logger.error(f"采集任务失败: task_id={task_id}, error={str(e)}")
             raise
 
-    async def _auto_analyze_slow_queries(
+    def _auto_analyze_slow_queries(
         self,
         instance: RDBInstance,
         task: SlowQueryCollectionTask
@@ -268,20 +268,20 @@ class SQLOptimizationService:
             )
         ).order_by(desc(SlowQuery.query_time)).limit(20)
 
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         slow_queries = result.scalars().all()
 
         analyzed_count = 0
         for sq in slow_queries:
             # 检查是否已有优化建议
-            existing = await self._has_suggestion(sq.id)
+            existing = self._has_suggestion(sq.id)
             if existing:
                 continue
 
             try:
                 # 执行 LLM 分析
                 if task.llm_analysis and sq.sql_sample:
-                    await self._create_suggestion_from_slow_query(
+                    self._create_suggestion_from_slow_query(
                         instance=instance,
                         slow_query=sq,
                         enable_llm=True
@@ -294,7 +294,7 @@ class SQLOptimizationService:
 
     # ==================== 优化建议管理 ====================
 
-    async def create_suggestion(
+    def create_suggestion(
         self,
         suggestion_data: OptimizationSuggestionCreate
     ) -> OptimizationSuggestion:
@@ -319,13 +319,13 @@ class SQLOptimizationService:
         )
 
         self.db.add(suggestion)
-        await self.db.commit()
-        await self.db.refresh(suggestion)
+        self.db.commit()
+        self.db.refresh(suggestion)
 
         logger.info(f"创建优化建议: suggestion_id={suggestion.id}")
         return suggestion
 
-    async def list_suggestions(
+    def list_suggestions(
         self,
         instance_id: Optional[int] = None,
         status: Optional[str] = None,
@@ -351,33 +351,33 @@ class SQLOptimizationService:
         from sqlalchemy import func
         count_subquery = query.subquery()
         total_query = select(func.count()).select_from(count_subquery)
-        total_result = await self.db.execute(total_query)
+        total_result = self.db.execute(total_query)
         total = total_result.scalar() or 0
 
         # 分页查询
         query = query.order_by(desc(OptimizationSuggestion.created_at))
         query = query.offset((page - 1) * page_size).limit(page_size)
 
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         suggestions = result.scalars().all()
 
         return list(suggestions), total
 
-    async def get_suggestion(self, suggestion_id: int) -> Optional[OptimizationSuggestion]:
+    def get_suggestion(self, suggestion_id: int) -> Optional[OptimizationSuggestion]:
         """获取优化建议详情"""
         query = select(OptimizationSuggestion).where(
             OptimizationSuggestion.id == suggestion_id
         )
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def adopt_suggestion(
+    def adopt_suggestion(
         self,
         suggestion_id: int,
         current_user: User
     ) -> Dict[str, Any]:
         """采用建议，创建变更申请"""
-        suggestion = await self.get_suggestion(suggestion_id)
+        suggestion = self.get_suggestion(suggestion_id)
         if not suggestion:
             raise ValueError(f"建议不存在: {suggestion_id}")
 
@@ -390,7 +390,7 @@ class SQLOptimizationService:
             raise ValueError("该建议没有可执行的 SQL 语句")
 
         # 获取实例和环境信息
-        instance = await self._get_instance(suggestion.instance_id)
+        instance = self._get_instance(suggestion.instance_id)
         if not instance:
             raise ValueError(f"实例不存在: {suggestion.instance_id}")
 
@@ -409,15 +409,15 @@ class SQLOptimizationService:
         )
 
         self.db.add(approval)
-        await self.db.commit()
-        await self.db.refresh(approval)
+        self.db.commit()
+        self.db.refresh(approval)
 
         # 更新建议状态
         suggestion.status = "adopted"
         suggestion.approval_id = approval.id
         suggestion.adopted_by = current_user.id
         suggestion.adopted_at = datetime.now()
-        await self.db.commit()
+        self.db.commit()
 
         logger.info(
             f"采用优化建议: suggestion_id={suggestion_id}, "
@@ -432,14 +432,14 @@ class SQLOptimizationService:
             "message": "已创建变更申请，等待审批"
         }
 
-    async def reject_suggestion(
+    def reject_suggestion(
         self,
         suggestion_id: int,
         reason: Optional[str],
         current_user: User
     ) -> OptimizationSuggestion:
         """拒绝建议"""
-        suggestion = await self.get_suggestion(suggestion_id)
+        suggestion = self.get_suggestion(suggestion_id)
         if not suggestion:
             raise ValueError(f"建议不存在: {suggestion_id}")
 
@@ -447,8 +447,8 @@ class SQLOptimizationService:
             raise ValueError(f"建议状态不是 pending，无法拒绝: {suggestion.status}")
 
         suggestion.status = "rejected"
-        await self.db.commit()
-        await self.db.refresh(suggestion)
+        self.db.commit()
+        self.db.refresh(suggestion)
 
         logger.info(
             f"拒绝优化建议: suggestion_id={suggestion_id}, "
@@ -457,12 +457,12 @@ class SQLOptimizationService:
 
         return suggestion
 
-    async def verify_suggestion(
+    def verify_suggestion(
         self,
         suggestion_id: int
     ) -> Dict[str, Any]:
         """验证优化效果"""
-        suggestion = await self.get_suggestion(suggestion_id)
+        suggestion = self.get_suggestion(suggestion_id)
         if not suggestion:
             raise ValueError(f"建议不存在: {suggestion_id}")
 
@@ -473,14 +473,14 @@ class SQLOptimizationService:
         approval_query = select(ApprovalRecord).where(
             ApprovalRecord.id == suggestion.approval_id
         )
-        result = await self.db.execute(approval_query)
+        result = self.db.execute(approval_query)
         approval = result.scalar_one_or_none()
 
         if not approval or approval.status != ApprovalStatus.EXECUTED:
             raise ValueError("变更申请尚未执行")
 
         # 查询优化后的慢查询性能
-        instance = await self._get_instance(suggestion.instance_id)
+        instance = self._get_instance(suggestion.instance_id)
         if not instance:
             raise ValueError("实例不存在")
 
@@ -489,7 +489,7 @@ class SQLOptimizationService:
 
         # 查询优化后的平均执行时间
         # 这里简化实现，实际应该从慢查询表中统计
-        after_avg_time = await self._get_avg_query_time_after_optimization(
+        after_avg_time = self._get_avg_query_time_after_optimization(
             instance=instance,
             sql_fingerprint=suggestion.sql_fingerprint,
             after_time=before_time
@@ -505,7 +505,7 @@ class SQLOptimizationService:
         # 更新建议
         suggestion.after_avg_time = after_avg_time
         suggestion.actual_improvement = actual_improvement
-        await self.db.commit()
+        self.db.commit()
 
         improvement_msg = ""
         if actual_improvement:
@@ -527,21 +527,21 @@ class SQLOptimizationService:
             "message": improvement_msg
         }
 
-    async def manual_analyze(
+    def manual_analyze(
         self,
         instance_id: int,
         sql_text: str,
         database_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """手动分析 SQL"""
-        instance = await self._get_instance(instance_id)
+        instance = self._get_instance(instance_id)
         if not instance:
             raise ValueError(f"实例不存在: {instance_id}")
 
         start_time = time.time()
 
         # 执行 EXPLAIN 分析
-        explain_result = await self.analyzer.execute_explain(
+        explain_result = self.analyzer.execute_explain(
             instance=instance,
             sql=sql_text,
             database_name=database_name
@@ -551,7 +551,7 @@ class SQLOptimizationService:
         rule_issues = self._detect_rule_issues(explain_result)
 
         # 获取相关表结构
-        table_schemas = await self._get_relevant_table_schemas(
+        table_schemas = self._get_relevant_table_schemas(
             instance_id=instance_id,
             database_name=database_name,
             sql_text=sql_text
@@ -565,7 +565,7 @@ class SQLOptimizationService:
         risk_level = "low"
 
         try:
-            llm_result = await self._llm_analyze_sql(
+            llm_result = self._llm_analyze_sql(
                 sql_text=sql_text,
                 explain_result=explain_result,
                 table_schemas=table_schemas
@@ -581,7 +581,7 @@ class SQLOptimizationService:
         analysis_time = time.time() - start_time
 
         # 创建优化建议
-        suggestion = await self.create_suggestion(
+        suggestion = self.create_suggestion(
             OptimizationSuggestionCreate(
                 instance_id=instance_id,
                 database_name=database_name,
@@ -611,29 +611,29 @@ class SQLOptimizationService:
 
     # ==================== 辅助方法 ====================
 
-    async def _get_instance(self, instance_id: int) -> Optional[RDBInstance]:
+    def _get_instance(self, instance_id: int) -> Optional[RDBInstance]:
         """获取实例"""
         query = select(RDBInstance).where(RDBInstance.id == instance_id)
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def _get_task(self, task_id: int) -> Optional[SlowQueryCollectionTask]:
+    def _get_task(self, task_id: int) -> Optional[SlowQueryCollectionTask]:
         """获取采集任务"""
         query = select(SlowQueryCollectionTask).where(
             SlowQueryCollectionTask.id == task_id
         )
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def _get_task_by_instance(self, instance_id: int) -> Optional[SlowQueryCollectionTask]:
+    def _get_task_by_instance(self, instance_id: int) -> Optional[SlowQueryCollectionTask]:
         """根据实例ID获取采集任务"""
         query = select(SlowQueryCollectionTask).where(
             SlowQueryCollectionTask.instance_id == instance_id
         )
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def _find_existing_slow_query(
+    def _find_existing_slow_query(
         self,
         instance_id: int,
         sql_fingerprint: str
@@ -645,18 +645,18 @@ class SQLOptimizationService:
                 SlowQuery.sql_fingerprint == sql_fingerprint[:500]
             )
         ).order_by(desc(SlowQuery.created_at)).limit(1)
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         return result.scalar_one_or_none()
 
-    async def _has_suggestion(self, slow_query_id: int) -> bool:
+    def _has_suggestion(self, slow_query_id: int) -> bool:
         """检查慢查询是否已有优化建议"""
         query = select(OptimizationSuggestion.id).where(
             OptimizationSuggestion.slow_query_id == slow_query_id
         ).limit(1)
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         return result.scalar_one_or_none() is not None
 
-    async def _create_suggestion_from_slow_query(
+    def _create_suggestion_from_slow_query(
         self,
         instance: RDBInstance,
         slow_query: SlowQuery,
@@ -667,14 +667,14 @@ class SQLOptimizationService:
             return None
 
         # 获取表结构
-        table_schemas = await self._get_relevant_table_schemas(
+        table_schemas = self._get_relevant_table_schemas(
             instance_id=instance.id,
             database_name=slow_query.database_name,
             sql_text=slow_query.sql_sample
         )
 
         # 执行 EXPLAIN
-        explain_result = await self.analyzer.execute_explain(
+        explain_result = self.analyzer.execute_explain(
             instance=instance,
             sql=slow_query.sql_sample,
             database_name=slow_query.database_name
@@ -687,7 +687,7 @@ class SQLOptimizationService:
         llm_result = {}
         if enable_llm:
             try:
-                llm_result = await self._llm_analyze_sql(
+                llm_result = self._llm_analyze_sql(
                     sql_text=slow_query.sql_sample,
                     explain_result=explain_result,
                     table_schemas=table_schemas
@@ -718,12 +718,12 @@ class SQLOptimizationService:
         )
 
         self.db.add(suggestion)
-        await self.db.commit()
-        await self.db.refresh(suggestion)
+        self.db.commit()
+        self.db.refresh(suggestion)
 
         return suggestion
 
-    async def _get_relevant_table_schemas(
+    def _get_relevant_table_schemas(
         self,
         instance_id: int,
         database_name: Optional[str],
@@ -739,7 +739,7 @@ class SQLOptimizationService:
         if database_name:
             query = query.where(TableSchema.database_name == database_name)
 
-        result = await self.db.execute(query.limit(10))
+        result = self.db.execute(query.limit(10))
         schemas = result.scalars().all()
 
         return [
@@ -752,7 +752,7 @@ class SQLOptimizationService:
             for s in schemas
         ]
 
-    async def _llm_analyze_sql(
+    def _llm_analyze_sql(
         self,
         sql_text: str,
         explain_result: Dict[str, Any],
@@ -799,7 +799,7 @@ class SQLOptimizationService:
             "confidence": 0.85
         }
 
-    async def _get_avg_query_time_after_optimization(
+    def _get_avg_query_time_after_optimization(
         self,
         instance: RDBInstance,
         sql_fingerprint: str,
@@ -814,7 +814,7 @@ class SQLOptimizationService:
             )
         ).order_by(desc(SlowQuery.last_seen)).limit(10)
 
-        result = await self.db.execute(query)
+        result = self.db.execute(query)
         slow_queries = result.scalars().all()
 
         if not slow_queries:

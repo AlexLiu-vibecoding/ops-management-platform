@@ -36,7 +36,7 @@ router = APIRouter(prefix="/api/v1/sql-optimization", tags=["SQL优化闭环"])
 # ==================== 采集任务管理 ====================
 
 @router.get("/tasks", response_model=CollectionTaskListResponse)
-async def list_collection_tasks(
+def list_collection_tasks(
     instance_id: Optional[int] = Query(None, description="实例ID"),
     enabled: Optional[bool] = Query(None, description="启用状态"),
     page: int = Query(1, ge=1, description="页码"),
@@ -46,7 +46,7 @@ async def list_collection_tasks(
 ):
     """获取采集任务列表"""
     service = SQLOptimizationService(db)
-    tasks, total = await service.list_collection_tasks(
+    tasks, total = service.list_collection_tasks(
         instance_id=instance_id,
         enabled=enabled,
         page=page,
@@ -84,7 +84,7 @@ async def list_collection_tasks(
 
 
 @router.post("/tasks", response_model=CollectionTaskResponse, status_code=201)
-async def create_collection_task(
+def create_collection_task(
     task_data: CollectionTaskCreate,
     db=Depends(get_db),
     current_user: User = Depends(get_operator)
@@ -93,7 +93,7 @@ async def create_collection_task(
     service = SQLOptimizationService(db)
 
     try:
-        task = await service.create_collection_task(task_data, current_user)
+        task = service.create_collection_task(task_data, current_user)
 
         return CollectionTaskResponse(
             id=task.id,
@@ -118,14 +118,14 @@ async def create_collection_task(
 
 
 @router.get("/tasks/{task_id}", response_model=CollectionTaskResponse)
-async def get_collection_task(
+def get_collection_task(
     task_id: int,
     db=Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """获取采集任务详情"""
     service = SQLOptimizationService(db)
-    task = await service._get_task(task_id)
+    task = service._get_task(task_id)
 
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
@@ -150,7 +150,7 @@ async def get_collection_task(
 
 
 @router.put("/tasks/{task_id}", response_model=CollectionTaskResponse)
-async def update_collection_task(
+def update_collection_task(
     task_id: int,
     task_data: CollectionTaskUpdate,
     db=Depends(get_db),
@@ -159,7 +159,7 @@ async def update_collection_task(
     """更新采集任务"""
     service = SQLOptimizationService(db)
 
-    task = await service.update_collection_task(task_id, task_data)
+    task = service.update_collection_task(task_id, task_data)
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
 
@@ -183,7 +183,7 @@ async def update_collection_task(
 
 
 @router.delete("/tasks/{task_id}")
-async def delete_collection_task(
+def delete_collection_task(
     task_id: int,
     db=Depends(get_db),
     current_user: User = Depends(get_operator)
@@ -191,7 +191,7 @@ async def delete_collection_task(
     """删除采集任务"""
     service = SQLOptimizationService(db)
 
-    success = await service.delete_collection_task(task_id)
+    success = service.delete_collection_task(task_id)
     if not success:
         raise HTTPException(status_code=404, detail="任务不存在")
 
@@ -199,7 +199,7 @@ async def delete_collection_task(
 
 
 @router.post("/tasks/{task_id}/run", response_model=ManualCollectionResponse)
-async def run_collection_task(
+def run_collection_task(
     task_id: int,
     db=Depends(get_db),
     current_user: User = Depends(get_operator)
@@ -208,7 +208,7 @@ async def run_collection_task(
     service = SQLOptimizationService(db)
 
     try:
-        result = await service.run_collection(task_id)
+        result = service.run_collection(task_id)
 
         return ManualCollectionResponse(**result)
 
@@ -219,7 +219,7 @@ async def run_collection_task(
 # ==================== 优化建议管理 ====================
 
 @router.get("/suggestions", response_model=SuggestionListResponse)
-async def list_suggestions(
+def list_suggestions(
     instance_id: Optional[int] = Query(None, description="实例ID"),
     status: Optional[str] = Query(None, description="状态: pending/adopted/rejected/expired"),
     risk_level: Optional[str] = Query(None, description="风险等级: low/medium/high"),
@@ -230,7 +230,7 @@ async def list_suggestions(
 ):
     """获取优化建议列表"""
     service = SQLOptimizationService(db)
-    suggestions, total = await service.list_suggestions(
+    suggestions, total = service.list_suggestions(
         instance_id=instance_id,
         status=status,
         risk_level=risk_level,
@@ -277,14 +277,14 @@ async def list_suggestions(
 
 
 @router.get("/suggestions/{suggestion_id}", response_model=OptimizationSuggestionResponse)
-async def get_suggestion(
+def get_suggestion(
     suggestion_id: int,
     db=Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """获取优化建议详情"""
     service = SQLOptimizationService(db)
-    s = await service.get_suggestion(suggestion_id)
+    s = service.get_suggestion(suggestion_id)
 
     if not s:
         raise HTTPException(status_code=404, detail="建议不存在")
@@ -317,7 +317,7 @@ async def get_suggestion(
 
 
 @router.post("/suggestions/{suggestion_id}/adopt", response_model=AdoptSuggestionResponse)
-async def adopt_suggestion(
+def adopt_suggestion(
     suggestion_id: int,
     db=Depends(get_db),
     current_user: User = Depends(get_operator)
@@ -326,7 +326,7 @@ async def adopt_suggestion(
     service = SQLOptimizationService(db)
 
     try:
-        result = await service.adopt_suggestion(suggestion_id, current_user)
+        result = service.adopt_suggestion(suggestion_id, current_user)
         return AdoptSuggestionResponse(**result)
 
     except ValueError as e:
@@ -348,7 +348,7 @@ async def adopt_suggestion(
 
 
 @router.post("/suggestions/{suggestion_id}/reject", response_model=OptimizationSuggestionResponse)
-async def reject_suggestion(
+def reject_suggestion(
     suggestion_id: int,
     request: RejectSuggestionRequest,
     db=Depends(get_db),
@@ -358,7 +358,7 @@ async def reject_suggestion(
     service = SQLOptimizationService(db)
 
     try:
-        s = await service.reject_suggestion(suggestion_id, request.reason, current_user)
+        s = service.reject_suggestion(suggestion_id, request.reason, current_user)
 
         return OptimizationSuggestionResponse(
             id=s.id,
@@ -399,7 +399,7 @@ async def reject_suggestion(
 
 
 @router.post("/suggestions/{suggestion_id}/verify", response_model=VerifySuggestionResponse)
-async def verify_suggestion(
+def verify_suggestion(
     suggestion_id: int,
     db=Depends(get_db),
     current_user: User = Depends(get_operator)
@@ -408,7 +408,7 @@ async def verify_suggestion(
     service = SQLOptimizationService(db)
 
     try:
-        result = await service.verify_suggestion(suggestion_id)
+        result = service.verify_suggestion(suggestion_id)
         return VerifySuggestionResponse(**result)
 
     except ValueError as e:
@@ -416,7 +416,7 @@ async def verify_suggestion(
 
 
 @router.post("/suggestions/analyze")
-async def manual_analyze(
+def manual_analyze(
     request: ManualAnalyzeRequest,
     db=Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -425,7 +425,7 @@ async def manual_analyze(
     service = SQLOptimizationService(db)
 
     try:
-        result = await service.manual_analyze(
+        result = service.manual_analyze(
             instance_id=request.instance_id,
             sql_text=request.sql_text,
             database_name=request.database_name
