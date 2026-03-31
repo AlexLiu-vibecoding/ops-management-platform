@@ -213,26 +213,12 @@ const routes = [
         component: () => import('@/views/system/index.vue'),
         meta: { title: '系统设置', icon: 'Tools', roles: ['super_admin'] }
       },
-      
-      // 配置管理
-      {
-        path: 'config',
-        name: 'Config',
-        redirect: '/config/notification',
-        meta: { title: '配置管理', icon: 'Setting' },
-        children: [
-          {
-            path: 'notification',
-            name: 'NotificationManage',
-            component: () => import('@/views/config/notification.vue'),
-            meta: { title: '通知管理', icon: 'Bell' }
-          }
-        ]
-      },
-      // 兼容旧路径 /notification，重定向到 /config/notification
+      // 通知管理
       {
         path: 'notification',
-        redirect: '/config/notification'
+        name: 'NotificationManage',
+        component: () => import('@/views/config/notification.vue'),
+        meta: { title: '通知管理', icon: 'Bell', roles: ['super_admin'] }
       }
     ]
   }
