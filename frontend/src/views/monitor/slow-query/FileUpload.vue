@@ -378,8 +378,8 @@ const handleUpload = async () => {
     const formData = new FormData()
     formData.append('file', fileList.value[0].raw)
     
-    const response = await request.post(
-      `/api/v1/sql-optimization/upload-slow-log?instance_id=${uploadForm.instanceId}&auto_analyze=${uploadForm.autoAnalyze}`,
+    const data = await request.post(
+      `/sql-optimization/upload-slow-log?instance_id=${uploadForm.instanceId}&auto_analyze=${uploadForm.autoAnalyze}`,
       formData,
       {
         headers: {
@@ -411,15 +411,20 @@ const resetForm = () => {
 // 获取实例列表
 const fetchInstances = async () => {
   try {
-    const response = await request.get('/api/v1/instances', {
+    const data = await request.get('/instances', {
       params: {
-        page: 1,
-        page_size: 100
+        limit: 100
       }
     })
-    instances.value = response.data.items || []
+    // 只显示RDB实例，过滤掉Redis实例
+    instances.value = (data.items || []).filter(inst => inst.db_type !== 'redis')
   } catch (error) {
     console.error('获取实例列表失败:', error)
+    // 404 错误不显示提示
+    if (error.response?.status !== 404) {
+      ElMessage.error('获取实例列表失败')
+    }
+    instances.value = []
   }
 }
 
@@ -443,12 +448,12 @@ const fetchFiles = async () => {
       params.analyze_status = filters.analyzeStatus
     }
     
-    const response = await request.get('/api/v1/sql-optimization/slow-log-files', {
+    const data = await request.get('/sql-optimization/slow-log-files', {
       params
     })
     
-    files.value = response.data.items || []
-    pagination.total = response.data.total || 0
+    files.value = data.items || []
+    pagination.total = data.total || 0
     
   } catch (error) {
     console.error('获取文件列表失败:', error)
@@ -485,10 +490,10 @@ const handlePageSizeChange = (size) => {
 const handleAnalyze = async (row) => {
   try {
     ElMessage.info('开始分析...')
-    const response = await request.post(
-      `/api/v1/sql-optimization/slow-log-files/${row.id}/analyze`
+    const data = await request.post(
+      `/sql-optimization/slow-log-files/${row.id}/analyze`
     )
-    ElMessage.success(`分析完成，发现 ${response.data.suggestion_count || 0} 个问题`)
+    ElMessage.success(`分析完成，发现 ${data.suggestion_count || 0} 个问题`)
     fetchFiles()
   } catch (error) {
     console.error('分析失败:', error)
@@ -515,7 +520,7 @@ const handleDelete = async (row) => {
       }
     )
     
-    await request.delete(`/api/v1/sql-optimization/slow-log-files/${row.id}`)
+    await request.delete(`/sql-optimization/slow-log-files/${row.id}`)
     ElMessage.success('删除成功')
     fetchFiles()
     
