@@ -39,11 +39,7 @@ class PermissionService:
         Returns:
             是否有权限
         """
-        # 超级管理员拥有所有权限
-        if user.role == UserRole.SUPER_ADMIN:
-            return True
-        
-        # 获取用户角色的权限列表
+        # 获取用户角色的权限列表（包括超级管理员也从数据库获取）
         permissions = self.get_role_permissions(user.role)
         return permission_code in permissions
     

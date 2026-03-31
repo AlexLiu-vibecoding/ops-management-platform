@@ -11,6 +11,7 @@ from app.models import Environment
 from app.schemas import EnvironmentCreate, EnvironmentUpdate, EnvironmentResponse, MessageResponse
 from app.deps import get_super_admin, get_current_user
 from app.models import User
+from app.services.permission_service import PermissionService
 
 router = APIRouter(prefix="/environments", tags=["环境管理"])
 
@@ -115,6 +116,10 @@ async def create_environment(
     db: Session = Depends(get_db)
 ):
     """创建环境（仅超级管理员）"""
+    # 检查功能权限
+    permission_service = PermissionService(db)
+    permission_service.check_permission(current_user, "environment:create")
+    
     # 检查名称是否已存在
     if db.query(Environment).filter(Environment.name == env_data.name).first():
         raise HTTPException(
@@ -157,6 +162,10 @@ async def update_environment(
     db: Session = Depends(get_db)
 ):
     """更新环境（仅超级管理员）"""
+    # 检查功能权限
+    permission_service = PermissionService(db)
+    permission_service.check_permission(current_user, "environment:update")
+    
     env = db.query(Environment).filter(Environment.id == env_id).first()
     if not env:
         raise HTTPException(
@@ -194,6 +203,10 @@ async def delete_environment(
     db: Session = Depends(get_db)
 ):
     """删除环境（仅超级管理员）"""
+    # 检查功能权限
+    permission_service = PermissionService(db)
+    permission_service.check_permission(current_user, "environment:delete")
+    
     env = db.query(Environment).filter(Environment.id == env_id).first()
     if not env:
         raise HTTPException(
