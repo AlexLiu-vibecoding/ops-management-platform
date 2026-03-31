@@ -160,22 +160,26 @@
         <el-alert
           v-if="changeWindowInfo.checked"
           :title="changeWindowInfo.message"
-          :type="changeWindowInfo.inWindow ? 'success' : (changeWindowInfo.allowEmergency ? 'warning' : 'error')"
+          :type="changeWindowInfo.canChange ? 'success' : (changeWindowInfo.allowEmergency ? 'warning' : 'error')"
           :closable="false"
           show-icon
           class="change-window-alert"
         >
           <template #default>
-            <div v-if="!changeWindowInfo.inWindow && changeWindowInfo.allowEmergency" class="emergency-option">
+            <div v-if="!changeWindowInfo.canChange && changeWindowInfo.allowEmergency" class="emergency-option">
               <el-checkbox v-model="dialog.form.is_emergency">标记为紧急变更</el-checkbox>
               <el-tooltip content="紧急变更需要更高级别的审批" placement="top">
                 <el-icon><QuestionFilled /></el-icon>
               </el-tooltip>
             </div>
             <div v-if="changeWindowInfo.windows.length > 0" class="window-details">
-              <span class="text-sm text-gray-500">生效窗口：</span>
-              <span v-for="w in changeWindowInfo.windows" :key="w.id" class="window-tag">
-                {{ w.name }} ({{ w.in_window ? '✓ 当前可变更' : '✗ 不在窗口内' }})
+              <span class="text-sm text-gray-500">窗口状态：</span>
+              <span v-for="w in changeWindowInfo.windows" :key="w.id" class="window-tag" :class="w.window_type">
+                <el-tag :type="w.window_type === 'forbidden' ? 'danger' : 'success'" size="small">
+                  {{ w.window_type === 'forbidden' ? '封禁' : '允许' }}
+                </el-tag>
+                {{ w.name }}
+                <span class="status">({{ w.in_window ? '✓ 生效中' : '○ 未生效' }})</span>
               </span>
             </div>
           </template>
@@ -388,10 +392,11 @@ const dbInstances = computed(() => {
 // 变更窗口状态
 const changeWindowInfo = reactive({
   checked: false,
-  inWindow: true,
-  allowEmergency: false,
+  canChange: true,           // 最终是否可以变更
+  allowEmergency: false,     // 是否允许紧急变更
+  inForbidden: false,        // 是否在封禁窗口内
   message: '',
-  windows: []
+  windows: []                // 窗口列表，包含 window_type 字段
 })
 
 const dialog = reactive({
@@ -509,8 +514,9 @@ const handleAdd = () => {
   
   // 重置变更窗口状态
   changeWindowInfo.checked = false
-  changeWindowInfo.inWindow = true
+  changeWindowInfo.canChange = true
   changeWindowInfo.allowEmergency = false
+  changeWindowInfo.inForbidden = false
   changeWindowInfo.message = ''
   changeWindowInfo.windows = []
   
@@ -603,8 +609,9 @@ const handleInstanceSelect = async (instanceId) => {
   
   // 重置变更窗口状态
   changeWindowInfo.checked = false
-  changeWindowInfo.inWindow = true
+  changeWindowInfo.canChange = true
   changeWindowInfo.allowEmergency = false
+  changeWindowInfo.inForbidden = false
   changeWindowInfo.message = ''
   changeWindowInfo.windows = []
   
@@ -622,39 +629,31 @@ const handleInstanceSelect = async (instanceId) => {
         const windowData = await request.post('/change-windows/check', null, {
           params: { environment_id: instance.environment_id }
         })
+        
+        // 更新变更窗口状态
         changeWindowInfo.checked = true
-        changeWindowInfo.inWindow = windowData.in_window
+        changeWindowInfo.canChange = windowData.can_change
+        changeWindowInfo.allowEmergency = windowData.allow_emergency
+        changeWindowInfo.inForbidden = windowData.in_forbidden
         changeWindowInfo.windows = windowData.windows || []
         
-        // 检查是否有窗口允许紧急变更
-        if (!windowData.in_window && changeWindowInfo.windows.length > 0) {
-          // 查找是否有允许紧急变更的窗口
-          const allowEmergency = changeWindowInfo.windows.some(w => {
-            const window = w
-            // 需要从数据库获取窗口详情来判断 allow_emergency
-            return true // 暂时假设可以
-          })
-          changeWindowInfo.allowEmergency = true // 允许用户尝试紧急变更
-        }
-        
-        if (windowData.in_window) {
-          changeWindowInfo.message = '✓ 当前在变更窗口内，可以提交变更'
-        } else if (changeWindowInfo.allowEmergency) {
-          changeWindowInfo.message = '⚠ 当前不在变更窗口内，可提交紧急变更（需额外审批）'
+        // 根据结果显示消息
+        if (windowData.can_change) {
+          changeWindowInfo.message = '✓ ' + windowData.message
         } else {
-          changeWindowInfo.message = '✗ 当前不在变更窗口内，不允许提交变更'
+          changeWindowInfo.message = '✗ ' + windowData.message
         }
       } catch (error) {
         console.error('检查变更窗口失败:', error)
         // 检查失败时不阻止提交
         changeWindowInfo.checked = true
-        changeWindowInfo.inWindow = true
+        changeWindowInfo.canChange = true
         changeWindowInfo.message = '未配置变更窗口，允许提交变更'
       }
     } else {
       // 没有环境信息，默认允许
       changeWindowInfo.checked = true
-      changeWindowInfo.inWindow = true
+      changeWindowInfo.canChange = true
       changeWindowInfo.message = '未关联环境，允许提交变更'
     }
   } catch (error) {
@@ -671,13 +670,13 @@ const handleSubmit = async () => {
     if (!valid) return
     
     // 检查变更窗口
-    if (changeWindowInfo.checked && !changeWindowInfo.inWindow) {
+    if (changeWindowInfo.checked && !changeWindowInfo.canChange) {
       if (!changeWindowInfo.allowEmergency) {
-        ElMessage.error('当前不在变更窗口内，不允许提交变更')
+        ElMessage.error('当前不允许提交变更')
         return
       }
       if (!dialog.form.is_emergency) {
-        ElMessage.warning('当前不在变更窗口内，请勾选"紧急变更"选项')
+        ElMessage.warning('当前不允许提交变更，请勾选"紧急变更"选项')
         return
       }
       // 紧急变更需要确认
@@ -936,12 +935,18 @@ onMounted(() => {
       margin-top: 8px;
       
       .window-tag {
-        display: inline-block;
-        padding: 2px 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 8px;
         margin-right: 8px;
         background: rgba(0, 0, 0, 0.05);
         border-radius: 4px;
         font-size: 12px;
+        
+        .status {
+          color: #909399;
+        }
       }
     }
   }
