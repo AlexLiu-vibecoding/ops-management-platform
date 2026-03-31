@@ -337,27 +337,65 @@ async def check_change_window(
     
     if not applicable_windows:
         return {
-            "in_window": True,
+            "can_change": True,
             "message": "未配置变更窗口，允许变更",
             "windows": []
         }
     
     result_windows = []
-    in_window = False
+    # 默认允许变更
+    can_change = True
+    # 是否在封禁窗口内
+    in_forbidden = False
+    # 是否在允许窗口内（当存在允许窗口时，默认变为不允许）
+    has_allow_window = False
+    in_allow_window = False
     
     for window in applicable_windows:
         window_check = _check_single_window(window, dt)
         result_windows.append(window_check)
-        if window_check["in_window"]:
-            in_window = True
+        
+        # 根据窗口类型处理
+        if window.window_type == "forbidden":
+            # 封禁窗口：在窗口内则禁止变更
+            if window_check["in_window"]:
+                in_forbidden = True
+        else:
+            # 允许窗口：存在允许窗口时，默认不允许，只有在窗口内才允许
+            has_allow_window = True
+            if window_check["in_window"]:
+                in_allow_window = True
+    
+    # 最终判断：
+    # 1. 如果在封禁窗口内，禁止变更
+    # 2. 如果存在允许窗口，只有在允许窗口内才能变更
+    # 3. 否则默认允许
+    if in_forbidden:
+        can_change = False
+    elif has_allow_window:
+        can_change = in_allow_window
+    else:
+        can_change = True
     
     # 检查是否有允许紧急变更的窗口
     allow_emergency = any(w.get("allow_emergency") for w in result_windows)
     
+    # 生成消息
+    if can_change:
+        message = "可以提交变更"
+    else:
+        if in_forbidden:
+            message = "当前在封禁窗口内，禁止变更"
+        else:
+            message = "当前不在允许窗口内，禁止变更"
+        if allow_emergency:
+            message += "，可提交紧急变更"
+    
     return {
-        "in_window": in_window,
-        "message": "在变更窗口内" if in_window else ("不在任何变更窗口内，可提交紧急变更" if allow_emergency else "不在任何变更窗口内"),
-        "allow_emergency": allow_emergency and not in_window,
+        "can_change": can_change,
+        "message": message,
+        "allow_emergency": allow_emergency and not can_change,
+        "in_forbidden": in_forbidden,
         "windows": result_windows
     }
 
@@ -367,41 +405,52 @@ def _check_single_window(window: ChangeWindow, dt: datetime) -> dict:
     result = {
         "id": window.id,
         "name": window.name,
+        "window_type": window.window_type or "allowed",
         "allow_emergency": window.allow_emergency,
         "in_window": False,
         "reason": ""
     }
     
+    # 如果没有配置时间限制，则全天生效
+    time_matched = True
+    if window.start_time and window.end_time:
+        check_time_str = dt.strftime("%H:%M")
+        start_time = window.start_time
+        end_time = window.end_time
+        
+        if start_time <= end_time:
+            # 不跨天
+            time_matched = start_time <= check_time_str <= end_time
+        else:
+            # 跨天 (如 22:00 - 02:00)
+            time_matched = check_time_str >= start_time or check_time_str <= end_time
+        
+        if not time_matched:
+            result["reason"] = f"当前时间不在 {window.start_time}-{window.end_time} 范围内"
+            return result
+    
     # 检查日期范围
+    date_matched = True
     if window.start_date and window.end_date:
         check_date = dt.date()
         if not (window.start_date <= check_date <= window.end_date):
+            date_matched = False
             result["reason"] = f"不在日期范围内 ({window.start_date} ~ {window.end_date})"
             return result
     
     # 检查星期
-    weekday = dt.weekday()  # 0-6, Monday=0
-    if window.weekdays and weekday not in window.weekdays:
-        result["reason"] = f"星期{['一', '二', '三', '四', '五', '六', '日'][weekday]}不在允许范围内"
-        return result
+    weekday_matched = True
+    if window.weekdays:
+        weekday = dt.weekday()  # 0-6, Monday=0
+        if weekday not in window.weekdays:
+            weekday_matched = False
+            result["reason"] = f"星期{['一', '二', '三', '四', '五', '六', '日'][weekday]}不在允许范围内"
+            return result
     
-    # 检查时间
-    check_time_str = dt.strftime("%H:%M")
-    start_time = window.start_time
-    end_time = window.end_time
-    
-    if start_time <= end_time:
-        # 不跨天
-        time_in_window = start_time <= check_time_str <= end_time
-    else:
-        # 跨天 (如 22:00 - 02:00)
-        time_in_window = check_time_str >= start_time or check_time_str <= end_time
-    
-    if time_in_window:
-        result["in_window"] = True
-        result["reason"] = "在变更窗口内"
-    else:
-        result["reason"] = f"当前时间不在 {window.start_time}-{window.end_time} 范围内"
+    # 所有条件都满足，则在窗口内
+    result["in_window"] = True
+    window_type_name = "封禁" if window.window_type == "forbidden" else "允许"
+    result["reason"] = f"在{window_type_name}窗口内"
     
     return result
 
