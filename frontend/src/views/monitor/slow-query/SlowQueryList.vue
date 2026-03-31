@@ -1,5 +1,5 @@
 <template>
-  <div class="slow-query-page">
+  <div class="slow-query-list">
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="stats-row">
       <el-col :span="6">
@@ -53,12 +53,7 @@
       <el-form :inline="true" :model="filters" class="filter-form">
         <el-form-item label="实例">
           <el-select v-model="selectedInstance" placeholder="选择实例" @change="fetchSlowQueries" style="width: 200px;">
-            <el-option
-              v-for="inst in instances"
-              :key="inst.id"
-              :label="inst.name"
-              :value="inst.id"
-            />
+            <el-option v-for="inst in instances" :key="inst.id" :label="inst.name" :value="inst.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="耗时阈值">
@@ -117,20 +112,14 @@
           </template>
         </el-table-column>
         <el-table-column prop="rows_examined" label="扫描行" width="80" align="right">
-          <template #default="{ row }">
-            {{ formatNumber(row.rows_examined) }}
-          </template>
+          <template #default="{ row }">{{ formatNumber(row.rows_examined) }}</template>
         </el-table-column>
         <el-table-column prop="rows_sent" label="返回行" width="80" align="right">
-          <template #default="{ row }">
-            {{ formatNumber(row.rows_sent) }}
-          </template>
+          <template #default="{ row }">{{ formatNumber(row.rows_sent) }}</template>
         </el-table-column>
         <el-table-column prop="execution_count" label="执行次数" width="80" align="center" />
         <el-table-column prop="last_seen" label="最后执行" width="160">
-          <template #default="{ row }">
-            {{ formatTime(row.last_seen) }}
-          </template>
+          <template #default="{ row }">{{ formatTime(row.last_seen) }}</template>
         </el-table-column>
         <el-table-column label="操作" min-width="80" fixed="right" align="center">
           <template #default="{ row }">
@@ -194,9 +183,7 @@
         
         <!-- EXPLAIN 结果 -->
         <el-card shadow="never" class="explain-card" v-if="explainDialog.data.explain?.length">
-          <template #header>
-            <span>执行计划</span>
-          </template>
+          <template #header><span>执行计划</span></template>
           <el-table :data="explainDialog.data.explain" border style="width: 100%">
             <el-table-column prop="id" label="ID" width="60" />
             <el-table-column prop="select_type" label="查询类型" width="120">
@@ -222,9 +209,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="rows" label="预估行数" width="100">
-              <template #default="{ row }">
-                {{ formatNumber(row.rows) }}
-              </template>
+              <template #default="{ row }">{{ formatNumber(row.rows) }}</template>
             </el-table-column>
             <el-table-column prop="Extra" label="额外信息" min-width="200">
               <template #default="{ row }">
@@ -235,14 +220,7 @@
         </el-card>
         
         <!-- 错误信息 -->
-        <el-alert
-          v-if="explainDialog.data.explain?.error"
-          :title="explainDialog.data.explain.error"
-          type="error"
-          :closable="false"
-          show-icon
-          style="margin-bottom: 20px;"
-        />
+        <el-alert v-if="explainDialog.data.explain?.error" :title="explainDialog.data.explain.error" type="error" :closable="false" show-icon style="margin-bottom: 20px;" />
         
         <!-- 优化建议 -->
         <el-card shadow="never" class="suggestions-card" v-if="explainDialog.data.suggestions?.length">
@@ -253,12 +231,7 @@
             </div>
           </template>
           <div class="suggestions-list">
-            <div
-              v-for="(suggestion, idx) in explainDialog.data.suggestions"
-              :key="idx"
-              class="suggestion-item"
-              :class="suggestion.type"
-            >
+            <div v-for="(suggestion, idx) in explainDialog.data.suggestions" :key="idx" class="suggestion-item" :class="suggestion.type">
               <div class="suggestion-icon">
                 <el-icon v-if="suggestion.type === 'warning'" :size="20"><Warning /></el-icon>
                 <el-icon v-else-if="suggestion.type === 'error'" :size="20"><CircleClose /></el-icon>
@@ -273,95 +246,6 @@
             </div>
           </div>
         </el-card>
-        
-        <!-- AI 智能分析 -->
-        <el-card shadow="never" class="llm-card" v-if="explainDialog.data.llm_analysis?.success">
-          <template #header>
-            <div class="card-header">
-              <span>AI 智能分析</span>
-              <el-tag size="small" type="success">大模型</el-tag>
-            </div>
-          </template>
-          
-          <div class="llm-content" v-if="explainDialog.data.llm_analysis.analysis">
-            <!-- 问题总结 -->
-            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.summary">
-              <div class="llm-section-title">问题总结</div>
-              <div class="llm-summary">{{ explainDialog.data.llm_analysis.analysis.summary }}</div>
-            </div>
-            
-            <!-- 发现的问题 -->
-            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.issues?.length">
-              <div class="llm-section-title">发现的问题</div>
-              <div class="llm-issues">
-                <div 
-                  v-for="(issue, idx) in explainDialog.data.llm_analysis.analysis.issues" 
-                  :key="idx"
-                  class="llm-issue-item"
-                  :class="issue.severity"
-                >
-                  <div class="issue-header">
-                    <el-tag :type="getSeverityType(issue.severity)" size="small">{{ issue.type }}</el-tag>
-                    <span class="issue-location" v-if="issue.location">{{ issue.location }}</span>
-                  </div>
-                  <div class="issue-desc">{{ issue.description }}</div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- 优化建议 -->
-            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.suggestions?.length">
-              <div class="llm-section-title">优化建议</div>
-              <div class="llm-suggestions">
-                <div 
-                  v-for="(suggestion, idx) in explainDialog.data.llm_analysis.analysis.suggestions" 
-                  :key="idx"
-                  class="llm-suggestion-item"
-                >
-                  <div class="suggestion-header">
-                    <el-tag :type="getPriorityType(suggestion.priority)" size="small">{{ suggestion.priority }}</el-tag>
-                    <span class="suggestion-type">{{ suggestion.type }}</span>
-                  </div>
-                  <div class="suggestion-desc">{{ suggestion.description }}</div>
-                  <div class="suggestion-action" v-if="suggestion.action">
-                    <strong>操作步骤：</strong>{{ suggestion.action }}
-                  </div>
-                  <div class="suggestion-effect" v-if="suggestion.expected_improvement">
-                    <strong>预期效果：</strong>{{ suggestion.expected_improvement }}
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- 优化后的SQL -->
-            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.optimized_sql">
-              <div class="llm-section-title">优化后的 SQL</div>
-              <div class="llm-sql-box">
-                <pre>{{ explainDialog.data.llm_analysis.analysis.optimized_sql }}</pre>
-                <el-button size="small" type="primary" link @click="copyOptimizedSQL">复制</el-button>
-              </div>
-            </div>
-            
-            <!-- 建议创建的索引 -->
-            <div class="llm-section" v-if="explainDialog.data.llm_analysis.analysis.create_index_sql">
-              <div class="llm-section-title">建议创建索引</div>
-              <div class="llm-sql-box">
-                <pre>{{ explainDialog.data.llm_analysis.analysis.create_index_sql }}</pre>
-                <el-button size="small" type="primary" link @click="copyIndexSQL">复制</el-button>
-              </div>
-            </div>
-          </div>
-        </el-card>
-        
-        <!-- LLM 分析失败 -->
-        <el-alert
-          v-else-if="explainDialog.data.llm_analysis && !explainDialog.data.llm_analysis.success"
-          :title="`AI 分析失败: ${explainDialog.data.llm_analysis.error}`"
-          type="warning"
-          :closable="false"
-          show-icon
-          style="margin-bottom: 20px;"
-        />
       </div>
       
       <template #footer>
@@ -371,18 +255,8 @@
     </el-dialog>
     
     <!-- 从 RDS 抓取慢查询对话框 -->
-    <el-dialog 
-      v-model="fetchDialog.visible" 
-      title="从 AWS RDS 抓取慢查询" 
-      width="90%" 
-      top="5vh"
-      :close-on-click-modal="false"
-    >
-      <el-alert
-        type="info"
-        :closable="false"
-        style="margin-bottom: 20px;"
-      >
+    <el-dialog v-model="fetchDialog.visible" title="从 AWS RDS 抓取慢查询" width="90%" top="5vh" :close-on-click-modal="false">
+      <el-alert type="info" :closable="false" style="margin-bottom: 20px;">
         <template #title>
           <div style="display: flex; align-items: center; gap: 10px;">
             <el-icon><InfoFilled /></el-icon>
@@ -391,55 +265,11 @@
         </template>
       </el-alert>
       
-      <!-- performance_schema 状态 -->
-      <el-card shadow="never" class="status-card" v-if="fetchDialog.psStatus">
-        <template #header>
-          <div class="card-header">
-            <span>Performance Schema 状态</span>
-            <el-tag :type="fetchDialog.psStatus.enabled ? 'success' : 'danger'">
-              {{ fetchDialog.psStatus.enabled ? '已启用' : '未启用' }}
-            </el-tag>
-          </div>
-        </template>
-        <div v-if="fetchDialog.psStatus.enabled">
-          <el-descriptions :column="3" border size="small">
-            <el-descriptions-item label="events_statements_current">
-              <el-tag :type="fetchDialog.psStatus.consumers?.events_statements_current === 'YES' ? 'success' : 'danger'" size="small">
-                {{ fetchDialog.psStatus.consumers?.events_statements_current === 'YES' ? '已启用' : '未启用' }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="events_statements_history">
-              <el-tag :type="fetchDialog.psStatus.consumers?.events_statements_history === 'YES' ? 'success' : 'danger'" size="small">
-                {{ fetchDialog.psStatus.consumers?.events_statements_history === 'YES' ? '已启用' : '未启用' }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="statement instruments">
-              {{ fetchDialog.psStatus.instruments?.enabled_count }} / {{ fetchDialog.psStatus.instruments?.total }} 已启用
-            </el-descriptions-item>
-          </el-descriptions>
-        </div>
-        <div v-else>
-          <el-alert type="error" :closable="false">
-            {{ fetchDialog.psStatus.message }}
-          </el-alert>
-        </div>
-      </el-card>
-      
       <!-- 抓取配置 -->
       <el-card shadow="never" class="config-card">
-        <template #header>
-          <span>抓取配置</span>
-        </template>
+        <template #header><span>抓取配置</span></template>
         <el-form :model="fetchDialog.config" label-width="120px">
           <el-row :gutter="20">
-            <el-col :span="8">
-              <el-form-item label="数据源">
-                <el-radio-group v-model="fetchDialog.config.useSysSchema">
-                  <el-radio-button :value="false">performance_schema</el-radio-button>
-                  <el-radio-button :value="true">sys.statement_analysis</el-radio-button>
-                </el-radio-group>
-              </el-form-item>
-            </el-col>
             <el-col :span="8">
               <el-form-item label="最小执行时间">
                 <el-input-number v-model="fetchDialog.config.minExecTime" :min="0.1" :max="3600" :step="0.1" :precision="1" style="width: 100%;">
@@ -452,21 +282,11 @@
                 <el-input-number v-model="fetchDialog.config.limit" :min="10" :max="500" :step="10" style="width: 100%;" />
               </el-form-item>
             </el-col>
-          </el-row>
-          <el-row :gutter="20">
-            <el-col :span="12">
+            <el-col :span="8">
               <el-form-item label="过滤数据库">
-                <el-select v-model="fetchDialog.config.database" placeholder="全部数据库" clearable style="width: 100%;" :loading="fetchDialog.loadingDbs">
+                <el-select v-model="fetchDialog.config.database" placeholder="全部数据库" clearable style="width: 100%;">
                   <el-option v-for="db in fetchDialog.databases" :key="db" :label="db" :value="db" />
                 </el-select>
-              </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="同步到本地">
-                <el-switch v-model="fetchDialog.config.syncToLocal" />
-                <span style="margin-left: 10px; color: #909399; font-size: 12px;">
-                  将抓取的慢查询保存到本地数据库
-                </span>
               </el-form-item>
             </el-col>
           </el-row>
@@ -478,18 +298,9 @@
         <template #header>
           <div class="card-header">
             <span>抓取结果 ({{ fetchDialog.results.length }} 条)</span>
-            <el-button type="primary" size="small" @click="syncSelectedToLocal" :loading="fetchDialog.syncing">
-              同步选中到本地
-            </el-button>
           </div>
         </template>
-        <el-table 
-          :data="fetchDialog.results" 
-          style="width: 100%" 
-          max-height="400"
-          @selection-change="handleSelectionChange"
-        >
-          <el-table-column type="selection" width="55" />
+        <el-table :data="fetchDialog.results" style="width: 100%" max-height="400">
           <el-table-column prop="schema_name" label="数据库" width="100" />
           <el-table-column label="SQL 摘要" min-width="300">
             <template #default="{ row }">
@@ -504,34 +315,18 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="最大耗时" width="100" sortable>
-            <template #default="{ row }">
-              {{ (row.max_exec_time_sec || row.max_latency_sec)?.toFixed(2) }}s
-            </template>
-          </el-table-column>
           <el-table-column prop="rows_examined" label="扫描行数" width="100">
-            <template #default="{ row }">
-              {{ formatNumber(row.rows_examined) }}
-            </template>
+            <template #default="{ row }">{{ formatNumber(row.rows_examined) }}</template>
           </el-table-column>
           <el-table-column prop="last_seen" label="最后执行" width="140">
-            <template #default="{ row }">
-              {{ formatTime(row.last_seen) }}
-            </template>
+            <template #default="{ row }">{{ formatTime(row.last_seen) }}</template>
           </el-table-column>
         </el-table>
       </el-card>
       
       <template #footer>
         <el-button @click="fetchDialog.visible = false">关闭</el-button>
-        <el-button 
-          type="primary" 
-          @click="fetchFromPerformanceSchema" 
-          :loading="fetchDialog.fetching"
-          :disabled="!fetchDialog.psStatus?.enabled"
-        >
-          开始抓取
-        </el-button>
+        <el-button type="primary" @click="fetchFromPerformanceSchema" :loading="fetchDialog.fetching">开始抓取</el-button>
       </template>
     </el-dialog>
   </div>
@@ -545,6 +340,8 @@ import request from '@/api/index'
 import dayjs from 'dayjs'
 import TableActions from '@/components/TableActions.vue'
 
+const emit = defineEmits(['analyze'])
+
 // 操作列配置
 const slowQueryActions = [
   { key: 'explain', label: 'EXPLAIN', event: 'explain', primary: true }
@@ -557,12 +354,13 @@ const minTime = ref(1.0)
 const timeRange = ref(24)
 const slowQueries = ref([])
 
-// 筛选表单（用于 el-form 绑定）
+// 筛选表单
 const filters = reactive({
   instance: null,
   minTime: 1.0,
   timeRange: 24
 })
+
 const stats = ref({
   total_count: 0,
   total_executions: 0,
@@ -586,26 +384,19 @@ const explainDialog = reactive({
 const fetchDialog = reactive({
   visible: false,
   fetching: false,
-  syncing: false,
-  loadingDbs: false,
-  psStatus: null,
   databases: [],
   results: [],
-  selectedRows: [],
   config: {
-    useSysSchema: false,
     minExecTime: 1.0,
     limit: 100,
-    database: null,
-    syncToLocal: true
+    database: null
   }
 })
 
-// 获取实例列表（只显示 MySQL 和 PostgreSQL，Redis 没有慢SQL概念）
+// 获取实例列表
 const fetchInstances = async () => {
   try {
     const data = await request.get('/instances', { params: { limit: 100 } })
-    // 过滤掉 Redis 实例，Redis 使用慢日志(Slow Log)而非慢SQL
     instances.value = (data.items || []).filter(inst => inst.db_type !== 'redis')
     if (instances.value.length > 0 && !selectedInstance.value) {
       selectedInstance.value = instances.value[0].id
@@ -664,6 +455,7 @@ const analyzeQuery = async (row) => {
   try {
     const data = await request.get(`/slow-query/${selectedInstance.value}/analysis/${row.id}`)
     explainDialog.data = data
+    emit('analyze', row)
   } catch (error) {
     ElMessage.error('获取EXPLAIN分析失败')
     console.error(error)
@@ -686,6 +478,79 @@ const copySQL = async () => {
     } catch (e) {
       ElMessage.error('复制失败')
     }
+  }
+}
+
+// 打开抓取对话框
+const openFetchDialog = async () => {
+  if (!selectedInstance.value) {
+    ElMessage.warning('请先选择实例')
+    return
+  }
+  
+  fetchDialog.visible = true
+  fetchDialog.results = []
+  
+  // 获取数据库列表
+  try {
+    const data = await request.get(`/slow-query/${selectedInstance.value}/databases`)
+    fetchDialog.databases = data.databases || []
+  } catch (error) {
+    console.error('获取数据库列表失败:', error)
+    fetchDialog.databases = []
+  }
+}
+
+// 从 performance_schema 抓取慢查询
+const fetchFromPerformanceSchema = async () => {
+  fetchDialog.fetching = true
+  fetchDialog.results = []
+  
+  try {
+    const params = {
+      limit: fetchDialog.config.limit,
+      min_exec_time: fetchDialog.config.minExecTime
+    }
+    if (fetchDialog.config.database) {
+      params.database_name = fetchDialog.config.database
+    }
+    
+    const data = await request.get(`/slow-query/${selectedInstance.value}/fetch-slow-queries`, { params })
+    fetchDialog.results = data.items || []
+    
+    ElMessage.success(`成功抓取 ${fetchDialog.results.length} 条慢查询`)
+    
+    // 同步到本地
+    if (fetchDialog.results.length > 0) {
+      await syncAllToLocal()
+    }
+  } catch (error) {
+    console.error('抓取慢查询失败:', error)
+    ElMessage.error(error.response?.data?.detail || '抓取慢查询失败')
+  } finally {
+    fetchDialog.fetching = false
+  }
+}
+
+// 同步所有抓取结果到本地
+const syncAllToLocal = async () => {
+  try {
+    const params = {
+      limit: fetchDialog.config.limit,
+      min_exec_time: fetchDialog.config.minExecTime
+    }
+    if (fetchDialog.config.database) {
+      params.database_name = fetchDialog.config.database
+    }
+    
+    const data = await request.post(`/slow-query/${selectedInstance.value}/sync-slow-queries`, null, { params })
+    ElMessage.success(`同步完成: 新增 ${data.saved_count} 条, 更新 ${data.updated_count} 条`)
+    
+    // 刷新本地慢查询列表
+    await fetchSlowQueries()
+  } catch (error) {
+    console.error('同步慢查询失败:', error)
+    ElMessage.error(error.response?.data?.detail || '同步慢查询失败')
   }
 }
 
@@ -737,174 +602,10 @@ const getTypeTag = (type) => {
   return types[type] || 'info'
 }
 
-// 获取严重级别标签类型
-const getSeverityType = (severity) => {
-  const types = {
-    'high': 'danger',
-    'medium': 'warning',
-    'low': 'info'
-  }
-  return types[severity] || 'info'
-}
-
-// 获取优先级标签类型
-const getPriorityType = (priority) => {
-  const types = {
-    'high': 'danger',
-    'medium': 'warning',
-    'low': 'info'
-  }
-  return types[priority] || 'info'
-}
-
-// 复制优化后的SQL
-const copyOptimizedSQL = async () => {
-  const sql = explainDialog.data?.llm_analysis?.analysis?.optimized_sql
-  if (sql) {
-    try {
-      await navigator.clipboard.writeText(sql)
-      ElMessage.success('优化SQL已复制到剪贴板')
-    } catch (e) {
-      ElMessage.error('复制失败')
-    }
-  }
-}
-
-// 复制索引创建SQL
-const copyIndexSQL = async () => {
-  const sql = explainDialog.data?.llm_analysis?.analysis?.create_index_sql
-  if (sql) {
-    try {
-      await navigator.clipboard.writeText(sql)
-      ElMessage.success('索引SQL已复制到剪贴板')
-    } catch (e) {
-      ElMessage.error('复制失败')
-    }
-  }
-}
-
-// ========== 从 RDS 抓取慢查询 ==========
-
-// 打开抓取对话框
-const openFetchDialog = async () => {
-  if (!selectedInstance.value) {
-    ElMessage.warning('请先选择实例')
-    return
-  }
-  
-  fetchDialog.visible = true
-  fetchDialog.results = []
-  fetchDialog.selectedRows = []
-  fetchDialog.psStatus = null
-  
-  // 检查 performance_schema 状态
-  await checkPerformanceSchemaStatus()
-  // 获取数据库列表
-  await fetchInstanceDatabases()
-}
-
-// 检查 performance_schema 状态
-const checkPerformanceSchemaStatus = async () => {
-  try {
-    const data = await request.get(`/slow-query/${selectedInstance.value}/performance-schema-status`)
-    fetchDialog.psStatus = data
-  } catch (error) {
-    console.error('检查 performance_schema 状态失败:', error)
-    fetchDialog.psStatus = { enabled: false, message: '检查失败' }
-  }
-}
-
-// 获取实例数据库列表
-const fetchInstanceDatabases = async () => {
-  fetchDialog.loadingDbs = true
-  try {
-    const data = await request.get(`/slow-query/${selectedInstance.value}/databases`)
-    fetchDialog.databases = data.databases || []
-  } catch (error) {
-    console.error('获取数据库列表失败:', error)
-    fetchDialog.databases = []
-  } finally {
-    fetchDialog.loadingDbs = false
-  }
-}
-
-// 从 performance_schema 抓取慢查询
-const fetchFromPerformanceSchema = async () => {
-  if (!fetchDialog.psStatus?.enabled) {
-    ElMessage.error('performance_schema 未启用')
-    return
-  }
-  
-  fetchDialog.fetching = true
-  fetchDialog.results = []
-  
-  try {
-    const params = {
-      limit: fetchDialog.config.limit,
-      min_exec_time: fetchDialog.config.minExecTime,
-      use_sys_schema: fetchDialog.config.useSysSchema
-    }
-    if (fetchDialog.config.database) {
-      params.database_name = fetchDialog.config.database
-    }
-    
-    const data = await request.get(`/slow-query/${selectedInstance.value}/fetch-slow-queries`, { params })
-    fetchDialog.results = data.items || []
-    
-    ElMessage.success(`成功抓取 ${fetchDialog.results.length} 条慢查询`)
-    
-    // 如果配置了自动同步到本地
-    if (fetchDialog.config.syncToLocal && fetchDialog.results.length > 0) {
-      await syncAllToLocal()
-    }
-  } catch (error) {
-    console.error('抓取慢查询失败:', error)
-    ElMessage.error(error.response?.data?.detail || '抓取慢查询失败')
-  } finally {
-    fetchDialog.fetching = false
-  }
-}
-
-// 同步所有抓取结果到本地
-const syncAllToLocal = async () => {
-  fetchDialog.syncing = true
-  try {
-    const params = {
-      limit: fetchDialog.config.limit,
-      min_exec_time: fetchDialog.config.minExecTime
-    }
-    if (fetchDialog.config.database) {
-      params.database_name = fetchDialog.config.database
-    }
-    
-    const data = await request.post(`/slow-query/${selectedInstance.value}/sync-slow-queries`, null, { params })
-    ElMessage.success(`同步完成: 新增 ${data.saved_count} 条, 更新 ${data.updated_count} 条`)
-    
-    // 刷新本地慢查询列表
-    await fetchSlowQueries()
-  } catch (error) {
-    console.error('同步慢查询失败:', error)
-    ElMessage.error(error.response?.data?.detail || '同步慢查询失败')
-  } finally {
-    fetchDialog.syncing = false
-  }
-}
-
-// 同步选中项到本地
-const syncSelectedToLocal = async () => {
-  if (fetchDialog.selectedRows.length === 0) {
-    ElMessage.warning('请选择要同步的慢查询')
-    return
-  }
-  
-  ElMessage.info('此功能将通过全量同步实现，会同时同步符合条件的所有慢查询')
-  await syncAllToLocal()
-}
-
-// 选择变更
-const handleSelectionChange = (selection) => {
-  fetchDialog.selectedRows = selection
-}
+// 暴露方法供父组件调用
+defineExpose({
+  fetchData: fetchSlowQueries
+})
 
 onMounted(() => {
   fetchInstances()
@@ -912,7 +613,7 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
-.slow-query-page {
+.slow-query-list {
   .stats-row {
     margin-bottom: 20px;
   }
@@ -951,48 +652,6 @@ onMounted(() => {
   
   .filter-card {
     margin-bottom: 20px;
-    
-    :deep(.inline-form) {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-end;
-      gap: 16px;
-      
-      .el-form-item {
-        margin-bottom: 0;
-        margin-right: 0;
-      }
-      
-      .el-form-item__label {
-        font-size: 13px;
-        color: #606266;
-        font-weight: 500;
-      }
-      
-      .el-select, .el-input-number {
-        width: 100%;
-      }
-      
-      .form-actions {
-        margin-left: auto;
-        
-        .el-button {
-          min-width: 80px;
-        }
-      }
-    }
-    
-    .filter-item {
-      display: flex;
-      flex-direction: column;
-      gap: 5px;
-      
-      .filter-label {
-        font-size: 12px;
-        color: #606266;
-        font-weight: 500;
-      }
-    }
   }
   
   .table-card {
@@ -1147,156 +806,10 @@ onMounted(() => {
         }
       }
     }
-    
-    .llm-card {
-      margin-top: 20px;
-      border: 1px solid #e1f3d8;
-      background: linear-gradient(135deg, #f6ffed 0%, #ffffff 100%);
-      
-      .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      
-      .llm-content {
-        .llm-section {
-          margin-bottom: 20px;
-          
-          &:last-child {
-            margin-bottom: 0;
-          }
-          
-          .llm-section-title {
-            font-weight: bold;
-            font-size: 14px;
-            color: #303133;
-            margin-bottom: 10px;
-            padding-left: 10px;
-            border-left: 3px solid #67c23a;
-          }
-          
-          .llm-summary {
-            background: #f5f7fa;
-            padding: 12px 15px;
-            border-radius: 6px;
-            font-size: 14px;
-            color: #303133;
-            line-height: 1.6;
-          }
-        }
-        
-        .llm-issues {
-          .llm-issue-item {
-            padding: 12px 15px;
-            margin-bottom: 10px;
-            border-radius: 6px;
-            background: #fafafa;
-            
-            &.high {
-              border-left: 3px solid #f56c6c;
-            }
-            
-            &.medium {
-              border-left: 3px solid #e6a23c;
-            }
-            
-            &.low {
-              border-left: 3px solid #909399;
-            }
-            
-            .issue-header {
-              display: flex;
-              align-items: center;
-              gap: 10px;
-              margin-bottom: 8px;
-              
-              .issue-location {
-                color: #909399;
-                font-size: 12px;
-              }
-            }
-            
-            .issue-desc {
-              font-size: 13px;
-              color: #606266;
-            }
-          }
-        }
-        
-        .llm-suggestions {
-          .llm-suggestion-item {
-            padding: 15px;
-            margin-bottom: 12px;
-            border-radius: 8px;
-            background: #fff;
-            border: 1px solid #e4e7ed;
-            
-            .suggestion-header {
-              display: flex;
-              align-items: center;
-              gap: 10px;
-              margin-bottom: 10px;
-              
-              .suggestion-type {
-                font-weight: 500;
-                color: #303133;
-              }
-            }
-            
-            .suggestion-desc {
-              font-size: 14px;
-              color: #303133;
-              margin-bottom: 8px;
-            }
-            
-            .suggestion-action {
-              font-size: 13px;
-              color: #606266;
-              margin-bottom: 5px;
-              background: #f5f7fa;
-              padding: 8px 12px;
-              border-radius: 4px;
-            }
-            
-            .suggestion-effect {
-              font-size: 13px;
-              color: #67c23a;
-            }
-          }
-        }
-        
-        .llm-sql-box {
-          background: #1e1e1e;
-          padding: 15px;
-          border-radius: 6px;
-          position: relative;
-          
-          pre {
-            margin: 0;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 13px;
-            color: #d4d4d4;
-            white-space: pre-wrap;
-            word-break: break-all;
-          }
-          
-          .el-button {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-          }
-        }
-      }
-    }
   }
 }
 
 // 抓取对话框样式
-.status-card {
-  margin-bottom: 20px;
-}
-
 .config-card {
   margin-bottom: 20px;
 }

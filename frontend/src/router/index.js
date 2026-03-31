@@ -115,7 +115,7 @@ const routes = [
           {
             path: 'slow-query',
             name: 'SlowQuery',
-            component: () => import('@/views/monitor/slow-query.vue'),
+            component: () => import('@/views/monitor/slow-query/index.vue'),
             meta: { title: '慢查询监控', icon: 'Timer' }
           },
           {
