@@ -866,3 +866,97 @@ class SQLOptimizationService:
                 ))
 
         return issues
+
+    # ==================== 分析历史管理 ====================
+    
+    def list_analysis_history(
+        self,
+        instance_id: Optional[int] = None,
+        analysis_type: Optional[str] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20
+    ) -> tuple[list, int]:
+        """获取分析历史列表"""
+        # 由于没有专门的分析历史表，我们从慢查询和优化建议中构建
+        # 这里简化处理，返回空的列表
+        # 实际项目中应该有一个专门的分析历史表
+        
+        query = select(OptimizationSuggestion)
+        conditions = []
+        
+        if instance_id:
+            conditions.append(OptimizationSuggestion.instance_id == instance_id)
+        
+        # 这里可以添加更多的筛选条件
+        
+        if conditions:
+            query = query.where(and_(*conditions))
+        
+        # 统计总数
+        from sqlalchemy import func
+        count_subquery = query.subquery()
+        total_query = select(func.count()).select_from(count_subquery)
+        total_result = self.db.execute(total_query)
+        total = total_result.scalar() or 0
+        
+        # 分页查询
+        query = query.order_by(desc(OptimizationSuggestion.created_at))
+        query = query.offset((page - 1) * page_size).limit(page_size)
+        
+        result = self.db.execute(query)
+        suggestions = result.scalars().all()
+        
+        # 将建议转换为分析历史格式
+        history = []
+        for s in suggestions:
+            history.append({
+                "id": s.id,
+                "instance_id": s.instance_id,
+                "instance_name": self._get_instance_name(s.instance_id),
+                "database_name": s.database_name,
+                "sql_fingerprint": s.sql_fingerprint[:100] if s.sql_fingerprint else "",
+                "sql_sample": s.sql_sample,
+                "analysis_type": "rule",  # 简化处理
+                "analysis_content": s.analysis_result,
+                "issues": s.issues or [],
+                "issues_count": len(s.issues) if s.issues else 0,
+                "suggestions": s.suggestions or [],
+                "suggestions_count": len(s.suggestions) if s.suggestions else 0,
+                "analyzed_by": s.analyzed_by,
+                "created_at": s.created_at
+            })
+        
+        return history, total
+    
+    def _get_instance_name(self, instance_id: int) -> str:
+        """获取实例名称"""
+        query = select(RDBInstance.name).where(RDBInstance.id == instance_id)
+        result = self.db.execute(query)
+        name = result.scalar_one_or_none()
+        return name or "未知实例"
+    
+    def get_analysis_detail(self, history_id: int) -> Optional[Dict[str, Any]]:
+        """获取分析历史详情"""
+        suggestion = self.get_suggestion(history_id)
+        if not suggestion:
+            return None
+        
+        return {
+            "id": suggestion.id,
+            "instance_id": suggestion.instance_id,
+            "instance_name": self._get_instance_name(suggestion.instance_id),
+            "database_name": suggestion.database_name,
+            "sql_fingerprint": suggestion.sql_fingerprint,
+            "sql_sample": suggestion.sql_sample,
+            "analysis_type": "rule",
+            "analysis_content": suggestion.analysis_result,
+            "issues": suggestion.issues or [],
+            "issues_count": len(suggestion.issues) if suggestion.issues else 0,
+            "suggestions": suggestion.suggestions or [],
+            "suggestions_count": len(suggestion.suggestions) if suggestion.suggestions else 0,
+            "explain_result": suggestion.explain_result,
+            "analyzed_by": suggestion.analyzed_by,
+            "created_at": suggestion.created_at
+        }

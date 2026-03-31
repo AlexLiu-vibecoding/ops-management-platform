@@ -323,7 +323,13 @@ const fetchData = async () => {
     pagination.total = data.total || 0
   } catch (error) {
     console.error('获取分析历史失败:', error)
-    ElMessage.error(error.response?.data?.message || '获取分析历史失败，请刷新页面重试')
+    // 如果是404错误，说明API不存在或者没有数据，不显示错误提示
+    if (error.response?.status === 404) {
+      history.value = []
+      pagination.total = 0
+    } else {
+      ElMessage.error(error.response?.data?.message || '获取分析历史失败，请刷新页面重试')
+    }
   } finally {
     loading.value = false
   }

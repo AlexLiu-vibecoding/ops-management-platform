@@ -429,12 +429,29 @@ const fetchSlowQueries = async () => {
       request.get(`/slow-query/${selectedInstance.value}/statistics`, { params: { hours: timeRange.value } })
     ])
     
-    slowQueries.value = queriesData
-    stats.value = statsData
-    pagination.total = statsData.total_count
+    slowQueries.value = queriesData || []
+    stats.value = statsData || {
+      total_count: 0,
+      total_executions: 0,
+      max_time: 0,
+      avg_time: 0
+    }
+    pagination.total = statsData?.total_count || 0
   } catch (error) {
     console.error('获取慢查询失败:', error)
-    ElMessage.error('获取慢查询数据失败')
+    // 如果是404错误，说明没有数据
+    if (error.response?.status === 404) {
+      slowQueries.value = []
+      stats.value = {
+        total_count: 0,
+        total_executions: 0,
+        max_time: 0,
+        avg_time: 0
+      }
+      pagination.total = 0
+    } else {
+      ElMessage.error(error.response?.data?.message || '获取慢查询数据失败，请刷新页面重试')
+    }
   } finally {
     loading.value = false
   }

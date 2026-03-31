@@ -9,6 +9,7 @@ SQL 优化闭环 API
 - 效果验证
 """
 import logging
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -434,3 +435,95 @@ def manual_analyze(
 
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==================== 分析历史管理 ====================
+
+class AnalysisHistoryItem(BaseModel):
+    """分析历史项"""
+    id: int
+    instance_id: int
+    instance_name: str
+    database_name: Optional[str] = None
+    sql_fingerprint: str
+    sql_sample: Optional[str] = None
+    analysis_type: str
+    analysis_content: Optional[str] = None
+    issues: list = []
+    issues_count: int = 0
+    suggestions: list = []
+    suggestions_count: int = 0
+    analyzed_by: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AnalysisHistoryListResponse(BaseModel):
+    """分析历史列表响应"""
+    items: list
+    total: int
+
+
+class AnalysisDetailResponse(BaseModel):
+    """分析详情响应"""
+    id: int
+    instance_id: int
+    instance_name: str
+    database_name: Optional[str] = None
+    sql_fingerprint: str
+    sql_sample: Optional[str] = None
+    analysis_type: str
+    analysis_content: Optional[str] = None
+    issues: list = []
+    issues_count: int = 0
+    suggestions: list = []
+    suggestions_count: int = 0
+    explain_result: Optional[list] = None
+    analyzed_by: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+@router.get("/analysis-history", response_model=AnalysisHistoryListResponse)
+def list_analysis_history(
+    instance_id: Optional[int] = Query(None, description="实例ID"),
+    analysis_type: Optional[str] = Query(None, description="分析类型"),
+    start_date: Optional[str] = Query(None, description="开始日期"),
+    end_date: Optional[str] = Query(None, description="结束日期"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取分析历史列表"""
+    service = SQLOptimizationService(db)
+    history, total = service.list_analysis_history(
+        instance_id=instance_id,
+        analysis_type=analysis_type,
+        start_date=start_date,
+        end_date=end_date,
+        page=page,
+        page_size=page_size
+    )
+    
+    return AnalysisHistoryListResponse(items=history, total=total)
+
+
+@router.get("/analysis-history/{history_id}", response_model=AnalysisDetailResponse)
+def get_analysis_detail(
+    history_id: int,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取分析历史详情"""
+    service = SQLOptimizationService(db)
+    detail = service.get_analysis_detail(history_id)
+    
+    if not detail:
+        raise HTTPException(status_code=404, detail="分析历史不存在")
+    
+    return AnalysisDetailResponse(**detail)

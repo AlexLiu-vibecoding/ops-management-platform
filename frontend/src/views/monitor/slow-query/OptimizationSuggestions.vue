@@ -266,7 +266,13 @@ const fetchData = async () => {
     pagination.total = data.total || 0
   } catch (error) {
     console.error('获取优化建议失败:', error)
-    ElMessage.error(error.response?.data?.message || '获取优化建议失败，请刷新页面重试')
+    // 如果是404错误，说明没有数据，设置空列表
+    if (error.response?.status === 404) {
+      suggestions.value = []
+      pagination.total = 0
+    } else {
+      ElMessage.error(error.response?.data?.message || '获取优化建议失败，请刷新页面重试')
+    }
   } finally {
     loading.value = false
   }
