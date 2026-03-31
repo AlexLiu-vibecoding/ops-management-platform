@@ -180,8 +180,6 @@
             </div>
           </template>
         </el-alert>
-          </el-col>
-        </el-row>
         
         <el-form-item label="SQL内容" prop="sql_content">
           <div class="sql-input-wrapper">
