@@ -90,6 +90,7 @@ class RDBInstance(Base):
     high_cpu_sqls = relationship("HighCPUSQL", back_populates="rdb_instance")
     optimization_suggestions = relationship("OptimizationSuggestion", back_populates="rdb_instance")
     collection_tasks = relationship("SlowQueryCollectionTask", back_populates="rdb_instance")
+    slow_log_files = relationship("SlowLogFile", back_populates="rdb_instance")
 
 
 class RedisInstance(Base):

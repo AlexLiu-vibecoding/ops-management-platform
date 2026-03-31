@@ -52,6 +52,22 @@ class ApprovalScheduler:
             replace_existing=True
         )
         
+        # 添加慢日志文件清理任务：每天凌晨3点执行
+        self.scheduler.add_job(
+            self.cleanup_expired_slow_log_files,
+            trigger=CronTrigger(hour=3, minute=0),
+            id="cleanup_expired_slow_log_files",
+            replace_existing=True
+        )
+        
+        # 添加分析历史清理任务：每天凌晨4点执行
+        self.scheduler.add_job(
+            self.cleanup_expired_analysis_history,
+            trigger=CronTrigger(hour=4, minute=0),
+            id="cleanup_expired_analysis_history",
+            replace_existing=True
+        )
+        
         self.scheduler.start()
         logger.info("审批定时执行调度器已启动")
     
@@ -314,6 +330,98 @@ class ApprovalScheduler:
                 
         except Exception as e:
             logger.error(f"清理过期文件任务失败: {e}")
+    
+    async def cleanup_expired_slow_log_files(self):
+        """
+        清理过期的慢日志文件
+        
+        上传的慢日志文件保留30天后自动删除
+        同时删除关联的分析历史记录
+        """
+        from app.models import SlowLogFile, SQLAnalysisHistory
+        import os
+        
+        db = SessionLocal()
+        try:
+            now = datetime.now()
+            
+            # 查找过期的慢日志文件（expire_at <= now）
+            expired_files = db.query(SlowLogFile).filter(
+                SlowLogFile.expire_at <= now
+            ).all()
+            
+            logger.info(f"开始清理过期慢日志文件，共 {len(expired_files)} 个")
+            
+            cleaned_files = 0
+            cleaned_history = 0
+            
+            for file in expired_files:
+                try:
+                    # 删除物理文件
+                    if file.file_path and os.path.exists(file.file_path):
+                        os.remove(file.file_path)
+                        logger.debug(f"删除物理文件: {file.file_path}")
+                    
+                    # 删除关联的分析历史
+                    history_count = db.query(SQLAnalysisHistory).filter(
+                        SQLAnalysisHistory.source_file_id == file.id
+                    ).delete()
+                    cleaned_history += history_count
+                    
+                    # 删除数据库记录
+                    db.delete(file)
+                    cleaned_files += 1
+                    
+                except Exception as e:
+                    logger.warning(f"清理慢日志文件失败: file_id={file.id}, error={e}")
+            
+            db.commit()
+            logger.info(
+                f"慢日志文件清理完成: 文件 {cleaned_files} 个, "
+                f"分析历史 {cleaned_history} 条"
+            )
+            
+        except Exception as e:
+            logger.error(f"清理过期慢日志文件失败: {e}")
+            db.rollback()
+        finally:
+            db.close()
+    
+    async def cleanup_expired_analysis_history(self):
+        """
+        清理过期的分析历史记录
+        
+        分析历史保留1年后自动删除
+        """
+        from app.models import SQLAnalysisHistory
+        
+        db = SessionLocal()
+        try:
+            now = datetime.now()
+            
+            # 查找过期的分析历史（expire_at <= now）
+            expired_history = db.query(SQLAnalysisHistory).filter(
+                SQLAnalysisHistory.expire_at <= now
+            ).all()
+            
+            logger.info(f"开始清理过期分析历史，共 {len(expired_history)} 条")
+            
+            cleaned_count = 0
+            for history in expired_history:
+                try:
+                    db.delete(history)
+                    cleaned_count += 1
+                except Exception as e:
+                    logger.warning(f"清理分析历史失败: history_id={history.id}, error={e}")
+            
+            db.commit()
+            logger.info(f"分析历史清理完成: {cleaned_count} 条")
+            
+        except Exception as e:
+            logger.error(f"清理过期分析历史失败: {e}")
+            db.rollback()
+        finally:
+            db.close()
 
 
 # 全局调度器实例

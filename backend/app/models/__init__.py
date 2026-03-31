@@ -791,25 +791,49 @@ class TableSchema(Base):
 # ==================== SQL分析历史表 - 仅适用于 RDB 实例 ====================
 
 class SQLAnalysisHistory(Base):
-    """SQL分析历史表 - 仅适用于 RDB 实例"""
+    """SQL分析历史表 - 仅适用于 RDB 实例
+    
+    数据保留策略：1年自动清理
+    """
     __tablename__ = "sql_analysis_history"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="CASCADE"), comment="RDB实例ID")
     database_name = Column(String(100))
+    
+    # SQL信息
     sql_text = Column(Text, nullable=False)
-    sql_normalized = Column(Text)
-    explain_json = Column(JSON)
-    rule_issues = Column(JSON)
-    llm_suggestions = Column(Text)
-    optimized_sql = Column(Text)
-    risk_level = Column(String(20))
-    analysis_time = Column(Float)
-    analyzed_by = Column(Integer, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.now)
+    sql_normalized = Column(Text, comment="SQL标准化后的指纹")
+    sql_fingerprint = Column(String(64), index=True, comment="SQL指纹(MD5)")
+    
+    # 分析类型
+    analysis_type = Column(String(20), default='manual', comment="分析类型: manual/file_upload/auto_collect")
+    source_file_id = Column(Integer, ForeignKey("slow_log_files.id", ondelete="SET NULL"), comment="来源文件ID")
+    
+    # 分析结果
+    explain_json = Column(JSON, comment="EXPLAIN结果")
+    rule_issues = Column(JSON, comment="规则检查发现的问题")
+    llm_suggestions = Column(Text, comment="LLM优化建议")
+    optimized_sql = Column(Text, comment="优化后的SQL")
+    suggested_index = Column(Text, comment="建议添加的索引DDL")
+    rollback_sql = Column(Text, comment="回滚SQL")
+    
+    # 风险评估
+    risk_level = Column(String(20), comment="风险等级: low/medium/high")
+    confidence = Column(Float, comment="LLM置信度")
+    
+    # 分析元数据
+    analysis_time = Column(Float, comment="分析耗时(秒)")
+    llm_model = Column(String(50), comment="使用的LLM模型")
+    analyzed_by = Column(Integer, ForeignKey("users.id"), comment="分析人")
+    
+    # 保留策略：1年后自动删除
+    expire_at = Column(DateTime, comment="过期时间（创建后1年）")
+    created_at = Column(DateTime, default=datetime.now, index=True)
     
     rdb_instance = relationship("RDBInstance", back_populates="sql_analysis_history")
     analyzer = relationship("User", foreign_keys=[analyzed_by])
+    source_file = relationship("SlowLogFile", foreign_keys=[source_file_id])
 
 
 # ==================== AWS 配置 ====================
@@ -898,7 +922,7 @@ __all__ = [
     'ChangeWindow', 'WEEKDAY_LABELS', 'WINDOW_TYPE_LABELS',
     
     # SQL 优化闭环
-    'OptimizationSuggestion', 'SlowQueryCollectionTask',
+    'OptimizationSuggestion', 'SlowQueryCollectionTask', 'SlowLogFile',
 ]
 
 # 导入权限模型
@@ -918,4 +942,4 @@ from app.models.alert_rule import AlertRule, RULE_TYPE_LABELS, OPERATOR_LABELS, 
 from app.models.change_window import ChangeWindow, WEEKDAY_LABELS, WINDOW_TYPE_LABELS
 
 # 导入 SQL 优化闭环模型
-from app.models.sql_optimization import OptimizationSuggestion, SlowQueryCollectionTask
+from app.models.sql_optimization import OptimizationSuggestion, SlowQueryCollectionTask, SlowLogFile

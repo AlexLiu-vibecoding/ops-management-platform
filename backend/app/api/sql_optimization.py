@@ -527,3 +527,144 @@ def get_analysis_detail(
         raise HTTPException(status_code=404, detail="分析历史不存在")
     
     return AnalysisDetailResponse(**detail)
+
+
+# ==================== 慢日志文件上传 ====================
+
+import os
+import hashlib
+from datetime import datetime, timedelta
+from fastapi import UploadFile, File
+from pathlib import Path
+
+# 文件存储目录
+UPLOAD_DIR = Path("/tmp/slow_log_files")
+
+
+class SlowLogFileResponse(BaseModel):
+    """慢日志文件响应"""
+    id: int
+    instance_id: int
+    instance_name: str
+    file_name: str
+    file_size: int
+    file_hash: str
+    parse_status: str
+    parse_error: Optional[str] = None
+    parsed_count: int
+    analyze_status: str
+    analyzed_count: int
+    suggestion_count: int
+    uploaded_by: Optional[str] = None
+    expire_at: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SlowLogFileListResponse(BaseModel):
+    """慢日志文件列表响应"""
+    items: list
+    total: int
+
+
+@router.post("/upload-slow-log", response_model=SlowLogFileResponse, status_code=201)
+async def upload_slow_log_file(
+    instance_id: int = Query(..., description="实例ID"),
+    file: UploadFile = File(..., description="慢日志文件"),
+    auto_analyze: bool = Query(True, description="是否自动分析"),
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    上传慢日志文件进行分析
+    
+    支持的文件格式：
+    - MySQL 慢查询日志 (.log, .txt)
+    - PostgreSQL 慢查询日志 (.log, .txt)
+    
+    文件保留策略：30天后自动删除
+    """
+    service = SQLOptimizationService(db)
+    
+    try:
+        result = await service.upload_slow_log_file(
+            instance_id=instance_id,
+            file=file,
+            auto_analyze=auto_analyze,
+            current_user=current_user
+        )
+        return SlowLogFileResponse(**result)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/slow-log-files", response_model=SlowLogFileListResponse)
+def list_slow_log_files(
+    instance_id: Optional[int] = Query(None, description="实例ID"),
+    parse_status: Optional[str] = Query(None, description="解析状态"),
+    analyze_status: Optional[str] = Query(None, description="分析状态"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取慢日志文件列表"""
+    service = SQLOptimizationService(db)
+    files, total = service.list_slow_log_files(
+        instance_id=instance_id,
+        parse_status=parse_status,
+        analyze_status=analyze_status,
+        page=page,
+        page_size=page_size
+    )
+    return SlowLogFileListResponse(items=files, total=total)
+
+
+@router.get("/slow-log-files/{file_id}", response_model=SlowLogFileResponse)
+def get_slow_log_file(
+    file_id: int,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取慢日志文件详情"""
+    service = SQLOptimizationService(db)
+    file_info = service.get_slow_log_file(file_id)
+    
+    if not file_info:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    
+    return SlowLogFileResponse(**file_info)
+
+
+@router.post("/slow-log-files/{file_id}/analyze")
+def analyze_slow_log_file(
+    file_id: int,
+    db=Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """手动触发分析慢日志文件"""
+    service = SQLOptimizationService(db)
+    
+    try:
+        result = service.analyze_slow_log_file(file_id, current_user)
+        return result
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/slow-log-files/{file_id}")
+def delete_slow_log_file(
+    file_id: int,
+    db=Depends(get_db),
+    current_user: User = Depends(get_operator)
+):
+    """删除慢日志文件"""
+    service = SQLOptimizationService(db)
+    
+    success = service.delete_slow_log_file(file_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="文件不存在")
+    
+    return {"message": "删除成功"}

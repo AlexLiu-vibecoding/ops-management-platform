@@ -960,3 +960,472 @@ class SQLOptimizationService:
             "analyzed_by": suggestion.analyzed_by,
             "created_at": suggestion.created_at
         }
+    
+    # ==================== 慢日志文件上传 ====================
+    
+    async def upload_slow_log_file(
+        self,
+        instance_id: int,
+        file,
+        auto_analyze: bool,
+        current_user: User
+    ) -> Dict[str, Any]:
+        """
+        上传慢日志文件
+        
+        Args:
+            instance_id: 实例ID
+            file: 上传的文件对象
+            auto_analyze: 是否自动分析
+            current_user: 当前用户
+        
+        Returns:
+            文件信息字典
+        """
+        from app.models import SlowLogFile
+        from datetime import datetime, timedelta
+        import os
+        import hashlib
+        import aiofiles
+        
+        # 检查实例是否存在
+        instance = self._get_instance(instance_id)
+        if not instance:
+            raise ValueError(f"实例不存在: {instance_id}")
+        
+        # 验证文件类型
+        filename = file.filename or ""
+        if not (filename.endswith('.log') or filename.endswith('.txt')):
+            raise ValueError("仅支持 .log 或 .txt 格式的慢日志文件")
+        
+        # 创建上传目录
+        upload_dir = "/tmp/slow_log_files"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # 计算文件哈希（用于去重）
+        file_hash = hashlib.md5()
+        content = await file.read()
+        file_hash.update(content)
+        hash_value = file_hash.hexdigest()
+        
+        # 重置文件指针
+        await file.seek(0)
+        
+        # 检查是否已存在相同文件
+        existing = self.db.query(SlowLogFile).filter(
+            SlowLogFile.instance_id == instance_id,
+            SlowLogFile.file_hash == hash_value
+        ).first()
+        
+        if existing:
+            # 文件已存在，返回已有记录
+            logger.info(f"文件已存在: file_id={existing.id}, hash={hash_value}")
+            return self._format_file_info(existing)
+        
+        # 保存文件
+        file_path = os.path.join(upload_dir, f"{instance_id}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}")
+        async with aiofiles.open(file_path, 'wb') as f:
+            content = await file.read()
+            await f.write(content)
+        
+        file_size = len(content)
+        
+        # 创建数据库记录
+        expire_at = datetime.now() + timedelta(days=30)
+        
+        slow_log_file = SlowLogFile(
+            instance_id=instance_id,
+            file_name=filename,
+            file_path=file_path,
+            file_size=file_size,
+            file_hash=hash_value,
+            parse_status="pending",
+            analyze_status="pending",
+            uploaded_by=current_user.username,
+            expire_at=expire_at
+        )
+        
+        self.db.add(slow_log_file)
+        self.db.commit()
+        self.db.refresh(slow_log_file)
+        
+        logger.info(f"上传慢日志文件: file_id={slow_log_file.id}, instance_id={instance_id}")
+        
+        # 自动解析和分析
+        if auto_analyze:
+            try:
+                self.parse_slow_log_file(slow_log_file.id)
+                self.analyze_slow_log_file(slow_log_file.id, current_user)
+            except Exception as e:
+                logger.error(f"自动解析分析失败: {e}")
+        
+        return self._format_file_info(slow_log_file)
+    
+    def parse_slow_log_file(self, file_id: int) -> Dict[str, Any]:
+        """
+        解析慢日志文件
+        
+        Args:
+            file_id: 文件ID
+        
+        Returns:
+            解析结果
+        """
+        from app.models import SlowLogFile
+        import re
+        
+        slow_log_file = self.db.query(SlowLogFile).filter(SlowLogFile.id == file_id).first()
+        if not slow_log_file:
+            raise ValueError(f"文件不存在: {file_id}")
+        
+        try:
+            # 更新解析状态
+            slow_log_file.parse_status = "parsing"
+            self.db.commit()
+            
+            # 读取文件内容
+            with open(slow_log_file.file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            
+            # 解析慢日志（MySQL 格式）
+            # 示例格式：
+            # # Time: 2024-01-01T10:00:00.000000Z
+            # # User@Host: root[root] @ localhost []
+            # # Query_time: 5.000000  Lock_time: 0.000000 Rows_sent: 1  Rows_examined: 10000
+            # SET timestamp=1704100800;
+            # SELECT * FROM users WHERE name = 'test';
+            
+            parsed_queries = []
+            
+            # MySQL 慢查询日志解析
+            pattern = r'# Time:.*?\n# User@Host:.*?\n# Query_time:\s*([\d.]+).*?Rows_sent:\s*(\d+).*?Rows_examined:\s*(\d+).*?\n.*?\n(.*?)(?=# Time:|$)'
+            matches = re.findall(pattern, content, re.DOTALL)
+            
+            for match in matches:
+                query_time = float(match[0])
+                rows_sent = int(match[1])
+                rows_examined = int(match[2])
+                sql = match[3].strip()
+                
+                # 跳过空SQL或系统SQL
+                if not sql or sql.startswith('#'):
+                    continue
+                
+                parsed_queries.append({
+                    "query_time": query_time,
+                    "rows_sent": rows_sent,
+                    "rows_examined": rows_examined,
+                    "sql": sql
+                })
+            
+            # 存储解析结果
+            slow_log_file.parsed_queries = parsed_queries
+            slow_log_file.parsed_count = len(parsed_queries)
+            slow_log_file.parse_status = "completed"
+            self.db.commit()
+            
+            logger.info(f"解析慢日志文件完成: file_id={file_id}, parsed_count={len(parsed_queries)}")
+            
+            return {
+                "file_id": file_id,
+                "parsed_count": len(parsed_queries),
+                "status": "completed"
+            }
+            
+        except Exception as e:
+            slow_log_file.parse_status = "failed"
+            slow_log_file.parse_error = str(e)
+            self.db.commit()
+            
+            logger.error(f"解析慢日志文件失败: file_id={file_id}, error={str(e)}")
+            raise
+    
+    def analyze_slow_log_file(
+        self,
+        file_id: int,
+        current_user: User
+    ) -> Dict[str, Any]:
+        """
+        分析慢日志文件
+        
+        Args:
+            file_id: 文件ID
+            current_user: 当前用户
+        
+        Returns:
+            分析结果
+        """
+        from app.models import SlowLogFile, SQLAnalysisHistory
+        from datetime import datetime, timedelta
+        import json
+        
+        slow_log_file = self.db.query(SlowLogFile).filter(SlowLogFile.id == file_id).first()
+        if not slow_log_file:
+            raise ValueError(f"文件不存在: {file_id}")
+        
+        if slow_log_file.parse_status != "completed":
+            raise ValueError(f"文件尚未解析完成: {slow_log_file.parse_status}")
+        
+        if slow_log_file.analyze_status == "analyzing":
+            raise ValueError("文件正在分析中")
+        
+        try:
+            # 更新分析状态
+            slow_log_file.analyze_status = "analyzing"
+            self.db.commit()
+            
+            parsed_queries = slow_log_file.parsed_queries or []
+            analyzed_count = 0
+            suggestion_count = 0
+            
+            # 对每个查询进行分析
+            for query_data in parsed_queries:
+                try:
+                    # 创建分析历史记录
+                    expire_at = datetime.now() + timedelta(days=365)
+                    
+                    # 对SQL进行去重（基于SQL指纹）
+                    sql = query_data.get("sql", "")
+                    sql_fingerprint = self._generate_sql_fingerprint(sql)
+                    
+                    # 检查是否已分析过
+                    existing = self.db.query(SQLAnalysisHistory).filter(
+                        SQLAnalysisHistory.source_file_id == file_id,
+                        SQLAnalysisHistory.sql_fingerprint == sql_fingerprint
+                    ).first()
+                    
+                    if existing:
+                        continue
+                    
+                    # 执行规则分析
+                    issues = self._analyze_sql_rules(sql, query_data)
+                    
+                    # 创建分析历史
+                    analysis = SQLAnalysisHistory(
+                        instance_id=slow_log_file.instance_id,
+                        source_file_id=file_id,
+                        analysis_type="file_upload",
+                        sql_fingerprint=sql_fingerprint,
+                        sql_sample=sql,
+                        analysis_content={
+                            "query_time": query_data.get("query_time"),
+                            "rows_sent": query_data.get("rows_sent"),
+                            "rows_examined": query_data.get("rows_examined"),
+                            "issues": issues
+                        },
+                        issues=issues,
+                        suggestions=self._generate_suggestions(issues),
+                        analyzed_by=current_user.username,
+                        expire_at=expire_at
+                    )
+                    
+                    self.db.add(analysis)
+                    analyzed_count += 1
+                    
+                    if issues:
+                        suggestion_count += 1
+                    
+                except Exception as e:
+                    logger.error(f"分析查询失败: {str(e)}")
+            
+            self.db.commit()
+            
+            # 更新文件分析状态
+            slow_log_file.analyze_status = "completed"
+            slow_log_file.analyzed_count = analyzed_count
+            slow_log_file.suggestion_count = suggestion_count
+            self.db.commit()
+            
+            logger.info(f"分析慢日志文件完成: file_id={file_id}, analyzed_count={analyzed_count}")
+            
+            return {
+                "file_id": file_id,
+                "analyzed_count": analyzed_count,
+                "suggestion_count": suggestion_count,
+                "status": "completed"
+            }
+            
+        except Exception as e:
+            slow_log_file.analyze_status = "failed"
+            self.db.commit()
+            
+            logger.error(f"分析慢日志文件失败: file_id={file_id}, error={str(e)}")
+            raise
+    
+    def _generate_sql_fingerprint(self, sql: str) -> str:
+        """生成SQL指纹（用于去重）"""
+        import hashlib
+        # 简化处理：移除空白字符、参数值等
+        normalized = ' '.join(sql.split()).lower()
+        # 移除字符串字面值
+        import re
+        normalized = re.sub(r"'[^']*'", "?", normalized)
+        normalized = re.sub(r'"[^"]*"', "?", normalized)
+        # 移除数字
+        normalized = re.sub(r'\b\d+\b', "?", normalized)
+        # 生成哈希
+        return hashlib.md5(normalized.encode()).hexdigest()
+    
+    def _analyze_sql_rules(self, sql: str, query_data: Dict) -> List[Dict]:
+        """
+        基于规则分析SQL
+        
+        Args:
+            sql: SQL语句
+            query_data: 查询数据
+        
+        Returns:
+            问题列表
+        """
+        issues = []
+        
+        # 检查查询时间
+        query_time = query_data.get("query_time", 0)
+        if query_time > 10:
+            issues.append({
+                "severity": "error",
+                "category": "performance",
+                "title": "查询时间过长",
+                "description": f"查询执行时间 {query_time}秒，超过阈值10秒",
+                "suggestion": "建议添加索引或优化查询"
+            })
+        elif query_time > 5:
+            issues.append({
+                "severity": "warning",
+                "category": "performance",
+                "title": "查询时间较长",
+                "description": f"查询执行时间 {query_time}秒",
+                "suggestion": "建议检查是否可以优化"
+            })
+        
+        # 检查扫描行数
+        rows_examined = query_data.get("rows_examined", 0)
+        rows_sent = query_data.get("rows_sent", 0)
+        
+        if rows_examined > 10000 and rows_sent > 0:
+            scan_ratio = rows_examined / rows_sent
+            if scan_ratio > 100:
+                issues.append({
+                    "severity": "warning",
+                    "category": "index",
+                    "title": "扫描行数过多",
+                    "description": f"扫描了 {rows_examined} 行，只返回 {rows_sent} 行，扫描比 {scan_ratio:.1f}",
+                    "suggestion": "建议添加索引减少扫描行数"
+                })
+        
+        # 检查全表扫描
+        sql_upper = sql.upper()
+        if "SELECT * FROM" in sql_upper or "SELECT *" in sql_upper:
+            issues.append({
+                "severity": "warning",
+                "category": "best_practice",
+                "title": "使用 SELECT *",
+                "description": "查询使用了 SELECT *，可能返回不必要的数据",
+                "suggestion": "建议明确指定需要的列"
+            })
+        
+        # 检查没有WHERE子句
+        if "WHERE" not in sql_upper and "SELECT" in sql_upper:
+            issues.append({
+                "severity": "info",
+                "category": "best_practice",
+                "title": "缺少WHERE条件",
+                "description": "查询没有WHERE条件，可能返回大量数据",
+                "suggestion": "建议添加适当的过滤条件"
+            })
+        
+        return issues
+    
+    def _generate_suggestions(self, issues: List[Dict]) -> List[Dict]:
+        """根据问题生成建议"""
+        suggestions = []
+        
+        for issue in issues:
+            suggestions.append({
+                "type": "rule",
+                "priority": issue.get("severity"),
+                "description": issue.get("suggestion"),
+                "related_issue": issue.get("title")
+            })
+        
+        return suggestions
+    
+    def list_slow_log_files(
+        self,
+        instance_id: Optional[int] = None,
+        parse_status: Optional[str] = None,
+        analyze_status: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20
+    ) -> tuple[list, int]:
+        """获取慢日志文件列表"""
+        from app.models import SlowLogFile
+        
+        query = self.db.query(SlowLogFile)
+        
+        if instance_id:
+            query = query.filter(SlowLogFile.instance_id == instance_id)
+        if parse_status:
+            query = query.filter(SlowLogFile.parse_status == parse_status)
+        if analyze_status:
+            query = query.filter(SlowLogFile.analyze_status == analyze_status)
+        
+        # 统计总数
+        total = query.count()
+        
+        # 分页查询
+        files = query.order_by(desc(SlowLogFile.created_at)).offset(
+            (page - 1) * page_size
+        ).limit(page_size).all()
+        
+        return [self._format_file_info(f) for f in files], total
+    
+    def get_slow_log_file(self, file_id: int) -> Optional[Dict[str, Any]]:
+        """获取慢日志文件详情"""
+        from app.models import SlowLogFile
+        
+        file = self.db.query(SlowLogFile).filter(SlowLogFile.id == file_id).first()
+        if not file:
+            return None
+        
+        return self._format_file_info(file)
+    
+    def delete_slow_log_file(self, file_id: int) -> bool:
+        """删除慢日志文件"""
+        from app.models import SlowLogFile
+        import os
+        
+        file = self.db.query(SlowLogFile).filter(SlowLogFile.id == file_id).first()
+        if not file:
+            return False
+        
+        # 删除物理文件
+        if os.path.exists(file.file_path):
+            os.remove(file.file_path)
+        
+        # 删除数据库记录（关联的分析历史会被级联删除）
+        self.db.delete(file)
+        self.db.commit()
+        
+        logger.info(f"删除慢日志文件: file_id={file_id}")
+        return True
+    
+    def _format_file_info(self, file) -> Dict[str, Any]:
+        """格式化文件信息"""
+        return {
+            "id": file.id,
+            "instance_id": file.instance_id,
+            "instance_name": self._get_instance_name(file.instance_id),
+            "file_name": file.file_name,
+            "file_size": file.file_size,
+            "file_hash": file.file_hash,
+            "parse_status": file.parse_status,
+            "parse_error": file.parse_error,
+            "parsed_count": file.parsed_count,
+            "analyze_status": file.analyze_status,
+            "analyzed_count": file.analyzed_count,
+            "suggestion_count": file.suggestion_count,
+            "uploaded_by": file.uploaded_by,
+            "expire_at": file.expire_at,
+            "created_at": file.created_at
+        }

@@ -16,6 +16,11 @@
         <CollectionTasks ref="tasksRef" />
       </el-tab-pane>
       
+      <!-- 文件上传 -->
+      <el-tab-pane label="文件上传" name="upload">
+        <FileUpload ref="uploadRef" />
+      </el-tab-pane>
+      
       <!-- 分析历史 -->
       <el-tab-pane label="分析历史" name="history">
         <AnalysisHistory ref="historyRef" />
@@ -40,6 +45,7 @@ import { useRouter } from 'vue-router'
 import SlowQueryList from './SlowQueryList.vue'
 import OptimizationSuggestions from './OptimizationSuggestions.vue'
 import CollectionTasks from './CollectionTasks.vue'
+import FileUpload from './FileUpload.vue'
 import AnalysisHistory from './AnalysisHistory.vue'
 
 const router = useRouter()
@@ -50,6 +56,7 @@ const error = ref(null)
 const slowQueryListRef = ref(null)
 const suggestionsRef = ref(null)
 const tasksRef = ref(null)
+const uploadRef = ref(null)
 const historyRef = ref(null)
 
 // 捕获子组件错误
@@ -73,6 +80,9 @@ const handleTabChange = (name) => {
       case 'tasks':
         tasksRef.value?.fetchData()
         break
+      case 'upload':
+        uploadRef.value?.fetchData()
+        break
       case 'history':
         historyRef.value?.fetchData()
         break
@@ -92,7 +102,7 @@ onMounted(() => {
   // 从 URL 参数恢复标签页状态
   try {
     const tab = router.currentRoute.value.query.tab
-    if (tab && ['list', 'suggestions', 'tasks', 'history'].includes(tab)) {
+    if (tab && ['list', 'suggestions', 'tasks', 'upload', 'history'].includes(tab)) {
       activeTab.value = tab
     }
   } catch (err) {

@@ -4,11 +4,61 @@ SQL 优化闭环模型
 包含：
 - OptimizationSuggestion: 优化建议表
 - SlowQueryCollectionTask: 慢SQL采集任务表
+- SlowLogFile: 慢日志文件表（用户上传）
+- SQLAnalysisHistory: SQL分析历史表（扩展）
+
+数据保留策略：
+- 上传文件：30天自动清理
+- 分析历史：1年自动清理
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, Float, JSON, DECIMAL, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
+
+
+class SlowLogFile(Base):
+    """慢日志文件表 - 用户上传的慢日志文件"""
+    __tablename__ = "slow_log_files"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="CASCADE"), nullable=False, comment="RDB实例ID")
+    
+    # 文件信息
+    file_name = Column(String(255), nullable=False, comment="原始文件名")
+    file_path = Column(String(500), nullable=False, comment="存储路径")
+    file_size = Column(Integer, comment="文件大小(字节)")
+    file_hash = Column(String(64), comment="文件MD5哈希")
+    
+    # 解析状态
+    parse_status = Column(String(20), default='pending', comment="解析状态: pending/parsing/parsed/failed")
+    parse_error = Column(Text, comment="解析错误信息")
+    parsed_count = Column(Integer, default=0, comment="解析出的慢查询数量")
+    parsed_queries = Column(JSON, comment="解析出的查询列表")
+    
+    # 分析状态
+    analyze_status = Column(String(20), default='pending', comment="分析状态: pending/analyzing/completed/failed")
+    analyzed_count = Column(Integer, default=0, comment="已分析的慢查询数量")
+    suggestion_count = Column(Integer, default=0, comment="生成的优化建议数量")
+    
+    # 上传信息
+    uploaded_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), comment="上传人")
+    
+    # 保留策略：30天后自动删除
+    expire_at = Column(DateTime, nullable=False, comment="过期时间（上传后30天）")
+    
+    created_at = Column(DateTime, default=datetime.now, index=True, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    # 关联
+    rdb_instance = relationship("RDBInstance", back_populates="slow_log_files")
+    uploader = relationship("User", foreign_keys=[uploaded_by])
+    analysis_records = relationship("SQLAnalysisHistory", back_populates="source_file", foreign_keys="SQLAnalysisHistory.source_file_id")
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        if not self.expire_at:
+            self.expire_at = datetime.now() + timedelta(days=30)
 
 
 class OptimizationSuggestion(Base):
