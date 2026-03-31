@@ -285,6 +285,7 @@ class ApprovalRecord(Base):
     affected_rows_estimate = Column(Integer, default=0, comment="预估影响行数")
     affected_rows_actual = Column(Integer, comment="实际影响行数")
     auto_execute = Column(Boolean, default=False, comment="审批通过后自动执行")
+    is_emergency = Column(Boolean, default=False, comment="是否紧急变更")
     
     environment_id = Column(Integer, ForeignKey("environments.id"), comment="环境ID")
     requester_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="申请人ID")

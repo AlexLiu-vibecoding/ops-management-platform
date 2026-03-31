@@ -793,6 +793,7 @@ async def create_approval(
             file_storage_type=file_storage_type,
             affected_rows_estimate=affected_rows_estimate,
             auto_execute=approval_data.auto_execute or False,
+            is_emergency=approval_data.is_emergency or False,
             environment_id=environment_id,
             requester_id=current_user.id,
             scheduled_time=approval_data.scheduled_time
@@ -856,6 +857,7 @@ async def create_approval(
             file_storage_type="database",
             affected_rows_estimate=affected_rows_estimate,
             auto_execute=approval_data.auto_execute or False,
+            is_emergency=approval_data.is_emergency or False,
             environment_id=instance.environment_id,
             requester_id=current_user.id,
             scheduled_time=approval_data.scheduled_time

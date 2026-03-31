@@ -92,28 +92,29 @@
       <!-- 数据表格 -->
       <el-table v-loading="loading" :data="tableData" stripe>
         <el-table-column prop="name" label="窗口名称" min-width="150" />
-        <el-table-column prop="description" label="描述" min-width="150" />
-        <el-table-column label="时间范围" width="150">
+        <el-table-column prop="description" label="描述" min-width="120" show-overflow-tooltip />
+        <el-table-column label="日期范围" width="200">
+          <template #default="{ row }">
+            <span v-if="row.start_date && row.end_date">
+              {{ row.start_date }} ~ {{ row.end_date }}
+            </span>
+            <span v-else class="text-gray-400">长期有效</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="时间范围" width="120">
           <template #default="{ row }">
             {{ row.start_time }} - {{ row.end_time }}
           </template>
         </el-table-column>
-        <el-table-column prop="weekdays_label" label="星期" width="150" />
-        <el-table-column label="允许紧急变更" width="110">
+        <el-table-column prop="weekdays_label" label="星期" width="100" />
+        <el-table-column label="允许紧急变更" width="100">
           <template #default="{ row }">
             <el-tag :type="row.allow_emergency ? 'success' : 'danger'" size="small">
               {{ row.allow_emergency ? '是' : '否' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="需要审批" width="90">
-          <template #default="{ row }">
-            <el-tag :type="row.require_approval ? 'warning' : 'success'" size="small">
-              {{ row.require_approval ? '是' : '否' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="最小审批人" width="100">
+        <el-table-column label="最小审批人" width="90">
           <template #default="{ row }">
             {{ row.min_approvers }} 人
           </template>
@@ -160,6 +161,24 @@
             <el-option v-for="env in environmentList" :key="env.id" :label="env.name" :value="env.id" />
           </el-select>
         </el-form-item>
+        
+        <!-- 日期范围选择 -->
+        <el-divider content-position="left">日期范围（可选）</el-divider>
+        <el-form-item label="生效日期">
+          <el-date-picker
+            v-model="form.dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            class="w-full"
+          />
+          <div class="text-gray-500 text-sm mt-1">不选择则长期有效</div>
+        </el-form-item>
+        
+        <!-- 时间范围选择 -->
+        <el-divider content-position="left">每日时间范围</el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="开始时间" prop="start_time">
@@ -300,6 +319,7 @@ const form = reactive({
   name: '',
   description: '',
   environment_ids: [],
+  dateRange: null,  // 日期范围 [start_date, end_date]
   start_time: '',
   start_time_obj: null,
   end_time: '',
@@ -397,11 +417,18 @@ async function handleEdit(row) {
     const endDate = new Date()
     endDate.setHours(endHour, endMin, 0, 0)
     
+    // 处理日期范围
+    let dateRange = null
+    if (data.start_date && data.end_date) {
+      dateRange = [data.start_date, data.end_date]
+    }
+    
     Object.assign(form, {
       id: data.id,
       name: data.name,
       description: data.description || '',
       environment_ids: data.environment_ids || [],
+      dateRange: dateRange,
       start_time: data.start_time,
       start_time_obj: startDate,
       end_time: data.end_time,
@@ -465,6 +492,12 @@ async function handleSubmit() {
       min_approvers: form.min_approvers,
       auto_reject_outside: form.auto_reject_outside
     }
+    
+    // 添加日期范围
+    if (form.dateRange && form.dateRange.length === 2) {
+      submitData.start_date = form.dateRange[0]
+      submitData.end_date = form.dateRange[1]
+    }
 
     if (form.id) {
       await changeWindowsApi.update(form.id, submitData)
@@ -476,7 +509,7 @@ async function handleSubmit() {
     dialogVisible.value = false
     loadData()
   } catch (error) {
-    ElMessage.error('操作失败')
+    ElMessage.error(error.response?.data?.detail || '操作失败')
   } finally {
     submitLoading.value = false
   }
@@ -488,6 +521,7 @@ function resetForm() {
   form.name = ''
   form.description = ''
   form.environment_ids = []
+  form.dateRange = null
   form.start_time = ''
   form.start_time_obj = null
   form.end_time = ''
@@ -534,5 +568,9 @@ function resetForm() {
       color: #909399;
     }
   }
+}
+
+.text-gray-400 {
+  color: #9ca3af;
 }
 </style>

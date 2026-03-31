@@ -1,7 +1,7 @@
 """
 变更时间窗口API - 变更时间窗口管理
 """
-from datetime import datetime, time
+from datetime import datetime, date
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -25,9 +25,13 @@ class ChangeWindowCreate(BaseModel):
     name: str = Field(..., description="窗口名称")
     description: Optional[str] = Field(None, description="描述")
     environment_ids: Optional[List[int]] = Field(None, description="应用环境ID列表")
+    # 日期范围
+    start_date: Optional[str] = Field(None, description="生效开始日期 YYYY-MM-DD")
+    end_date: Optional[str] = Field(None, description="生效结束日期 YYYY-MM-DD")
+    # 时间范围
     start_time: str = Field(..., description="开始时间 HH:MM")
     end_time: str = Field(..., description="结束时间 HH:MM")
-    weekdays: Optional[List[int]] = Field(None, description="允许的星期 0-6")
+    weekdays: Optional[List[int]] = Field(None, description="允许的星期 0-6（0=周一）")
     allow_emergency: bool = Field(False, description="允许紧急变更")
     require_approval: bool = Field(True, description="需要审批")
     min_approvers: int = Field(1, description="最小审批人数")
@@ -39,6 +43,8 @@ class ChangeWindowUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     environment_ids: Optional[List[int]] = None
+    start_date: Optional[str] = Field(None, description="生效开始日期 YYYY-MM-DD")
+    end_date: Optional[str] = Field(None, description="生效结束日期 YYYY-MM-DD")
     start_time: Optional[str] = None
     end_time: Optional[str] = None
     weekdays: Optional[List[int]] = None
@@ -82,6 +88,8 @@ async def list_change_windows(
             "name": w.name,
             "description": w.description,
             "environment_ids": w.environment_ids,
+            "start_date": w.start_date.isoformat() if w.start_date else None,
+            "end_date": w.end_date.isoformat() if w.end_date else None,
             "start_time": w.start_time,
             "end_time": w.end_time,
             "weekdays": w.weekdays,
@@ -107,14 +115,28 @@ async def create_change_window(
     """创建变更时间窗口"""
     # 验证时间格式
     try:
-        start_time = datetime.strptime(data.start_time, "%H:%M").time()
+        datetime.strptime(data.start_time, "%H:%M")
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="开始时间格式错误，应为 HH:MM")
     
     try:
-        end_time = datetime.strptime(data.end_time, "%H:%M").time()
+        datetime.strptime(data.end_time, "%H:%M")
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="结束时间格式错误，应为 HH:MM")
+    
+    # 验证日期格式
+    start_date = None
+    end_date = None
+    if data.start_date:
+        try:
+            start_date = datetime.strptime(data.start_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="开始日期格式错误，应为 YYYY-MM-DD")
+    if data.end_date:
+        try:
+            end_date = datetime.strptime(data.end_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="结束日期格式错误，应为 YYYY-MM-DD")
     
     # 验证星期
     if data.weekdays:
@@ -126,6 +148,8 @@ async def create_change_window(
         name=data.name,
         description=data.description,
         environment_ids=data.environment_ids,
+        start_date=start_date,
+        end_date=end_date,
         start_time=data.start_time,
         end_time=data.end_time,
         weekdays=data.weekdays,
@@ -170,6 +194,8 @@ async def get_change_window(
         "description": window.description,
         "environment_ids": window.environment_ids,
         "environment_names": environment_names,
+        "start_date": window.start_date.isoformat() if window.start_date else None,
+        "end_date": window.end_date.isoformat() if window.end_date else None,
         "start_time": window.start_time,
         "end_time": window.end_time,
         "weekdays": window.weekdays,
@@ -204,6 +230,16 @@ async def update_change_window(
         window.description = data.description
     if data.environment_ids is not None:
         window.environment_ids = data.environment_ids
+    if data.start_date is not None:
+        try:
+            window.start_date = datetime.strptime(data.start_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="开始日期格式错误，应为 YYYY-MM-DD")
+    if data.end_date is not None:
+        try:
+            window.end_date = datetime.strptime(data.end_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="结束日期格式错误，应为 YYYY-MM-DD")
     if data.start_time is not None:
         try:
             datetime.strptime(data.start_time, "%H:%M")
@@ -215,7 +251,7 @@ async def update_change_window(
             datetime.strptime(data.end_time, "%H:%M")
             window.end_time = data.end_time
         except ValueError:
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="结束时间格式错误，应为 HH:MM")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="结束时间格式错误，应为 HH:MM")
     if data.weekdays is not None:
         for wd in data.weekdays:
             if wd < 0 or wd > 6:
@@ -288,11 +324,18 @@ async def check_change_window(
     
     # 查找该环境的变更窗口
     windows = db.query(ChangeWindow).filter(
-        ChangeWindow.is_enabled == True,
-        ChangeWindow.environment_ids.contains([environment_id])
+        ChangeWindow.is_enabled == True
     ).all()
     
-    if not windows:
+    # 过滤出适用于该环境的窗口
+    applicable_windows = []
+    for w in windows:
+        if w.environment_ids is None or len(w.environment_ids) == 0:
+            applicable_windows.append(w)
+        elif environment_id in (w.environment_ids or []):
+            applicable_windows.append(w)
+    
+    if not applicable_windows:
         return {
             "in_window": True,
             "message": "未配置变更窗口，允许变更",
@@ -302,51 +345,65 @@ async def check_change_window(
     result_windows = []
     in_window = False
     
-    for window in windows:
-        # 检查星期
-        weekday = dt.weekday()  # 0-6, Monday=0
-        if window.weekdays and weekday not in window.weekdays:
-            result_windows.append({
-                "id": window.id,
-                "name": window.name,
-                "in_window": False,
-                "reason": f"星期{['一', '二', '三', '四', '五', '六', '日'][weekday]}不在允许范围内"
-            })
-            continue
-        
-        # 检查时间
-        check_time_obj = dt.time()
-        start_time = datetime.strptime(window.start_time, "%H:%M").time()
-        end_time = datetime.strptime(window.end_time, "%H:%M").time()
-        
-        if start_time <= end_time:
-            # 不跨天
-            time_in_window = start_time <= check_time_obj <= end_time
-        else:
-            # 跨天
-            time_in_window = check_time_obj >= start_time or check_time_obj <= end_time
-        
-        if time_in_window:
+    for window in applicable_windows:
+        window_check = _check_single_window(window, dt)
+        result_windows.append(window_check)
+        if window_check["in_window"]:
             in_window = True
-            result_windows.append({
-                "id": window.id,
-                "name": window.name,
-                "in_window": True,
-                "reason": "在变更窗口内"
-            })
-        else:
-            result_windows.append({
-                "id": window.id,
-                "name": window.name,
-                "in_window": False,
-                "reason": f"当前时间不在 {window.start_time}-{window.end_time} 范围内"
-            })
+    
+    # 检查是否有允许紧急变更的窗口
+    allow_emergency = any(w.get("allow_emergency") for w in result_windows)
     
     return {
         "in_window": in_window,
-        "message": "在变更窗口内" if in_window else "不在任何变更窗口内",
+        "message": "在变更窗口内" if in_window else ("不在任何变更窗口内，可提交紧急变更" if allow_emergency else "不在任何变更窗口内"),
+        "allow_emergency": allow_emergency and not in_window,
         "windows": result_windows
     }
+
+
+def _check_single_window(window: ChangeWindow, dt: datetime) -> dict:
+    """检查单个窗口"""
+    result = {
+        "id": window.id,
+        "name": window.name,
+        "allow_emergency": window.allow_emergency,
+        "in_window": False,
+        "reason": ""
+    }
+    
+    # 检查日期范围
+    if window.start_date and window.end_date:
+        check_date = dt.date()
+        if not (window.start_date <= check_date <= window.end_date):
+            result["reason"] = f"不在日期范围内 ({window.start_date} ~ {window.end_date})"
+            return result
+    
+    # 检查星期
+    weekday = dt.weekday()  # 0-6, Monday=0
+    if window.weekdays and weekday not in window.weekdays:
+        result["reason"] = f"星期{['一', '二', '三', '四', '五', '六', '日'][weekday]}不在允许范围内"
+        return result
+    
+    # 检查时间
+    check_time_str = dt.strftime("%H:%M")
+    start_time = window.start_time
+    end_time = window.end_time
+    
+    if start_time <= end_time:
+        # 不跨天
+        time_in_window = start_time <= check_time_str <= end_time
+    else:
+        # 跨天 (如 22:00 - 02:00)
+        time_in_window = check_time_str >= start_time or check_time_str <= end_time
+    
+    if time_in_window:
+        result["in_window"] = True
+        result["reason"] = "在变更窗口内"
+    else:
+        result["reason"] = f"当前时间不在 {window.start_time}-{window.end_time} 范围内"
+    
+    return result
 
 
 def _get_weekdays_label(weekdays: Optional[List[int]]) -> str:

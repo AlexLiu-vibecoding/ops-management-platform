@@ -305,6 +305,7 @@ class ApprovalCreate(BaseModel):
     auto_execute: Optional[bool] = Field(False, description="审批通过后自动执行")
     scheduled_time: Optional[datetime] = None
     remark: Optional[str] = Field(None, max_length=500, description="备注")
+    is_emergency: Optional[bool] = Field(False, description="是否紧急变更")
 
 
 class ApprovalAction(BaseModel):
