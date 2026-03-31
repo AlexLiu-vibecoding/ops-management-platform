@@ -84,6 +84,9 @@
             <div class="status-cell">
               <el-tag :type="getStatusType(row.status)" size="small">
                 {{ getStatusLabel(row.status) }}
+                <span v-if="row.status === 'pending' && row.min_approvers > 1" class="approval-progress">
+                  ({{ row.approval_count || 0 }}/{{ row.min_approvers }})
+                </span>
               </el-tag>
               <el-tag v-if="row.is_emergency" type="danger" size="small" class="emergency-tag">
                 紧急
@@ -965,6 +968,12 @@ onMounted(() => {
     
     .emergency-tag {
       font-size: 10px;
+    }
+    
+    .approval-progress {
+      margin-left: 2px;
+      font-size: 11px;
+      color: #e6a23c;
     }
   }
 }

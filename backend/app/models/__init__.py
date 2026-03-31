@@ -287,6 +287,11 @@ class ApprovalRecord(Base):
     auto_execute = Column(Boolean, default=False, comment="审批通过后自动执行")
     is_emergency = Column(Boolean, default=False, comment="是否紧急变更")
     
+    # 多人审批相关字段
+    min_approvers = Column(Integer, default=1, comment="最小审批人数")
+    approval_count = Column(Integer, default=0, comment="已审批人数")
+    approver_ids = Column(JSON, default=list, comment="已审批人ID列表")
+    
     environment_id = Column(Integer, ForeignKey("environments.id"), comment="环境ID")
     requester_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="申请人ID")
     status = Column(SQLEnum(ApprovalStatus), default=ApprovalStatus.PENDING, comment="审批状态")
@@ -305,6 +310,23 @@ class ApprovalRecord(Base):
     rdb_instance = relationship("RDBInstance", back_populates="approval_records")
     redis_instance = relationship("RedisInstance", back_populates="approval_records")
     optimization_suggestions = relationship("OptimizationSuggestion", back_populates="approval")
+    approval_flows = relationship("ApprovalFlow", back_populates="approval", cascade="all, delete-orphan")
+
+
+class ApprovalFlow(Base):
+    """审批流程记录表 - 记录每次审批操作"""
+    __tablename__ = "approval_flows"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    approval_id = Column(Integer, ForeignKey("approval_records.id", ondelete="CASCADE"), nullable=False, comment="审批记录ID")
+    approver_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="审批人ID")
+    action = Column(String(20), nullable=False, comment="操作: approve/reject")
+    comment = Column(String(500), comment="审批意见")
+    created_at = Column(DateTime, default=datetime.now, comment="审批时间")
+    
+    # 关联
+    approval = relationship("ApprovalRecord", back_populates="approval_flows")
+    approver = relationship("User")
 
 
 # ==================== RDB 性能监控 ====================

@@ -567,12 +567,17 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
         "affected_rows_estimate": approval.affected_rows_estimate,
         "affected_rows_actual": approval.affected_rows_actual,
         "auto_execute": approval.auto_execute,
+        "is_emergency": approval.is_emergency,
         "status": approval.status,
         "requester_id": approval.requester_id,
         "requester_name": approval.requester.real_name if approval.requester else None,
         "approver_id": approval.approver_id,
         "approver_name": approval.approver.real_name if approval.approver else None,
         "approve_comment": approval.approve_comment,
+        # 多人审批相关字段
+        "min_approvers": approval.min_approvers or 1,
+        "approval_count": approval.approval_count or 0,
+        "approver_ids": approval.approver_ids or [],
         "scheduled_time": approval.scheduled_time,
         "execute_time": approval.execute_time,
         "execute_result": approval.execute_result,
@@ -703,6 +708,25 @@ async def create_approval(
             detail="Critical risk detected, submission rejected"
         )
     
+    # 获取变更窗口配置（用于多人审批）
+    min_approvers = 1
+    if environment_id:
+        from app.models import ChangeWindow
+        windows = db.query(ChangeWindow).filter(
+            ChangeWindow.is_enabled == True,
+            ChangeWindow.allow_emergency == True
+        ).all()
+        # 找到适用于该环境的窗口
+        for w in windows:
+            if w.environment_ids is None or len(w.environment_ids) == 0 or environment_id in (w.environment_ids or []):
+                if w.min_approvers and w.min_approvers > min_approvers:
+                    min_approvers = w.min_approvers
+                    break
+    
+    # 如果是紧急变更，min_approvers 至少为 2
+    if approval_data.is_emergency and min_approvers < 2:
+        min_approvers = 2
+    
     # 计算SQL/命令行数（如果前端没传）
     sql_line_count = approval_data.sql_line_count
     if not sql_line_count:
@@ -794,6 +818,7 @@ async def create_approval(
             affected_rows_estimate=affected_rows_estimate,
             auto_execute=approval_data.auto_execute or False,
             is_emergency=approval_data.is_emergency or False,
+            min_approvers=min_approvers,
             environment_id=environment_id,
             requester_id=current_user.id,
             scheduled_time=approval_data.scheduled_time
@@ -858,6 +883,7 @@ async def create_approval(
             affected_rows_estimate=affected_rows_estimate,
             auto_execute=approval_data.auto_execute or False,
             is_emergency=approval_data.is_emergency or False,
+            min_approvers=min_approvers,
             environment_id=instance.environment_id,
             requester_id=current_user.id,
             scheduled_time=approval_data.scheduled_time
@@ -913,7 +939,9 @@ async def approve_or_reject(
     current_user: User = Depends(get_approval_admin),
     db: Session = Depends(get_db)
 ):
-    """审批通过或拒绝"""
+    """审批通过或拒绝（支持多人审批）"""
+    from app.models import ApprovalFlow
+    
     approval = db.query(ApprovalRecord).filter(ApprovalRecord.id == approval_id).first()
     if not approval:
         raise HTTPException(
@@ -927,42 +955,83 @@ async def approve_or_reject(
             detail="This approval has already been processed"
         )
     
-    # 更新审批状态
-    approval.status = ApprovalStatus.APPROVED if action_data.approved else ApprovalStatus.REJECTED
-    approval.approver_id = current_user.id
-    approval.approve_time = datetime.now()
-    approval.approve_comment = action_data.comment
+    # 检查是否已审批过（防止重复审批）
+    approver_ids = approval.approver_ids or []
+    if current_user.id in approver_ids:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="您已审批过此申请，请勿重复操作"
+        )
     
-    db.commit()
-    db.refresh(approval)
-    
-    # 记录审计日志
-    audit_log = AuditLog(
-        user_id=current_user.id,
-        username=current_user.username,
-        instance_id=approval.rdb_instance_id or approval.redis_instance_id,
-        instance_name=(approval.rdb_instance.name if approval.rdb_instance else None) or 
-                      (approval.redis_instance.name if approval.redis_instance else None),
-        environment_id=approval.environment_id,
-        operation_type="approve" if action_data.approved else "reject",
-        operation_detail=f"{'Approved' if action_data.approved else 'Rejected'} approval: {approval.title}",
-        request_ip="",
-        request_method="POST",
-        request_path=f"/api/approvals/{approval_id}/approve",
-        response_code=200
+    # 记录审批流程
+    flow = ApprovalFlow(
+        approval_id=approval.id,
+        approver_id=current_user.id,
+        action="approve" if action_data.approved else "reject",
+        comment=action_data.comment
     )
-    db.add(audit_log)
-    db.commit()
+    db.add(flow)
     
-    # 发送钉钉通知给申请人
-    try:
-        await notification_service.send_approval_notification(db, approval, "approved" if action_data.approved else "rejected")
-    except Exception as e:
-        logger.warning(f"发送审批结果通知失败: {e}")
+    # 如果是拒绝，直接拒绝
+    if not action_data.approved:
+        approval.status = ApprovalStatus.REJECTED
+        approval.approver_id = current_user.id
+        approval.approve_time = datetime.now()
+        approval.approve_comment = action_data.comment
+        db.commit()
+        
+        # 记录审计日志
+        _add_audit_log(db, current_user, approval, "reject")
+        db.commit()
+        
+        # 发送通知
+        try:
+            await notification_service.send_approval_notification(db, approval, "rejected")
+        except Exception as e:
+            logger.warning(f"发送审批结果通知失败: {e}")
+        
+        return format_approval_response(approval, include_full_sql=True)
     
-    # 如果通过，处理执行逻辑
-    if action_data.approved:
-        # 如果设置了定时执行时间，添加到调度器
+    # 通过审批 - 更新审批计数
+    approver_ids.append(current_user.id)
+    approval.approver_ids = approver_ids
+    approval.approval_count = len(approver_ids)
+    
+    # 获取最小审批人数
+    min_approvers = approval.min_approvers or 1
+    
+    # 获取系统中所有有审批权限的用户数量（用于兜底判断）
+    approver_count = db.query(User).filter(
+        User.role.in_(["super_admin", "approval_admin"]),
+        User.status == True
+    ).count()
+    
+    # 判断是否达到审批条件
+    # 条件1：已审批人数 >= 最小审批人数
+    # 条件2：系统中审批人不足时，所有审批人都已审批
+    all_approvers_voted = approval.approval_count >= approver_count
+    min_approvers_reached = approval.approval_count >= min_approvers
+    
+    if min_approvers_reached or all_approvers_voted:
+        # 审批通过
+        approval.status = ApprovalStatus.APPROVED
+        approval.approver_id = current_user.id  # 最后一个审批人
+        approval.approve_time = datetime.now()
+        approval.approve_comment = action_data.comment
+        
+        db.commit()
+        
+        # 记录审计日志
+        _add_audit_log(db, current_user, approval, "approve")
+        db.commit()
+        
+        # 发送通知
+        try:
+            await notification_service.send_approval_notification(db, approval, "approved")
+        except Exception as e:
+            logger.warning(f"发送审批结果通知失败: {e}")
+        
+        # 如果通过，处理执行逻辑
         if approval.scheduled_time:
             try:
                 approval_scheduler.schedule_approval_execution(
@@ -972,15 +1041,37 @@ async def approve_or_reject(
                 logger.info(f"已添加定时执行任务: 审批ID={approval.id}, 执行时间={approval.scheduled_time}")
             except Exception as e:
                 logger.error(f"添加定时执行任务失败: {e}")
-        # 如果开启了自动执行且没有定时时间，立即执行
         elif approval.auto_execute:
             try:
                 logger.info(f"审批通过且启用自动执行，开始执行: 审批ID={approval.id}")
                 await approval_scheduler.execute_approval(approval.id, db)
             except Exception as e:
                 logger.error(f"自动执行审批失败: {e}")
+    else:
+        # 还需要继续审批
+        db.commit()
+        logger.info(f"审批进度: {approval.approval_count}/{min_approvers}，等待更多审批人")
     
     return format_approval_response(approval, include_full_sql=True)
+
+
+def _add_audit_log(db, current_user, approval, action):
+    """添加审计日志"""
+    audit_log = AuditLog(
+        user_id=current_user.id,
+        username=current_user.username,
+        instance_id=approval.rdb_instance_id or approval.redis_instance_id,
+        instance_name=(approval.rdb_instance.name if approval.rdb_instance else None) or 
+                      (approval.redis_instance.name if approval.redis_instance else None),
+        environment_id=approval.environment_id,
+        operation_type=action,
+        operation_detail=f"{'Approved' if action == 'approve' else 'Rejected'} approval: {approval.title}",
+        request_ip="",
+        request_method="POST",
+        request_path=f"/api/approvals/{approval.id}/approve",
+        response_code=200
+    )
+    db.add(audit_log)
 
 
 @router.post("/{approval_id}/execute", response_model=MessageResponse)
