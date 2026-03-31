@@ -342,7 +342,13 @@ async def add_missing_menus(
         child_menus = [
             {"name": "性能监控", "path": "/monitor/performance", "icon": "TrendCharts", "sort_order": 1},
             {"name": "慢查询监控", "path": "/monitor/slow-query", "icon": "Timer", "sort_order": 2},
-            {"name": "监控配置", "path": "/monitor/settings", "icon": "Setting", "sort_order": 3},
+            {"name": "告警中心", "path": "/monitor/alerts", "icon": "Bell", "sort_order": 3},
+            {"name": "主从复制", "path": "/monitor/replication", "icon": "Connection", "sort_order": 4},
+            {"name": "事务与锁", "path": "/monitor/locks", "icon": "Lock", "sort_order": 5},
+            {"name": "巡检报告", "path": "/monitor/inspection", "icon": "DocumentChecked", "sort_order": 6},
+            {"name": "定时巡检", "path": "/monitor/scheduled-inspection", "icon": "AlarmClock", "sort_order": 7},
+            {"name": "告警规则", "path": "/monitor/alert-rules", "icon": "Warning", "sort_order": 8},
+            {"name": "监控配置", "path": "/monitor/settings", "icon": "Setting", "sort_order": 9},
         ]
         
         for menu_data in child_menus:
