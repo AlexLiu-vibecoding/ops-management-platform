@@ -20,7 +20,7 @@ from app.schemas import (
     ApprovalCreate, ApprovalAction, ApprovalResponse,
     MessageResponse
 )
-from app.deps import get_approval_admin, get_current_user
+from app.deps import get_approval_admin, get_current_user, require_permission
 from app.services.notification import notification_service
 from app.services.scheduler import approval_scheduler
 from app.services.rollback_generator import rollback_generator
@@ -667,7 +667,7 @@ async def get_approval(
 @router.post("", response_model=ApprovalResponse)
 async def create_approval(
     approval_data: ApprovalCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("approval:create")),
     db: Session = Depends(get_db)
 ):
     """提交审批申请"""
@@ -936,7 +936,7 @@ async def create_approval(
 async def approve_or_reject(
     approval_id: int,
     action_data: ApprovalAction,
-    current_user: User = Depends(get_approval_admin),
+    current_user: User = Depends(require_permission("approval:approve")),
     db: Session = Depends(get_db)
 ):
     """审批通过或拒绝（支持多人审批）"""
@@ -1077,7 +1077,7 @@ def _add_audit_log(db, current_user, approval, action):
 @router.post("/{approval_id}/execute", response_model=MessageResponse)
 async def execute_approval(
     approval_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("approval:execute")),
     db: Session = Depends(get_db)
 ):
     """执行已通过的审批"""

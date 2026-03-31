@@ -16,7 +16,7 @@ import logging
 from app.database import get_db
 from app.models import RDBInstance, InstanceGroup, Environment, MonitorSwitch, MonitorType, RDBType, GlobalConfig
 from app.utils.auth import encrypt_instance_password, decrypt_instance_password
-from app.deps import get_operator, get_current_user
+from app.deps import get_operator, get_current_user, require_permission
 from app.models import User
 from app.utils.aws_rds_collector import parse_aws_region_from_host, is_rds_endpoint
 
@@ -307,7 +307,7 @@ async def test_rdb_instance_connection(
 @router.post("", response_model=RDBInstanceResponse)
 async def create_rdb_instance(
     instance_data: RDBInstanceCreate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:create")),
     db: Session = Depends(get_db)
 ):
     """创建 RDB 实例"""
@@ -417,7 +417,7 @@ async def create_rdb_instance(
 async def update_rdb_instance(
     instance_id: int,
     instance_data: RDBInstanceUpdate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:update")),
     db: Session = Depends(get_db)
 ):
     """更新 RDB 实例"""
@@ -511,7 +511,7 @@ async def sync_aws_regions(
 @router.delete("/{instance_id}", response_model=MessageResponse)
 async def delete_rdb_instance(
     instance_id: int,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:delete")),
     db: Session = Depends(get_db)
 ):
     """删除 RDB 实例"""

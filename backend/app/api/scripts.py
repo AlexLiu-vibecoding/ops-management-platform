@@ -23,7 +23,7 @@ from app.models import (
     User, UserRole, DingTalkChannel
 )
 from app.schemas import MessageResponse
-from app.deps import get_current_user
+from app.deps import get_current_user, require_permission
 from app.utils.redis_client import redis_client
 from app.utils.auth import aes_cipher
 import logging
@@ -418,7 +418,7 @@ async def list_scripts(
 @router.post("", response_model=MessageResponse)
 async def create_script(
     script_data: ScriptCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("script:create")),
     db: Session = Depends(get_db)
 ):
     """创建脚本"""
@@ -567,7 +567,7 @@ async def update_script(
 @router.delete("/{script_id}", response_model=MessageResponse)
 async def delete_script(
     script_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("script:delete")),
     db: Session = Depends(get_db)
 ):
     """删除脚本"""
@@ -598,7 +598,7 @@ async def execute_script(
     exec_data: ScriptExecute,
     background_tasks: BackgroundTasks,
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("script:execute")),
     db: Session = Depends(get_db)
 ):
     """执行脚本"""

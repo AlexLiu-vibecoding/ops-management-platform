@@ -85,8 +85,19 @@ async def list_environments(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """获取环境列表"""
-    environments = db.query(Environment).all()
+    """获取环境列表（根据用户角色过滤）"""
+    from app.models.permissions import RoleEnvironment
+    
+    # 获取用户可访问的环境ID列表
+    permission_service = PermissionService(db)
+    accessible_env_ids = permission_service.get_user_environment_ids(current_user)
+    
+    # 根据环境ID过滤
+    if accessible_env_ids:
+        environments = db.query(Environment).filter(Environment.id.in_(accessible_env_ids)).all()
+    else:
+        environments = []
+    
     return {
         "total": len(environments),
         "items": [EnvironmentResponse.from_orm(e) for e in environments]

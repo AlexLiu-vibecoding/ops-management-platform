@@ -13,7 +13,7 @@ import logging
 from app.database import get_db
 from app.models import RedisInstance, InstanceGroup, RedisMode, RedisSlowLog, RedisMemoryStats, Environment, GlobalConfig
 from app.utils.auth import encrypt_instance_password, decrypt_instance_password
-from app.deps import get_operator, get_current_user
+from app.deps import get_operator, get_current_user, require_permission
 from app.models import User
 
 router = APIRouter(prefix="/redis-instances", tags=["Redis实例管理"])
@@ -336,7 +336,7 @@ async def test_redis_instance_connection(
 @router.post("", response_model=RedisInstanceResponse)
 async def create_redis_instance(
     instance_data: RedisInstanceCreate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:create")),
     db: Session = Depends(get_db)
 ):
     """创建 Redis 实例"""
@@ -405,7 +405,7 @@ async def create_redis_instance(
 async def update_redis_instance(
     instance_id: int,
     instance_data: RedisInstanceUpdate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:update")),
     db: Session = Depends(get_db)
 ):
     """更新 Redis 实例"""
@@ -436,7 +436,7 @@ async def update_redis_instance(
 @router.delete("/{instance_id}", response_model=MessageResponse)
 async def delete_redis_instance(
     instance_id: int,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:delete")),
     db: Session = Depends(get_db)
 ):
     """删除 Redis 实例"""

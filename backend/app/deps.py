@@ -150,6 +150,36 @@ async def get_operator(
     return current_user
 
 
+# ==================== 功能权限检查 ====================
+
+def require_permission(permission_code: str):
+    """
+    检查用户是否拥有指定功能权限
+    
+    Args:
+        permission_code: 权限编码，如 "instance:create", "environment:delete"
+    
+    Returns:
+        权限检查依赖
+    """
+    async def permission_checker(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+    ) -> User:
+        from app.services.permission_service import PermissionService
+        permission_service = PermissionService(db)
+        
+        if not permission_service.has_permission(current_user, permission_code):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"无权限: {permission_code}"
+            )
+        
+        return current_user
+    
+    return permission_checker
+
+
 # ==================== 环境权限校验 ====================
 
 def get_user_environment_ids(db: Session, user: User) -> List[int]:

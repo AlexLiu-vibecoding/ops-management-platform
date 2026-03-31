@@ -105,12 +105,7 @@ class PermissionService:
         Returns:
             环境ID集合
         """
-        # 超级管理员可访问所有环境
-        if user.role == UserRole.SUPER_ADMIN:
-            envs = self.db.query(Environment.id).filter(Environment.status == True).all()
-            return {env.id for env in envs}
-        
-        # 从 RoleEnvironment 获取角色的环境权限
+        # 从 RoleEnvironment 获取角色的环境权限（包括超级管理员也从数据库获取）
         role = user.role.value if isinstance(user.role, UserRole) else user.role
         role_envs = self.db.query(RoleEnvironment.environment_id).filter(
             RoleEnvironment.role == role
