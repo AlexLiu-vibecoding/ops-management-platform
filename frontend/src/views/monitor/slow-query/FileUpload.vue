@@ -301,7 +301,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled, Upload } from '@element-plus/icons-vue'
-import request from '@/utils/request'
+import request from '@/api/index'
 import dayjs from 'dayjs'
 
 // 表单相关
