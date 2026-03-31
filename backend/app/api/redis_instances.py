@@ -11,13 +11,24 @@ from pydantic import BaseModel
 import logging
 
 from app.database import get_db
-from app.models import RedisInstance, InstanceGroup, RedisMode, RedisSlowLog, RedisMemoryStats, Environment
+from app.models import RedisInstance, InstanceGroup, RedisMode, RedisSlowLog, RedisMemoryStats, Environment, GlobalConfig
 from app.utils.auth import encrypt_instance_password, decrypt_instance_password
 from app.deps import get_operator, get_current_user
 from app.models import User
 
 router = APIRouter(prefix="/redis-instances", tags=["Redis实例管理"])
 logger = logging.getLogger(__name__)
+
+
+def check_db_type_enabled(db: Session, db_type: str) -> bool:
+    """检查数据库类型是否启用"""
+    config = db.query(GlobalConfig).filter(
+        GlobalConfig.config_key == f"db_type_{db_type}_enabled"
+    ).first()
+    
+    if config:
+        return config.config_value.lower() == "true"
+    return True  # 默认启用
 
 
 # ============ Schema 定义 ============
@@ -329,6 +340,13 @@ async def create_redis_instance(
     db: Session = Depends(get_db)
 ):
     """创建 Redis 实例"""
+    # 检查 Redis 类型是否启用
+    if not check_db_type_enabled(db, "redis"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Redis 实例类型已被禁用，无法创建新实例"
+        )
+    
     # 检查名称是否已存在
     if db.query(RedisInstance).filter(RedisInstance.name == instance_data.name).first():
         raise HTTPException(

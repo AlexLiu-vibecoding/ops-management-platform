@@ -14,7 +14,7 @@ import psycopg2
 import logging
 
 from app.database import get_db
-from app.models import RDBInstance, InstanceGroup, Environment, MonitorSwitch, MonitorType, RDBType
+from app.models import RDBInstance, InstanceGroup, Environment, MonitorSwitch, MonitorType, RDBType, GlobalConfig
 from app.utils.auth import encrypt_instance_password, decrypt_instance_password
 from app.deps import get_operator, get_current_user
 from app.models import User
@@ -22,6 +22,17 @@ from app.utils.aws_rds_collector import parse_aws_region_from_host, is_rds_endpo
 
 router = APIRouter(prefix="/rdb-instances", tags=["RDB实例管理"])
 logger = logging.getLogger(__name__)
+
+
+def check_db_type_enabled(db: Session, db_type: str) -> bool:
+    """检查数据库类型是否启用"""
+    config = db.query(GlobalConfig).filter(
+        GlobalConfig.config_key == f"db_type_{db_type}_enabled"
+    ).first()
+    
+    if config:
+        return config.config_value.lower() == "true"
+    return True  # 默认启用
 
 
 # ============ Schema 定义 ============
@@ -300,6 +311,14 @@ async def create_rdb_instance(
     db: Session = Depends(get_db)
 ):
     """创建 RDB 实例"""
+    # 检查数据库类型是否启用
+    db_type = instance_data.db_type.lower() if instance_data.db_type else "mysql"
+    if not check_db_type_enabled(db, db_type):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{db_type.upper()} 实例类型已被禁用，无法创建新实例"
+        )
+    
     # 检查名称是否已存在
     if db.query(RDBInstance).filter(RDBInstance.name == instance_data.name).first():
         raise HTTPException(
