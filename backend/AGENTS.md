@@ -210,6 +210,68 @@ def transfer_ownership(self, from_user_id: int, to_user_id: int, resource_id: in
 | `RedisInstanceService` | Redis 实例管理 | `/api/v1/redis-instances` |
 | `PermissionService` | 权限检查、环境权限 | 全局 |
 
+## 异步数据库操作
+
+### 架构设计
+
+采用渐进式迁移方案，同步和异步 API 并存：
+
+```
+同步 API (现有)              异步 API (推荐)
+     ↓                           ↓
+Session                      AsyncSession
+     ↓                           ↓
+psycopg2 / pymysql           asyncpg / aiomysql
+```
+
+### 使用方式
+
+**异步 API 端点：**
+
+```python
+from app.database_async import get_async_db
+from app.services import AsyncUserService
+
+@router.get("/users")
+async def list_users(db: AsyncSession = Depends(get_async_db)):
+    user_service = AsyncUserService(db)
+    users, total = await user_service.get_multi_with_count()
+    return {"total": total, "items": users}
+```
+
+**后台任务：**
+
+```python
+from app.database_async import get_async_db_context
+from app.services import AsyncUserService
+
+async def background_task():
+    async with get_async_db_context() as db:
+        user_service = AsyncUserService(db)
+        users = await user_service.get_multi()
+        return users
+```
+
+### 异步 Service 清单
+
+| Service | 同步版本 | 异步版本 |
+|---------|---------|---------|
+| 用户服务 | `UserService` | `AsyncUserService` |
+| 实例服务 | `RDBInstanceService` | 待实现 |
+| 权限服务 | `PermissionService` | 待实现 |
+
+### 迁移指南
+
+1. **新增 API**：推荐使用异步 API
+2. **高频 API**：优先迁移到异步（用户列表、实例列表等）
+3. **低频 API**：可保持同步，逐步迁移
+
+### 注意事项
+
+- 异步操作中禁止使用同步阻塞代码
+- 同一会话中不要混用同步和异步操作
+- 异步 Service 的方法都是 `async` 方法，需要 `await`
+
 ## 常见问题修复
 
 ### 问题 1：API 层直接操作数据库

@@ -10,18 +10,47 @@ Service 层模块
 1. API 层禁止直接操作数据库，必须通过 Service 层
 2. Service 层负责业务逻辑，返回业务对象或 DTO
 3. 复杂查询可在 Service 层使用 joinedload 预加载
+
+异步操作：
+- 高并发场景推荐使用异步 Service（AsyncXxxService）
+- 异步 Service 使用 AsyncSession，通过 get_async_db_context() 获取
+
+使用示例：
+```python
+# 同步 Service
+from app.services import UserService
+
+def list_users(db: Session = Depends(get_db)):
+    user_service = UserService(db)
+    return user_service.get_multi_with_count()
+
+# 异步 Service
+from app.services import AsyncUserService
+from app.database_async import get_async_db_context
+
+async def list_users_async():
+    async with get_async_db_context() as db:
+        user_service = AsyncUserService(db)
+        return await user_service.get_multi_with_count()
+```
 """
 
 from app.services.base import BaseService
+from app.services.base_async import AsyncBaseService
 from app.services.user_service import UserService
+from app.services.user_service_async import AsyncUserService
 from app.services.instance_service import RDBInstanceService, RedisInstanceService
 from app.services.permission_service import PermissionService, BatchOperationService
 
 __all__ = [
-    # 基类
+    # 同步基类
     "BaseService",
-    # 用户服务
+    # 异步基类
+    "AsyncBaseService",
+    # 同步用户服务
     "UserService",
+    # 异步用户服务
+    "AsyncUserService",
     # 实例服务
     "RDBInstanceService",
     "RedisInstanceService",
