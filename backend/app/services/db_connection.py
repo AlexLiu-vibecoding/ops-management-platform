@@ -3,9 +3,21 @@
 
 提供统一的数据库连接管理，支持：
 - MySQL / PostgreSQL 连接
+- Redis 连接
 - 连接池管理
 - 密码自动解密
 - 连接测试
+- 统一异常处理
+
+使用示例:
+    # 方式1：上下文管理器（推荐）
+    with db_manager.connection(instance, 'mydb') as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+
+    # 方式2：Redis 连接
+    with db_manager.redis_connection(redis_instance) as r:
+        r.get('key')
 """
 import logging
 from typing import Optional, Dict, Any, Tuple, List
@@ -550,3 +562,207 @@ class DatabaseConnectionManager:
 
 # 单例实例
 db_manager = DatabaseConnectionManager()
+
+
+
+# ==================== Redis 连接管理 ====================
+
+class RedisConnectionManager:
+    """
+    Redis 连接管理器
+    
+    提供 Redis 连接的统一管理，支持：
+    - 自动密码解密
+    - 连接超时控制
+    - 上下文管理器
+    """
+    
+    # 连接超时配置
+    CONNECT_TIMEOUT = 10
+    SOCKET_TIMEOUT = 10
+    
+    def __init__(self):
+        self._connection_cache: dict[int, Any] = {}
+    
+    def _get_credentials(self, instance: 'RedisInstance') -> Tuple[str, int, Optional[str], int]:
+        """
+        获取 Redis 实例连接凭证
+        
+        Args:
+            instance: Redis 实例
+        
+        Returns:
+            Tuple[str, int, Optional[str], int]: (host, port, password, db)
+        """
+        password = None
+        if instance.password_encrypted:
+            try:
+                password = decrypt_instance_password(instance.password_encrypted)
+            except ValueError as e:
+                raise DatabaseConnectionError(f"Redis密码解密失败: {str(e)}") from None
+        
+        return (
+            instance.host,
+            instance.port,
+            password,
+            0  # 默认使用 db 0
+        )
+    
+    def get_connection(self, instance: 'RedisInstance') -> 'redis.Redis':
+        """
+        获取 Redis 连接
+        
+        Args:
+            instance: Redis 实例
+        
+        Returns:
+            redis.Redis: Redis 连接对象
+        
+        Raises:
+            DatabaseConnectionError: 连接失败
+        """
+        import redis
+        
+        host, port, password, db = self._get_credentials(instance)
+        
+        try:
+            return redis.Redis(
+                host=host,
+                port=port,
+                password=password,
+                db=db,
+                decode_responses=True,
+                socket_connect_timeout=self.CONNECT_TIMEOUT,
+                socket_timeout=self.SOCKET_TIMEOUT
+            )
+        except Exception as e:
+            logger.error(f"Redis连接失败: {instance.host}:{instance.port}, 错误: {e}")
+            raise DatabaseConnectionError(f"Redis连接失败: {str(e)}") from e
+    
+    @contextmanager
+    def connection(self, instance: 'RedisInstance'):
+        """
+        Redis 连接上下文管理器
+        
+        使用示例:
+            with redis_manager.connection(redis_instance) as r:
+                r.get('key')
+                r.set('key', 'value')
+        """
+        conn = None
+        try:
+            conn = self.get_connection(instance)
+            yield conn
+        finally:
+            if conn:
+                conn.close()
+    
+    async def test_connection(self, instance: 'RedisInstance') -> Dict[str, Any]:
+        """
+        测试 Redis 连接
+        
+        Returns:
+            Dict: {'success': bool, 'message': str, 'version': str}
+        """
+        try:
+            with self.connection(instance) as r:
+                info = r.info('server')
+                return {
+                    'success': True,
+                    'message': '连接成功',
+                    'version': info.get('redis_version', 'unknown')
+                }
+        except DatabaseConnectionError as e:
+            return {'success': False, 'message': str(e)}
+        except Exception as e:
+            return {'success': False, 'message': f'连接失败: {str(e)}'}
+    
+    async def get_info(self, instance: 'RedisInstance') -> Dict[str, Any]:
+        """
+        获取 Redis 信息
+        
+        Returns:
+            Dict: Redis 服务器信息
+        """
+        with self.connection(instance) as r:
+            return r.info()
+    
+    async def get_memory_stats(self, instance: 'RedisInstance') -> Dict[str, Any]:
+        """
+        获取 Redis 内存统计
+        """
+        with self.connection(instance) as r:
+            info = r.info('memory')
+            return {
+                'used_memory': info.get('used_memory', 0),
+                'used_memory_human': info.get('used_memory_human', '0B'),
+                'used_memory_peak': info.get('used_memory_peak', 0),
+                'used_memory_peak_human': info.get('used_memory_peak_human', '0B'),
+                'mem_fragmentation_ratio': info.get('mem_fragmentation_ratio', 1.0)
+            }
+
+
+# Redis 单例实例
+redis_manager = RedisConnectionManager()
+
+
+# ==================== 统一连接工厂 ====================
+
+class ConnectionFactory:
+    """
+    统一连接工厂
+    
+    提供统一的连接获取入口，根据实例类型自动选择连接管理器
+    """
+    
+    @staticmethod
+    def get_manager(instance):
+        """
+        根据实例类型获取对应的连接管理器
+        
+        Args:
+            instance: RDBInstance 或 RedisInstance
+        
+        Returns:
+            DatabaseConnectionManager 或 RedisConnectionManager
+        """
+        from app.models import RedisInstance
+        
+        if isinstance(instance, RedisInstance):
+            return redis_manager
+        return db_manager
+    
+    @staticmethod
+    @contextmanager
+    def connection(instance, database: Optional[str] = None):
+        """
+        统一连接上下文管理器
+        
+        使用示例:
+            with ConnectionFactory.connection(instance) as conn:
+                if isinstance(instance, RDBInstance):
+                    cursor = conn.cursor()
+                    cursor.execute("SELECT 1")
+                else:
+                    conn.get('key')
+        """
+        from app.models import RedisInstance
+        
+        if isinstance(instance, RedisInstance):
+            with redis_manager.connection(instance) as conn:
+                yield conn
+        else:
+            with db_manager.connection(instance, database) as conn:
+                yield conn
+
+
+# 导出
+__all__ = [
+    'DatabaseConnectionManager',
+    'RedisConnectionManager', 
+    'ConnectionFactory',
+    'db_manager',
+    'redis_manager',
+    'DatabaseConnectionError',
+    'DatabaseExecutionError'
+]

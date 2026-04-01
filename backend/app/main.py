@@ -31,13 +31,20 @@ from app.api import auth, users, environments, instances, monitor, dingtalk, app
 from app.api import rdb_instances, redis_instances, batch_operations, permissions
 from app.api import scheduled_inspection, alert_rules, change_windows, scheduler, sql_optimization
 
-# 配置日志（统一配置，确保只调用一次）
+# 配置安全日志（统一配置，敏感信息脱敏）
+from app.utils.log_filter import SensitiveDataFilter
+
 logging.basicConfig(
     level=logging.INFO if not settings.DEBUG else logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     stream=sys.stdout,
     force=True  # 强制覆盖已有配置，防止重复
 )
+
+# 为所有日志处理器添加敏感信息过滤器
+for handler in logging.root.handlers:
+    handler.addFilter(SensitiveDataFilter())
+
 logger = logging.getLogger(__name__)
 
 
