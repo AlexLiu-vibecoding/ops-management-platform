@@ -429,6 +429,21 @@ class Settings(BaseSettings):
     
     # 兼容旧配置的属性
     @property
+    def APP_NAME(self) -> str:
+        """兼容旧代码"""
+        return self.app.NAME
+    
+    @property
+    def APP_VERSION(self) -> str:
+        """兼容旧代码"""
+        return self.app.VERSION
+    
+    @property
+    def APP_ENV(self) -> str:
+        """兼容旧代码"""
+        return self.app.ENV
+    
+    @property
     def SECRET_KEY(self) -> str:
         """兼容旧代码"""
         return self.security.get_jwt_secret_key()

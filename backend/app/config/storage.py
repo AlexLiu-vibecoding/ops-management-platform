@@ -171,9 +171,14 @@ def get_effective_storage_settings() -> StorageConfig:
     return StorageConfig(**settings_dict)
 
 
+# 向后兼容别名
+StorageSettings = StorageConfig
+
+
 # 导出
 __all__ = [
     "StorageConfig",
+    "StorageSettings",  # 向后兼容
     "get_storage_settings",
     "get_storage_settings_from_db",
     "get_effective_storage_settings",
