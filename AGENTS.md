@@ -1,8 +1,61 @@
 # AGENTS.md - 项目导航与开发指南
 
-> 本文档帮助 AI 快速理解项目全貌、定位代码、遵循规范。
-> 
 > **⚠️ AI 开发前必读此文件！**
+> 
+> 本文档包含项目全貌、开发规范、检查清单和经验教训。
+
+---
+
+## 零、开发必读
+
+### 核心原则
+
+| 原则 | 说明 |
+|------|------|
+| **先读后做** | 开发前必须先读取本文档 |
+| **先确认后开发** | 不确定的需求，先确认再动手 |
+| **不擅自扩展** | 用户说什么做什么，不猜测不扩展 |
+| **改完要验证** | 让用户验证效果，不自己认为完成 |
+| **经验要沉淀** | 踩坑/学到的经验，记录到本文档 |
+
+### 开发前检查清单
+
+```
+□ 读取本文档了解项目结构
+□ 读取相关规格文件（.vibecoding/specs/xxx.md）
+□ 确认需求范围，不擅自扩展
+□ 检查现有代码，避免重复造轮子
+□ 列出将要修改的文件清单
+```
+
+### 开发后检查清单
+
+```
+□ 确认改动范围与需求一致
+□ 没有引入硬编码
+□ 没有遗漏 import 语句
+□ 让用户验证效果
+```
+
+### 验收模板
+
+开发完成后，按以下格式向用户确认：
+
+```markdown
+## 完成内容
+
+1. 修改文件：
+   - frontend/src/xxx.vue - 改动说明
+   - backend/app/api/xxx.py - 改动说明
+
+2. 验收要点：
+   - [ ] 功能点1
+   - [ ] 功能点2
+
+3. 请验证：
+   - 刷新页面查看 xxx 功能
+   - 测试 xxx 场景
+```
 
 ---
 
@@ -27,6 +80,18 @@
 - **自动化**: 脚本管理、定时任务、定时巡检
 - **权限管理**: RBAC 权限模型、环境权限隔离
 
+### 1.3 架构特点
+
+```
+⚠️ 数据库驱动设计 - 重要！
+
+菜单配置 → menu_configs 表 (不是前端硬编码)
+权限配置 → permissions 表 + role_permissions 表
+系统配置 → system_configs 表
+
+特点：前端不硬编码配置，全部从数据库动态加载
+```
+
 ---
 
 ## 二、目录结构
@@ -48,7 +113,7 @@
 │
 ├── frontend/                   # 前端代码
 │   ├── src/
-│   │   ├── api/               # API 封装
+│   │   ├── api/               # API 封装 (baseURL 已包含 /api/v1)
 │   │   ├── components/        # 公共组件
 │   │   ├── layouts/           # 布局组件
 │   │   ├── router/            # 路由配置
@@ -58,7 +123,7 @@
 │
 ├── .vibecoding/               # 协作文档
 │   ├── specs/                 # 功能规格 (16个)
-│   └── VIBECODING.md          # 协作经验
+│   └── template.md            # 规格模板
 │
 ├── .coze                      # 项目配置
 └── AGENTS.md                  # 本文件
@@ -68,16 +133,14 @@
 
 ## 三、功能模块索引
 
-### 3.1 核心模块
-
 | 模块 | 前端 | 后端 API | 规格 |
 |------|------|----------|------|
 | 认证与权限 | `views/login/` | `api/auth.py` | [SPEC-001](.vibecoding/specs/001-认证与权限.md) |
-| 实例管理 | `views/instances/` | `api/instances.py`, `rdb_instances.py`, `redis_instances.py` | [SPEC-002](.vibecoding/specs/002-实例管理.md) |
+| 实例管理 | `views/instances/` | `api/instances.py` | [SPEC-002](.vibecoding/specs/002-实例管理.md) |
 | 环境管理 | `views/environments/` | `api/environments.py` | [SPEC-003](.vibecoding/specs/003-环境管理.md) |
 | SQL 编辑器 | `views/sql-editor/` | `api/sql.py` | [SPEC-004](.vibecoding/specs/004-SQL编辑器.md) |
 | 变更审批 | `views/change/` | `api/approval.py` | [SPEC-005](.vibecoding/specs/005-变更审批.md) |
-| 监控中心 | `views/monitor/`, `views/alerts/` | `api/monitor.py`, `monitor_ext.py`, `alerts.py` | [SPEC-006](.vibecoding/specs/006-监控中心.md) |
+| 监控中心 | `views/monitor/` | `api/monitor.py` | [SPEC-006](.vibecoding/specs/006-监控中心.md) |
 | Redis 管理 | `views/instances/redis-detail.vue` | `api/redis.py` | [SPEC-007](.vibecoding/specs/007-Redis管理.md) |
 | 消息通知 | `views/notification/` | `api/notification.py` | [SPEC-008](.vibecoding/specs/008-消息通知.md) |
 | 脚本管理 | `views/scripts/` | `api/scripts.py` | [SPEC-009](.vibecoding/specs/009-脚本管理.md) |
@@ -88,66 +151,61 @@
 | SQL 优化器 | `views/sql-optimizer/` | `api/sql_optimizer.py` | [SPEC-014](.vibecoding/specs/014-SQL优化器.md) |
 | 权限管理 | `views/permissions/` | `api/permissions.py` | [SPEC-015](.vibecoding/specs/015-权限管理.md) |
 
-### 3.2 新增功能
-
-| 功能 | 前端 | 说明 |
-|------|------|------|
-| **SQL 优化闭环** | `views/monitor/slow-query/` | 慢查询列表、优化建议、采集任务、分析历史 |
-| **告警中心** | `views/alerts/index.vue` | 告警事件管理（查看、确认、解决） |
-| **告警规则** | `views/monitor/settings.vue` (Tab) | 完整规则CRUD，位于监控配置页面第3个Tab |
-| **定时巡检** | `views/inspection/scheduled/` | 定时任务、自动报告 |
-| **变更窗口** | `views/change/windows/` | 窗口定义、全局策略、紧急变更支持 |
-
 ---
 
-## 四、路由配置
+## 四、特定场景 Checklist
 
-### 4.1 路由规则
-
-| 场景 | 规则 | 示例 |
-|------|------|------|
-| 单页面 | 一级路由 | `/users`, `/notification` |
-| 多个相关页面 | 嵌套路由 | `/monitor/performance`, `/monitor/slow-query` |
-
-### 4.2 路由结构
+### 新增菜单 (三步骤，缺一不可)
 
 ```
-/                              # 主布局
-├── /dashboard                 # 仪表盘
-├── /instances                 # 实例管理
-├── /instances/:id             # 实例详情 (动态路由)
-├── /environments              # 环境管理
-├── /sql-editor                # SQL 编辑器
-├── /sql-optimizer             # SQL 优化器
-├── /change/                   # 变更管理
-│   ├── /change/requests       # DB 变更
-│   ├── /change/redis-requests # Redis 变更
-│   └── /change/windows        # 变更窗口
-├── /monitor/                  # 监控中心
-│   ├── /monitor/performance   # 性能监控
-│   ├── /monitor/slow-query    # 慢查询监控
-│   ├── /monitor/alerts        # 告警中心
-│   ├── /monitor/replication   # 主从复制
-│   ├── /monitor/locks         # 事务与锁
-│   ├── /monitor/inspection    # 巡检报告
-│   ├── /monitor/scheduled-inspection  # 定时巡检
-│   └── /monitor/settings      # 监控配置 (含告警规则Tab)
-├── /scripts                   # 脚本管理
-├── /scheduled-tasks           # 定时任务
-├── /users                     # 用户管理
-├── /permissions               # 权限管理
-├── /audit                     # 审计日志
-├── /system                    # 系统设置
-└── /notification              # 通知管理
+□ 数据库配置
+  - INSERT INTO menu_configs (name, path, icon, ...) VALUES (...);
+  - 或调用 POST /api/v1/menu/add-missing
+
+□ 前端路由配置
+  - 在 router/index.js 中添加路由
+
+□ 验证菜单显示
+  - 登录系统，检查导航栏
 ```
 
-### 4.3 路由守卫
+### 新增 API
 
 ```
-启动检查 → 未初始化 → /init
-         → 已初始化 → 未登录 → /login
-                    → 已登录 → 权限检查 → 无权限 → /dashboard
-                                      → 有权限 → 目标页面
+□ 创建路由文件 backend/app/api/xxx.py
+□ 在 main.py 中注册路由
+□ 创建 Schema backend/app/schemas/xxx.py
+□ 前端封装 API frontend/src/api/xxx.js
+□ 注意：前端调用时不要重复 /api/v1 前缀
+```
+
+### 新增数据库字段
+
+```
+□ 更新 SQLAlchemy 模型
+□ 更新 Pydantic Schema
+□ 考虑数据迁移（已有数据的默认值）
+```
+
+### 新增完整功能
+
+```
+后端：
+□ 数据模型 (models/)
+□ API接口 (api/)
+□ 数据库迁移/初始化数据
+□ 菜单配置 (menu_configs表)
+□ 权限配置 (permissions表)
+
+前端：
+□ 路由配置 (router/index.js)
+□ 页面组件 (views/)
+□ API封装 (api/)
+
+验证：
+□ 功能测试
+□ 菜单显示
+□ 权限控制
 ```
 
 ---
@@ -156,7 +214,16 @@
 
 ### 5.1 前端开发
 
-#### 组件规范
+#### 代码风格
+
+| 类型 | 规范 |
+|------|------|
+| 框架 | Vue 3 组合式 API，`<script setup>` |
+| 表格操作列 | 统一使用 `TableActions` 组件 |
+| 筛选区域 | 使用 `el-form inline` 布局 |
+| 格式化 | Ruff 格式化，行宽 120 |
+
+#### 组件模板
 
 ```vue
 <script setup>
@@ -170,7 +237,8 @@ const dataList = ref([])
 const fetchData = async () => {
   loading.value = true
   try {
-    dataList.value = await request.get('/api/xxx')
+    // 注意：request 的 baseURL 已包含 /api/v1，不要再加前缀
+    dataList.value = await request.get('/xxx')
   } catch (error) {
     // 404 特殊处理：显示空数据而非错误提示
     if (error.response?.status === 404) {
@@ -189,8 +257,6 @@ onMounted(() => fetchData())
 
 #### 表格操作列
 
-统一使用 `TableActions` 组件：
-
 ```vue
 <el-table-column label="操作" width="180" fixed="right" align="center">
   <template #default="{ row }">
@@ -207,16 +273,9 @@ const actions = [
 </script>
 ```
 
-#### 新增菜单
-
-修改三处：
-1. 后端 `backend/app/api/menu.py` - 菜单初始化数据
-2. 前端 `frontend/src/router/index.js` - 路由配置
-3. 调用 `/api/v1/menu/add-missing` API
-
 ### 5.2 后端开发
 
-#### API 规范
+#### API 模板
 
 ```python
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -245,21 +304,12 @@ async def create_item(
     return {"id": item.id}
 ```
 
-#### 新增 API
+### 5.3 路由配置规则
 
-1. 创建路由文件 `backend/app/api/xxx.py`
-2. 在 `main.py` 中注册路由
-3. 创建 Schema `backend/app/schemas/xxx.py`
-4. 前端封装 API `frontend/src/api/xxx.js`
-
-### 5.3 启动自检
-
-服务启动时自动执行：
-- Python 版本 (>= 3.11)
-- 依赖包 (FastAPI, SQLAlchemy, Pydantic 等 18 个)
-- Pydantic 版本兼容性
-- 数据库配置
-- 前端构建产物
+| 场景 | 规则 | 示例 |
+|------|------|------|
+| 单页面 | 一级路由 | `/users`, `/notification` |
+| 多个相关页面 | 嵌套路由 | `/monitor/performance`, `/monitor/slow-query` |
 
 ---
 
@@ -274,60 +324,96 @@ async def create_item(
 
 ---
 
-## 七、API 端点索引
-
-| 模块 | 端点 | 说明 |
-|------|------|------|
-| 认证 | `/api/v1/auth/login` | 登录 |
-| 实例 | `/api/v1/instances`, `/api/v1/rdb-instances`, `/api/v1/redis-instances` | 实例管理 |
-| SQL | `/api/v1/sql/execute`, `/api/v1/sql/validate` | SQL 执行 |
-| 监控 | `/api/v1/monitor/performance/{id}`, `/api/v1/slow-queries/{id}` | 性能监控 |
-| 告警 | `/api/v1/alerts` | 告警事件管理（查看、确认、解决） |
-| 告警规则 | `/api/v1/alert-rules` | 告警规则CRUD（位于监控配置页面） |
-| 优化 | `/api/v1/sql-optimization/tasks`, `/api/v1/sql-optimization/suggestions` | SQL 优化闭环 |
-
----
-
-## 八、常见问题
+## 七、常见问题
 
 ### Q1: 如何添加新页面？
 1. 创建页面组件 `frontend/src/views/xxx/index.vue`
 2. 添加路由配置 `frontend/src/router/index.js`
-3. 添加菜单配置 `backend/app/api/menu.py`
+3. **添加菜单配置** `menu_configs 表` ⬅️ 容易遗漏
 4. 调用 `/api/v1/menu/add-missing` 同步菜单
 
-### Q2: 如何添加新 API？
-1. 创建路由文件 `backend/app/api/xxx.py`
-2. 在 `main.py` 中注册路由
-3. 创建 Schema
-4. 前端封装 API
+### Q2: API 返回 404？
+1. 检查后端路由是否注册
+2. **检查前端调用是否重复了 /api/v1 前缀** ⬅️ 常见错误
+3. 查看浏览器 Network 面板确认实际请求路径
 
 ### Q3: 页面访问白屏？
 1. 检查路由是否正确配置
 2. 检查组件文件是否存在
 3. 查看浏览器控制台错误
-4. 确认前端已构建 `pnpm build`
 
-### Q4: API 返回 401？
-1. 检查是否已登录
-2. 检查 Token 是否过期
-3. 确认接口权限要求
-
-### Q5: 前端修改后页面没变化？
-- Vite 支持热更新，保存后自动刷新
-- 检查浏览器控制台是否有报错
+### Q4: 菜单不显示？
+1. **检查数据库 menu_configs 表是否有记录** ⬅️ 最常见
+2. 检查前端路由是否配置
+3. 调用 `/api/v1/menu/add-missing` 同步
 
 ---
 
-## 九、快速定位
+## 八、避坑指南
+
+| 场景 | ❌ 错误 | ✅ 正确 |
+|------|---------|---------|
+| 端口检测 | `lsof -i:5000` | `curl -I http://localhost:5000` |
+| 文件下载 | `<a href=url download>` | `fetch + blob + createObjectURL` |
+| 读取文件 | `cat file.txt` | `read_file` 工具 |
+| 搜索内容 | `grep "xxx" file` | `grep_file` 工具 |
+| 修改文件 | 直接 write_file 覆盖 | 先 read_file 再 edit_file |
+| 需求理解 | 猜测用户意图 | 先确认，再开发 |
+| 服务重启 | 每次改代码都重启 | 利用热更新 |
+| API调用 | `request.get('/api/v1/xxx')` | `request.get('/xxx')` |
+| 新增菜单 | 只配置前端路由 | 数据库 + 前端双端配置 |
+
+---
+
+## 九、经验教训
+
+> ⚠️ **重要**: 以下案例来自实际开发中的踩坑经历，务必引以为戒！
+
+### 案例1: 菜单不显示问题 (2026-04)
+
+**问题现象**: 新增功能后，前端路由配置正确，页面可以访问，但导航栏菜单不显示。
+
+**根本原因**: 只修改了前端路由，未配置数据库菜单。项目采用**数据库驱动菜单**架构。
+
+**正确流程**:
+```
+1. 数据库配置: INSERT INTO menu_configs ...
+2. 前端路由: router/index.js
+3. 验证: 登录系统检查导航栏
+```
+
+**关键教训**:
+- 开发前必读本文档
+- 理解项目架构（数据库驱动）
+- 完整验证全流程
+
+### 案例2: API路径重复导致404 (2026-04)
+
+**问题现象**: 前端调用 API 返回 404，但后端接口存在。
+
+**根本原因**: `request` 的 baseURL 已包含 `/api/v1`，代码又手动拼接。
+
+```javascript
+// ❌ 错误：实际请求 /api/v1/api/v1/xxx
+const res = await request.get('/api/v1/notification/channels')
+
+// ✅ 正确：实际请求 /api/v1/notification/channels
+const res = await request.get('/notification/channels')
+```
+
+**关键教训**: 使用 API 前先了解 baseURL 配置
+
+---
+
+## 十、快速定位
 
 | 需求 | 文件位置 |
 |------|----------|
 | 修改路由 | `frontend/src/router/index.js` |
-| 添加菜单 | `backend/app/api/menu.py` |
+| 添加菜单 | `menu_configs 表` 或 `/api/v1/menu/add-missing` |
 | 修改布局 | `frontend/src/layouts/MainLayout.vue` |
 | 公共组件 | `frontend/src/components/` |
-| API 封装 | `frontend/src/api/index.js` |
+| API 封装 | `frontend/src/api/index.js` (baseURL 在此定义) |
 | 后端入口 | `backend/app/main.py` |
 | 数据库模型 | `backend/app/models/` |
 | 日志文件 | `/app/work/logs/bypass/app.log` |
@@ -347,111 +433,5 @@ cd frontend && pnpm build
 
 ---
 
-## 十、避坑指南
-
-| 场景 | ❌ 错误 | ✅ 正确 |
-|------|---------|---------|
-| 端口检测 | `lsof -i:5000` | `curl -I http://localhost:5000` |
-| 文件下载 | `<a href=url download>` | `fetch + blob + createObjectURL` |
-| 读取文件 | `cat file.txt` | `read_file` 工具 |
-| 搜索内容 | `grep "xxx" file` | `grep_file` 工具 |
-| 修改文件 | 直接 write_file 覆盖 | 先 read_file 再 edit_file |
-| 需求理解 | 猜测用户意图 | 先确认，再开发 |
-| 服务重启 | 每次改代码都重启 | 利用热更新 |
-
----
-
-## 十一、经验教训
-
-> ⚠️ **重要**: 以下案例来自实际开发中的踩坑经历，务必引以为戒！
-
-### 案例1: 菜单不显示问题 (2026-04)
-
-#### 问题现象
-新增"通知管理"功能后，前端路由配置正确，页面可以访问，但导航栏菜单不显示。
-
-#### 根本原因
-只修改了前端路由，未配置数据库菜单。项目采用**数据库驱动菜单**架构，菜单显示依赖 `menu_configs` 表。
-
-#### 错误流程
-```diff
-+ ✅ 创建了前端页面组件
-+ ✅ 配置了前端路由
-- ❌ 没有配置数据库菜单
-- ❌ 没有调用菜单同步API
-```
-
-#### 正确流程
-```
-新增菜单三步骤（缺一不可）：
-
-1. 数据库配置
-   INSERT INTO menu_configs (name, path, icon, ...) VALUES (...);
-   或调用 POST /api/v1/menu/add-missing
-
-2. 前端路由配置
-   在 router/index.js 中添加路由
-
-3. 验证菜单显示
-   登录系统，检查导航栏
-```
-
-#### 关键教训
-1. **开发前必读 AGENTS.md** - 文档已明确说明流程
-2. **理解项目架构** - 本项目是数据库驱动，不是前端硬编码
-3. **完整验证** - 功能开发完成要验证全流程，不只是页面能否访问
-4. **双端配置意识** - 前后端分离项目，菜单/权限等配置需双端同步
-
-#### 防范措施
-```markdown
-新增功能 Checklist：
-
-后端：
-- [ ] 数据模型 (models/)
-- [ ] API接口 (api/)
-- [ ] 数据库迁移/初始化数据
-- [ ] 菜单配置 (menu_configs表) ⬅️ 本次遗漏
-- [ ] 权限配置 (permissions表)
-
-前端：
-- [ ] 路由配置 (router/index.js)
-- [ ] 页面组件 (views/)
-- [ ] API封装 (api/)
-
-验证：
-- [ ] 功能测试
-- [ ] 菜单显示 ⬅️ 本次遗漏
-- [ ] 权限控制
-```
-
-### 案例2: API路径重复导致404 (2026-04)
-
-#### 问题现象
-前端调用 API 返回 404，但后端接口确实存在。
-
-#### 根本原因
-前端代码中手动拼接了 `/api/v1` 前缀，而 `request` 的 baseURL 已包含该前缀，导致最终路径变成 `/api/v1/api/v1/xxx`。
-
-#### 错误示例
-```javascript
-// ❌ 错误：baseURL 已包含 /api/v1
-const res = await request.get('/api/v1/notification/channels')
-// 实际请求: /api/v1/api/v1/notification/channels (404)
-```
-
-#### 正确示例
-```javascript
-// ✅ 正确：直接使用相对路径
-const res = await request.get('/notification/channels')
-// 实际请求: /api/v1/notification/channels
-```
-
-#### 关键教训
-1. **理解 API 封装** - 使用前先阅读 `api/index.js` 了解 baseURL
-2. **调试技巧** - 404 时检查浏览器 Network 面板，确认实际请求路径
-3. **避免重复** - 前端调用时不要重复 baseURL 已有的前缀
-
----
-
-*文档版本：v3.2*
+*文档版本：v4.0*
 *最后更新：2026-04*
