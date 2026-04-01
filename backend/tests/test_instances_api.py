@@ -5,26 +5,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 
-class TestInstancesAPI:
-    """实例管理 API 测试"""
-
-    def test_get_instances_unauthorized(self, client):
-        """测试未授权访问"""
-        response = client.get("/api/v1/instances")
-        assert response.status_code == 401
-
-    def test_get_instances_success(self, client, operator_token):
-        """测试获取实例列表"""
-        response = client.get(
-            "/api/v1/instances",
-            headers={"Authorization": f"Bearer {operator_token}"}
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "items" in data
-        assert "total" in data
-
-
 class TestRDBInstancesAPI:
     """RDB 实例管理 API 测试"""
 

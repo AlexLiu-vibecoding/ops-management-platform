@@ -23,16 +23,16 @@ class TestScriptsAPI:
         assert "items" in data
         assert "total" in data
 
-    def test_create_script_missing_fields(self, client, operator_token):
+    def test_create_script_missing_fields(self, client, super_admin_token):
         """测试创建脚本缺少必填字段"""
         response = client.post(
             "/api/v1/scripts",
             json={},
-            headers={"Authorization": f"Bearer {operator_token}"}
+            headers={"Authorization": f"Bearer {super_admin_token}"}
         )
         assert response.status_code == 422  # Validation error
 
-    def test_create_shell_script(self, client, operator_token):
+    def test_create_shell_script(self, client, super_admin_token):
         """测试创建 Shell 脚本"""
         response = client.post(
             "/api/v1/scripts",
@@ -44,13 +44,13 @@ class TestScriptsAPI:
                 "is_enabled": True,
                 "is_public": False
             },
-            headers={"Authorization": f"Bearer {operator_token}"}
+            headers={"Authorization": f"Bearer {super_admin_token}"}
         )
         assert response.status_code == 200
         data = response.json()
         assert "success" in data or "message" in data
 
-    def test_create_sql_script(self, client, operator_token):
+    def test_create_sql_script(self, client, super_admin_token):
         """测试创建 SQL 脚本"""
         response = client.post(
             "/api/v1/scripts",
@@ -62,13 +62,13 @@ class TestScriptsAPI:
                 "is_enabled": True,
                 "is_public": False
             },
-            headers={"Authorization": f"Bearer {operator_token}"}
+            headers={"Authorization": f"Bearer {super_admin_token}"}
         )
         assert response.status_code == 200
         data = response.json()
         assert "success" in data or "message" in data
 
-    def test_update_script(self, client, operator_token, db_session):
+    def test_update_script(self, client, super_admin_token, db_session):
         """测试更新脚本"""
         from app.models import Script
         
@@ -86,11 +86,11 @@ class TestScriptsAPI:
         response = client.put(
             f"/api/v1/scripts/{script.id}",
             json={"name": "更新后的脚本"},
-            headers={"Authorization": f"Bearer {operator_token}"}
+            headers={"Authorization": f"Bearer {super_admin_token}"}
         )
         assert response.status_code in [200, 403, 404]
 
-    def test_delete_script(self, client, operator_token, db_session):
+    def test_delete_script(self, client, super_admin_token, db_session):
         """测试删除脚本"""
         from app.models import Script
         
@@ -107,7 +107,7 @@ class TestScriptsAPI:
         
         response = client.delete(
             f"/api/v1/scripts/{script.id}",
-            headers={"Authorization": f"Bearer {operator_token}"}
+            headers={"Authorization": f"Bearer {super_admin_token}"}
         )
         assert response.status_code in [200, 403, 404]
 

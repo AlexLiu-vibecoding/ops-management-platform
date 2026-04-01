@@ -98,7 +98,8 @@ class E2ETester:
         print("📋 步骤2: 获取可用实例")
         print("=" * 60)
         
-        status, data = self.request("GET", "/instances", {"limit": 10}, token=self.admin_token)
+        # 使用正确的API端点
+        status, data = self.request("GET", "/rdb-instances", token=self.admin_token)
         
         if status == 200 and data.get("items"):
             self.log("获取实例列表", True, f"共 {data.get('total', 0)} 个实例")
@@ -115,6 +116,9 @@ class E2ETester:
                 self.log("选择实例", False, "没有可用的 RDB 实例")
                 return False
             return True
+        elif status == 200:
+            self.log("获取实例列表", True, "无实例，需要先创建")
+            return False
         else:
             self.log("获取实例列表", False, f"状态码: {status}")
             return False

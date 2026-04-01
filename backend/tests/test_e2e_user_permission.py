@@ -322,7 +322,7 @@ class E2EUserPermissionTester:
             return False
         
         # 测试1: 访问实例列表（operator 应该有权限）
-        status, data = self.request("GET", "/instances", token=self.test_user_token)
+        status, data = self.request("GET", "/rdb-instances", token=self.test_user_token)
         self.log("访问实例列表", status == 200, 
                  f"状态码: {status}, 可见实例: {data.get('total', 0) if status == 200 else 'N/A'}")
         
