@@ -569,3 +569,73 @@ async def check_rdb_instance_status(
     })
     
     return InstanceTestResult(**result)
+
+
+@router.get("/{instance_id}/variables")
+async def get_rdb_instance_variables(
+    instance_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取 RDB 实例的数据库变量"""
+    service = RDBInstanceService(db)
+    instance = service.get(instance_id)
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    # 尝试解密密码
+    try:
+        password = service.get_decrypted_password(instance)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"密码解密失败: {str(e)}"
+        )
+    
+    variables = {}
+    
+    try:
+        if instance.db_type.lower() == "mysql":
+            # MySQL: 使用 SHOW VARIABLES
+            conn = pymysql.connect(
+                host=instance.host,
+                port=instance.port,
+                user=instance.username,
+                password=password,
+                connect_timeout=10
+            )
+            with conn.cursor() as cursor:
+                cursor.execute("SHOW VARIABLES")
+                for row in cursor.fetchall():
+                    variables[row[0]] = row[1]
+            conn.close()
+        elif instance.db_type.lower() == "postgresql":
+            # PostgreSQL: 使用 SHOW ALL
+            conn = psycopg2.connect(
+                host=instance.host,
+                port=instance.port,
+                user=instance.username,
+                password=password,
+                connect_timeout=10
+            )
+            with conn.cursor() as cursor:
+                cursor.execute("SHOW ALL")
+                for row in cursor.fetchall():
+                    variables[row[0]] = row[1]
+            conn.close()
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"不支持的数据库类型: {instance.db_type}"
+            )
+    except Exception as e:
+        logger.warning(f"获取实例 {instance_id} 变量失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取数据库变量失败: {str(e)}"
+        )
+    
+    return variables
