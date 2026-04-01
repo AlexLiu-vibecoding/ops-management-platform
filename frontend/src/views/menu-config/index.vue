@@ -23,7 +23,7 @@
         style="margin-bottom: 15px;"
       >
         <template #title>
-          配置系统导航菜单。可设置菜单名称、图标、路径、可见角色等。修改后刷新页面生效。
+          配置系统导航菜单。可设置菜单名称、图标、路径、权限码等。权限码需在「权限管理」中配置后生效。
         </template>
       </el-alert>
       
@@ -47,6 +47,12 @@
             {{ row.path || '-' }}
           </template>
         </el-table-column>
+        <el-table-column prop="permission" label="权限码" min-width="120">
+          <template #default="{ row }">
+            <el-tag v-if="row.permission" size="small" type="warning">{{ row.permission }}</el-tag>
+            <span v-else class="text-gray">公开</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="sort_order" label="排序" width="60" align="center" />
         <el-table-column prop="is_visible" label="显示" width="60" align="center">
           <template #default="{ row }">
@@ -60,21 +66,6 @@
             <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
               {{ row.is_enabled ? '是' : '否' }}
             </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="roles" label="可见角色" min-width="120">
-          <template #default="{ row }">
-            <template v-if="row.roles">
-              <el-tag
-                v-for="role in row.roles.split(',')"
-                :key="role"
-                size="small"
-                style="margin-right: 4px;"
-              >
-                {{ getRoleLabel(role.trim()) }}
-              </el-tag>
-            </template>
-            <span v-else>所有用户</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" min-width="120" fixed="right" align="center">
@@ -137,6 +128,27 @@
           </el-select>
         </el-form-item>
         
+        <el-form-item label="权限码">
+          <el-select
+            v-model="dialog.form.permission"
+            placeholder="选择权限码（不选则公开）"
+            filterable
+            clearable
+            style="width: 100%;"
+          >
+            <el-option
+              v-for="perm in permissionOptions"
+              :key="perm.code"
+              :label="perm.name"
+              :value="perm.code"
+            >
+              <span>{{ perm.name }}</span>
+              <span style="color: #999; margin-left: 8px; font-size: 12px;">{{ perm.code }}</span>
+            </el-option>
+          </el-select>
+          <div class="form-tip">权限码控制菜单可见性，需在「权限管理」中为角色分配权限</div>
+        </el-form-item>
+        
         <el-form-item label="排序">
           <el-input-number v-model="dialog.form.sort_order" :min="0" :max="999" />
         </el-form-item>
@@ -147,20 +159,6 @@
         
         <el-form-item label="是否启用">
           <el-switch v-model="dialog.form.is_enabled" />
-        </el-form-item>
-        
-        <el-form-item label="可见角色">
-          <el-select
-            v-model="dialog.form.roleList"
-            multiple
-            placeholder="不选则所有用户可见"
-            style="width: 100%;"
-          >
-            <el-option label="超级管理员" value="super_admin" />
-            <el-option label="审批管理员" value="approval_admin" />
-            <el-option label="运维人员" value="operator" />
-            <el-option label="只读用户" value="readonly" />
-          </el-select>
         </el-form-item>
       </el-form>
       
@@ -185,6 +183,7 @@ const loading = ref(false)
 const menuList = ref([])
 const hasMenus = ref(false)
 const formRef = ref(null)
+const permissionOptions = ref([])
 
 // 操作列配置
 const menuActions = [
@@ -212,10 +211,10 @@ const dialog = reactive({
     name: '',
     path: '',
     icon: '',
+    permission: '',
     sort_order: 0,
     is_visible: true,
-    is_enabled: true,
-    roleList: []
+    is_enabled: true
   },
   rules: {
     name: [{ required: true, message: '请输入菜单名称', trigger: 'blur' }]
@@ -234,17 +233,6 @@ const parentOptions = computed(() => {
   return buildOptions(menuList.value)
 })
 
-// 角色标签
-const getRoleLabel = (role) => {
-  const labels = {
-    super_admin: '超管',
-    approval_admin: '审批管理',
-    operator: '运维',
-    readonly: '只读'
-  }
-  return labels[role] || role
-}
-
 // 获取菜单列表
 const fetchMenus = async () => {
   loading.value = true
@@ -255,6 +243,19 @@ const fetchMenus = async () => {
     console.error('获取菜单列表失败:', error)
   } finally {
     loading.value = false
+  }
+}
+
+// 获取权限列表
+const fetchPermissions = async () => {
+  try {
+    const data = await request.get('/permissions')
+    permissionOptions.value = (data.items || []).map(p => ({
+      code: p.code,
+      name: p.name
+    }))
+  } catch (error) {
+    console.error('获取权限列表失败:', error)
   }
 }
 
@@ -287,10 +288,10 @@ const handleAdd = (parent) => {
     name: '',
     path: '',
     icon: '',
+    permission: '',
     sort_order: 0,
     is_visible: true,
-    is_enabled: true,
-    roleList: []
+    is_enabled: true
   }
   dialog.visible = true
 }
@@ -304,10 +305,10 @@ const handleEdit = (row) => {
     name: row.name,
     path: row.path || '',
     icon: row.icon || '',
+    permission: row.permission || '',
     sort_order: row.sort_order,
     is_visible: row.is_visible,
-    is_enabled: row.is_enabled,
-    roleList: row.roles ? row.roles.split(',').map(r => r.trim()) : []
+    is_enabled: row.is_enabled
   }
   dialog.visible = true
 }
@@ -346,10 +347,10 @@ const handleSubmit = async () => {
         name: dialog.form.name,
         path: dialog.form.path || null,
         icon: dialog.form.icon || null,
+        permission: dialog.form.permission || null,
         sort_order: dialog.form.sort_order,
         is_visible: dialog.form.is_visible,
-        is_enabled: dialog.form.is_enabled,
-        roles: dialog.form.roleList.length > 0 ? dialog.form.roleList.join(',') : null
+        is_enabled: dialog.form.is_enabled
       }
       
       if (dialog.isEdit) {
@@ -373,6 +374,7 @@ const handleSubmit = async () => {
 
 onMounted(() => {
   fetchMenus()
+  fetchPermissions()
 })
 </script>
 
@@ -389,14 +391,15 @@ onMounted(() => {
     }
   }
   
-  .table-operations {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    
-    .el-button + .el-button {
-      margin-left: 0;
-    }
+  .text-gray {
+    color: #999;
+    font-size: 12px;
+  }
+  
+  .form-tip {
+    font-size: 12px;
+    color: #909399;
+    margin-top: 4px;
   }
 }
 </style>
