@@ -9,7 +9,7 @@
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 from datetime import datetime
 import logging
@@ -47,7 +47,9 @@ async def list_instances(
     
     # 如果没有指定 db_type 或指定的是 mysql/postgresql，查询 RDB 实例
     if not db_type or db_type.lower() in ('mysql', 'postgresql'):
-        rdb_query = db.query(RDBInstance)
+        rdb_query = db.query(RDBInstance).options(
+            joinedload(RDBInstance.environment)
+        )
         
         if environment_id:
             rdb_query = rdb_query.filter(RDBInstance.environment_id == environment_id)
@@ -63,12 +65,10 @@ async def list_instances(
         
         rdb_instances = rdb_query.all()
         for i in rdb_instances:
-            # 获取环境信息
+            # 使用预加载的 environment 关系，避免 N+1 查询
             env_data = None
-            if i.environment_id:
-                env = db.query(Environment).filter(Environment.id == i.environment_id).first()
-                if env:
-                    env_data = {"id": env.id, "name": env.name, "color": env.color}
+            if i.environment:
+                env_data = {"id": i.environment.id, "name": i.environment.name, "color": i.environment.color}
             
             items.append({
                 "id": i.id,
@@ -94,7 +94,9 @@ async def list_instances(
     
     # 如果没有指定 db_type 或指定的是 redis，查询 Redis 实例
     if not db_type or db_type.lower() == 'redis':
-        redis_query = db.query(RedisInstance)
+        redis_query = db.query(RedisInstance).options(
+            joinedload(RedisInstance.environment)
+        )
         
         if environment_id:
             redis_query = redis_query.filter(RedisInstance.environment_id == environment_id)
@@ -105,12 +107,10 @@ async def list_instances(
         
         redis_instances = redis_query.all()
         for i in redis_instances:
-            # 获取环境信息
+            # 使用预加载的 environment 关系，避免 N+1 查询
             env_data = None
-            if i.environment_id:
-                env = db.query(Environment).filter(Environment.id == i.environment_id).first()
-                if env:
-                    env_data = {"id": env.id, "name": env.name, "color": env.color}
+            if i.environment:
+                env_data = {"id": i.environment.id, "name": i.environment.name, "color": i.environment.color}
             
             items.append({
                 "id": i.id,
@@ -155,14 +155,14 @@ async def get_instance(
 ):
     """获取实例详情（向后兼容）"""
     # 先尝试从 RDB 表查找
-    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
+    instance = db.query(RDBInstance).options(
+        joinedload(RDBInstance.environment)
+    ).filter(RDBInstance.id == instance_id).first()
     if instance:
-        # 获取环境信息
+        # 使用预加载的 environment 关系
         env_data = None
-        if instance.environment_id:
-            env = db.query(Environment).filter(Environment.id == instance.environment_id).first()
-            if env:
-                env_data = {"id": env.id, "name": env.name, "color": env.color}
+        if instance.environment:
+            env_data = {"id": instance.environment.id, "name": instance.environment.name, "color": instance.environment.color}
         
         return {
             "id": instance.id,
@@ -187,14 +187,14 @@ async def get_instance(
         }
     
     # 再尝试从 Redis 表查找
-    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    instance = db.query(RedisInstance).options(
+        joinedload(RedisInstance.environment)
+    ).filter(RedisInstance.id == instance_id).first()
     if instance:
-        # 获取环境信息
+        # 使用预加载的 environment 关系
         env_data = None
-        if instance.environment_id:
-            env = db.query(Environment).filter(Environment.id == instance.environment_id).first()
-            if env:
-                env_data = {"id": env.id, "name": env.name, "color": env.color}
+        if instance.environment:
+            env_data = {"id": instance.environment.id, "name": instance.environment.name, "color": instance.environment.color}
         
         return {
             "id": instance.id,

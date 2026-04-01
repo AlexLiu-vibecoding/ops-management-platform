@@ -7,7 +7,7 @@ from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import HTMLResponse, StreamingResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 import pymysql
 import psycopg2
 import redis as redis_client
@@ -605,7 +605,12 @@ async def list_approvals(
     db: Session = Depends(get_db)
 ):
     """获取审批列表"""
-    query = db.query(ApprovalRecord)
+    query = db.query(ApprovalRecord).options(
+        joinedload(ApprovalRecord.requester),
+        joinedload(ApprovalRecord.approver),
+        joinedload(ApprovalRecord.rdb_instance),
+        joinedload(ApprovalRecord.redis_instance)
+    )
     
     if status_filter:
         query = query.filter(ApprovalRecord.status == status_filter)
@@ -645,7 +650,12 @@ async def get_approval(
     db: Session = Depends(get_db)
 ):
     """获取审批详情"""
-    approval = db.query(ApprovalRecord).filter(ApprovalRecord.id == approval_id).first()
+    approval = db.query(ApprovalRecord).options(
+        joinedload(ApprovalRecord.requester),
+        joinedload(ApprovalRecord.approver),
+        joinedload(ApprovalRecord.rdb_instance),
+        joinedload(ApprovalRecord.redis_instance)
+    ).filter(ApprovalRecord.id == approval_id).first()
     if not approval:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
