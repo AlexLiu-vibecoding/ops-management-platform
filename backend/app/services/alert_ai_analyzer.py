@@ -68,16 +68,18 @@ class AlertAIAnalyzer:
             # 2. 构建 AI 分析提示词
             prompt = cls._build_analysis_prompt(alert, context)
             
-            # 3. 调用 AI 分析
-            llm = LLMClient()
-            analysis = llm.invoke(
+            # 3. 调用 AI 分析（使用新的多模型服务）
+            from app.services.ai_model_service import call_with_fallback
+            analysis, model_used = call_with_fallback(
+                db=db,
+                use_case="alert_analysis",
                 messages=[{"role": "user", "content": prompt}],
-                model="doubao-seed-1-6-flash-250615",  # 使用快速模型
                 temperature=0.3,  # 低温度保证稳定性
                 max_tokens=1024
             )
             
             if analysis:
+                logger.info(f"AI 分析完成，使用模型: {model_used.name if model_used else '默认'}")
                 # 格式化分析结果
                 return cls._format_analysis(analysis)
             

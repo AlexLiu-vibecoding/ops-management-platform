@@ -207,6 +207,13 @@ const routes = [
         component: () => import('@/views/system/index.vue'),
         meta: { title: '系统设置', icon: 'Tools', roles: ['super_admin'] }
       },
+      // 系统管理 - AI 模型配置
+      {
+        path: 'ai-models',
+        name: 'AIModels',
+        component: () => import('@/views/system/ai-models.vue'),
+        meta: { title: 'AI 模型配置', icon: 'MagicStick', roles: ['super_admin'] }
+      },
       // 通知管理
       {
         path: 'notification',

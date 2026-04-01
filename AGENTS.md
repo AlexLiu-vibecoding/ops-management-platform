@@ -202,6 +202,7 @@ ruff check --select F401
 | 巡检报告 | `views/inspection/` | `api/inspection.py` | [SPEC-013](.vibecoding/specs/013-巡检报告.md) |
 | SQL 优化器 | `views/sql-optimizer/` | `api/sql_optimizer.py` | [SPEC-014](.vibecoding/specs/014-SQL优化器.md) |
 | 权限管理 | `views/permissions/` | `api/permissions.py` | [SPEC-015](.vibecoding/specs/015-权限管理.md) |
+| AI 模型配置 | `views/system/ai-models.vue` | `api/ai_models.py` | [SPEC-017](.vibecoding/specs/017-AI模型配置.md) |
 
 ---
 

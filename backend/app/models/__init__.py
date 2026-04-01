@@ -1161,6 +1161,9 @@ __all__ = [
     
     # 通知系统 (新)
     'NotificationChannel', 'ChannelSilenceRule', 'ChannelRateLimit',
+    
+    # AI 模型配置
+    'AIModelConfig', 'AICallLog', 'AIProvider', 'AIModelType',
 ]
 
 # 导入权限模型
@@ -1184,3 +1187,6 @@ from app.models.sql_optimization import OptimizationSuggestion, SlowQueryCollect
 
 # 导入通知系统模型
 from app.models.notification_new import NotificationChannel, ChannelSilenceRule, ChannelRateLimit
+
+# 导入 AI 模型配置
+from app.models.ai_model import AIModelConfig, AICallLog, AIProvider, AIModelType, PROVIDER_LABELS, USE_CASE_LABELS
