@@ -205,21 +205,21 @@ async def get_storage_config(
     settings = get_effective_storage_settings()
     
     return StorageConfigResponse(
-        storage_type=settings.STORAGE_TYPE,
-        retention_days=settings.SQL_FILE_RETENTION_DAYS,
-        size_threshold=settings.SQL_FILE_SIZE_THRESHOLD,
-        local_path=settings.LOCAL_STORAGE_PATH,
+        storage_type=settings.TYPE,
+        retention_days=settings.FILE_RETENTION_DAYS,
+        size_threshold=settings.FILE_SIZE_THRESHOLD,
+        local_path=settings.LOCAL_PATH,
         # AWS S3 配置
-        s3_bucket=settings.S3_BUCKET_NAME,
-        s3_region=settings.AWS_REGION,
-        s3_endpoint=settings.S3_ENDPOINT_URL,
-        s3_access_key_id=settings.AWS_ACCESS_KEY_ID,
-        s3_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+        s3_bucket=settings.S3_BUCKET,
+        s3_region=settings.S3_REGION,
+        s3_endpoint=settings.S3_ENDPOINT,
+        s3_access_key_id=settings.S3_ACCESS_KEY,
+        s3_secret_access_key=settings.S3_SECRET_KEY,
         # 阿里云 OSS 配置
-        oss_bucket=settings.OSS_BUCKET_NAME,
+        oss_bucket=settings.OSS_BUCKET,
         oss_endpoint=settings.OSS_ENDPOINT,
-        oss_access_key_id=settings.OSS_ACCESS_KEY_ID,
-        oss_access_key_secret=settings.OSS_ACCESS_KEY_SECRET
+        oss_access_key_id=settings.OSS_ACCESS_KEY,
+        oss_access_key_secret=settings.OSS_SECRET_KEY
     )
 
 
@@ -581,7 +581,7 @@ async def get_system_overview(
         version=app_settings.APP_VERSION,
         python_version=f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         database_type="postgresql" if "postgresql" in app_settings.DATABASE_URL else "mysql",
-        storage_type=storage_settings.STORAGE_TYPE,
+        storage_type=storage_settings.TYPE,
         redis_enabled=bool(app_settings.REDIS_HOST),
         scheduler_running=scheduler_running
     )

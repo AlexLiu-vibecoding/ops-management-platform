@@ -22,7 +22,7 @@ if settings.TYPE == "s3":
 ```
 """
 from typing import Optional
-from pydantic import Field, computed_field
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
@@ -71,82 +71,6 @@ class StorageConfig(BaseSettings):
     OSS_ENDPOINT: Optional[str] = Field(default=None, description="OSS 端点")
     OSS_ACCESS_KEY: Optional[str] = Field(default=None, description="OSS Access Key")
     OSS_SECRET_KEY: Optional[str] = Field(default=None, description="OSS Secret Key")
-    
-    # ==========================================
-    # 向后兼容属性（旧API使用）
-    # ==========================================
-    
-    @computed_field
-    @property
-    def STORAGE_TYPE(self) -> str:
-        """向后兼容：存储类型"""
-        return self.TYPE
-    
-    @computed_field
-    @property
-    def LOCAL_STORAGE_PATH(self) -> str:
-        """向后兼容：本地存储路径"""
-        return self.LOCAL_PATH
-    
-    @computed_field
-    @property
-    def SQL_FILE_RETENTION_DAYS(self) -> int:
-        """向后兼容：文件保留天数"""
-        return self.FILE_RETENTION_DAYS
-    
-    @computed_field
-    @property
-    def SQL_FILE_SIZE_THRESHOLD(self) -> int:
-        """向后兼容：大文件阈值"""
-        return self.FILE_SIZE_THRESHOLD
-    
-    @computed_field
-    @property
-    def S3_BUCKET_NAME(self) -> Optional[str]:
-        """向后兼容：S3 存储桶名称"""
-        return self.S3_BUCKET
-    
-    @computed_field
-    @property
-    def S3_ENDPOINT_URL(self) -> Optional[str]:
-        """向后兼容：S3 端点URL"""
-        return self.S3_ENDPOINT
-    
-    @computed_field
-    @property
-    def AWS_REGION(self) -> str:
-        """向后兼容：AWS 区域"""
-        return self.S3_REGION
-    
-    @computed_field
-    @property
-    def AWS_ACCESS_KEY_ID(self) -> Optional[str]:
-        """向后兼容：AWS Access Key ID"""
-        return self.S3_ACCESS_KEY
-    
-    @computed_field
-    @property
-    def AWS_SECRET_ACCESS_KEY(self) -> Optional[str]:
-        """向后兼容：AWS Secret Access Key"""
-        return self.S3_SECRET_KEY
-    
-    @computed_field
-    @property
-    def OSS_BUCKET_NAME(self) -> Optional[str]:
-        """向后兼容：OSS 存储桶名称"""
-        return self.OSS_BUCKET
-    
-    @computed_field
-    @property
-    def OSS_ACCESS_KEY_ID(self) -> Optional[str]:
-        """向后兼容：OSS Access Key ID"""
-        return self.OSS_ACCESS_KEY
-    
-    @computed_field
-    @property
-    def OSS_ACCESS_KEY_SECRET(self) -> Optional[str]:
-        """向后兼容：OSS Access Key Secret"""
-        return self.OSS_SECRET_KEY
 
 
 @lru_cache()

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from app.deps import get_current_user
 from app.models import User
-from app.config.storage import get_storage_settings, StorageSettings
+from app.config.storage import get_storage_settings, StorageConfig
 from app.services.storage import storage_manager
 
 router = APIRouter(prefix="/storage", tags=["存储管理"])
@@ -46,12 +46,12 @@ async def get_storage_config(
     settings = get_storage_settings()
     
     return StorageConfigResponse(
-        storage_type=settings.STORAGE_TYPE,
-        retention_days=settings.SQL_FILE_RETENTION_DAYS,
-        size_threshold=settings.SQL_FILE_SIZE_THRESHOLD,
-        local_path=settings.LOCAL_STORAGE_PATH if settings.STORAGE_TYPE == "local" else None,
-        s3_bucket=settings.S3_BUCKET_NAME if settings.STORAGE_TYPE == "s3" else None,
-        oss_bucket=settings.OSS_BUCKET_NAME if settings.STORAGE_TYPE == "oss" else None
+        storage_type=settings.TYPE,
+        retention_days=settings.FILE_RETENTION_DAYS,
+        size_threshold=settings.FILE_SIZE_THRESHOLD,
+        local_path=settings.LOCAL_PATH if settings.TYPE == "local" else None,
+        s3_bucket=settings.S3_BUCKET if settings.TYPE == "s3" else None,
+        oss_bucket=settings.OSS_BUCKET if settings.TYPE == "oss" else None
     )
 
 
@@ -120,11 +120,11 @@ async def get_storage_stats(
         rollback_files = [f for f in files if f.endswith('_rollback.sql')]
         
         return {
-            "storage_type": storage_manager.settings.STORAGE_TYPE,
+            "storage_type": storage_manager.settings.TYPE,
             "total_files": total_files,
             "sql_files": len(sql_files),
             "rollback_files": len(rollback_files),
-            "retention_days": storage_manager.settings.SQL_FILE_RETENTION_DAYS
+            "retention_days": storage_manager.settings.FILE_RETENTION_DAYS
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取统计信息失败: {str(e)}")

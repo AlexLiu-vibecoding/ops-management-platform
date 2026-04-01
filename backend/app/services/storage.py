@@ -499,32 +499,32 @@ class StorageManager:
     def _create_backend(self) -> StorageBackend:
         """创建存储后端"""
         settings = self.settings
-        storage_type = settings.STORAGE_TYPE
+        storage_type = settings.TYPE
         
         if storage_type == "local":
-            logger.info(f"使用本地存储: {settings.LOCAL_STORAGE_PATH}")
-            return LocalStorage(settings.LOCAL_STORAGE_PATH)
+            logger.info(f"使用本地存储: {settings.LOCAL_PATH}")
+            return LocalStorage(settings.LOCAL_PATH)
         
         elif storage_type == "s3":
-            if not all([settings.S3_BUCKET_NAME, settings.AWS_ACCESS_KEY_ID]):
-                raise ValueError("S3存储需要配置 S3_BUCKET_NAME 和 AWS_ACCESS_KEY_ID")
-            logger.info(f"使用AWS S3存储: {settings.S3_BUCKET_NAME}")
+            if not all([settings.S3_BUCKET, settings.S3_ACCESS_KEY]):
+                raise ValueError("S3存储需要配置 S3_BUCKET 和 S3_ACCESS_KEY")
+            logger.info(f"使用AWS S3存储: {settings.S3_BUCKET}")
             return S3Storage(
-                bucket_name=settings.S3_BUCKET_NAME,
-                access_key=settings.AWS_ACCESS_KEY_ID,
-                secret_key=settings.AWS_SECRET_ACCESS_KEY,
-                region=settings.AWS_REGION or "us-east-1",
-                endpoint_url=settings.S3_ENDPOINT_URL
+                bucket_name=settings.S3_BUCKET,
+                access_key=settings.S3_ACCESS_KEY,
+                secret_key=settings.S3_SECRET_KEY,
+                region=settings.S3_REGION or "us-east-1",
+                endpoint_url=settings.S3_ENDPOINT
             )
         
         elif storage_type == "oss":
-            if not all([settings.OSS_BUCKET_NAME, settings.OSS_ACCESS_KEY_ID]):
-                raise ValueError("OSS存储需要配置 OSS_BUCKET_NAME 和 OSS_ACCESS_KEY_ID")
-            logger.info(f"使用阿里云OSS存储: {settings.OSS_BUCKET_NAME}")
+            if not all([settings.OSS_BUCKET, settings.OSS_ACCESS_KEY]):
+                raise ValueError("OSS存储需要配置 OSS_BUCKET 和 OSS_ACCESS_KEY")
+            logger.info(f"使用阿里云OSS存储: {settings.OSS_BUCKET}")
             return OSSStorage(
-                bucket_name=settings.OSS_BUCKET_NAME,
-                access_key=settings.OSS_ACCESS_KEY_ID,
-                secret_key=settings.OSS_ACCESS_KEY_SECRET,
+                bucket_name=settings.OSS_BUCKET,
+                access_key=settings.OSS_ACCESS_KEY,
+                secret_key=settings.OSS_SECRET_KEY,
                 endpoint=settings.OSS_ENDPOINT
             )
         
@@ -579,7 +579,7 @@ class StorageManager:
     
     async def cleanup_expired_files(self) -> int:
         """清理过期文件"""
-        retention_days = self.settings.SQL_FILE_RETENTION_DAYS
+        retention_days = self.settings.FILE_RETENTION_DAYS
         
         if isinstance(self.backend, LocalStorage):
             return await self.backend.cleanup_old_files(retention_days)

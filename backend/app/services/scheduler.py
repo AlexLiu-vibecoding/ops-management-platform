@@ -279,7 +279,7 @@ class ApprovalScheduler:
         
         try:
             settings = get_storage_settings()
-            retention_days = settings.SQL_FILE_RETENTION_DAYS
+            retention_days = settings.FILE_RETENTION_DAYS
             cutoff_date = datetime.now() - timedelta(days=retention_days)
             
             logger.info(f"开始清理过期SQL文件，保留天数: {retention_days}, 截止日期: {cutoff_date}")
