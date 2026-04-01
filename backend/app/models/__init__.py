@@ -67,6 +67,7 @@ class MonitorType(str, enum.Enum):
     CPU_SQL = "cpu_sql"
     PERFORMANCE = "performance"
     INSPECTION = "inspection"
+    AI_ANALYSIS = "ai_analysis"
 
 
 class ScriptType(str, enum.Enum):

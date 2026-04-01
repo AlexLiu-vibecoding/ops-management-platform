@@ -586,11 +586,37 @@ class NotificationService:
             if channel.auth_type == "sign" and channel.secret_encrypted:
                 secret = NotificationService.decrypt_secret(channel.secret_encrypted)
             
+            # AI 分析增强（根据全局配置决定是否启用）
+            final_content = content
+            ai_analysis_enabled = False
+            try:
+                from sqlalchemy import select as sql_select
+                from app.models import GlobalConfig
+                config_stmt = sql_select(GlobalConfig).where(
+                    GlobalConfig.config_key == "monitor_ai_analysis_enabled"
+                )
+                config_result = await db.execute(config_stmt)
+                config = config_result.scalar_one_or_none()
+                if config and config.config_value.lower() in ("true", "1", "yes"):
+                    ai_analysis_enabled = True
+            except Exception as e:
+                logger.debug(f"读取 AI 分析配置失败: {e}")
+            
+            if ai_analysis_enabled:
+                try:
+                    from app.services.alert_ai_analyzer import analyze_alert, build_content_with_analysis
+                    analysis = await analyze_alert(db, alert)
+                    if analysis:
+                        final_content = build_content_with_analysis(content, analysis)
+                        logger.info(f"告警 {alert.id} AI 分析完成")
+                except Exception as e:
+                    logger.warning(f"AI 分析失败，使用原始内容: {e}")
+            
             message = {
                 "msgtype": "markdown",
                 "markdown": {
                     "title": title,
-                    "text": content
+                    "text": final_content
                 }
             }
             

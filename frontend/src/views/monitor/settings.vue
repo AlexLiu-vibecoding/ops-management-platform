@@ -512,7 +512,8 @@ const globalSwitches = reactive({
   slow_query: true,
   cpu_sql: true,
   performance: true,
-  inspection: true
+  inspection: true,
+  ai_analysis: false
 })
 
 // ========== 告警规则 ==========
@@ -591,7 +592,8 @@ const getMonitorTypeLabel = (type) => {
     slow_query: '慢查询监控',
     cpu_sql: '高CPU SQL监控',
     performance: '性能监控',
-    inspection: '实例巡检'
+    inspection: '实例巡检',
+    ai_analysis: 'AI 智能分析'
   }
   return labels[type] || type
 }
