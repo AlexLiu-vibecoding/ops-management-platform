@@ -404,8 +404,8 @@ const fetchPendingCount = async () => {
 // 获取 Redis 实例列表
 const fetchRedisInstances = async () => {
   try {
-    const data = await request.get('/instances', { params: { limit: 100 } })
-    redisInstances.value = (data.items || []).filter(inst => inst.db_type === 'redis')
+    const data = await request.get('/redis-instances', { params: { limit: 100 } })
+    redisInstances.value = data.items || []
   } catch (error) {
     console.error('获取实例列表失败:', error)
   }

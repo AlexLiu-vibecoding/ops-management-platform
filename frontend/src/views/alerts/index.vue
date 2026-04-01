@@ -284,7 +284,7 @@ const fetchStats = async () => {
 // 获取实例列表
 const fetchInstances = async () => {
   try {
-    const res = await request.get('/instances', { params: { limit: 100 } })
+    const res = await request.get('/rdb-instances', { params: { limit: 100 } })
     instances.value = res.items || []
   } catch (error) {
     console.error('获取实例列表失败:', error)

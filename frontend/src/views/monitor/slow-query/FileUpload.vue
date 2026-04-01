@@ -411,13 +411,12 @@ const resetForm = () => {
 // 获取实例列表
 const fetchInstances = async () => {
   try {
-    const data = await request.get('/instances', {
+    const data = await request.get('/rdb-instances', {
       params: {
         limit: 100
       }
     })
-    // 只显示RDB实例，过滤掉Redis实例
-    instances.value = (data.items || []).filter(inst => inst.db_type !== 'redis')
+    instances.value = data.items || []
   } catch (error) {
     console.error('获取实例列表失败:', error)
     // 404 错误不显示提示

@@ -396,7 +396,7 @@ const fetchDialog = reactive({
 // 获取实例列表
 const fetchInstances = async () => {
   try {
-    const data = await request.get('/instances', { params: { limit: 100 } })
+    const data = await request.get('/rdb-instances', { params: { limit: 100 } })
     instances.value = (data.items || []).filter(inst => inst.db_type !== 'redis')
     if (instances.value.length > 0 && !selectedInstance.value) {
       selectedInstance.value = instances.value[0].id
