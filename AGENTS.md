@@ -53,7 +53,7 @@
 │   │   ├── layouts/           # 布局组件
 │   │   ├── router/            # 路由配置
 │   │   ├── stores/            # Pinia 状态
-│   │   └── views/             # 页面组件 (31个)
+│   │   └── views/             # 页面组件 (30个)
 │   └── package.json
 │
 ├── .vibecoding/               # 协作文档
@@ -77,7 +77,7 @@
 | 环境管理 | `views/environments/` | `api/environments.py` | [SPEC-003](.vibecoding/specs/003-环境管理.md) |
 | SQL 编辑器 | `views/sql-editor/` | `api/sql.py` | [SPEC-004](.vibecoding/specs/004-SQL编辑器.md) |
 | 变更审批 | `views/change/` | `api/approval.py` | [SPEC-005](.vibecoding/specs/005-变更审批.md) |
-| 监控中心 | `views/monitor/` | `api/monitor.py`, `monitor_ext.py` | [SPEC-006](.vibecoding/specs/006-监控中心.md) |
+| 监控中心 | `views/monitor/`, `views/alerts/` | `api/monitor.py`, `monitor_ext.py`, `alerts.py` | [SPEC-006](.vibecoding/specs/006-监控中心.md) |
 | Redis 管理 | `views/instances/redis-detail.vue` | `api/redis.py` | [SPEC-007](.vibecoding/specs/007-Redis管理.md) |
 | 消息通知 | `views/notification/` | `api/notification.py` | [SPEC-008](.vibecoding/specs/008-消息通知.md) |
 | 脚本管理 | `views/scripts/` | `api/scripts.py` | [SPEC-009](.vibecoding/specs/009-脚本管理.md) |
@@ -93,7 +93,8 @@
 | 功能 | 前端 | 说明 |
 |------|------|------|
 | **SQL 优化闭环** | `views/monitor/slow-query/` | 慢查询列表、优化建议、采集任务、分析历史 |
-| **告警规则** | `views/alerts/rules/` | 规则配置、通知关联 |
+| **告警中心** | `views/alerts/index.vue` | 告警事件管理（查看、确认、解决） |
+| **告警规则** | `views/monitor/settings.vue` (Tab) | 完整规则CRUD，位于监控配置页面第3个Tab |
 | **定时巡检** | `views/inspection/scheduled/` | 定时任务、自动报告 |
 | **变更窗口** | `views/change/windows/` | 窗口定义、全局策略、紧急变更支持 |
 
@@ -129,7 +130,8 @@
 │   ├── /monitor/replication   # 主从复制
 │   ├── /monitor/locks         # 事务与锁
 │   ├── /monitor/inspection    # 巡检报告
-│   └── /monitor/alert-rules   # 告警规则
+│   ├── /monitor/scheduled-inspection  # 定时巡检
+│   └── /monitor/settings      # 监控配置 (含告警规则Tab)
 ├── /scripts                   # 脚本管理
 ├── /scheduled-tasks           # 定时任务
 ├── /users                     # 用户管理
@@ -280,7 +282,8 @@ async def create_item(
 | 实例 | `/api/v1/instances`, `/api/v1/rdb-instances`, `/api/v1/redis-instances` | 实例管理 |
 | SQL | `/api/v1/sql/execute`, `/api/v1/sql/validate` | SQL 执行 |
 | 监控 | `/api/v1/monitor/performance/{id}`, `/api/v1/slow-queries/{id}` | 性能监控 |
-| 告警 | `/api/v1/alerts`, `/api/v1/alert-rules` | 告警管理 |
+| 告警 | `/api/v1/alerts` | 告警事件管理（查看、确认、解决） |
+| 告警规则 | `/api/v1/alert-rules` | 告警规则CRUD（位于监控配置页面） |
 | 优化 | `/api/v1/sql-optimization/tasks`, `/api/v1/sql-optimization/suggestions` | SQL 优化闭环 |
 
 ---
@@ -358,5 +361,5 @@ cd frontend && pnpm build
 
 ---
 
-*文档版本：v3.0*
-*最后更新：2025-03*
+*文档版本：v3.1*
+*最后更新：2026-04*
