@@ -242,7 +242,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Message, CircleCheck, CircleClose, Clock, Delete } from '@element-plus/icons-vue'
-import request from '@/utils/request'
+import request from '@/api/index'
 import { formatTime } from '@/utils/format'
 
 // 统计数据

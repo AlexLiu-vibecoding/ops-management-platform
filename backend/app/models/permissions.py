@@ -123,6 +123,14 @@ class PermissionCode:
     SCRIPT_EXECUTE = "script:execute"
     SCRIPT_DELETE = "script:delete"
     
+    # 通知管理
+    NOTIFICATION_VIEW = "notification:view"
+    NOTIFICATION_CHANNEL_MANAGE = "notification:channel_manage"
+    NOTIFICATION_BINDING_MANAGE = "notification:binding_manage"
+    NOTIFICATION_TEMPLATE_MANAGE = "notification:template_manage"
+    NOTIFICATION_SILENCE_MANAGE = "notification:silence_manage"
+    NOTIFICATION_RATE_LIMIT_MANAGE = "notification:rate_limit_manage"
+    
     # 系统管理
     USER_MANAGE = "system:user_manage"
     ROLE_MANAGE = "system:role_manage"
@@ -171,6 +179,13 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.SCRIPT_CREATE,
         PermissionCode.SCRIPT_EXECUTE,
         PermissionCode.SCRIPT_DELETE,
+        # 通知管理 - 全部权限
+        PermissionCode.NOTIFICATION_VIEW,
+        PermissionCode.NOTIFICATION_CHANNEL_MANAGE,
+        PermissionCode.NOTIFICATION_BINDING_MANAGE,
+        PermissionCode.NOTIFICATION_TEMPLATE_MANAGE,
+        PermissionCode.NOTIFICATION_SILENCE_MANAGE,
+        PermissionCode.NOTIFICATION_RATE_LIMIT_MANAGE,
         # 系统管理
         PermissionCode.USER_MANAGE,
         PermissionCode.ROLE_MANAGE,
@@ -203,6 +218,9 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.SCRIPT_VIEW,
         PermissionCode.SCRIPT_CREATE,
         PermissionCode.SCRIPT_EXECUTE,
+        # 通知管理 - 查看、模板管理
+        PermissionCode.NOTIFICATION_VIEW,
+        PermissionCode.NOTIFICATION_TEMPLATE_MANAGE,
         # 审计日志
         PermissionCode.AUDIT_LOG,
         # 调度器管理
@@ -226,6 +244,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         # 脚本管理 - 查看、执行
         PermissionCode.SCRIPT_VIEW,
         PermissionCode.SCRIPT_EXECUTE,
+        # 通知管理 - 查看
+        PermissionCode.NOTIFICATION_VIEW,
         # 调度器管理 - 查看
         PermissionCode.SCHEDULER_VIEW,
     ],
@@ -243,6 +263,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.MONITOR_VIEW,
         # 脚本管理 - 仅查看
         PermissionCode.SCRIPT_VIEW,
+        # 通知管理 - 查看
+        PermissionCode.NOTIFICATION_VIEW,
         # 调度器管理 - 查看
         PermissionCode.SCHEDULER_VIEW,
     ],

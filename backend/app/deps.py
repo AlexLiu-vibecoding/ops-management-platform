@@ -180,6 +180,40 @@ def require_permission(permission_code: str):
     return permission_checker
 
 
+def require_permissions(permission_codes: List[str]):
+    """
+    检查用户是否拥有任意一个指定功能权限（OR关系）
+    
+    Args:
+        permission_codes: 权限编码列表，如 ["instance:create", "instance:update"]
+    
+    Returns:
+        权限检查依赖
+    """
+    async def permission_checker(
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db)
+    ) -> User:
+        from app.services.permission_service import PermissionService
+        permission_service = PermissionService(db)
+        
+        # 检查是否有任意一个权限
+        has_any_permission = any(
+            permission_service.has_permission(current_user, code)
+            for code in permission_codes
+        )
+        
+        if not has_any_permission:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"无权限，需要以下权限之一: {', '.join(permission_codes)}"
+            )
+        
+        return current_user
+    
+    return permission_checker
+
+
 # ==================== 环境权限校验 ====================
 
 def get_user_environment_ids(db: Session, user: User) -> List[int]:

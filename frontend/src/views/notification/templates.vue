@@ -191,14 +191,14 @@
         <h4>可用变量</h4>
         <div v-if="availableVariables.length > 0" class="variables-grid">
           <el-tag 
-            v-for="var in availableVariables" 
-            :key="var.name"
+            v-for="variable in availableVariables" 
+            :key="variable.name"
             class="variable-tag"
-            @click="insertVariable(var.name)"
+            @click="insertVariable(variable.name)"
             type="info"
           >
-            <span class="var-name">{ {{ var.name }} }</span>
-            <el-tooltip :content="var.description">
+            <span class="var-name">{ {{ variable.name }} }</span>
+            <el-tooltip :content="variable.description">
               <el-icon class="var-info"><InfoFilled /></el-icon>
             </el-tooltip>
           </el-tag>
@@ -233,7 +233,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, InfoFilled } from '@element-plus/icons-vue'
-import request from '@/utils/request'
+import request from '@/api/index'
 import { formatTime } from '@/utils/format'
 
 // 筛选条件

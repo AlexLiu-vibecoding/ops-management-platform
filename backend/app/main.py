@@ -29,7 +29,7 @@ from app.core import register_exception_handlers
 # 导入路由
 from app.api import auth, users, environments, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions, alerts, monitor_ext, inspection
 from app.api import rdb_instances, redis_instances, batch_operations, permissions
-from app.api import scheduled_inspection, alert_rules, change_windows, scheduler, sql_optimization, notification_logs, notification_templates
+from app.api import scheduled_inspection, alert_rules, change_windows, scheduler, sql_optimization, notification_logs, notification_templates, notification_config
 
 # 配置安全日志（统一配置，敏感信息脱敏）
 from app.utils.log_filter import SensitiveDataFilter
@@ -322,6 +322,7 @@ app.include_router(scheduler.router, prefix="/api/v1")  # 调度器管理
 app.include_router(sql_optimization.router)  # SQL 优化闭环
 app.include_router(notification_logs.router, prefix="/api/v1")  # 通知历史
 app.include_router(notification_templates.router, prefix="/api/v1")  # 通知模板
+app.include_router(notification_config.router, prefix="/api/v1")  # 通知配置管理
 
 
 # 健康检查
