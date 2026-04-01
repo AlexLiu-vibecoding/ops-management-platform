@@ -756,7 +756,8 @@ class NotificationService:
     @staticmethod
     async def send_alert_notification(
         db: Session,
-        alert
+        alert,
+        is_aggregated: bool = False
     ):
         """
         发送告警通知
@@ -764,14 +765,25 @@ class NotificationService:
         Args:
             db: 数据库会话
             alert: AlertRecord 对象
+            is_aggregated: 是否为聚合后的告警
         """
         import logging
         logger = logging.getLogger(__name__)
         
-        # 如果已发送通知，跳过
-        if alert.notification_sent:
+        # 如果已发送通知且不是聚合告警，跳过
+        if alert.notification_sent and not is_aggregated:
             logger.info(f"告警 {alert.id} 已发送通知，跳过")
             return
+        
+        # 检查静默规则（非聚合告警才检查）
+        if not is_aggregated:
+            try:
+                from app.services.alert_aggregation import AlertSilenceService
+                if AlertSilenceService.check_silence(db, alert):
+                    logger.info(f"告警 {alert.id} 命中静默规则，跳过发送")
+                    return
+            except Exception as e:
+                logger.warning(f"检查静默规则失败: {e}")
         
         # 获取实例信息
         instance_name = "未知实例"

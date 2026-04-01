@@ -344,6 +344,16 @@ class InspectionService:
         )
         self.db.add(alert)
         self.db.commit()
+        self.db.refresh(alert)
+        
+        # 调用告警聚合服务处理新告警
+        try:
+            from app.services.alert_aggregation import AlertAggregationService
+            AlertAggregationService.process_new_alert(self.db, alert)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"告警聚合处理失败: {e}")
     
     def _send_notification(self, task: ScheduledInspection, execution: InspectionExecution, 
                           summary: Dict[str, Any]):

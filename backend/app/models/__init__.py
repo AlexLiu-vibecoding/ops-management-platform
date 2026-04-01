@@ -509,6 +509,96 @@ class AlertRecord(Base):
     resolver = relationship("User", foreign_keys=[resolved_by])
 
 
+class AlertAggregationRule(Base):
+    """告警聚合规则表"""
+    __tablename__ = "alert_aggregation_rules"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True, comment="规则名称")
+    description = Column(String(200), comment="规则描述")
+    metric_type = Column(String(32), comment="指标类型")
+    alert_level = Column(String(16), comment="告警级别")
+    rdb_instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="CASCADE"), comment="RDB实例ID")
+    redis_instance_id = Column(Integer, ForeignKey("redis_instances.id", ondelete="CASCADE"), comment="Redis实例ID")
+    aggregation_window = Column(Integer, default=300, comment="聚合时间窗口(秒)")
+    min_alert_count = Column(Integer, default=2, comment="最小告警数量")
+    aggregation_method = Column(String(20), default="count", comment="聚合方法: count/summary")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    priority = Column(Integer, default=0, comment="优先级")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    rdb_instance = relationship("RDBInstance")
+    redis_instance = relationship("RedisInstance")
+    aggregations = relationship("AlertAggregation", back_populates="rule", cascade="all, delete-orphan")
+
+
+class AlertAggregation(Base):
+    """告警聚合记录表"""
+    __tablename__ = "alert_aggregations"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    rule_id = Column(Integer, ForeignKey("alert_aggregation_rules.id", ondelete="CASCADE"), comment="规则ID")
+    metric_type = Column(String(32), comment="指标类型")
+    alert_level = Column(String(16), comment="告警级别")
+    rdb_instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="CASCADE"), comment="RDB实例ID")
+    redis_instance_id = Column(Integer, ForeignKey("redis_instances.id", ondelete="CASCADE"), comment="Redis实例ID")
+    alert_count = Column(Integer, default=1, comment="告警数量")
+    alert_ids = Column(JSON, comment="告警ID列表")
+    aggregated_content = Column(Text, comment="聚合后的内容")
+    notification_sent = Column(Boolean, default=False, comment="是否已发送通知")
+    started_at = Column(DateTime, nullable=False, comment="聚合开始时间")
+    ended_at = Column(DateTime, comment="聚合结束时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    
+    rule = relationship("AlertAggregationRule", back_populates="aggregations")
+    rdb_instance = relationship("RDBInstance")
+    redis_instance = relationship("RedisInstance")
+
+
+class AlertSilenceRule(Base):
+    """告警静默规则表"""
+    __tablename__ = "alert_silence_rules"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True, comment="规则名称")
+    description = Column(String(200), comment="规则描述")
+    metric_type = Column(String(32), comment="指标类型")
+    alert_level = Column(String(16), comment="告警级别")
+    rdb_instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="CASCADE"), comment="RDB实例ID")
+    redis_instance_id = Column(Integer, ForeignKey("redis_instances.id", ondelete="CASCADE"), comment="Redis实例ID")
+    start_time = Column(DateTime, comment="静默开始时间")
+    end_time = Column(DateTime, comment="静默结束时间")
+    recurrence_type = Column(String(20), default="once", comment="重复类型: once/daily/weekly")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    rdb_instance = relationship("RDBInstance")
+    redis_instance = relationship("RedisInstance")
+
+
+class AlertEscalationRule(Base):
+    """告警升级规则表"""
+    __tablename__ = "alert_escalation_rules"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True, comment="规则名称")
+    description = Column(String(200), comment="规则描述")
+    alert_level = Column(String(16), nullable=False, comment="告警级别")
+    trigger_condition = Column(String(20), default="time", comment="触发条件: time/acknowledge")
+    trigger_minutes = Column(Integer, default=30, comment="触发时间(分钟)")
+    escalation_level = Column(String(16), comment="升级后的级别")
+    escalation_notification = Column(Boolean, default=True, comment="是否发送升级通知")
+    additional_channel_id = Column(Integer, ForeignKey("dingtalk_channels.id", ondelete="SET NULL"), comment="额外通知通道ID")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    priority = Column(Integer, default=0, comment="优先级")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    additional_channel = relationship("DingTalkChannel")
+
+
 class LockWait(Base):
     """锁等待记录表 - 仅适用于 RDB 实例"""
     __tablename__ = "lock_waits"
@@ -976,6 +1066,9 @@ __all__ = [
     # RDB 监控扩展
     'AlertRecord', 'LockWait', 'ReplicationStatus', 'LongTransaction',
     'InspectMetric', 'InspectResult',
+    
+    # 告警聚合与升级
+    'AlertAggregationRule', 'AlertSilenceRule', 'AlertEscalationRule', 'AlertAggregation',
     
     # 审计与日志
     'AuditLog', 'LoginLog',
