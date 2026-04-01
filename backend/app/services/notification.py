@@ -753,5 +753,167 @@ class NotificationService:
             )
 
 
+    @staticmethod
+    async def send_alert_notification(
+        db: Session,
+        alert
+    ):
+        """
+        发送告警通知
+        
+        Args:
+            db: 数据库会话
+            alert: AlertRecord 对象
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # 如果已发送通知，跳过
+        if alert.notification_sent:
+            logger.info(f"告警 {alert.id} 已发送通知，跳过")
+            return
+        
+        # 获取实例信息
+        instance_name = "未知实例"
+        if alert.rdb_instance_id:
+            from app.models import RDBInstance
+            instance = db.query(RDBInstance).filter(RDBInstance.id == alert.rdb_instance_id).first()
+            if instance:
+                instance_name = instance.name
+        elif alert.redis_instance_id:
+            from app.models import RedisInstance
+            instance = db.query(RedisInstance).filter(RedisInstance.id == alert.redis_instance_id).first()
+            if instance:
+                instance_name = instance.name
+        
+        # 指标类型映射
+        metric_type_labels = {
+            "slow_query": "慢查询",
+            "cpu_sql": "高CPU SQL",
+            "performance": "性能指标",
+            "lock": "锁等待",
+            "repl": "主从复制",
+            "capacity": "容量告警"
+        }
+        metric_type_name = metric_type_labels.get(alert.metric_type, alert.metric_type)
+        
+        # 告警级别映射
+        alert_level_labels = {
+            "info": "信息",
+            "warning": "警告",
+            "critical": "严重"
+        }
+        alert_level_name = alert_level_labels.get(alert.alert_level, alert.alert_level)
+        
+        # 构建模板变量
+        variables = {
+            "alert_title": alert.alert_title,
+            "instance_name": instance_name,
+            "alert_level": alert_level_name,
+            "metric_name": metric_type_name,
+            "current_value": "-",
+            "threshold": "-",
+            "trigger_time": alert.created_at.strftime("%m-%d %H:%M") if alert.created_at else "-"
+        }
+        
+        # 渲染模板
+        title, content = NotificationService.render_template(
+            db=db,
+            notification_type="alert",
+            sub_type=alert.alert_level,
+            **variables
+        )
+        
+        # 获取通知绑定 - 告警类型
+        bindings = db.query(NotificationBinding).filter(
+            NotificationBinding.notification_type == "alert"
+        ).all()
+        
+        logger.info(f"找到 {len(bindings)} 个告警通知绑定")
+        
+        if not bindings:
+            logger.warning("没有找到告警通知绑定")
+            return
+        
+        # 发送通知
+        for binding in bindings:
+            logger.info(f"处理绑定: channel_id={binding.channel_id}")
+            
+            channel = db.query(DingTalkChannel).filter(
+                DingTalkChannel.id == binding.channel_id,
+                DingTalkChannel.is_enabled == True
+            ).first()
+            
+            if not channel:
+                logger.warning(f"通道 {binding.channel_id} 不存在或未启用")
+                continue
+            
+            # 检查环境过滤
+            if binding.environment_id:
+                env_id = None
+                if alert.rdb_instance_id:
+                    from app.models import RDBInstance
+                    instance = db.query(RDBInstance).filter(RDBInstance.id == alert.rdb_instance_id).first()
+                    if instance:
+                        env_id = instance.environment_id
+                elif alert.redis_instance_id:
+                    from app.models import RedisInstance
+                    instance = db.query(RedisInstance).filter(RedisInstance.id == alert.redis_instance_id).first()
+                    if instance:
+                        env_id = instance.environment_id
+                
+                if env_id and binding.environment_id != env_id:
+                    logger.info(f"环境不匹配，跳过")
+                    continue
+            
+            logger.info(f"准备发送告警通知到通道: {channel.name}")
+            
+            webhook = NotificationService.decrypt_webhook(channel.webhook_encrypted)
+            secret = None
+            if channel.auth_type == "sign" and channel.secret_encrypted:
+                secret = NotificationService.decrypt_secret(channel.secret_encrypted)
+            
+            message = {
+                "msgtype": "markdown",
+                "markdown": {
+                    "title": title,
+                    "text": content
+                }
+            }
+            
+            # 创建通知日志
+            log = NotificationService.create_notification_log(
+                db=db,
+                notification_type="alert",
+                title=title,
+                content=content,
+                sub_type=alert.alert_level,
+                channel_id=channel.id,
+                channel_name=channel.name,
+                rdb_instance_id=alert.rdb_instance_id,
+                redis_instance_id=alert.redis_instance_id,
+                alert_id=alert.id
+            )
+            
+            result = await NotificationService.send_dingtalk_message(
+                webhook, message, channel.auth_type, secret, channel.keywords
+            )
+            logger.info(f"告警通知发送结果: {result}")
+            
+            # 更新日志状态
+            NotificationService.update_notification_log(
+                db=db,
+                log=log,
+                status="success" if result["success"] else "failed",
+                error_message=result.get("error_message"),
+                response_code=result.get("response_code"),
+                response_data=result.get("response_data")
+            )
+        
+        # 标记告警已发送通知
+        alert.notification_sent = True
+        db.commit()
+
+
 # 全局通知服务实例
 notification_service = NotificationService()

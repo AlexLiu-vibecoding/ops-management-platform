@@ -366,3 +366,28 @@ async def get_alert_statuses():
         {"value": "resolved", "label": "已解决", "color": "#67C23A"},
         {"value": "ignored", "label": "已忽略", "color": "#909399"}
     ]
+
+
+@router.post("/{alert_id}/send-notification", response_model=MessageResponse)
+async def send_alert_notification(
+    alert_id: int,
+    current_user: User = Depends(get_super_admin),
+    db: Session = Depends(get_db)
+):
+    """手动发送告警通知"""
+    from app.services.notification import notification_service
+    
+    alert = db.query(AlertRecord).filter(AlertRecord.id == alert_id).first()
+    
+    if not alert:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="告警不存在"
+        )
+    
+    await notification_service.send_alert_notification(db, alert)
+    
+    return MessageResponse(
+        message="通知发送成功",
+        success=True
+    )
