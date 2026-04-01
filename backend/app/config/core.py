@@ -484,6 +484,26 @@ class Settings(BaseSettings):
         return self.redis.url
     
     @property
+    def REDIS_HOST(self) -> str:
+        """兼容旧代码"""
+        return self.redis.REDIS_HOST
+    
+    @property
+    def REDIS_PORT(self) -> int:
+        """兼容旧代码"""
+        return self.redis.REDIS_PORT
+    
+    @property
+    def REDIS_PASSWORD(self) -> Optional[str]:
+        """兼容旧代码"""
+        return self.redis.REDIS_PASSWORD
+    
+    @property
+    def REDIS_DB(self) -> int:
+        """兼容旧代码"""
+        return self.redis.REDIS_DB
+    
+    @property
     def PROJECT_DOMAIN(self) -> Optional[str]:
         """兼容旧代码"""
         return self.app.PROJECT_DOMAIN
