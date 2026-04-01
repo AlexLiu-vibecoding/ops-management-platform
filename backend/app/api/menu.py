@@ -1,7 +1,12 @@
 """
 菜单配置API
+
+菜单权限控制：
+1. 角色过滤：检查用户角色是否在菜单的 roles 字段中
+2. 权限过滤：检查用户是否拥有菜单的 permission 字段对应的权限码
+两者都需要满足才能显示菜单
 """
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Set
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -11,6 +16,7 @@ from app.schemas import (
     MenuItemResponse, MessageResponse
 )
 from app.deps import get_super_admin, get_current_user
+from app.services.permission_service import PermissionService
 
 router = APIRouter(prefix="/menu", tags=["Menu Config"])
 
@@ -28,6 +34,7 @@ def menu_to_dict(menu: MenuConfig) -> Dict[str, Any]:
         "is_visible": menu.is_visible,
         "is_enabled": menu.is_enabled,
         "roles": menu.roles,
+        "permission": menu.permission,  # 新增：关联的权限码
         "meta": menu.meta,
         "created_at": menu.created_at,
         "children": []
@@ -47,23 +54,38 @@ def build_menu_tree(menus: List[MenuConfig], parent_id: Optional[int] = None) ->
     return result
 
 
-def filter_menu_by_role(menus: List[Dict[str, Any]], user_role: UserRole) -> List[Dict[str, Any]]:
-    """根据角色过滤菜单"""
+def filter_menu_by_role(menus: List[Dict[str, Any]], user_role: UserRole, user_permissions: Set[str]) -> List[Dict[str, Any]]:
+    """
+    根据角色和权限过滤菜单
+    
+    Args:
+        menus: 菜单列表
+        user_role: 用户角色
+        user_permissions: 用户拥有的权限码集合
+    
+    Returns:
+        过滤后的菜单列表
+    """
     result = []
     for menu in menus:
         # 检查菜单是否启用
         if not menu.get("is_enabled", True):
             continue
         
-        # 检查角色权限
+        # 1. 检查角色过滤
         if menu.get("roles"):
             allowed_roles = [r.strip() for r in menu["roles"].split(',')]
-            if user_role.value not in allowed_roles and user_role != UserRole.SUPER_ADMIN:
+            if user_role.value not in allowed_roles:
+                continue
+        
+        # 2. 检查权限过滤（如果菜单配置了 permission 字段）
+        if menu.get("permission"):
+            if menu["permission"] not in user_permissions:
                 continue
         
         # 递归处理子菜单
         if menu.get("children"):
-            menu["children"] = filter_menu_by_role(menu["children"], user_role)
+            menu["children"] = filter_menu_by_role(menu["children"], user_role, user_permissions)
         
         result.append(menu)
     
@@ -94,8 +116,12 @@ async def get_user_menu(
     # 构建树形结构
     menu_tree = build_menu_tree(menus)
     
-    # 根据角色过滤
-    filtered_menus = filter_menu_by_role(menu_tree, current_user.role)
+    # 获取用户权限
+    permission_service = PermissionService(db)
+    user_permissions = permission_service.get_role_permissions(current_user.role)
+    
+    # 根据角色和权限过滤
+    filtered_menus = filter_menu_by_role(menu_tree, current_user.role, user_permissions)
     
     # 转换为前端需要的格式
     def to_menu_item(menus: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
