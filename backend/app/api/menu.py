@@ -2,9 +2,8 @@
 菜单配置API
 
 菜单权限控制：
-1. 角色过滤：检查用户角色是否在菜单的 roles 字段中
-2. 权限过滤：检查用户是否拥有菜单的 permission 字段对应的权限码
-两者都需要满足才能显示菜单
+- 权限过滤：检查用户是否拥有菜单的 permission 字段对应的权限码
+- 如果没有配置 permission，所有登录用户都能访问
 """
 from typing import List, Optional, Dict, Any, Set
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -164,7 +163,7 @@ async def create_menu(
         sort_order=menu_data.sort_order,
         is_visible=menu_data.is_visible,
         is_enabled=menu_data.is_enabled,
-        roles=menu_data.roles,
+        permission=menu_data.permission,
         meta=menu_data.meta
     )
     db.add(menu)
