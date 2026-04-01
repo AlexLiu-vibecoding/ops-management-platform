@@ -569,22 +569,3 @@ async def check_rdb_instance_status(
     })
     
     return InstanceTestResult(**result)
-
-
-# ============ 兼容旧 API（向后兼容） ============
-
-@router.get("/all/list", include_in_schema=False)
-async def list_all_instances_compat(
-    environment_id: Optional[int] = None,
-    group_id: Optional[int] = None,
-    db_type: Optional[str] = None,
-    status: Optional[bool] = None,
-    skip: int = 0,
-    limit: int = 20,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """兼容旧 API - 获取实例列表"""
-    return await list_rdb_instances(
-        environment_id, group_id, db_type, status, skip, limit, current_user, db
-    )

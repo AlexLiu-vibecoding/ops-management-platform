@@ -27,7 +27,7 @@ from app.services.task_scheduler import task_scheduler
 from app.core import register_exception_handlers
 
 # 导入路由
-from app.api import auth, users, environments, instances, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions, alerts, monitor_ext, inspection
+from app.api import auth, users, environments, monitor, dingtalk, approval, sql, performance, slow_query, audit, menu, init, scripts, scheduled_tasks, notification, sql_optimizer, dashboard, redis, storage, system, aws_regions, alerts, monitor_ext, inspection
 from app.api import rdb_instances, redis_instances, batch_operations, permissions
 from app.api import scheduled_inspection, alert_rules, change_windows, scheduler, sql_optimization
 
@@ -291,7 +291,6 @@ app.include_router(init.router, prefix="/api/v1")  # 初始化API放在最前面
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(users.router, prefix="/api/v1")
 app.include_router(environments.router, prefix="/api/v1")
-app.include_router(instances.router, prefix="/api/v1")  # 实例管理（向后兼容）
 app.include_router(rdb_instances.router, prefix="/api/v1")  # RDB 实例管理
 app.include_router(redis_instances.router, prefix="/api/v1")  # Redis 实例管理
 app.include_router(monitor.router, prefix="/api/v1")
