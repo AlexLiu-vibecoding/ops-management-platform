@@ -3,7 +3,7 @@ Pydantic模型（请求/响应模型）
 """
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from app.models import UserRole, EnvironmentType, ApprovalStatus, MonitorType, RegistrationStatus
 
 
@@ -36,6 +36,8 @@ class UserUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     """用户响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     username: str
     real_name: Optional[str]
@@ -46,9 +48,6 @@ class UserResponse(BaseModel):
     last_login_time: Optional[datetime]
     last_login_ip: Optional[str]
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class TokenResponse(BaseModel):
@@ -78,6 +77,8 @@ class RegistrationAction(BaseModel):
 
 class RegistrationResponse(BaseModel):
     """注册申请响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     username: str
     real_name: Optional[str]
@@ -90,9 +91,6 @@ class RegistrationResponse(BaseModel):
     review_time: Optional[datetime]
     review_comment: Optional[str]
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 # ============ 环境相关 ============
@@ -124,6 +122,8 @@ class EnvironmentUpdate(BaseModel):
 
 class EnvironmentResponse(BaseModel):
     """环境响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
     code: str
@@ -135,9 +135,6 @@ class EnvironmentResponse(BaseModel):
     aws_region: Optional[str]
     aws_configured: Optional[bool] = False
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 # ============ 实例相关 ============
@@ -185,6 +182,8 @@ class InstanceUpdate(BaseModel):
 
 class InstanceResponse(BaseModel):
     """实例响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
     db_type: str = "mysql"
@@ -205,9 +204,6 @@ class InstanceResponse(BaseModel):
     last_check_time: Optional[datetime]
     created_at: datetime
     environment: Optional[EnvironmentResponse] = None
-    
-    class Config:
-        from_attributes = True
 
 
 class InstanceTestResult(BaseModel):
@@ -226,15 +222,14 @@ class MonitorSwitchUpdate(BaseModel):
 
 class MonitorSwitchResponse(BaseModel):
     """监控开关响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     instance_id: int
     monitor_type: MonitorType
     enabled: bool
     config: Optional[Dict[str, Any]]
     configured_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class GlobalMonitorSwitchUpdate(BaseModel):
@@ -267,6 +262,8 @@ class DingTalkChannelUpdate(BaseModel):
 
 class DingTalkChannelResponse(BaseModel):
     """钉钉通道响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     name: str
     description: Optional[str]
@@ -274,9 +271,6 @@ class DingTalkChannelResponse(BaseModel):
     keywords: Optional[List[str]]
     is_enabled: bool
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class NotificationBindingCreate(BaseModel):
@@ -316,6 +310,8 @@ class ApprovalAction(BaseModel):
 
 class ApprovalResponse(BaseModel):
     """审批响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     title: str
     change_type: str
@@ -352,14 +348,13 @@ class ApprovalResponse(BaseModel):
     created_at: datetime
     approved_at: Optional[datetime] = Field(None, description="审批时间")
     instance_name: Optional[str] = Field(None, description="实例名称")
-    
-    class Config:
-        from_attributes = True
 
 
 # ============ 性能监控相关 ============
 class PerformanceMetricResponse(BaseModel):
     """性能指标响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     instance_id: int
     collect_time: datetime
@@ -371,9 +366,6 @@ class PerformanceMetricResponse(BaseModel):
     qps: Optional[float]
     tps: Optional[float]
     lock_wait_count: Optional[int]
-    
-    class Config:
-        from_attributes = True
 
 
 class PerformanceAlertCreate(BaseModel):
@@ -406,6 +398,8 @@ class SQLExecuteResponse(BaseModel):
 # ============ 慢查询相关 ============
 class SlowQueryResponse(BaseModel):
     """慢查询响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     instance_id: int
     database_name: Optional[str]
@@ -418,14 +412,13 @@ class SlowQueryResponse(BaseModel):
     execution_count: int
     first_seen: Optional[datetime]
     last_seen: Optional[datetime]
-    
-    class Config:
-        from_attributes = True
 
 
 # ============ 索引管理相关 ============
 class IndexAnalysisResponse(BaseModel):
     """索引分析响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     instance_id: int
     database_name: Optional[str]
@@ -436,9 +429,6 @@ class IndexAnalysisResponse(BaseModel):
     issue_type: Optional[str]
     risk_level: Optional[str]
     suggestion: Optional[str]
-    
-    class Config:
-        from_attributes = True
 
 
 class IndexOperationRequest(BaseModel):
@@ -455,6 +445,8 @@ class IndexOperationRequest(BaseModel):
 # ============ 操作回滚相关 ============
 class SnapshotResponse(BaseModel):
     """快照响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     instance_id: int
     database_name: Optional[str]
@@ -465,9 +457,6 @@ class SnapshotResponse(BaseModel):
     status: str
     expire_at: Optional[datetime]
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class RollbackRequest(BaseModel):
@@ -479,6 +468,8 @@ class RollbackRequest(BaseModel):
 # ============ 审计日志相关 ============
 class AuditLogResponse(BaseModel):
     """审计日志响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     user_id: Optional[int]
     username: Optional[str]
@@ -495,9 +486,6 @@ class AuditLogResponse(BaseModel):
     response_message: Optional[str]
     execution_time: Optional[float]
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 # ============ 通用响应 ============
@@ -546,6 +534,8 @@ class MenuConfigUpdate(BaseModel):
 
 class MenuConfigResponse(BaseModel):
     """菜单配置响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     parent_id: Optional[int]
     name: str
@@ -559,9 +549,6 @@ class MenuConfigResponse(BaseModel):
     meta: Optional[Dict[str, Any]]
     created_at: datetime
     children: Optional[List['MenuConfigResponse']] = None
-    
-    class Config:
-        from_attributes = True
 
 
 class MenuItemResponse(BaseModel):
@@ -604,6 +591,8 @@ class IndexInfo(BaseModel):
 
 class TableSchemaResponse(BaseModel):
     """表结构响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     instance_id: int
     database_name: str
@@ -617,9 +606,6 @@ class TableSchemaResponse(BaseModel):
     columns: List[ColumnInfo]
     indexes: List[IndexInfo]
     sync_time: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class SQLAnalyzeRequest(BaseModel):
@@ -721,6 +707,8 @@ class OptimizationSuggestionUpdate(BaseModel):
 
 class OptimizationSuggestionResponse(BaseModel):
     """优化建议响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     instance_id: int
     instance_name: Optional[str] = None
@@ -744,9 +732,6 @@ class OptimizationSuggestionResponse(BaseModel):
     after_avg_time: Optional[float]
     actual_improvement: Optional[float]
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 # ==================== 采集任务 ====================
@@ -776,6 +761,8 @@ class CollectionTaskUpdate(BaseModel):
 
 class CollectionTaskResponse(BaseModel):
     """采集任务响应"""
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     instance_id: int
     instance_name: Optional[str] = None
@@ -791,9 +778,6 @@ class CollectionTaskResponse(BaseModel):
     last_collected_count: int
     total_collected_count: int
     created_at: datetime
-    
-    class Config:
-        from_attributes = True
 
 
 class CollectionTaskListResponse(BaseModel):

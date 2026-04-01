@@ -166,7 +166,7 @@ async def get_instance_monitor_switches(
             MonitorSwitch.instance_id == instance_id
         ).all()
     
-    return [MonitorSwitchResponse.from_orm(s) for s in switches]
+    return [MonitorSwitchResponse.model_validate(s) for s in switches]
 
 
 @router.put("/switches/instance/{instance_id}/{monitor_type}", response_model=MessageResponse)

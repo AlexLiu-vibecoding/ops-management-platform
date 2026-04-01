@@ -100,7 +100,7 @@ async def list_environments(
     
     return {
         "total": len(environments),
-        "items": [EnvironmentResponse.from_orm(e) for e in environments]
+        "items": [EnvironmentResponse.model_validate(e) for e in environments]
     }
 
 
@@ -117,7 +117,7 @@ async def get_environment(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Environment not found"
         )
-    return EnvironmentResponse.from_orm(env)
+    return EnvironmentResponse.model_validate(env)
 
 
 @router.post("", response_model=EnvironmentResponse)
@@ -162,7 +162,7 @@ async def create_environment(
     db.commit()
     db.refresh(env)
     
-    return EnvironmentResponse.from_orm(env)
+    return EnvironmentResponse.model_validate(env)
 
 
 @router.put("/{env_id}", response_model=EnvironmentResponse)
@@ -204,7 +204,7 @@ async def update_environment(
     db.commit()
     db.refresh(env)
     
-    return EnvironmentResponse.from_orm(env)
+    return EnvironmentResponse.model_validate(env)
 
 
 @router.delete("/{env_id}", response_model=MessageResponse)

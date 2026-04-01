@@ -30,7 +30,7 @@ async def list_users(
     users = db.query(User).offset(skip).limit(limit).all()
     return {
         "total": total,
-        "items": [UserResponse.from_orm(u) for u in users]
+        "items": [UserResponse.model_validate(u) for u in users]
     }
 
 
@@ -47,7 +47,7 @@ async def get_user(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    return UserResponse.from_orm(user)
+    return UserResponse.model_validate(user)
 
 
 @router.post("", response_model=UserResponse)
@@ -84,7 +84,7 @@ async def create_user(
     db.commit()
     db.refresh(user)
     
-    return UserResponse.from_orm(user)
+    return UserResponse.model_validate(user)
 
 
 @router.put("/{user_id}", response_model=UserResponse)
@@ -122,7 +122,7 @@ async def update_user(
     db.commit()
     db.refresh(user)
     
-    return UserResponse.from_orm(user)
+    return UserResponse.model_validate(user)
 
 
 @router.delete("/{user_id}", response_model=MessageResponse)

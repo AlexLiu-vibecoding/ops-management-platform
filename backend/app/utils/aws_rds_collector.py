@@ -5,7 +5,7 @@ AWS RDS 性能指标采集器
 import os
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 
@@ -343,9 +343,9 @@ class RDSMetricsCollector:
         if statistics is None:
             statistics = ["Average"]
         if start_time is None:
-            start_time = datetime.utcnow() - timedelta(minutes=10)
+            start_time = datetime.now(timezone.utc) - timedelta(minutes=10)
         if end_time is None:
-            end_time = datetime.utcnow()
+            end_time = datetime.now(timezone.utc)
         
         try:
             cw = self._get_cloudwatch_client()

@@ -170,7 +170,7 @@ async def get_current_performance(
     
     return {
         "enabled": True,
-        "data": PerformanceMetricResponse.from_orm(latest),
+        "data": PerformanceMetricResponse.model_validate(latest),
         "collect_time": latest.collect_time
     }
 
@@ -210,7 +210,7 @@ async def get_performance_history(
     
     return {
         "total": len(metrics),
-        "items": [PerformanceMetricResponse.from_orm(m) if hasattr(m, 'id') else m for m in metrics]
+        "items": [PerformanceMetricResponse.model_validate(m) if hasattr(m, 'id') else m for m in metrics]
     }
 
 

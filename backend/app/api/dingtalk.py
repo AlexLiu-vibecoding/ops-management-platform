@@ -82,7 +82,7 @@ async def list_dingtalk_channels(
     channels = db.query(DingTalkChannel).all()
     return {
         "total": len(channels),
-        "items": [DingTalkChannelResponse.from_orm(c) for c in channels]
+        "items": [DingTalkChannelResponse.model_validate(c) for c in channels]
     }
 
 

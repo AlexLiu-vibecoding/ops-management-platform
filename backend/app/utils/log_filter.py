@@ -13,6 +13,7 @@
 """
 import re
 import logging
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 
@@ -162,7 +163,7 @@ class StructuredLogFormatter(logging.Formatter):
         from datetime import datetime
         
         log_data = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

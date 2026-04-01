@@ -67,7 +67,7 @@ async def list_slow_queries(
         query = query.filter(SlowQuery.query_time >= min_time)
     
     queries = query.order_by(SlowQuery.query_time.desc()).limit(limit).all()
-    return [SlowQueryResponse.from_orm(q) for q in queries]
+    return [SlowQueryResponse.model_validate(q) for q in queries]
 
 
 @router.get("/{instance_id}/top", response_model=List[SlowQueryResponse])
@@ -101,7 +101,7 @@ async def get_top_slow_queries(
         SlowQuery.last_seen >= start_time
     ).order_by(SlowQuery.query_time.desc()).limit(top_n).all()
     
-    return [SlowQueryResponse.from_orm(q) for q in queries]
+    return [SlowQueryResponse.model_validate(q) for q in queries]
 
 
 @router.get("/{instance_id}/statistics", response_model=dict)

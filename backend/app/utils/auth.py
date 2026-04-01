@@ -4,7 +4,7 @@
 import os
 import hashlib
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -60,9 +60,9 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     if "sub" in to_encode and not isinstance(to_encode["sub"], str):
         to_encode["sub"] = str(to_encode["sub"])
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(hours=settings.ACCESS_TOKEN_EXPIRE_HOURS)
+        expire = datetime.now(timezone.utc) + timedelta(hours=settings.ACCESS_TOKEN_EXPIRE_HOURS)
     
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)

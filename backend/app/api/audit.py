@@ -47,7 +47,7 @@ def get_operation_type_label(operation_type: str, lang: str = "zh") -> str:
 
 def format_log_response(log: AuditLog, lang: str = "zh") -> dict:
     """格式化日志响应，添加中文操作类型"""
-    data = AuditLogResponse.from_orm(log).dict()
+    data = AuditLogResponse.model_validate(log).model_dump()
     data["operation_type_label"] = get_operation_type_label(log.operation_type, lang)
     return data
 
