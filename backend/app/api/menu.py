@@ -56,7 +56,12 @@ def build_menu_tree(menus: List[MenuConfig], parent_id: Optional[int] = None) ->
 
 def filter_menu_by_role(menus: List[Dict[str, Any]], user_role: UserRole, user_permissions: Set[str]) -> List[Dict[str, Any]]:
     """
-    根据角色和权限过滤菜单
+    根据权限过滤菜单
+    
+    过滤规则：
+    1. 如果菜单配置了 permission 字段，只检查权限码（以权限系统为准）
+    2. 如果菜单没有 permission 但有 roles 字段，检查角色（向后兼容旧配置）
+    3. 如果都没有配置，所有登录用户都能访问
     
     Args:
         menus: 菜单列表
@@ -72,16 +77,22 @@ def filter_menu_by_role(menus: List[Dict[str, Any]], user_role: UserRole, user_p
         if not menu.get("is_enabled", True):
             continue
         
-        # 1. 检查角色过滤
-        if menu.get("roles"):
-            allowed_roles = [r.strip() for r in menu["roles"].split(',')]
-            if user_role.value not in allowed_roles:
-                continue
+        # 权限检查逻辑
+        has_access = False
         
-        # 2. 检查权限过滤（如果菜单配置了 permission 字段）
         if menu.get("permission"):
-            if menu["permission"] not in user_permissions:
-                continue
+            # 优先使用权限码检查（推荐方式）
+            has_access = menu["permission"] in user_permissions
+        elif menu.get("roles"):
+            # 向后兼容：使用角色检查
+            allowed_roles = [r.strip() for r in menu["roles"].split(',')]
+            has_access = user_role.value in allowed_roles
+        else:
+            # 没有配置权限限制，默认可访问
+            has_access = True
+        
+        if not has_access:
+            continue
         
         # 递归处理子菜单
         if menu.get("children"):
