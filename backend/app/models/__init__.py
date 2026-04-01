@@ -662,7 +662,6 @@ class MenuConfig(Base):
     sort_order = Column(Integer, default=0)
     is_visible = Column(Boolean, default=True)
     is_enabled = Column(Boolean, default=True)
-    roles = Column(String(200))  # 允许访问的角色，逗号分隔
     permission = Column(String(100))  # 访问菜单所需的权限码
     meta = Column(JSON)
     created_at = Column(DateTime, default=datetime.now)

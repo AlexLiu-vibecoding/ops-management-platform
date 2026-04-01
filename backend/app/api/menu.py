@@ -33,8 +33,7 @@ def menu_to_dict(menu: MenuConfig) -> Dict[str, Any]:
         "sort_order": menu.sort_order,
         "is_visible": menu.is_visible,
         "is_enabled": menu.is_enabled,
-        "roles": menu.roles,
-        "permission": menu.permission,  # 新增：关联的权限码
+        "permission": menu.permission,
         "meta": menu.meta,
         "created_at": menu.created_at,
         "children": []
@@ -59,13 +58,12 @@ def filter_menu_by_role(menus: List[Dict[str, Any]], user_role: UserRole, user_p
     根据权限过滤菜单
     
     过滤规则：
-    1. 如果菜单配置了 permission 字段，只检查权限码（以权限系统为准）
-    2. 如果菜单没有 permission 但有 roles 字段，检查角色（向后兼容旧配置）
-    3. 如果都没有配置，所有登录用户都能访问
+    1. 如果菜单配置了 permission 字段，检查用户是否有该权限
+    2. 如果没有配置 permission，所有登录用户都能访问
     
     Args:
         menus: 菜单列表
-        user_role: 用户角色
+        user_role: 用户角色（保留参数，便于扩展）
         user_permissions: 用户拥有的权限码集合
     
     Returns:
@@ -77,22 +75,11 @@ def filter_menu_by_role(menus: List[Dict[str, Any]], user_role: UserRole, user_p
         if not menu.get("is_enabled", True):
             continue
         
-        # 权限检查逻辑
-        has_access = False
-        
+        # 权限检查
         if menu.get("permission"):
-            # 优先使用权限码检查（推荐方式）
-            has_access = menu["permission"] in user_permissions
-        elif menu.get("roles"):
-            # 向后兼容：使用角色检查
-            allowed_roles = [r.strip() for r in menu["roles"].split(',')]
-            has_access = user_role.value in allowed_roles
-        else:
-            # 没有配置权限限制，默认可访问
-            has_access = True
-        
-        if not has_access:
-            continue
+            # 检查权限码
+            if menu["permission"] not in user_permissions:
+                continue
         
         # 递归处理子菜单
         if menu.get("children"):

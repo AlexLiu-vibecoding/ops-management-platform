@@ -526,7 +526,6 @@ class MenuConfigCreate(BaseModel):
     sort_order: int = Field(0, description="排序")
     is_visible: bool = Field(True, description="是否显示")
     is_enabled: bool = Field(True, description="是否启用")
-    roles: Optional[str] = Field(None, max_length=200, description="可见角色，逗号分隔")
     permission: Optional[str] = Field(None, max_length=100, description="访问所需权限码")
     meta: Optional[Dict[str, Any]] = Field(None, description="其他配置")
 
@@ -541,7 +540,6 @@ class MenuConfigUpdate(BaseModel):
     sort_order: Optional[int] = None
     is_visible: Optional[bool] = None
     is_enabled: Optional[bool] = None
-    roles: Optional[str] = Field(None, max_length=200)
     permission: Optional[str] = Field(None, max_length=100)
     meta: Optional[Dict[str, Any]] = None
 
@@ -557,7 +555,6 @@ class MenuConfigResponse(BaseModel):
     sort_order: int
     is_visible: bool
     is_enabled: bool
-    roles: Optional[str]
     permission: Optional[str]
     meta: Optional[Dict[str, Any]]
     created_at: datetime
