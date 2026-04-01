@@ -152,15 +152,13 @@ container = ServiceContainer()
 
 def _register_services() -> None:
     """注册所有服务"""
-    # 用户服务
+    # 同步服务
     from app.services.user_service import UserService
     container.register_request_factory(UserService, lambda db: UserService(db))
     
-    # 权限服务
     from app.services.permission_service import PermissionService
     container.register_request_factory(PermissionService, lambda db: PermissionService(db))
     
-    # 实例服务
     from app.services.instance_service import RDBInstanceService, RedisInstanceService
     container.register_request_factory(RDBInstanceService, lambda db: RDBInstanceService(db))
     container.register_request_factory(RedisInstanceService, lambda db: RedisInstanceService(db))

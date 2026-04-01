@@ -40,7 +40,9 @@ from app.services.base_async import AsyncBaseService
 from app.services.user_service import UserService
 from app.services.user_service_async import AsyncUserService
 from app.services.instance_service import RDBInstanceService, RedisInstanceService
+from app.services.instance_service_async import AsyncRDBInstanceService, AsyncRedisInstanceService
 from app.services.permission_service import PermissionService, BatchOperationService
+from app.services.permission_service_async import AsyncPermissionService
 
 __all__ = [
     # 同步基类
@@ -51,10 +53,15 @@ __all__ = [
     "UserService",
     # 异步用户服务
     "AsyncUserService",
-    # 实例服务
+    # 同步实例服务
     "RDBInstanceService",
     "RedisInstanceService",
-    # 权限服务
+    # 异步实例服务
+    "AsyncRDBInstanceService",
+    "AsyncRedisInstanceService",
+    # 同步权限服务
     "PermissionService",
     "BatchOperationService",
+    # 异步权限服务
+    "AsyncPermissionService",
 ]
