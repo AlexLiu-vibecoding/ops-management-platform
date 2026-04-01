@@ -367,7 +367,7 @@ const rateLimitActions = [
 const loadSilenceRules = async () => {
   silenceLoading.value = true
   try {
-    const { data } = await request.get('/api/v1/notification/config/silence-rules')
+    const { data } = await request.get('/notification/config/silence-rules')
     silenceRules.value = data
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '加载静默规则失败')
@@ -380,7 +380,7 @@ const loadSilenceRules = async () => {
 const loadRateLimitRules = async () => {
   rateLimitLoading.value = true
   try {
-    const { data } = await request.get('/api/v1/notification/config/rate-limit-rules')
+    const { data } = await request.get('/notification/config/rate-limit-rules')
     rateLimitRules.value = data
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '加载频率限制规则失败')
@@ -455,10 +455,10 @@ const handleSaveSilenceRule = async () => {
     }
 
     if (silenceDialog.isEdit) {
-      await request.put(`/api/v1/notification/config/silence-rules/${silenceDialog.currentId}`, payload)
+      await request.put(`/notification/config/silence-rules/${silenceDialog.currentId}`, payload)
       ElMessage.success('更新成功')
     } else {
-      await request.post('/api/v1/notification/config/silence-rules', payload)
+      await request.post('/notification/config/silence-rules', payload)
       ElMessage.success('创建成功')
     }
 
@@ -478,7 +478,7 @@ const handleDeleteSilenceRule = async (row) => {
   })
 
   try {
-    await request.delete(`/api/v1/notification/config/silence-rules/${row.id}`)
+    await request.delete(`/notification/config/silence-rules/${row.id}`)
     ElMessage.success('删除成功')
     loadSilenceRules()
   } catch (error) {
@@ -541,10 +541,10 @@ const handleSaveRateLimitRule = async () => {
     }
 
     if (rateLimitDialog.isEdit) {
-      await request.put(`/api/v1/notification/config/rate-limit-rules/${rateLimitDialog.currentId}`, payload)
+      await request.put(`/notification/config/rate-limit-rules/${rateLimitDialog.currentId}`, payload)
       ElMessage.success('更新成功')
     } else {
-      await request.post('/api/v1/notification/config/rate-limit-rules', payload)
+      await request.post('/notification/config/rate-limit-rules', payload)
       ElMessage.success('创建成功')
     }
 
@@ -564,7 +564,7 @@ const handleDeleteRateLimitRule = async (row) => {
   })
 
   try {
-    await request.delete(`/api/v1/notification/config/rate-limit-rules/${row.id}`)
+    await request.delete(`/notification/config/rate-limit-rules/${row.id}`)
     ElMessage.success('删除成功')
     loadRateLimitRules()
   } catch (error) {

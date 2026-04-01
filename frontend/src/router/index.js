@@ -210,30 +210,35 @@ const routes = [
       // 通知管理
       {
         path: 'notification',
-        name: 'NotificationManage',
-        component: () => import('@/views/config/notification.vue'),
-        meta: { title: '通知管理', icon: 'Bell', roles: ['super_admin'] }
-      },
-      // 通知配置
-      {
-        path: 'notification-config',
-        name: 'NotificationConfig',
-        component: () => import('@/views/notification/config.vue'),
-        meta: { title: '通知配置', icon: 'Setting', roles: ['super_admin', 'approval_admin'] }
-      },
-      // 通知历史
-      {
-        path: 'notification-logs',
-        name: 'NotificationLogs',
-        component: () => import('@/views/notification/logs.vue'),
-        meta: { title: '通知历史', icon: 'List', roles: ['super_admin'] }
-      },
-      // 通知模板
-      {
-        path: 'notification-templates',
-        name: 'NotificationTemplates',
-        component: () => import('@/views/notification/templates.vue'),
-        meta: { title: '通知模板', icon: 'Document', roles: ['super_admin'] }
+        name: 'Notification',
+        redirect: '/notification/config',
+        meta: { title: '通知管理', icon: 'Bell', roles: ['super_admin', 'approval_admin'] },
+        children: [
+          {
+            path: 'config',
+            name: 'NotificationConfig',
+            component: () => import('@/views/notification/config.vue'),
+            meta: { title: '通知配置', icon: 'Setting' }
+          },
+          {
+            path: 'channels',
+            name: 'NotificationChannels',
+            component: () => import('@/views/config/notification.vue'),
+            meta: { title: '通道管理', icon: 'Connection' }
+          },
+          {
+            path: 'logs',
+            name: 'NotificationLogs',
+            component: () => import('@/views/notification/logs.vue'),
+            meta: { title: '通知历史', icon: 'List' }
+          },
+          {
+            path: 'templates',
+            name: 'NotificationTemplates',
+            component: () => import('@/views/notification/templates.vue'),
+            meta: { title: '通知模板', icon: 'Document' }
+          }
+        ]
       }
     ]
   }

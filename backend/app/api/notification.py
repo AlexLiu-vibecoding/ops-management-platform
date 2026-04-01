@@ -76,7 +76,16 @@ def encrypt_secret(secret: str) -> str:
 
 def decrypt_secret(encrypted_secret: str) -> str:
     """解密密钥"""
-    return aes_cipher.decrypt(encrypted_secret)
+    if not encrypted_secret:
+        return ""
+    try:
+        return aes_cipher.decrypt(encrypted_secret)
+    except Exception as e:
+        # 解密失败时返回空字符串，避免影响查询
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"解密密钥失败: {str(e)}")
+        return ""
 
 
 def generate_dingtalk_sign(secret: str) -> tuple:
