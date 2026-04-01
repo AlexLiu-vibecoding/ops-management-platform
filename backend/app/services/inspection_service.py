@@ -348,7 +348,7 @@ class InspectionService:
         
         # 调用告警聚合服务处理新告警
         try:
-            from app.services.alert_aggregation import AlertAggregationService
+            from app.services.alert_notification_control import AlertAggregationService
             AlertAggregationService.process_new_alert(self.db, alert)
         except Exception as e:
             import logging

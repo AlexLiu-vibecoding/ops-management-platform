@@ -563,19 +563,64 @@ class AlertSilenceRule(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(100), nullable=False, unique=True, comment="规则名称")
     description = Column(String(200), comment="规则描述")
-    metric_type = Column(String(32), comment="指标类型")
-    alert_level = Column(String(16), comment="告警级别")
-    rdb_instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="CASCADE"), comment="RDB实例ID")
-    redis_instance_id = Column(Integer, ForeignKey("redis_instances.id", ondelete="CASCADE"), comment="Redis实例ID")
-    start_time = Column(DateTime, comment="静默开始时间")
-    end_time = Column(DateTime, comment="静默结束时间")
-    recurrence_type = Column(String(20), default="once", comment="重复类型: once/daily/weekly")
+    
+    # 匹配条件
+    metric_type = Column(String(32), comment="指标类型，空表示所有类型")
+    alert_level = Column(String(16), comment="告警级别，空表示所有级别")
+    rdb_instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="CASCADE"), comment="RDB实例ID，空表示所有")
+    redis_instance_id = Column(Integer, ForeignKey("redis_instances.id", ondelete="CASCADE"), comment="Redis实例ID，空表示所有")
+    
+    # 时间配置
+    silence_type = Column(String(20), default="once", comment="静默类型: once/daily/weekly")
+    time_start = Column(String(5), comment="开始时间 HH:MM（用于每日/每周重复）")
+    time_end = Column(String(5), comment="结束时间 HH:MM（用于每日/每周重复）")
+    weekdays = Column(JSON, comment="允许的星期几 [0-6]，0=周一，如[0,1,2,3,4]表示工作日")
+    start_date = Column(DateTime, comment="生效开始日期（用于一次性静默）")
+    end_date = Column(DateTime, comment="生效结束日期（用于一次性静默）")
+    
+    # 状态和创建信息
     is_enabled = Column(Boolean, default=True, comment="是否启用")
+    created_by = Column(Integer, ForeignKey("users.id"), comment="创建人ID")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
     
+    # 关联
     rdb_instance = relationship("RDBInstance")
     redis_instance = relationship("RedisInstance")
+    creator = relationship("User", foreign_keys=[created_by])
+
+
+class AlertRateLimitRule(Base):
+    """告警频率限制规则表"""
+    __tablename__ = "alert_rate_limit_rules"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String(100), nullable=False, unique=True, comment="规则名称")
+    description = Column(String(200), comment="规则描述")
+    
+    # 匹配条件
+    metric_type = Column(String(32), comment="指标类型，空表示所有类型")
+    alert_level = Column(String(16), comment="告警级别，空表示所有级别")
+    rdb_instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="CASCADE"), comment="RDB实例ID，空表示所有")
+    redis_instance_id = Column(Integer, ForeignKey("redis_instances.id", ondelete="CASCADE"), comment="Redis实例ID，空表示所有")
+    
+    # 频率限制配置
+    limit_window = Column(Integer, default=300, comment="限制时间窗口(秒)")
+    max_notifications = Column(Integer, default=5, comment="时间窗口内最大通知数量")
+    cooldown_period = Column(Integer, default=600, comment="冷却期(秒)，达到限制后的静默时间")
+    
+    # 状态和创建信息
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    priority = Column(Integer, default=0, comment="优先级(数字越大优先级越高)")
+    created_by = Column(Integer, ForeignKey("users.id"), comment="创建人ID")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    # 关联
+    rdb_instance = relationship("RDBInstance")
+    redis_instance = relationship("RedisInstance")
+    creator = relationship("User", foreign_keys=[created_by])
+
 
 
 class AlertEscalationRule(Base):

@@ -775,15 +775,26 @@ class NotificationService:
             logger.info(f"告警 {alert.id} 已发送通知，跳过")
             return
         
-        # 检查静默规则（非聚合告警才检查）
+        # 1. 检查静默规则（非聚合告警才检查）
         if not is_aggregated:
             try:
-                from app.services.alert_aggregation import AlertSilenceService
+                from app.services.alert_notification_control import AlertSilenceService
                 if AlertSilenceService.check_silence(db, alert):
                     logger.info(f"告警 {alert.id} 命中静默规则，跳过发送")
                     return
             except Exception as e:
                 logger.warning(f"检查静默规则失败: {e}")
+        
+        # 2. 检查频率限制（非聚合告警才检查）
+        if not is_aggregated:
+            try:
+                from app.services.alert_notification_control import AlertRateLimitService
+                allowed, reason = AlertRateLimitService.check_rate_limit(db, alert)
+                if not allowed:
+                    logger.warning(f"告警 {alert.id} 被频率限制: {reason}")
+                    return
+            except Exception as e:
+                logger.warning(f"检查频率限制失败: {e}")
         
         # 获取实例信息
         instance_name = "未知实例"
@@ -925,6 +936,14 @@ class NotificationService:
         # 标记告警已发送通知
         alert.notification_sent = True
         db.commit()
+        
+        # 记录频率限制（用于下次检查）
+        if not is_aggregated:
+            try:
+                from app.services.alert_notification_control import AlertRateLimitService
+                AlertRateLimitService.record_notification_sent(db, alert)
+            except Exception as e:
+                logger.warning(f"记录频率限制失败: {e}")
 
 
 # 全局通知服务实例
