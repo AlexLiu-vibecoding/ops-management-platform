@@ -590,7 +590,7 @@ class StorageManager:
     
     def should_store_as_file(self, content: str) -> bool:
         """判断是否应该存储为文件"""
-        return len(content) > self.settings.SQL_FILE_SIZE_THRESHOLD
+        return len(content) > self.settings.FILE_SIZE_THRESHOLD
 
 
 # 全局存储管理器实例
