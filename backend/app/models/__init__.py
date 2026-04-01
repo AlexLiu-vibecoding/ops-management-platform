@@ -579,6 +579,9 @@ class AlertSilenceRule(Base):
     start_date = Column(DateTime, comment="生效开始日期（用于一次性静默）")
     end_date = Column(DateTime, comment="生效结束日期（用于一次性静默）")
     
+    # 优先级
+    priority = Column(Integer, default=0, comment="优先级，数值越大优先级越高")
+    
     # 状态和创建信息
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     created_by = Column(Integer, ForeignKey("users.id"), comment="创建人ID")
