@@ -42,9 +42,6 @@
                   {{ selectedRole }}
                 </el-tag>
               </div>
-              <el-button type="primary" @click="handleSaveAll" :loading="saveLoading">
-                保存配置
-              </el-button>
             </div>
           </template>
           
@@ -97,6 +94,7 @@
                     node-key="id"
                     :default-expand-all="false"
                     :default-expanded-keys="expandedKeys"
+                    @check="handlePermissionCheck"
                   >
                     <template #default="{ node, data }">
                       <div class="tree-node">
@@ -251,7 +249,6 @@ const userActions = computed(() => [
 const roles = ref([])
 const selectedRole = ref('')
 const detailLoading = ref(false)
-const saveLoading = ref(false)
 
 // 详情数据
 const activeTab = ref('environments')
@@ -393,12 +390,54 @@ const selectRole = (role) => {
 }
 
 // 切换环境选择
-const toggleEnvironment = (envId) => {
+const toggleEnvironment = async (envId) => {
   const index = selectedEnvIds.value.indexOf(envId)
   if (index === -1) {
     selectedEnvIds.value.push(envId)
   } else {
     selectedEnvIds.value.splice(index, 1)
+  }
+  
+  // 自动保存环境权限
+  await saveEnvironmentPermissions()
+}
+
+// 保存环境权限
+const saveEnvironmentPermissions = async () => {
+  if (!selectedRole.value) return
+  
+  try {
+    await request.put(`/permissions/roles/${selectedRole.value}/environments`, {
+      environment_ids: selectedEnvIds.value
+    })
+    ElMessage.success('环境权限已保存')
+    fetchRoles() // 刷新角色列表
+  } catch (error) {
+    console.error('保存环境权限失败:', error)
+    ElMessage.error('保存环境权限失败')
+  }
+}
+
+// 权限树勾选变化时自动保存
+const handlePermissionCheck = async () => {
+  if (!selectedRole.value || !treeRef.value) return
+  
+  const checkedIds = treeRef.value.getCheckedKeys()
+  const halfCheckedIds = treeRef.value.getHalfCheckedKeys()
+  const allIds = [...checkedIds, ...halfCheckedIds]
+  
+  try {
+    await request.put(`/permissions/roles/${selectedRole.value}/permissions`, {
+      role: selectedRole.value,
+      permission_ids: allIds
+    })
+    ElMessage.success('功能权限已保存')
+    fetchRoles() // 刷新角色列表
+  } catch (error) {
+    console.error('保存功能权限失败:', error)
+    ElMessage.error('保存功能权限失败')
+    // 刷新恢复原状态
+    fetchRoleDetail(selectedRole.value)
   }
 }
 
@@ -416,49 +455,6 @@ const handleCollapseAll = () => {
   Object.keys(treeRef.value.store.nodesMap).forEach(key => {
     treeRef.value.store.nodesMap[key].expanded = false
   })
-}
-
-// 保存所有配置
-const handleSaveAll = async () => {
-  if (!selectedRole.value) {
-    ElMessage.warning('请先选择角色')
-    return
-  }
-  
-  try {
-    await ElMessageBox.confirm(
-      `确定要保存 ${currentRoleName.value} 的配置吗？`,
-      '确认保存',
-      { type: 'warning' }
-    )
-    
-    saveLoading.value = true
-    
-    // 保存环境权限
-    await request.put(`/permissions/roles/${selectedRole.value}/environments`, {
-      environment_ids: selectedEnvIds.value
-    })
-    
-    // 保存功能权限
-    const checkedIds = treeRef.value?.getCheckedKeys() || []
-    const halfCheckedIds = treeRef.value?.getHalfCheckedKeys() || []
-    const allIds = [...checkedIds, ...halfCheckedIds]
-    
-    await request.put(`/permissions/roles/${selectedRole.value}/permissions`, {
-      role: selectedRole.value,
-      permission_ids: allIds
-    })
-    
-    ElMessage.success('保存成功')
-    fetchRoles() // 刷新角色列表
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('保存失败:', error)
-      ElMessage.error('保存失败')
-    }
-  } finally {
-    saveLoading.value = false
-  }
 }
 
 // 打开添加用户对话框
