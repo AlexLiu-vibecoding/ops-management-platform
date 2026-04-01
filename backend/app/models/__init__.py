@@ -251,6 +251,76 @@ class NotificationBinding(Base):
     channel = relationship("DingTalkChannel", back_populates="notification_bindings")
 
 
+class NotificationLog(Base):
+    """通知历史记录表"""
+    __tablename__ = "notification_logs"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    
+    # 通知类型
+    notification_type = Column(String(50), nullable=False, comment="通知类型: approval/alert/scheduled_task")
+    sub_type = Column(String(50), comment="细分类型: DDL/DML/critical/warning等")
+    
+    # 通知渠道
+    channel_id = Column(Integer, ForeignKey("dingtalk_channels.id", ondelete="SET NULL"), comment="通道ID")
+    channel_name = Column(String(100), comment="通道名称(冗余)")
+    
+    # 关联资源
+    rdb_instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="SET NULL"), comment="RDB实例ID")
+    redis_instance_id = Column(Integer, ForeignKey("redis_instances.id", ondelete="SET NULL"), comment="Redis实例ID")
+    approval_id = Column(Integer, ForeignKey("approval_records.id", ondelete="SET NULL"), comment="审批记录ID")
+    alert_id = Column(Integer, comment="告警记录ID")
+    
+    # 通知内容
+    title = Column(String(200), nullable=False, comment="通知标题")
+    content = Column(Text, comment="通知内容")
+    
+    # 发送状态
+    status = Column(String(20), default="pending", comment="状态: pending/success/failed")
+    error_message = Column(String(500), comment="错误信息")
+    
+    # 响应信息
+    response_code = Column(Integer, comment="HTTP响应码")
+    response_data = Column(JSON, comment="响应数据")
+    
+    # 时间信息
+    sent_at = Column(DateTime, comment="发送时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    
+    # 关系
+    channel = relationship("DingTalkChannel")
+
+
+class NotificationTemplate(Base):
+    """通知模板表"""
+    __tablename__ = "notification_templates"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    
+    # 基本信息
+    name = Column(String(100), nullable=False, unique=True, comment="模板名称")
+    description = Column(String(200), comment="模板描述")
+    
+    # 通知类型
+    notification_type = Column(String(50), nullable=False, comment="通知类型: approval/alert/scheduled_task")
+    sub_type = Column(String(50), comment="细分类型: DDL/DML/critical/warning等")
+    
+    # 模板内容
+    title_template = Column(String(200), nullable=False, comment="标题模板")
+    content_template = Column(Text, nullable=False, comment="内容模板(Markdown)")
+    
+    # 变量说明（JSON格式）
+    variables = Column(JSON, comment="可用变量列表")
+    
+    # 状态
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    is_default = Column(Boolean, default=False, comment="是否默认模板")
+    
+    # 时间
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
 # ==================== 审批管理 ====================
 
 class ApprovalRecord(Base):

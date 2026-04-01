@@ -213,6 +213,20 @@ const routes = [
         name: 'NotificationManage',
         component: () => import('@/views/config/notification.vue'),
         meta: { title: '通知管理', icon: 'Bell', roles: ['super_admin'] }
+      },
+      // 通知历史
+      {
+        path: 'notification-logs',
+        name: 'NotificationLogs',
+        component: () => import('@/views/notification/logs.vue'),
+        meta: { title: '通知历史', icon: 'List', roles: ['super_admin'] }
+      },
+      // 通知模板
+      {
+        path: 'notification-templates',
+        name: 'NotificationTemplates',
+        component: () => import('@/views/notification/templates.vue'),
+        meta: { title: '通知模板', icon: 'Document', roles: ['super_admin'] }
       }
     ]
   }

@@ -6,7 +6,7 @@ import hmac
 import time
 import urllib.parse
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 import httpx
 from sqlalchemy.orm import Session
@@ -14,13 +14,180 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.models import (
     DingTalkChannel, NotificationBinding, ApprovalRecord, 
-    ApprovalStatus, RDBInstance, RedisInstance, User, ScheduledTask, ScriptExecution
+    ApprovalStatus, RDBInstance, RedisInstance, User, ScheduledTask, ScriptExecution,
+    NotificationLog
 )
 from app.utils.auth import aes_cipher
 
 
 class NotificationService:
     """通知服务"""
+    
+    @staticmethod
+    def render_template(db: Session, notification_type: str, sub_type: str = None, **kwargs) -> tuple:
+        """
+        渲染通知模板
+        
+        Args:
+            db: 数据库会话
+            notification_type: 通知类型
+            sub_type: 细分类型
+            **kwargs: 模板变量
+        
+        Returns:
+            (title, content)
+        """
+        from app.models import NotificationTemplate
+        
+        # 查询匹配的模板
+        query = db.query(NotificationTemplate).filter(
+            NotificationTemplate.notification_type == notification_type,
+            NotificationTemplate.is_enabled == True,
+            NotificationTemplate.is_default == True
+        )
+        
+        if sub_type:
+            # 先尝试匹配细分类型
+            template = query.filter(NotificationTemplate.sub_type == sub_type).first()
+            if not template:
+                # 如果没有细分类型的默认模板，使用通用默认模板
+                template = query.first()
+        else:
+            template = query.first()
+        
+        if template:
+            title_template = template.title_template
+            content_template = template.content_template
+        else:
+            # 使用系统默认模板
+            if notification_type == "approval":
+                title_template = "变更审批通知"
+                content_template = """## 变更审批通知
+
+**申请信息**
+- 标题: {title}
+- 申请人: {requester_name}
+- 提交时间: {created_at}
+
+**变更详情**
+- 目标实例: {instance_name}
+- 变更类型: {change_type}
+- 风险等级: {risk_level}
+
+[点击通过]({approve_url}) | [点击拒绝]({reject_url})"""
+            elif notification_type == "alert":
+                title_template = "告警通知: {alert_title}"
+                content_template = """## 告警通知
+
+**告警详情**
+- 告警标题: {alert_title}
+- 告警级别: {alert_level}
+- 目标实例: {instance_name}
+- 指标: {metric_name}
+- 当前值: {current_value}
+- 阈值: {threshold}"""
+            elif notification_type == "scheduled_task":
+                title_template = "定时任务执行通知: {task_name}"
+                content_template = """## 定时任务执行通知
+
+**任务信息**
+- 任务名称: {task_name}
+- 执行脚本: {script_name}
+
+**执行详情**
+- 状态: {status}
+- 耗时: {duration}
+- 退出码: {exit_code}
+- 开始时间: {start_time}
+- 结束时间: {end_time}"""
+            else:
+                title_template = "通知"
+                content_template = "通知内容"
+        
+        # 渲染模板
+        try:
+            title = title_template.format(**kwargs)
+            content = content_template.format(**kwargs)
+        except KeyError as e:
+            # 如果缺少变量，使用简单替换（替换存在的变量，保留不存在的）
+            title = title_template
+            content = content_template
+            for key, value in kwargs.items():
+                var_pattern = "{" + key + "}"
+                title = title.replace(var_pattern, str(value))
+                content = content.replace(var_pattern, str(value))
+        
+        return title, content
+    
+    @staticmethod
+    def create_notification_log(
+        db: Session,
+        notification_type: str,
+        title: str,
+        content: str = None,
+        sub_type: str = None,
+        channel_id: int = None,
+        channel_name: str = None,
+        rdb_instance_id: int = None,
+        redis_instance_id: int = None,
+        approval_id: int = None,
+        alert_id: int = None,
+        status: str = "pending"
+    ) -> NotificationLog:
+        """
+        创建通知日志记录
+        
+        Args:
+            db: 数据库会话
+            notification_type: 通知类型 (approval/alert/scheduled_task)
+            title: 通知标题
+            content: 通知内容
+            sub_type: 细分类型
+            channel_id: 通道ID
+            channel_name: 通道名称
+            rdb_instance_id: RDB实例ID
+            redis_instance_id: Redis实例ID
+            approval_id: 审批记录ID
+            alert_id: 告警记录ID
+            status: 状态
+        
+        Returns:
+            创建的日志记录
+        """
+        log = NotificationLog(
+            notification_type=notification_type,
+            title=title,
+            content=content,
+            sub_type=sub_type,
+            channel_id=channel_id,
+            channel_name=channel_name,
+            rdb_instance_id=rdb_instance_id,
+            redis_instance_id=redis_instance_id,
+            approval_id=approval_id,
+            alert_id=alert_id,
+            status=status
+        )
+        db.add(log)
+        db.commit()
+        db.refresh(log)
+        return log
+    
+    @staticmethod
+    def update_notification_log(
+        db: Session,
+        log: NotificationLog,
+        status: str,
+        error_message: str = None,
+        response_code: int = None,
+        response_data: dict = None
+    ):
+        """更新通知日志"""
+        log.status = status
+        log.error_message = error_message
+        log.response_code = response_code
+        log.response_data = response_data
+        log.sent_at = datetime.now(timezone.utc)
+        db.commit()
     
     @staticmethod
     def generate_approval_token(approval_id: int, action: str, expires_hours: int = 48) -> str:
@@ -143,7 +310,7 @@ class NotificationService:
         auth_type: str = "none",
         secret: str = None,
         keywords: List[str] = None
-    ) -> bool:
+    ) -> Dict[str, Any]:
         """
         发送钉钉消息
         
@@ -155,10 +322,22 @@ class NotificationService:
             keywords: 关键词列表
         
         Returns:
-            是否发送成功
+            发送结果: {
+                "success": bool,
+                "response_code": int,
+                "response_data": dict,
+                "error_message": str
+            }
         """
         import logging
         logger = logging.getLogger(__name__)
+        
+        result = {
+            "success": False,
+            "response_code": None,
+            "response_data": None,
+            "error_message": None
+        }
         
         # 构建完整 webhook URL
         full_webhook = webhook
@@ -180,15 +359,23 @@ class NotificationService:
         try:
             async with httpx.AsyncClient(timeout=10) as client:
                 response = await client.post(full_webhook, json=message)
+                result["response_code"] = response.status_code
                 logger.info(f"钉钉响应: status={response.status_code}")
+                
                 if response.status_code == 200:
-                    result = response.json()
-                    logger.info(f"钉钉返回: {result}")
-                    return result.get("errcode") == 0
-                return False
+                    response_data = response.json()
+                    result["response_data"] = response_data
+                    logger.info(f"钉钉返回: {response_data}")
+                    result["success"] = response_data.get("errcode") == 0
+                    if not result["success"]:
+                        result["error_message"] = response_data.get("errmsg", "未知错误")
+                else:
+                    result["error_message"] = f"HTTP {response.status_code}"
         except Exception as e:
             logger.error(f"发送钉钉消息失败: {e}")
-            return False
+            result["error_message"] = str(e)
+        
+        return result
     
     @staticmethod
     async def send_approval_notification(
@@ -407,8 +594,33 @@ class NotificationService:
                 }
             }
             
-            await NotificationService.send_dingtalk_message(
+            # 创建通知日志
+            log = NotificationService.create_notification_log(
+                db=db,
+                notification_type="approval",
+                title=title,
+                content=content,
+                sub_type=approval.change_type,
+                channel_id=channel.id,
+                channel_name=channel.name,
+                rdb_instance_id=approval.rdb_instance_id,
+                redis_instance_id=approval.redis_instance_id,
+                approval_id=approval.id
+            )
+            
+            # 发送通知
+            result = await NotificationService.send_dingtalk_message(
                 webhook, message, channel.auth_type, secret, channel.keywords
+            )
+            
+            # 更新日志状态
+            NotificationService.update_notification_log(
+                db=db,
+                log=log,
+                status="success" if result["success"] else "failed",
+                error_message=result.get("error_message"),
+                response_code=result.get("response_code"),
+                response_data=result.get("response_data")
             )
 
     @staticmethod
@@ -514,10 +726,31 @@ class NotificationService:
                 }
             }
             
+            # 创建通知日志
+            log = NotificationService.create_notification_log(
+                db=db,
+                notification_type="scheduled_task",
+                title=title,
+                content=content,
+                sub_type="success" if success else "failed",
+                channel_id=channel.id,
+                channel_name=channel.name
+            )
+            
             result = await NotificationService.send_dingtalk_message(
                 webhook, message, channel.auth_type, secret, channel.keywords
             )
             logger.info(f"通知发送结果: {result}")
+            
+            # 更新日志状态
+            NotificationService.update_notification_log(
+                db=db,
+                log=log,
+                status="success" if result["success"] else "failed",
+                error_message=result.get("error_message"),
+                response_code=result.get("response_code"),
+                response_data=result.get("response_data")
+            )
 
 
 # 全局通知服务实例
