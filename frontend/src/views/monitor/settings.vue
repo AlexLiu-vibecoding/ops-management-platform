@@ -243,70 +243,6 @@
         </el-card>
       </el-tab-pane>
       
-      <!-- 告警规则配置 -->
-      <el-tab-pane label="告警规则" name="alertRules">
-        <el-card shadow="never" class="alert-rules-card">
-          <template #header>
-            <div class="card-header">
-              <span>告警规则配置</span>
-              <el-button type="primary" size="small" @click="saveAlertRulesDetail" :loading="saving" v-if="isAdmin">
-                保存全部规则
-              </el-button>
-            </div>
-          </template>
-          
-          <el-table :data="alertRulesDetail" style="width: 100%">
-            <el-table-column prop="name" label="规则名称" width="180" />
-            <el-table-column prop="metric_type" label="指标类型" width="120">
-              <template #default="{ row }">
-                <el-tag size="small">{{ getMetricTypeLabel(row.metric_type) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="operator" label="操作符" width="80" />
-            <el-table-column prop="threshold" label="阈值" width="120">
-              <template #default="{ row }">
-                <el-input-number
-                  v-model="row.threshold"
-                  size="small"
-                  :min="0"
-                  :max="1000"
-                  :step="5"
-                  style="width: 100px"
-                  :disabled="!isAdmin"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="severity" label="严重级别" width="120">
-              <template #default="{ row }">
-                <el-select v-model="row.severity" size="small" style="width: 100px" :disabled="!isAdmin">
-                  <el-option label="提示" value="info" />
-                  <el-option label="警告" value="warning" />
-                  <el-option label="严重" value="critical" />
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column prop="cooldown" label="冷却时间" width="120">
-              <template #default="{ row }">
-                <el-input-number
-                  v-model="row.cooldown"
-                  size="small"
-                  :min="60"
-                  :max="3600"
-                  :step="60"
-                  style="width: 100px"
-                  :disabled="!isAdmin"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column prop="enabled" label="状态" min-width="80">
-              <template #default="{ row }">
-                <el-switch v-model="row.enabled" :disabled="!isAdmin" />
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-tab-pane>
-      
       <!-- 全局开关配置 -->
       <el-tab-pane label="全局开关" name="globalSwitches">
         <el-card shadow="never" class="settings-card">
@@ -376,9 +312,6 @@ const highCpuConfig = reactive({
   alert_cooldown: 300
 })
 
-// 告警规则
-const alertRulesDetail = ref([])
-
 // 统计数据
 const slowQueryStats = ref({
   total_count: 0,
@@ -416,19 +349,6 @@ const getMonitorTypeLabel = (type) => {
     cpu_sql: '高CPU SQL监控',
     performance: '性能监控',
     inspection: '实例巡检'
-  }
-  return labels[type] || type
-}
-
-// 获取指标类型标签
-const getMetricTypeLabel = (type) => {
-  const labels = {
-    cpu: 'CPU',
-    memory: '内存',
-    disk: '磁盘',
-    connections: '连接数',
-    qps: 'QPS',
-    slow_query: '慢查询'
   }
   return labels[type] || type
 }
@@ -476,16 +396,6 @@ const loadHighCpuConfig = async () => {
   }
 }
 
-// 加载告警规则
-const loadAlertRulesDetail = async () => {
-  try {
-    const res = await monitorApi.getAlertRulesDetail()
-    alertRulesDetail.value = res
-  } catch (error) {
-    console.error('加载告警规则失败:', error)
-  }
-}
-
 // 加载统计数据
 const loadStatistics = async () => {
   try {
@@ -526,24 +436,10 @@ const saveHighCpuConfig = async () => {
   }
 }
 
-// 保存告警规则
-const saveAlertRulesDetail = async () => {
-  saving.value = true
-  try {
-    await monitorApi.updateAlertRulesDetail(alertRulesDetail.value)
-    ElMessage.success('告警规则保存成功')
-  } catch (error) {
-    ElMessage.error('保存失败')
-  } finally {
-    saving.value = false
-  }
-}
-
 onMounted(() => {
   fetchGlobalSwitches()
   loadSlowQueryConfig()
   loadHighCpuConfig()
-  loadAlertRulesDetail()
   loadStatistics()
 })
 </script>
@@ -611,14 +507,6 @@ onMounted(() => {
     
     .switch-label {
       font-weight: 500;
-    }
-  }
-  
-  .alert-rules-card {
-    .card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
     }
   }
 }

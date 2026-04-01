@@ -31,16 +31,6 @@ export const monitorApi = {
     return request.put('/monitor/config', data)
   },
 
-  // 获取告警规则
-  getAlertRules() {
-    return request.get('/monitor/alert-rules')
-  },
-
-  // 更新告警规则
-  updateAlertRules(rules) {
-    return request.put('/monitor/alert-rules', rules)
-  },
-
   // 慢查询监控配置
   getSlowQueryConfig() {
     return request.get('/monitor/slow-query/config')
@@ -65,15 +55,6 @@ export const monitorApi = {
 
   getHighCpuStatistics(hours = 24) {
     return request.get('/monitor/high-cpu/statistics', { params: { hours } })
-  },
-
-  // 告警规则详细配置
-  getAlertRulesDetail() {
-    return request.get('/monitor/alert-rules/detail')
-  },
-
-  updateAlertRulesDetail(rules) {
-    return request.put('/monitor/alert-rules/detail', rules)
   },
 
   // 监控总览
