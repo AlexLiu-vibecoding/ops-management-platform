@@ -12,6 +12,8 @@
   - 003: 添加 global_configs 表（如果不存在）
   - 004: 创建 aws_regions 表并初始化区域数据
   - 005: 创建监控扩展相关表（告警记录、锁等待、主从复制状态、巡检指标、巡检结果、长事务）
+  - 006: 实例表拆分（rdb_instances, redis_instances）及 Redis 监控表
+  - 007: 通知系统重构（notification_channels, channel_silence_rules, channel_rate_limits）
 """
 
 import sys
@@ -735,6 +737,161 @@ def migration_006():
         logger.info("  ✓ 创建 v_all_instances 视图（向后兼容）")
 
 
+def migration_007():
+    """
+    迁移 007: 通知系统重构 - 创建新的通道、静默规则、频率限制表
+    
+    创建表:
+    - notification_channels: 统一的通道管理
+    - channel_silence_rules: 通道静默规则
+    - channel_rate_limits: 通道频率限制
+    
+    数据迁移:
+    - 从 dingtalk_configs 迁移现有钉钉通道数据
+    """
+    logger.info("执行迁移 007: 通知系统重构")
+    
+    # 1. 创建 notification_channels 表
+    if not table_exists('notification_channels'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE notification_channels (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) UNIQUE NOT NULL,
+                    channel_type VARCHAR(20) NOT NULL,
+                    config JSON NOT NULL,
+                    is_enabled BOOLEAN DEFAULT TRUE,
+                    description VARCHAR(200),
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_notification_channels_type ON notification_channels(channel_type)"))
+            conn.execute(text("CREATE INDEX idx_notification_channels_enabled ON notification_channels(is_enabled)"))
+            conn.commit()
+            logger.info("  ✓ 创建 notification_channels 表")
+    else:
+        logger.info("  - notification_channels 表已存在，跳过")
+    
+    # 2. 创建 channel_silence_rules 表
+    if not table_exists('channel_silence_rules'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE channel_silence_rules (
+                    id SERIAL PRIMARY KEY,
+                    channel_id INTEGER NOT NULL REFERENCES notification_channels(id) ON DELETE CASCADE,
+                    name VARCHAR(100) NOT NULL,
+                    description VARCHAR(200),
+                    alert_level VARCHAR(20),
+                    instance_type VARCHAR(20),
+                    instance_id INTEGER,
+                    metric_type VARCHAR(50),
+                    silence_type VARCHAR(20) DEFAULT 'once',
+                    start_time TIMESTAMP,
+                    end_time TIMESTAMP,
+                    time_start VARCHAR(10),
+                    time_end VARCHAR(10),
+                    weekdays JSON,
+                    is_enabled BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(channel_id, name)
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_channel_silence_rules_channel ON channel_silence_rules(channel_id)"))
+            conn.execute(text("CREATE INDEX idx_channel_silence_rules_enabled ON channel_silence_rules(is_enabled)"))
+            conn.commit()
+            logger.info("  ✓ 创建 channel_silence_rules 表")
+    else:
+        logger.info("  - channel_silence_rules 表已存在，跳过")
+    
+    # 3. 创建 channel_rate_limits 表
+    if not table_exists('channel_rate_limits'):
+        with engine.connect() as conn:
+            conn.execute(text("""
+                CREATE TABLE channel_rate_limits (
+                    id SERIAL PRIMARY KEY,
+                    channel_id INTEGER NOT NULL REFERENCES notification_channels(id) ON DELETE CASCADE,
+                    name VARCHAR(100) NOT NULL,
+                    description VARCHAR(200),
+                    alert_level VARCHAR(20),
+                    instance_type VARCHAR(20),
+                    instance_id INTEGER,
+                    metric_type VARCHAR(50),
+                    limit_window INTEGER DEFAULT 300,
+                    max_notifications INTEGER DEFAULT 5,
+                    cooldown_period INTEGER DEFAULT 600,
+                    is_enabled BOOLEAN DEFAULT TRUE,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(channel_id, name)
+                )
+            """))
+            conn.execute(text("CREATE INDEX idx_channel_rate_limits_channel ON channel_rate_limits(channel_id)"))
+            conn.execute(text("CREATE INDEX idx_channel_rate_limits_enabled ON channel_rate_limits(is_enabled)"))
+            conn.commit()
+            logger.info("  ✓ 创建 channel_rate_limits 表")
+    else:
+        logger.info("  - channel_rate_limits 表已存在，跳过")
+    
+    # 4. 迁移现有钉钉配置数据
+    if table_exists('dingtalk_configs') and table_exists('notification_channels'):
+        with engine.connect() as conn:
+            # 检查是否已有数据
+            existing_count = conn.execute(text(
+                "SELECT COUNT(*) FROM notification_channels WHERE channel_type = 'dingtalk'"
+            )).scalar()
+            
+            if existing_count == 0:
+                # 迁移钉钉配置
+                result = conn.execute(text("""
+                    SELECT 
+                        name,
+                        webhook_url,
+                        secret,
+                        keywords,
+                        is_enabled,
+                        description,
+                        created_at
+                    FROM dingtalk_configs
+                    WHERE webhook_url IS NOT NULL AND webhook_url != ''
+                """))
+                
+                rows = result.fetchall()
+                for row in rows:
+                    name, webhook_url, secret, keywords, is_enabled, description, created_at = row
+                    
+                    # 构建 config JSON
+                    config = {"webhook": webhook_url}
+                    if secret:
+                        config["secret"] = secret
+                        config["auth_type"] = "signature"
+                    elif keywords:
+                        config["keywords"] = keywords.split(",") if isinstance(keywords, str) else keywords
+                        config["auth_type"] = "keyword"
+                    else:
+                        config["auth_type"] = "none"
+                    
+                    # 插入到新表
+                    conn.execute(text("""
+                        INSERT INTO notification_channels (name, channel_type, config, is_enabled, description, created_at)
+                        VALUES (:name, 'dingtalk', :config::json, :is_enabled, :description, :created_at)
+                    """), {
+                        "name": name,
+                        "config": str(config).replace("'", '"'),
+                        "is_enabled": is_enabled if is_enabled is not None else True,
+                        "description": description,
+                        "created_at": created_at
+                    })
+                
+                conn.commit()
+                logger.info(f"  ✓ 迁移 {len(rows)} 条钉钉配置到 notification_channels 表")
+            else:
+                logger.info("  - 已有钉钉通道数据，跳过迁移")
+    else:
+        logger.info("  - dingtalk_configs 表不存在或已有通道数据，跳过数据迁移")
+
+
 def run_migrations():
     """执行所有迁移"""
     logger.info("=" * 50)
@@ -748,6 +905,7 @@ def run_migrations():
         migration_004()
         migration_005()
         migration_006()
+        migration_007()
         
         logger.info("=" * 50)
         logger.info("所有迁移执行完成")

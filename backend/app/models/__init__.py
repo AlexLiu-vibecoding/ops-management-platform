@@ -1154,6 +1154,9 @@ __all__ = [
     
     # SQL 优化闭环
     'OptimizationSuggestion', 'SlowQueryCollectionTask', 'SlowLogFile',
+    
+    # 通知系统 (新)
+    'NotificationChannel', 'ChannelSilenceRule', 'ChannelRateLimit',
 ]
 
 # 导入权限模型
@@ -1174,3 +1177,6 @@ from app.models.change_window import ChangeWindow, WEEKDAY_LABELS, WINDOW_TYPE_L
 
 # 导入 SQL 优化闭环模型
 from app.models.sql_optimization import OptimizationSuggestion, SlowQueryCollectionTask, SlowLogFile
+
+# 导入通知系统模型
+from app.models.notification_new import NotificationChannel, ChannelSilenceRule, ChannelRateLimit

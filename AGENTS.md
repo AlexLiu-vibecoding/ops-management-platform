@@ -194,7 +194,7 @@ ruff check --select F401
 | 变更审批 | `views/change/` | `api/approval.py` | [SPEC-005](.vibecoding/specs/005-变更审批.md) |
 | 监控中心 | `views/monitor/` | `api/monitor.py` | [SPEC-006](.vibecoding/specs/006-监控中心.md) |
 | Redis 管理 | `views/instances/redis-detail.vue` | `api/redis.py` | [SPEC-007](.vibecoding/specs/007-Redis管理.md) |
-| 消息通知 | `views/notification/` | `api/notification.py` | [SPEC-008](.vibecoding/specs/008-消息通知.md) |
+| 消息通知 | `views/notification/` | `api/notification_channels.py`, `api/notification_rules.py` | [SPEC-008](.vibecoding/specs/008-消息通知-重新设计.md) |
 | 脚本管理 | `views/scripts/` | `api/scripts.py` | [SPEC-009](.vibecoding/specs/009-脚本管理.md) |
 | 定时任务 | `views/scheduled-tasks/` | `api/scheduled_tasks.py` | [SPEC-010](.vibecoding/specs/010-定时任务.md) |
 | 审计日志 | `views/audit/` | `api/audit.py` | [SPEC-011](.vibecoding/specs/011-审计日志.md) |
@@ -454,6 +454,35 @@ const res = await request.get('/notification/channels')
 ```
 
 **关键教训**: 使用 API 前先了解 baseURL 配置
+
+### 案例3: 通知系统重构 (2026-04)
+
+**问题现象**: 通知配置页面 500 错误，数据库表结构与模型定义不一致。
+
+**根本原因**: 原通知系统设计不合理，静默规则和频率限制未关联到通道，导致规则无法精确控制。
+
+**重构方案**:
+```
+旧设计:
+- silence_rules (全局规则)
+- rate_limits (全局规则)
+
+新设计:
+- notification_channels (通道管理)
+  ├── channel_silence_rules (通道级静默规则)
+  └── channel_rate_limits (通道级频率限制)
+```
+
+**关键变更**:
+1. 新增表: `notification_channels`, `channel_silence_rules`, `channel_rate_limits`
+2. 新增 API: `/api/v1/notification/channels`, `/api/v1/notification/channels/{id}/silence-rules`
+3. 新增前端: `views/notification/channels.vue` (统一管理页面)
+4. 迁移脚本: `migrations/migrate.py` (migration_007)
+
+**关键教训**:
+- 系统设计要考虑关联性，规则应绑定到具体通道
+- 重构时要保留数据迁移能力
+- 新旧系统并存期间要做好兼容处理
 
 ---
 

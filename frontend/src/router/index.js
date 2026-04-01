@@ -211,19 +211,13 @@ const routes = [
       {
         path: 'notification',
         name: 'Notification',
-        redirect: '/notification/config',
+        redirect: '/notification/channels',
         meta: { title: '通知管理', icon: 'Bell', roles: ['super_admin', 'approval_admin'] },
         children: [
           {
-            path: 'config',
-            name: 'NotificationConfig',
-            component: () => import('@/views/notification/config.vue'),
-            meta: { title: '通知配置', icon: 'Setting' }
-          },
-          {
             path: 'channels',
             name: 'NotificationChannels',
-            component: () => import('@/views/config/notification.vue'),
+            component: () => import('@/views/notification/channels.vue'),
             meta: { title: '通道管理', icon: 'Connection' }
           },
           {
