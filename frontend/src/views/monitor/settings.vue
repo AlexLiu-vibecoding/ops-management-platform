@@ -243,6 +243,91 @@
         </el-card>
       </el-tab-pane>
       
+      <!-- 告警规则配置 -->
+      <el-tab-pane label="告警规则" name="alertRules">
+        <!-- 搜索栏 -->
+        <el-card shadow="never" class="filter-card">
+          <el-form :inline="true" :model="alertQueryParams" @submit.prevent="loadAlertRules">
+            <el-form-item label="规则名称">
+              <el-input v-model="alertQueryParams.search" placeholder="请输入规则名称" clearable @keyup.enter="loadAlertRules" />
+            </el-form-item>
+            <el-form-item label="规则类型">
+              <el-select v-model="alertQueryParams.rule_type" placeholder="全部" clearable style="width: 120px">
+                <el-option v-for="item in ruleTypes" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="状态">
+              <el-select v-model="alertQueryParams.is_enabled" placeholder="全部" clearable style="width: 100px">
+                <el-option label="启用" :value="true" />
+                <el-option label="禁用" :value="false" />
+              </el-select>
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="loadAlertRules">搜索</el-button>
+              <el-button @click="resetAlertQuery">重置</el-button>
+              <el-button type="success" @click="handleAddRule" v-if="isAdmin">
+                <el-icon><Plus /></el-icon>
+                新增规则
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </el-card>
+
+        <!-- 规则列表 -->
+        <el-card shadow="never">
+          <el-table v-loading="alertLoading" :data="alertRules" stripe>
+            <el-table-column prop="name" label="规则名称" min-width="150" />
+            <el-table-column prop="rule_type_label" label="规则类型" width="120" />
+            <el-table-column label="条件" min-width="150">
+              <template #default="{ row }">
+                {{ row.metric_name }} {{ row.operator_label }} {{ row.threshold }} (持续{{ row.duration }}s)
+              </template>
+            </el-table-column>
+            <el-table-column label="告警级别" width="100">
+              <template #default="{ row }">
+                <el-tag :color="row.severity_color" class="text-white">
+                  {{ row.severity_label }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="静默期" width="100">
+              <template #default="{ row }">
+                {{ row.silence_duration }}s
+              </template>
+            </el-table-column>
+            <el-table-column prop="is_enabled" label="状态" min-width="80">
+              <template #default="{ row }">
+                <el-tag :type="row.is_enabled ? 'success' : 'info'">
+                  {{ row.is_enabled ? '启用' : '禁用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="触发次数" width="100">
+              <template #default="{ row }">
+                {{ row.trigger_count || 0 }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="120" fixed="right" align="center">
+              <template #default="{ row }">
+                <TableActions :row="row" :actions="ruleActions" @edit="handleEditRule" @toggle="handleToggleRule" @delete="handleDeleteRule" />
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="pagination-container">
+            <el-pagination
+              v-model:current-page="alertQueryParams.page"
+              v-model:page-size="alertQueryParams.limit"
+              :total="alertTotal"
+              :page-sizes="[10, 20, 50, 100]"
+              layout="total, sizes, prev, pager, next"
+              @size-change="loadAlertRules"
+              @current-change="loadAlertRules"
+            />
+          </div>
+        </el-card>
+      </el-tab-pane>
+      
       <!-- 全局开关配置 -->
       <el-tab-pane label="全局开关" name="globalSwitches">
         <el-card shadow="never" class="settings-card">
@@ -264,14 +349,104 @@
         </el-card>
       </el-tab-pane>
     </el-tabs>
+
+    <!-- 新增/编辑告警规则对话框 -->
+    <el-dialog v-model="ruleDialog.visible" :title="ruleDialog.isEdit ? '编辑规则' : '新增规则'" width="700px" @close="resetRuleForm">
+      <el-form ref="ruleFormRef" :model="ruleForm" :rules="ruleFormRules" label-width="120px">
+        <el-form-item label="规则名称" prop="name">
+          <el-input v-model="ruleForm.name" placeholder="请输入规则名称" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="ruleForm.description" type="textarea" :rows="2" placeholder="请输入描述" />
+        </el-form-item>
+        <el-form-item label="规则类型" prop="rule_type">
+          <el-select v-model="ruleForm.rule_type" placeholder="请选择规则类型" style="width: 100%">
+            <el-option v-for="item in ruleTypes" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="实例范围" prop="instance_scope">
+          <el-radio-group v-model="ruleForm.instance_scope">
+            <el-radio value="all">全部实例</el-radio>
+            <el-radio value="selected">指定实例</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="ruleForm.instance_scope === 'selected'" label="选择实例">
+          <el-select v-model="ruleForm.instance_ids" multiple placeholder="请选择实例" style="width: 100%">
+            <el-option v-for="inst in instanceList" :key="inst.id" :label="inst.name" :value="inst.id" />
+          </el-select>
+        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="指标名称" prop="metric_name">
+              <el-input v-model="ruleForm.metric_name" placeholder="如: cpu_usage" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item label="运算符" prop="operator">
+              <el-select v-model="ruleForm.operator" placeholder="运算符">
+                <el-option v-for="item in operators" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item label="阈值" prop="threshold">
+              <el-input-number v-model="ruleForm.threshold" :precision="2" :min="0" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="持续时间" prop="duration">
+              <el-input-number v-model="ruleForm.duration" :min="0" style="width: 100%" />
+              <span class="unit">秒</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="聚合方式" prop="aggregation">
+              <el-select v-model="ruleForm.aggregation" placeholder="聚合方式" style="width: 100%">
+                <el-option v-for="item in aggregations" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="告警级别" prop="severity">
+              <el-select v-model="ruleForm.severity" placeholder="告警级别" style="width: 100%">
+                <el-option v-for="item in severities" :key="item.value" :label="item.label" :value="item.value">
+                  <span :style="{ color: item.color }">{{ item.label }}</span>
+                </el-option>
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="静默时长" prop="silence_duration">
+              <el-input-number v-model="ruleForm.silence_duration" :min="0" style="width: 100%" />
+              <span class="unit">秒</span>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="通知配置">
+          <el-checkbox v-model="ruleForm.notify_enabled">启用通知</el-checkbox>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="ruleDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="ruleDialog.submitting" @click="handleSubmitRule">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { monitorApi } from '@/api/monitor'
+import { alertRulesApi } from '@/api/inspection'
 import { useUserStore } from '@/stores/user'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
+import request from '@/api/index'
+import TableActions from '@/components/TableActions.vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -279,15 +454,7 @@ const isAdmin = computed(() => userStore.isAdmin)
 const activeTab = ref('slowQuery')
 const saving = ref(false)
 
-// 全局开关
-const globalSwitches = reactive({
-  slow_query: true,
-  cpu_sql: true,
-  performance: true,
-  inspection: true
-})
-
-// 慢查询配置
+// ========== 慢查询配置 ==========
 const slowQueryConfig = reactive({
   enabled: true,
   threshold: 1.0,
@@ -299,7 +466,21 @@ const slowQueryConfig = reactive({
   top_n: 10
 })
 
-// 高CPU配置
+const slowQueryStats = ref({
+  total_count: 0,
+  total_executions: 0,
+  max_time: 0,
+  avg_time: 0
+})
+
+const slowQueryStatsItems = computed(() => [
+  { label: '慢查询总数', value: slowQueryStats.value.total_count },
+  { label: '总执行次数', value: slowQueryStats.value.total_executions },
+  { label: '最大耗时', value: slowQueryStats.value.max_time?.toFixed(2) + 's' },
+  { label: '平均耗时', value: slowQueryStats.value.avg_time?.toFixed(2) + 's' }
+])
+
+// ========== 高CPU配置 ==========
 const highCpuConfig = reactive({
   enabled: true,
   cpu_threshold: 80.0,
@@ -312,14 +493,6 @@ const highCpuConfig = reactive({
   alert_cooldown: 300
 })
 
-// 统计数据
-const slowQueryStats = ref({
-  total_count: 0,
-  total_executions: 0,
-  max_time: 0,
-  avg_time: 0
-})
-
 const highCpuStats = ref({
   max_cpu: 0,
   avg_cpu: 0,
@@ -327,20 +500,90 @@ const highCpuStats = ref({
   avg_memory: 0
 })
 
-// 统计数据展示项
-const slowQueryStatsItems = computed(() => [
-  { label: '慢查询总数', value: slowQueryStats.value.total_count },
-  { label: '总执行次数', value: slowQueryStats.value.total_executions },
-  { label: '最大耗时', value: slowQueryStats.value.max_time?.toFixed(2) + 's' },
-  { label: '平均耗时', value: slowQueryStats.value.avg_time?.toFixed(2) + 's' }
-])
-
 const highCpuStatsItems = computed(() => [
   { label: '最高CPU使用率', value: highCpuStats.value.max_cpu?.toFixed(1) + '%' },
   { label: '平均CPU使用率', value: highCpuStats.value.avg_cpu?.toFixed(1) + '%' },
   { label: '最高内存使用率', value: highCpuStats.value.max_memory?.toFixed(1) + '%' },
   { label: '平均内存使用率', value: highCpuStats.value.avg_memory?.toFixed(1) + '%' }
 ])
+
+// ========== 全局开关 ==========
+const globalSwitches = reactive({
+  slow_query: true,
+  cpu_sql: true,
+  performance: true,
+  inspection: true
+})
+
+// ========== 告警规则 ==========
+const alertLoading = ref(false)
+const alertRules = ref([])
+const alertTotal = ref(0)
+const instanceList = ref([])
+
+// 下拉选项
+const ruleTypes = ref([])
+const operators = ref([])
+const aggregations = ref([])
+const severities = ref([])
+
+// 查询参数
+const alertQueryParams = reactive({
+  search: '',
+  rule_type: '',
+  is_enabled: undefined,
+  page: 1,
+  limit: 20
+})
+
+// 操作列配置
+const ruleActions = computed(() => [
+  { key: 'edit', label: '编辑', event: 'edit', primary: true },
+  { 
+    key: 'toggle', 
+    label: (row) => row.is_enabled ? '禁用' : '启用',
+    event: 'toggle',
+    primary: false,
+    visible: () => isAdmin.value
+  },
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false, visible: () => isAdmin.value }
+])
+
+// 规则表单
+const ruleFormRef = ref()
+const ruleDialog = reactive({
+  visible: false,
+  isEdit: false,
+  submitting: false
+})
+
+const ruleForm = reactive({
+  id: 0,
+  name: '',
+  description: '',
+  rule_type: '',
+  instance_scope: 'all',
+  instance_ids: [],
+  metric_name: '',
+  operator: '>',
+  threshold: 0,
+  duration: 60,
+  aggregation: 'avg',
+  severity: 'warning',
+  silence_duration: 300,
+  notify_enabled: true,
+  is_enabled: true
+})
+
+const ruleFormRules = {
+  name: [{ required: true, message: '请输入规则名称', trigger: 'blur' }],
+  rule_type: [{ required: true, message: '请选择规则类型', trigger: 'change' }],
+  metric_name: [{ required: true, message: '请输入指标名称', trigger: 'blur' }],
+  threshold: [{ required: true, message: '请输入阈值', trigger: 'blur' }],
+  severity: [{ required: true, message: '请选择告警级别', trigger: 'change' }]
+}
+
+// ========== 方法 ==========
 
 // 获取监控类型标签
 const getMonitorTypeLabel = (type) => {
@@ -436,6 +679,172 @@ const saveHighCpuConfig = async () => {
   }
 }
 
+// ========== 告警规则方法 ==========
+
+// 加载告警规则
+async function loadAlertRules() {
+  alertLoading.value = true
+  try {
+    const data = await alertRulesApi.list(alertQueryParams)
+    alertRules.value = data.items || []
+    alertTotal.value = data.total || 0
+  } catch (error) {
+    console.error('加载告警规则失败:', error)
+  } finally {
+    alertLoading.value = false
+  }
+}
+
+// 加载下拉选项
+async function loadRuleOptions() {
+  try {
+    const [typesRes, opsRes, aggRes, sevRes] = await Promise.all([
+      alertRulesApi.getTypes(),
+      alertRulesApi.getOperators(),
+      alertRulesApi.getAggregations(),
+      alertRulesApi.getSeverities()
+    ])
+    ruleTypes.value = typesRes || []
+    operators.value = opsRes || []
+    aggregations.value = aggRes || []
+    severities.value = sevRes || []
+  } catch (error) {
+    console.error('加载选项失败:', error)
+  }
+}
+
+// 加载实例列表
+async function loadInstances() {
+  try {
+    const data = await request.get('/rdb-instances', { params: { limit: 1000 } })
+    instanceList.value = data.items || []
+  } catch (error) {
+    console.error('加载实例失败:', error)
+  }
+}
+
+// 重置查询
+function resetAlertQuery() {
+  alertQueryParams.search = ''
+  alertQueryParams.rule_type = ''
+  alertQueryParams.is_enabled = undefined
+  alertQueryParams.page = 1
+  loadAlertRules()
+}
+
+// 新增规则
+function handleAddRule() {
+  resetRuleForm()
+  ruleDialog.isEdit = false
+  ruleDialog.visible = true
+}
+
+// 编辑规则
+async function handleEditRule(row) {
+  resetRuleForm()
+  try {
+    const data = await alertRulesApi.get(row.id)
+    Object.assign(ruleForm, {
+      id: data.id,
+      name: data.name,
+      description: data.description || '',
+      rule_type: data.rule_type,
+      instance_scope: data.instance_scope || 'all',
+      instance_ids: data.instance_ids || [],
+      metric_name: data.metric_name || '',
+      operator: data.operator,
+      threshold: data.threshold,
+      duration: data.duration,
+      aggregation: data.aggregation,
+      severity: data.severity,
+      silence_duration: data.silence_duration,
+      notify_enabled: data.notify_enabled,
+      is_enabled: data.is_enabled
+    })
+    ruleDialog.isEdit = true
+    ruleDialog.visible = true
+  } catch (error) {
+    ElMessage.error('获取详情失败')
+  }
+}
+
+// 删除规则
+async function handleDeleteRule(row) {
+  try {
+    await ElMessageBox.confirm('确定要删除该规则吗？', '警告', { type: 'warning' })
+    await alertRulesApi.delete(row.id)
+    ElMessage.success('删除成功')
+    loadAlertRules()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
+// 启用/禁用规则
+async function handleToggleRule(row) {
+  try {
+    await alertRulesApi.toggle(row.id)
+    ElMessage.success('操作成功')
+    loadAlertRules()
+  } catch (error) {
+    ElMessage.error('操作失败')
+  }
+}
+
+// 提交规则
+async function handleSubmitRule() {
+  const valid = await ruleFormRef.value?.validate()
+  if (!valid) return
+
+  ruleDialog.submitting = true
+  try {
+    if (ruleForm.id) {
+      await alertRulesApi.update(ruleForm.id, ruleForm)
+      ElMessage.success('更新成功')
+    } else {
+      await alertRulesApi.create(ruleForm)
+      ElMessage.success('创建成功')
+    }
+    ruleDialog.visible = false
+    loadAlertRules()
+  } catch (error) {
+    ElMessage.error('操作失败')
+  } finally {
+    ruleDialog.submitting = false
+  }
+}
+
+// 重置规则表单
+function resetRuleForm() {
+  ruleForm.id = 0
+  ruleForm.name = ''
+  ruleForm.description = ''
+  ruleForm.rule_type = ''
+  ruleForm.instance_scope = 'all'
+  ruleForm.instance_ids = []
+  ruleForm.metric_name = ''
+  ruleForm.operator = '>'
+  ruleForm.threshold = 0
+  ruleForm.duration = 60
+  ruleForm.aggregation = 'avg'
+  ruleForm.severity = 'warning'
+  ruleForm.silence_duration = 300
+  ruleForm.notify_enabled = true
+  ruleForm.is_enabled = true
+  ruleFormRef.value?.resetFields()
+}
+
+// 监听Tab切换，懒加载告警规则数据
+watch(activeTab, (newVal) => {
+  if (newVal === 'alertRules' && alertRules.value.length === 0) {
+    loadAlertRules()
+    loadRuleOptions()
+    loadInstances()
+  }
+})
+
 onMounted(() => {
   fetchGlobalSwitches()
   loadSlowQueryConfig()
@@ -508,6 +917,20 @@ onMounted(() => {
     .switch-label {
       font-weight: 500;
     }
+  }
+  
+  .filter-card {
+    margin-bottom: 16px;
+  }
+  
+  .pagination-container {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 16px;
+  }
+  
+  .text-white {
+    color: #fff;
   }
 }
 </style>

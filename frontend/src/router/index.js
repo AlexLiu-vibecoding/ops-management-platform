@@ -149,12 +149,6 @@ const routes = [
             meta: { title: '定时巡检', icon: 'Timer' }
           },
           {
-            path: 'alert-rules',
-            name: 'AlertRules',
-            component: () => import('@/views/alerts/rules/index.vue'),
-            meta: { title: '告警规则', icon: 'Warning' }
-          },
-          {
             path: 'settings',
             name: 'MonitorSettings',
             component: () => import('@/views/monitor/settings.vue'),
