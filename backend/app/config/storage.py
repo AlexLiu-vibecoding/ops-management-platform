@@ -1,51 +1,87 @@
 """
-存储配置
-支持本地存储、AWS S3、阿里云 OSS 等多种后端
-配置优先级：数据库配置 > 环境变量
+存储配置模块
+
+提供文件存储配置，支持：
+- 本地存储
+- AWS S3
+- 阿里云 OSS
+
+配置优先级：
+1. 数据库配置（运行时动态）
+2. 环境变量配置
+3. 默认值
+
+使用方式：
+```python
+from app.config.storage import get_storage_settings
+
+settings = get_storage_settings()
+if settings.TYPE == "s3":
+    # 使用 S3 存储
+    ...
+```
 """
-from pydantic_settings import BaseSettings
-from typing import Optional, Literal
+from typing import Optional
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
-class StorageSettings(BaseSettings):
-    """存储配置"""
+class StorageConfig(BaseSettings):
+    """存储运行时配置"""
+    
+    model_config = SettingsConfigDict(
+        env_prefix="STORAGE_",
+        env_file=".env",
+        extra="ignore"
+    )
     
     # 存储类型: local, s3, oss
-    STORAGE_TYPE: str = "local"
+    TYPE: str = Field(default="local", description="存储类型")
     
     # 本地存储配置
-    LOCAL_STORAGE_PATH: str = "/app/data/sql_files"
+    LOCAL_PATH: str = Field(
+        default="/app/data/sql_files", 
+        description="本地存储路径"
+    )
     
-    # 文件生命周期（天数）
-    SQL_FILE_RETENTION_DAYS: int = 30
+    # 文件生命周期配置
+    FILE_RETENTION_DAYS: int = Field(
+        default=30, 
+        ge=1, 
+        description="文件保留天数"
+    )
     
-    # 大文件阈值（字符数），超过此大小存文件
-    # 对于变更审批场景，10MB 是合理阈值（避免正常的批量SQL被存文件）
-    SQL_FILE_SIZE_THRESHOLD: int = 10000000  # 约10MB
+    # 大文件阈值（字符数）
+    FILE_SIZE_THRESHOLD: int = Field(
+        default=10000000,  # 约10MB
+        ge=1000,
+        description="大文件阈值(字符数)"
+    )
     
     # AWS S3 配置
-    AWS_ACCESS_KEY_ID: Optional[str] = None
-    AWS_SECRET_ACCESS_KEY: Optional[str] = None
-    AWS_REGION: Optional[str] = None
-    S3_BUCKET_NAME: Optional[str] = None
-    S3_ENDPOINT_URL: Optional[str] = None  # 用于兼容 S3 的其他服务
+    S3_BUCKET: Optional[str] = Field(default=None, description="S3 存储桶名称")
+    S3_ENDPOINT: Optional[str] = Field(default=None, description="S3 端点URL")
+    S3_REGION: Optional[str] = Field(default="us-east-1", description="S3 区域")
+    S3_ACCESS_KEY: Optional[str] = Field(default=None, description="S3 Access Key")
+    S3_SECRET_KEY: Optional[str] = Field(default=None, description="S3 Secret Key")
     
     # 阿里云 OSS 配置
-    OSS_ACCESS_KEY_ID: Optional[str] = None
-    OSS_ACCESS_KEY_SECRET: Optional[str] = None
-    OSS_ENDPOINT: Optional[str] = None  # 如 oss-cn-hangzhou.aliyuncs.com
-    OSS_BUCKET_NAME: Optional[str] = None
-    
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    OSS_BUCKET: Optional[str] = Field(default=None, description="OSS 存储桶名称")
+    OSS_ENDPOINT: Optional[str] = Field(default=None, description="OSS 端点")
+    OSS_ACCESS_KEY: Optional[str] = Field(default=None, description="OSS Access Key")
+    OSS_SECRET_KEY: Optional[str] = Field(default=None, description="OSS Secret Key")
 
 
 @lru_cache()
-def get_storage_settings() -> StorageSettings:
-    """获取存储配置（缓存）"""
-    return StorageSettings()
+def get_storage_settings() -> StorageConfig:
+    """
+    获取存储配置实例（缓存）
+    
+    Returns:
+        StorageConfig 实例
+    """
+    return StorageConfig()
 
 
 def get_storage_settings_from_db() -> dict:
@@ -92,7 +128,7 @@ def get_storage_settings_from_db() -> dict:
         return {}
 
 
-def get_effective_storage_settings() -> StorageSettings:
+def get_effective_storage_settings() -> StorageConfig:
     """
     获取有效的存储配置
     
@@ -100,6 +136,9 @@ def get_effective_storage_settings() -> StorageSettings:
     
     注意：此函数不缓存，每次调用都会查询数据库
     用于运行时动态获取最新配置
+    
+    Returns:
+        StorageConfig 实例
     """
     # 获取环境变量配置作为基础
     base_settings = get_storage_settings()
@@ -112,21 +151,30 @@ def get_effective_storage_settings() -> StorageSettings:
     
     # 创建新的配置对象，用数据库配置覆盖
     settings_dict = {
-        'STORAGE_TYPE': db_configs.get('storage_type', base_settings.STORAGE_TYPE),
-        'LOCAL_STORAGE_PATH': db_configs.get('local_storage_path', base_settings.LOCAL_STORAGE_PATH),
-        'SQL_FILE_RETENTION_DAYS': int(db_configs.get('sql_file_retention_days', base_settings.SQL_FILE_RETENTION_DAYS)),
-        'SQL_FILE_SIZE_THRESHOLD': int(db_configs.get('sql_file_size_threshold', base_settings.SQL_FILE_SIZE_THRESHOLD)),
-        # AWS S3 配置 - 支持数据库配置 AK/SK
-        'AWS_ACCESS_KEY_ID': db_configs.get('aws_access_key_id') or base_settings.AWS_ACCESS_KEY_ID,
-        'AWS_SECRET_ACCESS_KEY': db_configs.get('aws_secret_access_key') or base_settings.AWS_SECRET_ACCESS_KEY,
-        'AWS_REGION': db_configs.get('aws_region', base_settings.AWS_REGION),
-        'S3_BUCKET_NAME': db_configs.get('s3_bucket_name', base_settings.S3_BUCKET_NAME),
-        'S3_ENDPOINT_URL': db_configs.get('s3_endpoint_url', base_settings.S3_ENDPOINT_URL),
-        # 阿里云 OSS 配置 - 支持数据库配置 AK/SK
-        'OSS_ACCESS_KEY_ID': db_configs.get('oss_access_key_id') or base_settings.OSS_ACCESS_KEY_ID,
-        'OSS_ACCESS_KEY_SECRET': db_configs.get('oss_access_key_secret') or base_settings.OSS_ACCESS_KEY_SECRET,
+        'TYPE': db_configs.get('storage_type', base_settings.TYPE),
+        'LOCAL_PATH': db_configs.get('local_storage_path', base_settings.LOCAL_PATH),
+        'FILE_RETENTION_DAYS': int(db_configs.get('sql_file_retention_days', base_settings.FILE_RETENTION_DAYS)),
+        'FILE_SIZE_THRESHOLD': int(db_configs.get('sql_file_size_threshold', base_settings.FILE_SIZE_THRESHOLD)),
+        # AWS S3 配置
+        'S3_ACCESS_KEY': db_configs.get('aws_access_key_id') or base_settings.S3_ACCESS_KEY,
+        'S3_SECRET_KEY': db_configs.get('aws_secret_access_key') or base_settings.S3_SECRET_KEY,
+        'S3_REGION': db_configs.get('aws_region', base_settings.S3_REGION),
+        'S3_BUCKET': db_configs.get('s3_bucket_name', base_settings.S3_BUCKET),
+        'S3_ENDPOINT': db_configs.get('s3_endpoint_url', base_settings.S3_ENDPOINT),
+        # 阿里云 OSS 配置
+        'OSS_ACCESS_KEY': db_configs.get('oss_access_key_id') or base_settings.OSS_ACCESS_KEY,
+        'OSS_SECRET_KEY': db_configs.get('oss_access_key_secret') or base_settings.OSS_SECRET_KEY,
         'OSS_ENDPOINT': db_configs.get('oss_endpoint', base_settings.OSS_ENDPOINT),
-        'OSS_BUCKET_NAME': db_configs.get('oss_bucket_name', base_settings.OSS_BUCKET_NAME),
+        'OSS_BUCKET': db_configs.get('oss_bucket_name', base_settings.OSS_BUCKET),
     }
     
-    return StorageSettings(**settings_dict)
+    return StorageConfig(**settings_dict)
+
+
+# 导出
+__all__ = [
+    "StorageConfig",
+    "get_storage_settings",
+    "get_storage_settings_from_db",
+    "get_effective_storage_settings",
+]
