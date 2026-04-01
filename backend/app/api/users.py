@@ -8,12 +8,10 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.models import User, UserRole
+from app.models import User
 from app.schemas import UserCreate, UserUpdate, UserResponse, MessageResponse
-from app.utils.auth import hash_password
 from app.deps import get_super_admin, get_current_user
-from app.models.permissions import RoleEnvironment
-from sqlalchemy import text
+from app.services import UserService
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
 
@@ -26,8 +24,8 @@ async def list_users(
     db: Session = Depends(get_db)
 ):
     """获取用户列表（需要权限）"""
-    total = db.query(User).count()
-    users = db.query(User).offset(skip).limit(limit).all()
+    user_service = UserService(db)
+    users, total = user_service.get_multi_with_count(skip=skip, limit=limit)
     return {
         "total": total,
         "items": [UserResponse.model_validate(u) for u in users]
@@ -41,7 +39,8 @@ async def get_user(
     db: Session = Depends(get_db)
 ):
     """获取用户详情"""
-    user = db.query(User).filter(User.id == user_id).first()
+    user_service = UserService(db)
+    user = user_service.get(user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -57,33 +56,15 @@ async def create_user(
     db: Session = Depends(get_db)
 ):
     """创建用户（仅超级管理员）"""
-    # 检查用户名是否已存在
-    if db.query(User).filter(User.username == user_data.username).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already exists"
-        )
-    
-    # 检查邮箱是否已存在
-    if user_data.email and db.query(User).filter(User.email == user_data.email).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already in use"
-        )
-    
-    # 创建用户
-    user = User(
+    user_service = UserService(db)
+    user = user_service.create_user(
         username=user_data.username,
-        password_hash=hash_password(user_data.password),
+        password=user_data.password,
         real_name=user_data.real_name,
         email=user_data.email,
-        phone=user_data.phone,
-        role=user_data.role
+        role=user_data.role,
+        phone=user_data.phone
     )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    
     return UserResponse.model_validate(user)
 
 
@@ -95,33 +76,15 @@ async def update_user(
     db: Session = Depends(get_db)
 ):
     """更新用户（仅超级管理员）"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # 更新字段
-    if user_data.real_name is not None:
-        user.real_name = user_data.real_name
-    if user_data.email is not None:
-        if db.query(User).filter(User.email == user_data.email, User.id != user_id).first():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already in use"
-            )
-        user.email = user_data.email
-    if user_data.phone is not None:
-        user.phone = user_data.phone
-    if user_data.role is not None:
-        user.role = user_data.role
-    if user_data.status is not None:
-        user.status = user_data.status
-    
-    db.commit()
-    db.refresh(user)
-    
+    user_service = UserService(db)
+    user = user_service.update_user(
+        user_id=user_id,
+        real_name=user_data.real_name,
+        email=user_data.email,
+        phone=user_data.phone,
+        role=user_data.role,
+        status=user_data.status
+    )
     return UserResponse.model_validate(user)
 
 
@@ -132,22 +95,8 @@ async def delete_user(
     db: Session = Depends(get_db)
 ):
     """删除用户（仅超级管理员）"""
-    if user_id == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot delete your own account"
-        )
-    
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    db.delete(user)
-    db.commit()
-    
+    user_service = UserService(db)
+    user_service.delete_user(user_id, operator_id=current_user.id)
     return MessageResponse(message="用户删除成功")
 
 
@@ -159,16 +108,13 @@ async def reset_user_password(
     db: Session = Depends(get_db)
 ):
     """重置用户密码（仅超级管理员）"""
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
+    user_service = UserService(db)
+    success = user_service.update_password(user_id, new_password)
+    if not success:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
-    
-    user.password_hash = hash_password(new_password)
-    db.commit()
-    
     return MessageResponse(message="密码重置成功")
 
 
@@ -184,24 +130,8 @@ async def get_user_environments(
     注意：环境权限现在由角色控制
     用户的环境权限 = 用户所属角色的环境权限
     """
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found"
-        )
-    
-    # 从角色获取环境权限
-    role = user.role.value if isinstance(user.role, UserRole) else user.role
-    role_envs = db.query(RoleEnvironment).filter(RoleEnvironment.role == role).all()
-    environment_ids = [re.environment_id for re in role_envs]
-    
-    return {
-        "user_id": user_id,
-        "role": role,
-        "environment_ids": environment_ids,
-        "note": "环境权限由角色控制，如需修改请前往角色管理"
-    }
+    user_service = UserService(db)
+    return user_service.get_user_environments(user_id)
 
 
 @router.post("/{user_id}/environments", response_model=MessageResponse)

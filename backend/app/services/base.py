@@ -183,3 +183,12 @@ class BaseService(Generic[ModelType]):
             是否存在
         """
         return self.db.query(self.model).filter(self.model.id == id).count() > 0
+    
+    def get_all(self) -> List[ModelType]:
+        """
+        获取所有记录
+        
+        Returns:
+            模型实例列表
+        """
+        return self.db.query(self.model).all()

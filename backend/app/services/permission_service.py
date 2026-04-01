@@ -269,6 +269,283 @@ class PermissionService:
     def clear_cache(self) -> None:
         """清除权限缓存"""
         self._permission_cache.clear()
+    
+    # ==================== 权限管理方法 ====================
+    
+    def get_permissions(self, module: Optional[str] = None, category: Optional[str] = None) -> List[Permission]:
+        """
+        获取权限列表
+        
+        Args:
+            module: 模块过滤
+            category: 类别过滤
+        
+        Returns:
+            权限列表
+        """
+        query = self.db.query(Permission)
+        if module:
+            query = query.filter(Permission.module == module)
+        if category:
+            query = query.filter(Permission.category == category)
+        return query.order_by(Permission.sort_order, Permission.id).all()
+    
+    def get_permission_by_code(self, code: str) -> Optional[Permission]:
+        """
+        根据编码获取权限
+        
+        Args:
+            code: 权限编码
+        
+        Returns:
+            权限对象或 None
+        """
+        return self.db.query(Permission).filter(Permission.code == code).first()
+    
+    def get_permission_by_id(self, permission_id: int) -> Optional[Permission]:
+        """
+        根据 ID 获取权限
+        
+        Args:
+            permission_id: 权限 ID
+        
+        Returns:
+            权限对象或 None
+        """
+        return self.db.query(Permission).filter(Permission.id == permission_id).first()
+    
+    def create_permission(self, code: str, name: str, category: str = "button", 
+                          module: Optional[str] = None, description: Optional[str] = None,
+                          parent_id: Optional[int] = None, sort_order: int = 0) -> Permission:
+        """
+        创建权限
+        
+        Args:
+            code: 权限编码
+            name: 权限名称
+            category: 权限类别
+            module: 所属模块
+            description: 描述
+            parent_id: 父权限 ID
+            sort_order: 排序
+        
+        Returns:
+            创建的权限对象
+        """
+        permission = Permission(
+            code=code,
+            name=name,
+            category=category,
+            module=module,
+            description=description,
+            parent_id=parent_id,
+            sort_order=sort_order
+        )
+        self.db.add(permission)
+        self.db.commit()
+        self.db.refresh(permission)
+        return permission
+    
+    def update_permission(self, permission_id: int, **kwargs) -> Optional[Permission]:
+        """
+        更新权限
+        
+        Args:
+            permission_id: 权限 ID
+            **kwargs: 更新字段
+        
+        Returns:
+            更新后的权限对象或 None
+        """
+        permission = self.get_permission_by_id(permission_id)
+        if not permission:
+            return None
+        
+        for key, value in kwargs.items():
+            if hasattr(permission, key):
+                setattr(permission, key, value)
+        
+        self.db.commit()
+        self.db.refresh(permission)
+        return permission
+    
+    def delete_permission(self, permission_id: int) -> bool:
+        """
+        删除权限
+        
+        Args:
+            permission_id: 权限 ID
+        
+        Returns:
+            是否删除成功
+        """
+        permission = self.get_permission_by_id(permission_id)
+        if not permission:
+            return False
+        
+        # 删除关联的角色权限
+        self.db.query(RolePermission).filter(RolePermission.permission_id == permission_id).delete()
+        self.db.delete(permission)
+        self.db.commit()
+        return True
+    
+    # ==================== 角色权限管理方法 ====================
+    
+    def get_role_permission_ids(self, role: str) -> List[int]:
+        """
+        获取角色的权限 ID 列表
+        
+        Args:
+            role: 角色代码
+        
+        Returns:
+            权限 ID 列表
+        """
+        role_perms = self.db.query(RolePermission).filter(RolePermission.role == role).all()
+        return [rp.permission_id for rp in role_perms]
+    
+    def get_role_permission_count(self, role: str) -> int:
+        """
+        获取角色的权限数量
+        
+        Args:
+            role: 角色代码
+        
+        Returns:
+            权限数量
+        """
+        return self.db.query(RolePermission).filter(RolePermission.role == role).count()
+    
+    def update_role_permissions(self, role: str, permission_ids: List[int]) -> None:
+        """
+        更新角色权限
+        
+        Args:
+            role: 角色代码
+            permission_ids: 权限 ID 列表
+        """
+        # 删除原有权限
+        self.db.query(RolePermission).filter(RolePermission.role == role).delete()
+        
+        # 添加新权限
+        for perm_id in permission_ids:
+            role_perm = RolePermission(role=role, permission_id=perm_id)
+            self.db.add(role_perm)
+        
+        self.db.commit()
+    
+    # ==================== 角色环境权限管理方法 ====================
+    
+    def get_role_environment_ids(self, role: str) -> List[int]:
+        """
+        获取角色的环境权限 ID 列表
+        
+        Args:
+            role: 角色代码
+        
+        Returns:
+            环境 ID 列表
+        """
+        env_perms = self.db.query(RoleEnvironment).filter(RoleEnvironment.role == role).all()
+        return [ep.environment_id for ep in env_perms]
+    
+    def get_role_environment_count(self, role: str) -> int:
+        """
+        获取角色的环境权限数量
+        
+        Args:
+            role: 角色代码
+        
+        Returns:
+            环境权限数量
+        """
+        return self.db.query(RoleEnvironment).filter(RoleEnvironment.role == role).count()
+    
+    def update_role_environments(self, role: str, environment_ids: List[int]) -> None:
+        """
+        更新角色的环境权限
+        
+        Args:
+            role: 角色代码
+            environment_ids: 环境 ID 列表
+        """
+        # 删除原有环境权限
+        self.db.query(RoleEnvironment).filter(RoleEnvironment.role == role).delete()
+        
+        # 添加新环境权限
+        for env_id in environment_ids:
+            role_env = RoleEnvironment(role=role, environment_id=env_id)
+            self.db.add(role_env)
+        
+        self.db.commit()
+    
+    # ==================== 用户角色管理方法 ====================
+    
+    def get_users_by_role(self, role: str) -> List[User]:
+        """
+        获取指定角色的用户列表
+        
+        Args:
+            role: 角色代码
+        
+        Returns:
+            用户列表
+        """
+        return self.db.query(User).filter(User.role == UserRole(role)).all()
+    
+    def get_user_count_by_role(self, role: str) -> int:
+        """
+        获取指定角色的用户数量
+        
+        Args:
+            role: 角色代码
+        
+        Returns:
+            用户数量
+        """
+        return self.db.query(User).filter(User.role == UserRole(role)).count()
+    
+    def get_users_not_in_role(self, role: str, search: Optional[str] = None, limit: int = 100) -> List[User]:
+        """
+        获取不属于指定角色的用户列表
+        
+        Args:
+            role: 角色代码
+            search: 搜索关键词
+            limit: 返回数量限制
+        
+        Returns:
+            用户列表
+        """
+        query = self.db.query(User).filter(User.role != UserRole(role))
+        
+        if search:
+            query = query.filter(
+                (User.username.ilike(f"%{search}%")) |
+                (User.real_name.ilike(f"%{search}%")) |
+                (User.email.ilike(f"%{search}%"))
+            )
+        
+        return query.order_by(User.id).limit(limit).all()
+    
+    def update_user_role(self, user_id: int, role: str) -> bool:
+        """
+        更新用户角色
+        
+        Args:
+            user_id: 用户 ID
+            role: 新角色代码
+        
+        Returns:
+            是否更新成功
+        """
+        user = self.db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return False
+        
+        user.role = UserRole(role)
+        self.db.commit()
+        return True
 
 
 class BatchOperationService:

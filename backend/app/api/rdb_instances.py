@@ -7,7 +7,7 @@ import asyncio
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import pymysql
 import psycopg2
@@ -15,7 +15,8 @@ import logging
 
 from app.database import get_db
 from app.models import RDBInstance, InstanceGroup, Environment, MonitorSwitch, MonitorType, RDBType, GlobalConfig
-from app.utils.auth import encrypt_instance_password, decrypt_instance_password
+from app.services.instance_service import RDBInstanceService
+from app.utils.auth import encrypt_instance_password
 from app.deps import get_operator, get_current_user, require_permission
 from app.models import User
 from app.utils.aws_rds_collector import parse_aws_region_from_host, is_rds_endpoint
@@ -192,21 +193,15 @@ async def list_rdb_instances(
     db: Session = Depends(get_db)
 ):
     """获取 RDB 实例列表"""
-    query = db.query(RDBInstance).options(
-        joinedload(RDBInstance.environment)
+    service = RDBInstanceService(db)
+    instances, total = service.get_multi_with_environment(
+        skip=skip,
+        limit=limit,
+        environment_id=environment_id,
+        group_id=group_id,
+        db_type=db_type,
+        status=status
     )
-    
-    if environment_id:
-        query = query.filter(RDBInstance.environment_id == environment_id)
-    if group_id:
-        query = query.filter(RDBInstance.group_id == group_id)
-    if db_type:
-        query = query.filter(RDBInstance.db_type == db_type)
-    if status is not None:
-        query = query.filter(RDBInstance.status == status)
-    
-    total = query.count()
-    instances = query.offset(skip).limit(limit).all()
     
     # 构建返回数据，包含 environment 信息
     items = []
@@ -251,9 +246,8 @@ async def get_rdb_instance(
     db: Session = Depends(get_db)
 ):
     """获取 RDB 实例详情"""
-    instance = db.query(RDBInstance).options(
-        joinedload(RDBInstance.environment)
-    ).filter(RDBInstance.id == instance_id).first()
+    service = RDBInstanceService(db)
+    instance = service.get_with_environment(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -312,6 +306,8 @@ async def create_rdb_instance(
     db: Session = Depends(get_db)
 ):
     """创建 RDB 实例"""
+    service = RDBInstanceService(db)
+    
     # 检查数据库类型是否启用
     db_type = instance_data.db_type.lower() if instance_data.db_type else "mysql"
     if not check_db_type_enabled(db, db_type):
@@ -321,7 +317,7 @@ async def create_rdb_instance(
         )
     
     # 检查名称是否已存在
-    if db.query(RDBInstance).filter(RDBInstance.name == instance_data.name).first():
+    if service.get_by_name(instance_data.name):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="实例名称已存在"
@@ -379,24 +375,23 @@ async def create_rdb_instance(
                 if aws_region:
                     logger.info(f"从 host 自动解析出 AWS 区域: {aws_region}")
     
-    instance = RDBInstance(
-        name=instance_data.name,
-        db_type=instance_data.db_type or "mysql",
-        host=instance_data.host or "",
-        port=instance_data.port or 3306,
-        username=instance_data.username or "",
-        password_encrypted=encrypt_instance_password(instance_data.password) if instance_data.password else "",
-        environment_id=instance_data.environment_id,
-        group_id=instance_data.group_id,
-        description=instance_data.description,
-        status=instance_data.status if instance_data.status is not None else True,
-        is_rds=is_rds,
-        rds_instance_id=instance_data.rds_instance_id,
-        aws_region=aws_region,
-        slow_query_threshold=instance_data.slow_query_threshold,
-        enable_monitoring=instance_data.enable_monitoring
-    )
-    db.add(instance)
+    instance = service.create({
+        "name": instance_data.name,
+        "db_type": instance_data.db_type or "mysql",
+        "host": instance_data.host or "",
+        "port": instance_data.port or 3306,
+        "username": instance_data.username or "",
+        "password_encrypted": encrypt_instance_password(instance_data.password) if instance_data.password else "",
+        "environment_id": instance_data.environment_id,
+        "group_id": instance_data.group_id,
+        "description": instance_data.description,
+        "status": instance_data.status if instance_data.status is not None else True,
+        "is_rds": is_rds,
+        "rds_instance_id": instance_data.rds_instance_id,
+        "aws_region": aws_region,
+        "slow_query_threshold": instance_data.slow_query_threshold,
+        "enable_monitoring": instance_data.enable_monitoring
+    })
     db.commit()
     db.refresh(instance)
     
@@ -422,7 +417,8 @@ async def update_rdb_instance(
     db: Session = Depends(get_db)
 ):
     """更新 RDB 实例"""
-    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
+    service = RDBInstanceService(db)
+    instance = service.get(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -452,11 +448,7 @@ async def update_rdb_instance(
                     update_data['aws_region'] = parsed_region
                     logger.info(f"从 host 自动解析出 AWS 区域: {parsed_region}")
     
-    for key, value in update_data.items():
-        setattr(instance, key, value)
-    
-    db.commit()
-    db.refresh(instance)
+    instance = service.update(instance_id, update_data)
     
     logger.info(f"更新 RDB 实例: {instance.name} (ID: {instance.id})")
     return RDBInstanceResponse.model_validate(instance)
@@ -472,22 +464,25 @@ async def sync_aws_regions(
     自动从 RDS endpoint 解析区域并更新到数据库
     适用于已有实例的区域信息补充
     """
-    instances = db.query(RDBInstance).all()
+    service = RDBInstanceService(db)
+    instances = service.get_all()
     updated_count = 0
     updated_instances = []
     
     for instance in instances:
         if instance.host and is_rds_endpoint(instance.host):
+            update_data = {}
+            
             # 自动设置 is_rds
             if not instance.is_rds:
-                instance.is_rds = True
+                update_data['is_rds'] = True
                 updated_count += 1
             
             # 自动解析区域
             parsed_region = parse_aws_region_from_host(instance.host)
             if parsed_region and instance.aws_region != parsed_region:
                 old_region = instance.aws_region
-                instance.aws_region = parsed_region
+                update_data['aws_region'] = parsed_region
                 updated_count += 1
                 updated_instances.append({
                     "id": instance.id,
@@ -497,9 +492,9 @@ async def sync_aws_regions(
                     "new_region": parsed_region
                 })
                 logger.info(f"更新实例 {instance.name} 区域: {old_region} -> {parsed_region}")
-    
-    if updated_count > 0:
-        db.commit()
+            
+            if update_data:
+                service.update(instance.id, update_data)
     
     return {
         "success": True,
@@ -516,7 +511,8 @@ async def delete_rdb_instance(
     db: Session = Depends(get_db)
 ):
     """删除 RDB 实例"""
-    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
+    service = RDBInstanceService(db)
+    instance = service.get(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -524,8 +520,7 @@ async def delete_rdb_instance(
         )
     
     instance_name = instance.name
-    db.delete(instance)
-    db.commit()
+    service.delete(instance_id)
     
     logger.info(f"删除 RDB 实例: {instance_name} (ID: {instance_id})")
     return MessageResponse(message="实例删除成功")
@@ -538,7 +533,8 @@ async def check_rdb_instance_status(
     db: Session = Depends(get_db)
 ):
     """检查 RDB 实例状态"""
-    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
+    service = RDBInstanceService(db)
+    instance = service.get(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -551,7 +547,7 @@ async def check_rdb_instance_status(
     
     # 尝试解密密码
     try:
-        password = decrypt_instance_password(instance.password_encrypted)
+        password = service.get_decrypted_password(instance)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -567,9 +563,10 @@ async def check_rdb_instance_status(
     )
     
     # 更新实例状态
-    instance.status = result["success"]
-    instance.last_check_time = datetime.now()
-    db.commit()
+    service.update(instance_id, {
+        "status": result["success"],
+        "last_check_time": datetime.now()
+    })
     
     return InstanceTestResult(**result)
 

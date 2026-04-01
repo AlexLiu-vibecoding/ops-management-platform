@@ -6,13 +6,14 @@ Redis 实例管理 API
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 import logging
 
 from app.database import get_db
 from app.models import RedisInstance, InstanceGroup, RedisMode, RedisSlowLog, RedisMemoryStats, Environment, GlobalConfig
-from app.utils.auth import encrypt_instance_password, decrypt_instance_password
+from app.services.instance_service import RedisInstanceService
+from app.utils.auth import encrypt_instance_password
 from app.deps import get_operator, get_current_user, require_permission
 from app.models import User
 
@@ -190,11 +191,16 @@ async def test_redis_connection(host: str, port: int, password: str = "", redis_
 async def get_redis_client(instance: RedisInstance, db: int = None):
     """获取 Redis 客户端"""
     import redis.asyncio as redis
+    from app.services.instance_service import RedisInstanceService
+    from app.database import SessionLocal
     
     password = None
     if instance.password_encrypted:
         try:
-            password = decrypt_instance_password(instance.password_encrypted)
+            # 使用 Service 层解密密码
+            with SessionLocal() as session:
+                service = RedisInstanceService(session)
+                password = service.get_decrypted_password(instance)
         except Exception:
             pass
     
@@ -222,21 +228,15 @@ async def list_redis_instances(
     db: Session = Depends(get_db)
 ):
     """获取 Redis 实例列表"""
-    query = db.query(RedisInstance).options(
-        joinedload(RedisInstance.environment)
+    service = RedisInstanceService(db)
+    instances, total = service.get_multi_with_environment(
+        skip=skip,
+        limit=limit,
+        environment_id=environment_id,
+        group_id=group_id,
+        redis_mode=redis_mode,
+        status=status
     )
-    
-    if environment_id:
-        query = query.filter(RedisInstance.environment_id == environment_id)
-    if group_id:
-        query = query.filter(RedisInstance.group_id == group_id)
-    if redis_mode:
-        query = query.filter(RedisInstance.redis_mode == redis_mode)
-    if status is not None:
-        query = query.filter(RedisInstance.status == status)
-    
-    total = query.count()
-    instances = query.offset(skip).limit(limit).all()
     
     # 构建返回数据，包含 environment 信息
     items = []
@@ -281,9 +281,8 @@ async def get_redis_instance(
     db: Session = Depends(get_db)
 ):
     """获取 Redis 实例详情"""
-    instance = db.query(RedisInstance).options(
-        joinedload(RedisInstance.environment)
-    ).filter(RedisInstance.id == instance_id).first()
+    service = RedisInstanceService(db)
+    instance = service.get_with_environment(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -341,6 +340,8 @@ async def create_redis_instance(
     db: Session = Depends(get_db)
 ):
     """创建 Redis 实例"""
+    service = RedisInstanceService(db)
+    
     # 检查 Redis 类型是否启用
     if not check_db_type_enabled(db, "redis"):
         raise HTTPException(
@@ -349,7 +350,7 @@ async def create_redis_instance(
         )
     
     # 检查名称是否已存在
-    if db.query(RedisInstance).filter(RedisInstance.name == instance_data.name).first():
+    if service.get_by_name(instance_data.name):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="实例名称已存在"
@@ -377,26 +378,23 @@ async def create_redis_instance(
         )
     
     # 创建实例
-    instance = RedisInstance(
-        name=instance_data.name,
-        host=instance_data.host,
-        port=instance_data.port or 6379,
-        password_encrypted=encrypt_instance_password(instance_data.password) if instance_data.password else None,
-        redis_mode=instance_data.redis_mode or "standalone",
-        redis_db=instance_data.redis_db or 0,
-        cluster_nodes=instance_data.cluster_nodes,
-        sentinel_master_name=instance_data.sentinel_master_name,
-        sentinel_hosts=instance_data.sentinel_hosts,
-        environment_id=instance_data.environment_id,
-        group_id=instance_data.group_id,
-        description=instance_data.description,
-        status=instance_data.status if instance_data.status is not None else True,
-        slowlog_threshold=instance_data.slowlog_threshold,
-        enable_monitoring=instance_data.enable_monitoring
-    )
-    db.add(instance)
-    db.commit()
-    db.refresh(instance)
+    instance = service.create({
+        "name": instance_data.name,
+        "host": instance_data.host,
+        "port": instance_data.port or 6379,
+        "password_encrypted": encrypt_instance_password(instance_data.password) if instance_data.password else None,
+        "redis_mode": instance_data.redis_mode or "standalone",
+        "redis_db": instance_data.redis_db or 0,
+        "cluster_nodes": instance_data.cluster_nodes,
+        "sentinel_master_name": instance_data.sentinel_master_name,
+        "sentinel_hosts": instance_data.sentinel_hosts,
+        "environment_id": instance_data.environment_id,
+        "group_id": instance_data.group_id,
+        "description": instance_data.description,
+        "status": instance_data.status if instance_data.status is not None else True,
+        "slowlog_threshold": instance_data.slowlog_threshold,
+        "enable_monitoring": instance_data.enable_monitoring
+    })
     
     logger.info(f"创建 Redis 实例: {instance.name} (ID: {instance.id})")
     return RedisInstanceResponse.model_validate(instance)
@@ -410,7 +408,8 @@ async def update_redis_instance(
     db: Session = Depends(get_db)
 ):
     """更新 Redis 实例"""
-    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    service = RedisInstanceService(db)
+    instance = service.get(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -424,11 +423,7 @@ async def update_redis_instance(
     if 'password' in update_data:
         update_data['password_encrypted'] = encrypt_instance_password(update_data.pop('password'))
     
-    for key, value in update_data.items():
-        setattr(instance, key, value)
-    
-    db.commit()
-    db.refresh(instance)
+    instance = service.update(instance_id, update_data)
     
     logger.info(f"更新 Redis 实例: {instance.name} (ID: {instance.id})")
     return RedisInstanceResponse.model_validate(instance)
@@ -441,7 +436,8 @@ async def delete_redis_instance(
     db: Session = Depends(get_db)
 ):
     """删除 Redis 实例"""
-    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    service = RedisInstanceService(db)
+    instance = service.get(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -449,8 +445,7 @@ async def delete_redis_instance(
         )
     
     instance_name = instance.name
-    db.delete(instance)
-    db.commit()
+    service.delete(instance_id)
     
     logger.info(f"删除 Redis 实例: {instance_name} (ID: {instance_id})")
     return MessageResponse(message="实例删除成功")
@@ -463,7 +458,8 @@ async def check_redis_instance_status(
     db: Session = Depends(get_db)
 ):
     """检查 Redis 实例状态"""
-    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    service = RedisInstanceService(db)
+    instance = service.get(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -474,7 +470,7 @@ async def check_redis_instance_status(
     password = None
     if instance.password_encrypted:
         try:
-            password = decrypt_instance_password(instance.password_encrypted)
+            password = service.get_decrypted_password(instance)
         except ValueError as e:
             return InstanceTestResult(
                 success=False,
@@ -489,9 +485,10 @@ async def check_redis_instance_status(
     )
     
     # 更新实例状态
-    instance.status = result["success"]
-    instance.last_check_time = datetime.now()
-    db.commit()
+    service.update(instance_id, {
+        "status": result["success"],
+        "last_check_time": datetime.now()
+    })
     
     return InstanceTestResult(**result)
 
@@ -506,7 +503,8 @@ async def get_redis_slowlog(
     db: Session = Depends(get_db)
 ):
     """获取 Redis 慢日志"""
-    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    service = RedisInstanceService(db)
+    instance = service.get(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -575,7 +573,8 @@ async def get_redis_info(
     db: Session = Depends(get_db)
 ):
     """获取 Redis 信息"""
-    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    service = RedisInstanceService(db)
+    instance = service.get(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -620,7 +619,8 @@ async def get_redis_keys(
     db: Session = Depends(get_db)
 ):
     """获取 Redis Key 列表"""
-    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    service = RedisInstanceService(db)
+    instance = service.get(instance_id)
     if not instance:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

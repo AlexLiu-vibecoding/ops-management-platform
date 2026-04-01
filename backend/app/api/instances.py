@@ -9,16 +9,15 @@
 """
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from datetime import datetime
 import logging
 
 from app.database import get_db
-from app.models import RDBInstance, RedisInstance, InstanceGroup, Environment
 from app.deps import get_current_user
 from app.models import User
-from app.utils.auth import decrypt_instance_password
+from app.services.instance_service import RDBInstanceService, RedisInstanceService, InstanceGroupService
 from app.api.rdb_instances import test_rdb_connection, InstanceTestResult
 from app.api.redis_instances import test_redis_connection
 
@@ -45,25 +44,23 @@ async def list_instances(
     """获取实例列表（向后兼容）"""
     items = []
     
+    rdb_service = RDBInstanceService(db)
+    redis_service = RedisInstanceService(db)
+    
     # 如果没有指定 db_type 或指定的是 mysql/postgresql，查询 RDB 实例
     if not db_type or db_type.lower() in ('mysql', 'postgresql'):
-        rdb_query = db.query(RDBInstance).options(
-            joinedload(RDBInstance.environment)
+        # 构建过滤条件
+        filter_db_type = None
+        if db_type and db_type.lower() in ('mysql', 'postgresql'):
+            filter_db_type = 'MYSQL' if db_type.lower() == 'mysql' else 'POSTGRESQL'
+        
+        rdb_instances = rdb_service.get_all_with_environment(
+            environment_id=environment_id,
+            group_id=group_id,
+            db_type=filter_db_type,
+            status=status
         )
         
-        if environment_id:
-            rdb_query = rdb_query.filter(RDBInstance.environment_id == environment_id)
-        if group_id:
-            rdb_query = rdb_query.filter(RDBInstance.group_id == group_id)
-        if db_type and db_type.lower() in ('mysql', 'postgresql'):
-            if db_type.lower() == 'mysql':
-                rdb_query = rdb_query.filter(RDBInstance.db_type == 'MYSQL')
-            elif db_type.lower() == 'postgresql':
-                rdb_query = rdb_query.filter(RDBInstance.db_type == 'POSTGRESQL')
-        if status is not None:
-            rdb_query = rdb_query.filter(RDBInstance.status == status)
-        
-        rdb_instances = rdb_query.all()
         for i in rdb_instances:
             # 使用预加载的 environment 关系，避免 N+1 查询
             env_data = None
@@ -94,18 +91,12 @@ async def list_instances(
     
     # 如果没有指定 db_type 或指定的是 redis，查询 Redis 实例
     if not db_type or db_type.lower() == 'redis':
-        redis_query = db.query(RedisInstance).options(
-            joinedload(RedisInstance.environment)
+        redis_instances = redis_service.get_all_with_environment(
+            environment_id=environment_id,
+            group_id=group_id,
+            status=status
         )
         
-        if environment_id:
-            redis_query = redis_query.filter(RedisInstance.environment_id == environment_id)
-        if group_id:
-            redis_query = redis_query.filter(RedisInstance.group_id == group_id)
-        if status is not None:
-            redis_query = redis_query.filter(RedisInstance.status == status)
-        
-        redis_instances = redis_query.all()
         for i in redis_instances:
             # 使用预加载的 environment 关系，避免 N+1 查询
             env_data = None
@@ -154,10 +145,11 @@ async def get_instance(
     db: Session = Depends(get_db)
 ):
     """获取实例详情（向后兼容）"""
+    rdb_service = RDBInstanceService(db)
+    redis_service = RedisInstanceService(db)
+    
     # 先尝试从 RDB 表查找
-    instance = db.query(RDBInstance).options(
-        joinedload(RDBInstance.environment)
-    ).filter(RDBInstance.id == instance_id).first()
+    instance = rdb_service.get_with_environment(instance_id)
     if instance:
         # 使用预加载的 environment 关系
         env_data = None
@@ -187,9 +179,7 @@ async def get_instance(
         }
     
     # 再尝试从 Redis 表查找
-    instance = db.query(RedisInstance).options(
-        joinedload(RedisInstance.environment)
-    ).filter(RedisInstance.id == instance_id).first()
+    instance = redis_service.get_with_environment(instance_id)
     if instance:
         # 使用预加载的 environment 关系
         env_data = None
@@ -231,8 +221,11 @@ async def check_instance_status(
     db: Session = Depends(get_db)
 ):
     """检查实例状态（向后兼容）"""
+    rdb_service = RDBInstanceService(db)
+    redis_service = RedisInstanceService(db)
+    
     # 先尝试从 RDB 表查找
-    instance = db.query(RDBInstance).filter(RDBInstance.id == instance_id).first()
+    instance = rdb_service.get(instance_id)
     if instance:
         # RDS 实例不检查连接
         if instance.is_rds:
@@ -240,7 +233,7 @@ async def check_instance_status(
         
         # 尝试解密密码
         try:
-            password = decrypt_instance_password(instance.password_encrypted)
+            password = rdb_service.get_decrypted_password(instance)
         except ValueError as e:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -256,20 +249,21 @@ async def check_instance_status(
         )
         
         # 更新实例状态
-        instance.status = result["success"]
-        instance.last_check_time = datetime.now()
-        db.commit()
+        rdb_service.update(instance_id, {
+            "status": result["success"],
+            "last_check_time": datetime.now()
+        })
         
         return InstanceTestResult(**result)
     
     # 再尝试从 Redis 表查找
-    instance = db.query(RedisInstance).filter(RedisInstance.id == instance_id).first()
+    instance = redis_service.get(instance_id)
     if instance:
         # 尝试解密密码
         password = None
         if instance.password_encrypted:
             try:
-                password = decrypt_instance_password(instance.password_encrypted)
+                password = redis_service.get_decrypted_password(instance)
             except ValueError as e:
                 return InstanceTestResult(
                     success=False,
@@ -284,9 +278,10 @@ async def check_instance_status(
         )
         
         # 更新实例状态
-        instance.status = result["success"]
-        instance.last_check_time = datetime.now()
-        db.commit()
+        redis_service.update(instance_id, {
+            "status": result["success"],
+            "last_check_time": datetime.now()
+        })
         
         return InstanceTestResult(**result)
     
@@ -304,8 +299,9 @@ async def list_instance_groups(
     db: Session = Depends(get_db)
 ):
     """获取实例分组列表"""
-    groups = db.query(InstanceGroup).all()
-    return [{"id": g.id, "name": g.name, "description": g.description} for g in groups]
+    group_service = InstanceGroupService(db)
+    groups = group_service.get_all()
+    return [group_service.to_dict(g) for g in groups]
 
 
 @router.post("/groups/", response_model=MessageResponse)
@@ -316,14 +312,7 @@ async def create_instance_group(
     db: Session = Depends(get_db)
 ):
     """创建实例分组"""
-    if db.query(InstanceGroup).filter(InstanceGroup.name == name).first():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="分组名称已存在"
-        )
-    
-    group = InstanceGroup(name=name, description=description)
-    db.add(group)
-    db.commit()
+    group_service = InstanceGroupService(db)
+    group_service.create(name=name, description=description)
     
     return MessageResponse(message="分组创建成功")

@@ -17,6 +17,7 @@ from app.database import get_db
 from app.models.permissions import Permission, RolePermission, PermissionCode, DEFAULT_ROLE_PERMISSIONS, RoleEnvironment
 from app.models import User, Environment, UserRole
 from app.deps import get_current_user
+from app.services.permission_service import PermissionService
 
 router = APIRouter(prefix="/api/v1/permissions", tags=["权限管理"])
 
@@ -101,13 +102,8 @@ async def get_permissions(
     if current_user.role not in ["super_admin"]:
         raise HTTPException(status_code=403, detail="无权限访问")
     
-    query = db.query(Permission)
-    if module:
-        query = query.filter(Permission.module == module)
-    if category:
-        query = query.filter(Permission.category == category)
-    
-    permissions = query.order_by(Permission.sort_order, Permission.id).all()
+    service = PermissionService(db)
+    permissions = service.get_permissions(module=module, category=category)
     
     # 构建树形结构
     def build_tree(items, parent_id=None):
@@ -146,12 +142,14 @@ async def create_permission(
     if current_user.role not in ["super_admin"]:
         raise HTTPException(status_code=403, detail="无权限访问")
     
+    service = PermissionService(db)
+    
     # 检查权限编码是否已存在
-    existing = db.query(Permission).filter(Permission.code == data.code).first()
+    existing = service.get_permission_by_code(data.code)
     if existing:
         raise HTTPException(status_code=400, detail="权限编码已存在")
     
-    permission = Permission(
+    permission = service.create_permission(
         code=data.code,
         name=data.name,
         category=data.category,
@@ -160,9 +158,6 @@ async def create_permission(
         parent_id=data.parent_id,
         sort_order=data.sort_order
     )
-    db.add(permission)
-    db.commit()
-    db.refresh(permission)
     
     return {"success": True, "id": permission.id, "message": "创建成功"}
 
@@ -178,15 +173,14 @@ async def update_permission(
     if current_user.role not in ["super_admin"]:
         raise HTTPException(status_code=403, detail="无权限访问")
     
-    permission = db.query(Permission).filter(Permission.id == permission_id).first()
+    service = PermissionService(db)
+    
+    update_data = data.dict(exclude_unset=True)
+    permission = service.update_permission(permission_id, **update_data)
+    
     if not permission:
         raise HTTPException(status_code=404, detail="权限不存在")
     
-    update_data = data.dict(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(permission, key, value)
-    
-    db.commit()
     return {"success": True, "message": "更新成功"}
 
 
@@ -200,14 +194,10 @@ async def delete_permission(
     if current_user.role not in ["super_admin"]:
         raise HTTPException(status_code=403, detail="无权限访问")
     
-    permission = db.query(Permission).filter(Permission.id == permission_id).first()
-    if not permission:
-        raise HTTPException(status_code=404, detail="权限不存在")
+    service = PermissionService(db)
     
-    # 删除关联的角色权限
-    db.query(RolePermission).filter(RolePermission.permission_id == permission_id).delete()
-    db.delete(permission)
-    db.commit()
+    if not service.delete_permission(permission_id):
+        raise HTTPException(status_code=404, detail="权限不存在")
     
     return {"success": True, "message": "删除成功"}
 
@@ -244,18 +234,20 @@ async def get_roles(
     if current_user.role not in ["super_admin"]:
         raise HTTPException(status_code=403, detail="无权限访问")
     
+    service = PermissionService(db)
     result = []
+    
     for role_info in ROLES:
         role = role_info["role"]
         
         # 获取该角色的权限数量
-        perm_count = db.query(RolePermission).filter(RolePermission.role == role).count()
+        perm_count = service.get_role_permission_count(role)
         
         # 获取该角色的用户数量
-        user_count = db.query(User).filter(User.role == UserRole(role)).count()
+        user_count = service.get_user_count_by_role(role)
         
         # 获取该角色的环境权限数量
-        env_count = db.query(RoleEnvironment).filter(RoleEnvironment.role == role).count()
+        env_count = service.get_role_environment_count(role)
         
         result.append({
             **role_info,
@@ -282,9 +274,10 @@ async def get_role_detail(
     if not role_info:
         raise HTTPException(status_code=400, detail="无效的角色")
     
+    service = PermissionService(db)
+    
     # 获取环境权限
-    env_perms = db.query(RoleEnvironment).filter(RoleEnvironment.role == role).all()
-    environment_ids = [ep.environment_id for ep in env_perms]
+    environment_ids = service.get_role_environment_ids(role)
     
     # 获取环境详情
     environments = []
@@ -296,8 +289,7 @@ async def get_role_detail(
         ]
     
     # 获取功能权限
-    role_perms = db.query(RolePermission).filter(RolePermission.role == role).all()
-    permission_ids = [rp.permission_id for rp in role_perms]
+    permission_ids = service.get_role_permission_ids(role)
     
     permissions = []
     if permission_ids:
@@ -308,7 +300,7 @@ async def get_role_detail(
         ]
     
     # 获取用户列表
-    users = db.query(User).filter(User.role == UserRole(role)).all()
+    users = service.get_users_by_role(role)
     user_list = [
         {
             "id": u.id,
@@ -352,9 +344,10 @@ async def get_role_environments(
     if not role_info:
         raise HTTPException(status_code=400, detail="无效的角色")
     
+    service = PermissionService(db)
+    
     # 获取角色环境权限
-    env_perms = db.query(RoleEnvironment).filter(RoleEnvironment.role == role).all()
-    environment_ids = [ep.environment_id for ep in env_perms]
+    environment_ids = service.get_role_environment_ids(role)
     
     # 获取所有环境
     all_envs = db.query(Environment).filter(Environment.status == True).order_by(Environment.id).all()
@@ -385,18 +378,8 @@ async def update_role_environments(
     if not role_info:
         raise HTTPException(status_code=400, detail="无效的角色")
     
-    # 删除原有环境权限
-    db.query(RoleEnvironment).filter(RoleEnvironment.role == role).delete()
-    
-    # 添加新环境权限
-    for env_id in data.environment_ids:
-        # 验证环境存在
-        env = db.query(Environment).filter(Environment.id == env_id).first()
-        if env:
-            role_env = RoleEnvironment(role=role, environment_id=env_id)
-            db.add(role_env)
-    
-    db.commit()
+    service = PermissionService(db)
+    service.update_role_environments(role, data.environment_ids)
     
     return {"success": True, "message": "环境权限更新成功"}
 
@@ -419,9 +402,8 @@ async def get_role_permissions(
     if role not in valid_roles:
         raise HTTPException(status_code=400, detail="无效的角色")
     
-    # 获取角色权限
-    role_perms = db.query(RolePermission).filter(RolePermission.role == role).all()
-    permission_ids = [rp.permission_id for rp in role_perms]
+    service = PermissionService(db)
+    permission_ids = service.get_role_permission_ids(role)
     
     return {
         "role": role,
@@ -445,15 +427,8 @@ async def update_role_permissions(
     if role not in valid_roles:
         raise HTTPException(status_code=400, detail="无效的角色")
     
-    # 删除原有权限
-    db.query(RolePermission).filter(RolePermission.role == role).delete()
-    
-    # 添加新权限
-    for perm_id in data.permission_ids:
-        role_perm = RolePermission(role=role, permission_id=perm_id)
-        db.add(role_perm)
-    
-    db.commit()
+    service = PermissionService(db)
+    service.update_role_permissions(role, data.permission_ids)
     
     return {"success": True, "message": "权限更新成功"}
 
@@ -467,30 +442,22 @@ async def reset_default_permissions(
     if current_user.role not in ["super_admin"]:
         raise HTTPException(status_code=403, detail="无权限访问")
     
+    service = PermissionService(db)
+    
     # 初始化权限数据（如果不存在）
     for role, perm_codes in DEFAULT_ROLE_PERMISSIONS.items():
         for perm_code in perm_codes:
             # 确保权限存在
-            perm = db.query(Permission).filter(Permission.code == perm_code).first()
+            perm = service.get_permission_by_code(perm_code)
             if not perm:
                 # 根据权限编码推断模块和名称
                 module, name = perm_code.split(":")
-                module_names = {
-                    "instance": "实例管理",
-                    "environment": "环境管理",
-                    "approval": "变更管理",
-                    "monitor": "监控管理",
-                    "script": "脚本管理",
-                    "system": "系统管理"
-                }
-                perm = Permission(
+                perm = service.create_permission(
                     code=perm_code,
                     name=name,
                     module=module,
                     category="button"
                 )
-                db.add(perm)
-                db.flush()
             
             # 检查是否已存在关联
             existing = db.query(RolePermission).filter(
@@ -516,11 +483,11 @@ async def get_my_permissions(
     current_user: User = Depends(get_current_user)
 ):
     """获取当前用户的权限列表"""
+    service = PermissionService(db)
     role = current_user.role
     
     # 获取角色的权限
-    role_perms = db.query(RolePermission).filter(RolePermission.role == role).all()
-    permission_ids = [rp.permission_id for rp in role_perms]
+    permission_ids = service.get_role_permission_ids(role)
     
     # 获取权限详情
     permissions = db.query(Permission).filter(Permission.id.in_(permission_ids)).all()
@@ -546,22 +513,18 @@ async def check_permission(
     current_user: User = Depends(get_current_user)
 ):
     """检查当前用户是否有指定权限"""
+    service = PermissionService(db)
     role = current_user.role
     
     # 获取权限
-    perm = db.query(Permission).filter(Permission.code == permission_code).first()
+    perm = service.get_permission_by_code(permission_code)
     if not perm:
         return {"has_permission": False, "message": "权限不存在"}
     
     # 检查角色权限
-    role_perm = db.query(RolePermission).filter(
-        and_(
-            RolePermission.role == role,
-            RolePermission.permission_id == perm.id
-        )
-    ).first()
+    permission_ids = service.get_role_permission_ids(role)
     
-    return {"has_permission": role_perm is not None}
+    return {"has_permission": perm.id in permission_ids}
 
 
 # ==================== 角色用户管理 API ====================
@@ -582,17 +545,8 @@ async def get_available_users_for_role(
     if not role_info:
         raise HTTPException(status_code=400, detail="无效的角色")
     
-    # 查询不属于该角色的用户
-    query = db.query(User).filter(User.role != UserRole(role))
-    
-    if search:
-        query = query.filter(
-            (User.username.ilike(f"%{search}%")) |
-            (User.real_name.ilike(f"%{search}%")) |
-            (User.email.ilike(f"%{search}%"))
-        )
-    
-    users = query.order_by(User.id).limit(100).all()
+    service = PermissionService(db)
+    users = service.get_users_not_in_role(role, search=search, limit=100)
     
     return {
         "items": [
@@ -629,15 +583,13 @@ async def add_users_to_role(
     if not data.user_ids:
         raise HTTPException(status_code=400, detail="请选择要添加的用户")
     
+    service = PermissionService(db)
+    
     # 更新用户角色
     updated_count = 0
     for user_id in data.user_ids:
-        user = db.query(User).filter(User.id == user_id).first()
-        if user and user.role != UserRole(role):
-            user.role = UserRole(role)
+        if service.update_user_role(user_id, role):
             updated_count += 1
-    
-    db.commit()
     
     return {
         "success": True,
@@ -662,8 +614,10 @@ async def update_role_users(
     if not role_info:
         raise HTTPException(status_code=400, detail="无效的角色")
     
+    service = PermissionService(db)
+    
     # 获取当前属于该角色的用户
-    current_users = db.query(User).filter(User.role == UserRole(role)).all()
+    current_users = service.get_users_by_role(role)
     current_user_ids = {u.id for u in current_users}
     
     # 新用户ID集合
@@ -672,18 +626,12 @@ async def update_role_users(
     # 需要移除的用户（从角色移除，设为只读用户）
     to_remove = current_user_ids - new_user_ids
     for user_id in to_remove:
-        user = db.query(User).filter(User.id == user_id).first()
-        if user:
-            user.role = UserRole.READONLY
+        service.update_user_role(user_id, "readonly")
     
     # 需要添加的用户
     to_add = new_user_ids - current_user_ids
     for user_id in to_add:
-        user = db.query(User).filter(User.id == user_id).first()
-        if user:
-            user.role = UserRole(role)
-    
-    db.commit()
+        service.update_user_role(user_id, role)
     
     return {
         "success": True,
@@ -707,18 +655,17 @@ async def remove_user_from_role(
     if not role_info:
         raise HTTPException(status_code=400, detail="无效的角色")
     
-    # 查找用户
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="用户不存在")
+    service = PermissionService(db)
     
-    # 检查用户是否属于该角色
-    if user.role != UserRole(role):
-        raise HTTPException(status_code=400, detail="该用户不属于此角色")
+    # 获取用户
+    users = service.get_users_by_role(role)
+    user = next((u for u in users if u.id == user_id), None)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在或不属于此角色")
     
     # 将用户角色改为只读
-    user.role = UserRole.READONLY
-    db.commit()
+    service.update_user_role(user_id, "readonly")
     
     return {"success": True, "message": "已将用户从角色中移除"}
 
@@ -739,19 +686,20 @@ async def change_user_role(
     if not role_info:
         raise HTTPException(status_code=400, detail="无效的角色")
     
-    # 查找用户
+    service = PermissionService(db)
+    
+    # 不能修改自己的角色
+    if user_id == current_user.id:
+        raise HTTPException(status_code=400, detail="不能修改自己的角色")
+    
+    # 获取用户
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     
-    # 不能修改自己的角色
-    if user.id == current_user.id:
-        raise HTTPException(status_code=400, detail="不能修改自己的角色")
-    
     # 修改用户角色
     old_role = user.role.value if isinstance(user.role, UserRole) else user.role
-    user.role = UserRole(role)
-    db.commit()
+    service.update_user_role(user_id, role)
     
     return {
         "success": True,

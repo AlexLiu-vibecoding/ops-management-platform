@@ -299,3 +299,77 @@ class UserService(BaseService[User]):
             return True
         
         return False
+    
+    # ==================== 删除方法 ====================
+    
+    def delete_user(self, user_id: int, operator_id: Optional[int] = None) -> bool:
+        """
+        删除用户
+        
+        Args:
+            user_id: 用户 ID
+            operator_id: 操作者 ID（用于防止自删除）
+        
+        Returns:
+            是否删除成功
+        
+        Raises:
+            HTTPException: 用户不存在或尝试删除自己
+        """
+        # 防止删除自己
+        if operator_id and user_id == operator_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete your own account"
+            )
+        
+        user = self.get(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        self.delete(user_id)
+        return True
+    
+    # ==================== 环境权限方法 ====================
+    
+    def get_user_environments(self, user_id: int) -> Dict[str, Any]:
+        """
+        获取用户的环境权限
+        
+        注意：环境权限现在由角色控制
+        用户的环境权限 = 用户所属角色的环境权限
+        
+        Args:
+            user_id: 用户 ID
+        
+        Returns:
+            包含用户ID、角色和环境权限ID列表的字典
+        
+        Raises:
+            HTTPException: 用户不存在
+        """
+        from app.models.permissions import RoleEnvironment
+        
+        user = self.get(user_id)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # 从角色获取环境权限
+        role = user.role.value if isinstance(user.role, UserRole) else user.role
+        role_envs = self.db.query(RoleEnvironment).filter(
+            RoleEnvironment.role == role
+        ).all()
+        environment_ids = [re.environment_id for re in role_envs]
+        
+        return {
+            "user_id": user_id,
+            "role": role,
+            "environment_ids": environment_ids,
+            "note": "环境权限由角色控制，如需修改请前往角色管理"
+        }
