@@ -338,10 +338,8 @@ const loadLogs = async () => {
 // 加载通道列表
 const loadChannels = async () => {
   try {
-    const res = await request.get('/dingtalk/channels')
-    if (res.code === 0) {
-      channels.value = res.data
-    }
+    const res = await request.get('/notification/channels')
+    channels.value = res.items || []
   } catch (error) {
     console.error('加载通道列表失败:', error)
   }
