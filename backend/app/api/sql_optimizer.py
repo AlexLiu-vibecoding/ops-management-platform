@@ -704,7 +704,7 @@ async def get_llm_analysis(
     db_version: str = "8.0"
 ) -> str:
     """使用LLM进行深度SQL分析（带超时控制）"""
-    from app.utils.llm_client import get_llm_client
+    from app.utils.llm_client import get_llm_client, DEFAULT_MODEL
     
     # 构建上下文
     context = {
@@ -752,26 +752,30 @@ async def get_llm_analysis(
     try:
         client = get_llm_client()
         
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ]
+        logger.info(f"[SQL优化器] 开始 LLM 分析, SQL长度: {len(sql)}")
         
         # 使用 asyncio 等待，设置超时
         response = await asyncio.wait_for(
             client.ainvoke(
-                messages=messages,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_message}
+                ],
+                model=DEFAULT_MODEL,
                 temperature=0.3,
                 max_tokens=4096
             ),
             timeout=LLM_TIMEOUT
         )
         
+        logger.info(f"[SQL优化器] LLM 分析完成, 响应长度: {len(response)}")
         return response
             
     except asyncio.TimeoutError:
+        logger.warning(f"[SQL优化器] LLM 分析超时 ({LLM_TIMEOUT}秒)")
         return "LLM分析超时，请稍后重试"
     except Exception as e:
+        logger.error(f"[SQL优化器] LLM 分析失败: {e}")
         return f"LLM分析失败: {str(e)}"
 
 

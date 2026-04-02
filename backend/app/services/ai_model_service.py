@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 # 默认配置（作为兜底）
 DEFAULT_BASE_URL = os.getenv("COZE_INTEGRATION_MODEL_BASE_URL", "https://integration.coze.cn/api/v3")
 DEFAULT_API_KEY = os.getenv("COZE_WORKLOAD_IDENTITY_API_KEY", "")
-DEFAULT_MODEL = "doubao-pro-32k"
+DEFAULT_MODEL = "doubao-seed-1-8-251228"
 
 
 def decrypt_api_key(encrypted: str) -> str:

@@ -98,12 +98,12 @@ USE_CASE_LABELS = {
 # 预设模板
 AI_MODEL_TEMPLATES = [
     {
-        "name": "豆包 Pro",
+        "name": "豆包 Seed",
         "provider": "doubao",
-        "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-        "model_name": "doubao-pro-32k",
-        "description": "豆包 Pro 模型，稳定可用",
-        "use_cases": ["alert_analysis"]
+        "base_url": "https://integration.coze.cn/api/v3",
+        "model_name": "doubao-seed-1-8-251228",
+        "description": "豆包 Seed 模型，Multimodal Agent 优化",
+        "use_cases": ["alert_analysis", "sql_optimize"]
     },
     {
         "name": "OpenAI GPT-4",

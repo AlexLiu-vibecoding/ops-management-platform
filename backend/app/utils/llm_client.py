@@ -1,87 +1,79 @@
 """
 LLM 客户端工具
 
-直接使用 OpenAI SDK 调用豆包大模型，绕过 langchain 版本兼容性问题
+使用 coze_coding_dev_sdk 调用豆包大模型
 """
 import os
-import json
 import time
 import logging
 from typing import List, Optional, Dict, Any, AsyncGenerator
-from openai import OpenAI, AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
-# 默认配置 - 使用正确的环境变量
-DEFAULT_BASE_URL = os.getenv("COZE_INTEGRATION_MODEL_BASE_URL", "https://integration.coze.cn/api/v3")
-DEFAULT_API_KEY = os.getenv("COZE_WORKLOAD_IDENTITY_API_KEY", "")
-
-
 # 默认模型配置
-DEFAULT_MODEL = "doubao-pro-32k"  # Pro 模型，稳定可用
-DEFAULT_MODEL_LITE = "doubao-lite-32k"  # Lite 模型，更轻量
-
-
-def parse_sse_response(response_text: str) -> str:
-    content_parts = []
-    for line in response_text.strip().split('\n'):
-        if line.startswith('data: '):
-            try:
-                data = json.loads(line[6:])
-                if 'choices' in data and data['choices']:
-                    delta = data['choices'][0].get('delta', {})
-                    if 'content' in delta:
-                        content_parts.append(delta['content'])
-            except json.JSONDecodeError:
-                continue
-    return ''.join(content_parts)
+DEFAULT_MODEL = "doubao-seed-1-8-251228"  # Multimodal Agent 优化模型
+DEFAULT_MODEL_LITE = "doubao-seed-1-6-lite-251015"  # Lite 模型，更轻量
 
 
 class LLMClient:
-    """LLM 客户端，使用 OpenAI SDK 直接调用豆包模型"""
+    """LLM 客户端，使用 coze_coding_dev_sdk 调用豆包模型"""
     
-    def __init__(
-        self,
-        base_url: Optional[str] = None,
-        api_key: Optional[str] = None
-    ):
-        self.base_url = base_url or DEFAULT_BASE_URL
-        self.api_key = api_key or DEFAULT_API_KEY
+    def __init__(self):
+        """初始化客户端"""
+        try:
+            from coze_coding_dev_sdk import LLMClient as CozeLLMClient
+            from coze_coding_utils.runtime_ctx.context import new_context
+            
+            self._coze_client = CozeLLMClient
+            self._new_context = new_context
+        except ImportError as e:
+            logger.error(f"导入 coze_coding_dev_sdk 失败: {e}")
+            raise
         
-        if not self.api_key:
-            logger.warning("API Key 未配置，请设置 COZE_WORKLOAD_IDENTITY_API_KEY 环境变量")
-    
-    def _get_client(self) -> OpenAI:
-        """获取同步客户端"""
-        return OpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
-    
-    def _get_async_client(self) -> AsyncOpenAI:
-        """获取异步客户端"""
-        return AsyncOpenAI(
-            api_key=self.api_key,
-            base_url=self.base_url
-        )
-    
-    def _build_messages(
+    def _convert_messages(
         self,
+        messages: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
-        user_message: Optional[str] = None,
-        messages: Optional[List[Dict[str, str]]] = None
-    ) -> List[Dict[str, str]]:
-        """构建消息列表"""
-        if messages:
-            return messages
+        user_message: Optional[str] = None
+    ) -> List:
+        """转换消息格式为 LangChain 格式"""
+        from langchain_core.messages import SystemMessage, HumanMessage
         
         result = []
-        if system_prompt:
-            result.append({"role": "system", "content": system_prompt})
-        if user_message:
-            result.append({"role": "user", "content": user_message})
+        
+        if messages:
+            for msg in messages:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                if role == "system":
+                    result.append(SystemMessage(content=content))
+                elif role == "user":
+                    result.append(HumanMessage(content=content))
+                # 忽略其他角色，因为 AIMessage 通常用于多轮对话
+        else:
+            if system_prompt:
+                result.append(SystemMessage(content=system_prompt))
+            if user_message:
+                result.append(HumanMessage(content=user_message))
         
         return result
+    
+    def _extract_content(self, response) -> str:
+        """从响应中提取文本内容"""
+        content = response.content
+        if isinstance(content, str):
+            return content
+        elif isinstance(content, list):
+            # 处理 multimodal 响应
+            if content and isinstance(content[0], str):
+                return " ".join(content)
+            else:
+                return " ".join(
+                    item.get("text", "") 
+                    for item in content 
+                    if isinstance(item, dict) and item.get("type") == "text"
+                )
+        return str(content)
     
     def invoke(
         self,
@@ -107,34 +99,34 @@ class LLMClient:
         Returns:
             模型响应文本
         """
-        client = self._get_client()
-        formatted_messages = self._build_messages(
-            system_prompt=system_prompt,
-            user_message=user_message,
-            messages=messages
-        )
+        start_time = time.time()
         
         try:
-            # 使用流式请求来兼容 SSE 响应格式
-            stream = client.chat.completions.create(
-                model=model,
-                messages=formatted_messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-                **kwargs
+            ctx = self._new_context(method="invoke")
+            client = self._coze_client(ctx=ctx)
+            
+            formatted_messages = self._convert_messages(
+                system_prompt=system_prompt,
+                user_message=user_message,
+                messages=messages
             )
             
-            # 收集流式响应
-            content_parts = []
-            for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    content_parts.append(chunk.choices[0].delta.content)
+            logger.info(f"[LLM] 开始同步调用模型: {model}, 消息数: {len(formatted_messages)}")
             
-            return ''.join(content_parts)
+            response = client.invoke(
+                messages=formatted_messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
+            result = self._extract_content(response)
+            logger.info(f"[LLM] 同步调用完成，耗时: {time.time() - start_time:.2f}秒, 输出长度: {len(result)}字符")
+            
+            return result
             
         except Exception as e:
-            logger.error(f"LLM 调用失败: {e}")
+            logger.error(f"[LLM] 同步调用失败: {e}, 耗时: {time.time() - start_time:.2f}秒")
             raise
     
     async def ainvoke(
@@ -148,7 +140,7 @@ class LLMClient:
         **kwargs
     ) -> str:
         """
-        异步调用 LLM
+        异步调用 LLM（使用线程池包装同步调用）
         
         Args:
             messages: 消息列表
@@ -161,56 +153,41 @@ class LLMClient:
         Returns:
             模型响应文本
         """
-        start_time = time.time()
-        client = self._get_async_client()
-        formatted_messages = self._build_messages(
-            system_prompt=system_prompt,
-            user_message=user_message,
-            messages=messages
-        )
+        import asyncio
         
-        logger.info(f"[LLM] 开始调用模型: {model}, 消息数: {len(formatted_messages)}")
+        start_time = time.time()
         
         try:
-            # 使用流式请求来兼容 SSE 响应格式
-            stream_start = time.time()
-            stream = await client.chat.completions.create(
-                model=model,
-                messages=formatted_messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-                **kwargs
+            ctx = self._new_context(method="invoke")
+            client = self._coze_client(ctx=ctx)
+            
+            formatted_messages = self._convert_messages(
+                system_prompt=system_prompt,
+                user_message=user_message,
+                messages=messages
             )
-            logger.info(f"[LLM] 流式连接建立耗时: {time.time() - stream_start:.2f}秒")
             
-            # 收集流式响应
-            content_parts = []
-            first_chunk_time = None
-            last_chunk_time = None
-            chunk_count = 0
+            logger.info(f"[LLM] 开始异步调用模型: {model}, 消息数: {len(formatted_messages)}")
             
-            async for chunk in stream:
-                chunk_count += 1
-                if first_chunk_time is None:
-                    first_chunk_time = time.time()
-                    logger.info(f"[LLM] 首个chunk到达，等待时间: {first_chunk_time - stream_start:.2f}秒")
-                
-                if chunk.choices and chunk.choices[0].delta.content:
-                    content_parts.append(chunk.choices[0].delta.content)
-                
-                last_chunk_time = time.time()
+            # coze SDK 的 invoke 是同步的，使用线程池包装
+            response = await asyncio.to_thread(
+                client.invoke,
+                formatted_messages,
+                model,
+                temperature,
+                max_tokens
+            )
             
-            total_time = time.time() - start_time
-            content_length = len(''.join(content_parts))
+            # 或者使用流式调用获得更好的响应体验
+            # 这里先用同步调用确保稳定性
             
-            logger.info(f"[LLM] 调用完成 - 总耗时: {total_time:.2f}秒, chunk数: {chunk_count}, 输出长度: {content_length}字符")
-            logger.info(f"[LLM] 时间分解 - 首chunk: {first_chunk_time - stream_start:.2f}秒, 流式传输: {last_chunk_time - first_chunk_time:.2f}秒")
+            result = self._extract_content(response)
+            logger.info(f"[LLM] 异步调用完成，耗时: {time.time() - start_time:.2f}秒, 输出长度: {len(result)}字符")
             
-            return ''.join(content_parts)
+            return result
             
         except Exception as e:
-            logger.error(f"[LLM] 调用失败: {e}, 耗时: {time.time() - start_time:.2f}秒")
+            logger.error(f"[LLM] 异步调用失败: {e}, 耗时: {time.time() - start_time:.2f}秒")
             raise
     
     async def astream(
@@ -237,26 +214,30 @@ class LLMClient:
         Yields:
             模型响应文本片段
         """
-        client = self._get_async_client()
-        formatted_messages = self._build_messages(
+        ctx = self._new_context(method="invoke")
+        client = self._coze_client(ctx=ctx)
+        
+        formatted_messages = self._convert_messages(
             system_prompt=system_prompt,
             user_message=user_message,
             messages=messages
         )
         
         try:
-            stream = await client.chat.completions.create(
-                model=model,
+            for chunk in client.stream(
                 messages=formatted_messages,
+                model=model,
                 temperature=temperature,
-                max_tokens=max_tokens,
-                stream=True,
-                **kwargs
-            )
-            
-            async for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                max_tokens=max_tokens
+            ):
+                if chunk.content:
+                    content = chunk.content
+                    if isinstance(content, str):
+                        yield content
+                    elif isinstance(content, list) and content:
+                        for item in content:
+                            if isinstance(item, dict) and item.get("type") == "text":
+                                yield item.get("text", "")
                     
         except Exception as e:
             logger.error(f"LLM 流式调用失败: {e}")
