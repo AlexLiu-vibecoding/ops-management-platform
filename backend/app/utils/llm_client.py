@@ -170,12 +170,13 @@ class LLMClient:
             logger.info(f"[LLM] 开始异步调用模型: {model}, 消息数: {len(formatted_messages)}")
             
             # coze SDK 的 invoke 是同步的，使用线程池包装
+            # 注意：必须使用关键字参数，避免参数位置错乱
             response = await asyncio.to_thread(
                 client.invoke,
-                formatted_messages,
-                model,
-                temperature,
-                max_tokens
+                messages=formatted_messages,
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens
             )
             
             # 或者使用流式调用获得更好的响应体验
