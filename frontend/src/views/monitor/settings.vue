@@ -54,8 +54,8 @@
               <el-col :span="12">
                 <el-form-item label="分析工具">
                   <el-radio-group v-model="slowQueryConfig.analysis_tool">
-                    <el-radio label="built-in">内置分析</el-radio>
-                    <el-radio label="pt-query-digest">pt-query-digest</el-radio>
+                    <el-radio value="built-in">内置分析</el-radio>
+                    <el-radio value="pt-query-digest">pt-query-digest</el-radio>
                   </el-radio-group>
                 </el-form-item>
               </el-col>

@@ -253,9 +253,9 @@
           </el-form-item>
           <el-form-item label="认证方式">
             <el-radio-group v-model="channelDialog.form.config.auth_type">
-              <el-radio label="none">无认证</el-radio>
-              <el-radio label="keyword">关键词</el-radio>
-              <el-radio label="signature">加签</el-radio>
+              <el-radio value="none">无认证</el-radio>
+              <el-radio value="keyword">关键词</el-radio>
+              <el-radio value="signature">加签</el-radio>
             </el-radio-group>
           </el-form-item>
           <el-form-item label="关键词" v-if="channelDialog.form.config.auth_type === 'keyword'">
@@ -345,9 +345,9 @@
         
         <el-form-item label="静默类型" prop="silence_type">
           <el-radio-group v-model="silenceDialog.form.silence_type">
-            <el-radio label="once">一次性</el-radio>
-            <el-radio label="daily">每日重复</el-radio>
-            <el-radio label="weekly">每周重复</el-radio>
+            <el-radio value="once">一次性</el-radio>
+            <el-radio value="daily">每日重复</el-radio>
+            <el-radio value="weekly">每周重复</el-radio>
           </el-radio-group>
         </el-form-item>
 
@@ -371,7 +371,7 @@
 
         <el-form-item label="生效星期" v-if="silenceDialog.form.silence_type === 'weekly'">
           <el-checkbox-group v-model="silenceDialog.form.weekdays">
-            <el-checkbox v-for="(day, index) in weekDays" :key="index" :label="index">
+            <el-checkbox v-for="(day, index) in weekDays" :key="index" :value="index">
               {{ day }}
             </el-checkbox>
           </el-checkbox-group>

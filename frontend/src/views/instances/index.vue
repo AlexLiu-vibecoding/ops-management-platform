@@ -191,7 +191,7 @@
         <!-- AWS RDS 配置 (仅 MySQL/PostgreSQL) -->
         <template v-if="dialog.form.db_type !== 'redis'">
           <el-divider content-position="left">
-            <el-checkbox v-model="dialog.form.is_rds" :label="'AWS RDS 实例'" />
+            <el-checkbox v-model="dialog.form.is_rds">AWS RDS 实例</el-checkbox>
           </el-divider>
           
           <el-row :gutter="20" v-if="dialog.form.is_rds">

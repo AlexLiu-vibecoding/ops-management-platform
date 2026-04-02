@@ -160,7 +160,7 @@
         <el-divider content-position="left">高级配置</el-divider>
         <el-form-item label="使用场景">
           <el-checkbox-group v-model="form.use_cases">
-            <el-checkbox v-for="uc in useCases" :key="uc.value" :label="uc.value">
+            <el-checkbox v-for="uc in useCases" :key="uc.value" :value="uc.value">
               {{ uc.label }}
             </el-checkbox>
           </el-checkbox-group>

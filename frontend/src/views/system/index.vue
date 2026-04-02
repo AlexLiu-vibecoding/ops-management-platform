@@ -267,9 +267,9 @@
           <el-form :model="storageConfig" label-width="140px">
             <el-form-item label="存储类型">
               <el-radio-group v-model="storageConfig.storage_type">
-                <el-radio label="local"><el-icon><Folder /></el-icon>本地存储</el-radio>
-                <el-radio label="s3"><el-icon><Cloudy /></el-icon>AWS S3</el-radio>
-                <el-radio label="oss"><el-icon><Files /></el-icon>阿里云 OSS</el-radio>
+                <el-radio value="local"><el-icon><Folder /></el-icon>本地存储</el-radio>
+                <el-radio value="s3"><el-icon><Cloudy /></el-icon>AWS S3</el-radio>
+                <el-radio value="oss"><el-icon><Files /></el-icon>阿里云 OSS</el-radio>
               </el-radio-group>
             </el-form-item>
 

@@ -13,12 +13,12 @@
             </el-form-item>
             <el-form-item label="巡检模块">
               <el-checkbox-group v-model="runForm.modules">
-                <el-checkbox label="slow_query">慢查询</el-checkbox>
-                <el-checkbox label="index">索引分析</el-checkbox>
-                <el-checkbox label="lock">锁等待</el-checkbox>
-                <el-checkbox label="transaction">长事务</el-checkbox>
-                <el-checkbox label="repl">主从复制</el-checkbox>
-                <el-checkbox label="capacity">容量分析</el-checkbox>
+                <el-checkbox value="slow_query">慢查询</el-checkbox>
+                <el-checkbox value="index">索引分析</el-checkbox>
+                <el-checkbox value="lock">锁等待</el-checkbox>
+                <el-checkbox value="transaction">长事务</el-checkbox>
+                <el-checkbox value="repl">主从复制</el-checkbox>
+                <el-checkbox value="capacity">容量分析</el-checkbox>
               </el-checkbox-group>
               <div class="form-tip">不选择则检查全部模块</div>
             </el-form-item>
