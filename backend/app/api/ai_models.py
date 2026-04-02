@@ -304,26 +304,102 @@ async def test_ai_model(
     # 获取解密后的 API 密钥
     api_key = decrypt_api_key(config.api_key_encrypted) if config.api_key_encrypted else ""
     
+    start_time = time.time()
+    
+    # 检查 API Key 是否配置
+    if not api_key:
+        return {
+            "success": False,
+            "response": None,
+            "latency_ms": 0,
+            "error": "未配置 API Key，请编辑模型配置并填入有效的 API 密钥"
+        }
+    
     try:
-        from openai import OpenAI
+        import httpx
         
-        client = OpenAI(
-            api_key=api_key or "no-key",
-            base_url=config.base_url
-        )
+        # 直接使用 httpx 调用 API，更好地处理各种响应格式
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}"
+        }
         
-        start_time = time.time()
+        payload = {
+            "model": config.model_name,
+            "messages": [{"role": "user", "content": data.prompt}],
+            "max_tokens": 100
+        }
         
-        response = client.chat.completions.create(
-            model=config.model_name,
-            messages=[{"role": "user", "content": data.prompt}],
-            max_tokens=100,
-            timeout=config.timeout
-        )
+        # 构建完整的 API URL
+        base_url = config.base_url.rstrip('/')
+        if not base_url.endswith('/chat/completions'):
+            if base_url.endswith('/v1') or base_url.endswith('/v3'):
+                api_url = f"{base_url}/chat/completions"
+            else:
+                api_url = f"{base_url}/v1/chat/completions"
+        else:
+            api_url = base_url
+        
+        logger.info(f"Testing AI model: {config.name}, URL: {api_url}, Model: {config.model_name}")
+        
+        with httpx.Client(timeout=config.timeout) as client:
+            response = client.post(api_url, headers=headers, json=payload)
         
         latency_ms = int((time.time() - start_time) * 1000)
         
-        # 记录日志
+        logger.info(f"AI model test response status: {response.status_code}")
+        
+        if response.status_code != 200:
+            error_detail = response.text
+            try:
+                error_json = response.json()
+                if "error" in error_json:
+                    error_detail = error_json["error"].get("message", str(error_json["error"]))
+                elif "message" in error_json:
+                    error_detail = error_json["message"]
+                elif "code" in error_json:
+                    error_detail = f"错误码: {error_json.get('code')}, 消息: {error_json.get('message', response.text)}"
+            except:
+                pass
+            
+            # 记录失败日志
+            log = AICallLog(
+                model_config_id=config.id,
+                use_case="test",
+                latency_ms=latency_ms,
+                success=False,
+                error_message=error_detail
+            )
+            db.add(log)
+            db.commit()
+            
+            return {
+                "success": False,
+                "response": None,
+                "latency_ms": latency_ms,
+                "error": f"API 错误 ({response.status_code}): {error_detail}"
+            }
+        
+        # 解析响应
+        result = response.json()
+        
+        # 处理不同格式的响应
+        response_text = ""
+        if "choices" in result and result["choices"]:
+            # OpenAI 标准格式
+            response_text = result["choices"][0].get("message", {}).get("content", "")
+        elif "data" in result:
+            # 某些 API 返回 data 字段
+            response_text = str(result["data"])
+        elif "output" in result:
+            # 豆包/火山引擎格式
+            response_text = str(result["output"])
+        elif "result" in result:
+            response_text = str(result["result"])
+        else:
+            response_text = str(result)
+        
+        # 记录成功日志
         log = AICallLog(
             model_config_id=config.id,
             use_case="test",
@@ -335,13 +411,22 @@ async def test_ai_model(
         
         return {
             "success": True,
-            "response": response.choices[0].message.content if response.choices else "",
+            "response": response_text[:500],  # 限制响应长度
             "latency_ms": latency_ms,
             "error": None
         }
         
+    except httpx.TimeoutException:
+        latency_ms = int((time.time() - start_time) * 1000)
+        return {
+            "success": False,
+            "response": None,
+            "latency_ms": latency_ms,
+            "error": f"请求超时（{config.timeout}秒）"
+        }
     except Exception as e:
-        latency_ms = int((time.time() - start_time) * 1000) if 'start_time' in locals() else 0
+        latency_ms = int((time.time() - start_time) * 1000)
+        logger.error(f"AI model test error: {str(e)}")
         
         # 记录失败日志
         log = AICallLog(

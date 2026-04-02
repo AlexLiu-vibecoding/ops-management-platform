@@ -98,11 +98,11 @@ USE_CASE_LABELS = {
 # 预设模板
 AI_MODEL_TEMPLATES = [
     {
-        "name": "豆包 Flash",
+        "name": "豆包 Pro",
         "provider": "doubao",
         "base_url": "https://ark.cn-beijing.volces.com/api/v3",
-        "model_name": "doubao-seed-1-6-flash-250615",
-        "description": "豆包 Flash 模型，速度快，适合实时分析",
+        "model_name": "doubao-pro-32k",
+        "description": "豆包 Pro 模型，稳定可用",
         "use_cases": ["alert_analysis"]
     },
     {

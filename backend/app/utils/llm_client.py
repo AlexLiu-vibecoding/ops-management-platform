@@ -18,8 +18,8 @@ DEFAULT_API_KEY = os.getenv("COZE_WORKLOAD_IDENTITY_API_KEY", "")
 
 
 # 默认模型配置
-DEFAULT_MODEL = "doubao-seed-1-6-flash-250615"  # Flash 模型，速度快
-DEFAULT_MODEL_LITE = "doubao-seed-2-0-lite-260215"  # Lite 模型，更精确但较慢
+DEFAULT_MODEL = "doubao-pro-32k"  # Pro 模型，稳定可用
+DEFAULT_MODEL_LITE = "doubao-lite-32k"  # Lite 模型，更轻量
 
 
 def parse_sse_response(response_text: str) -> str:
