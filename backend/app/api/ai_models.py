@@ -301,10 +301,90 @@ async def test_ai_model(
     if not config:
         raise HTTPException(status_code=404, detail="模型配置不存在")
     
+    start_time = time.time()
+    
+    # 豆包模型使用 LLMClient 调用
+    if config.provider == "doubao":
+        return await _test_doubao_model(config, data.prompt, start_time, db)
+    
+    # 其他模型使用标准 OpenAI 格式调用
+    return await _test_openai_compatible_model(config, data.prompt, start_time, db)
+
+
+async def _test_doubao_model(
+    config: AIModelConfig,
+    prompt: str,
+    start_time: float,
+    db: Session
+) -> dict:
+    """测试豆包模型（使用 coze_coding_dev_sdk）"""
+    try:
+        from app.utils.llm_client import get_llm_client
+        
+        logger.info(f"Testing Doubao model: {config.name}, Model: {config.model_name}")
+        
+        llm_client = get_llm_client()
+        
+        # 使用 ainvoke 异步调用
+        response = await llm_client.ainvoke(
+            user_message=prompt,
+            model=config.model_name,
+            temperature=config.temperature,
+            max_tokens=100  # 测试时限制输出长度
+        )
+        
+        latency_ms = int((time.time() - start_time) * 1000)
+        
+        # 记录成功日志
+        log = AICallLog(
+            model_config_id=config.id,
+            use_case="test",
+            latency_ms=latency_ms,
+            success=True
+        )
+        db.add(log)
+        db.commit()
+        
+        return {
+            "success": True,
+            "response": response[:500] if response else "模型返回空响应",
+            "latency_ms": latency_ms,
+            "error": None
+        }
+        
+    except Exception as e:
+        latency_ms = int((time.time() - start_time) * 1000)
+        error_msg = str(e)
+        logger.error(f"Doubao model test error: {error_msg}")
+        
+        # 记录失败日志
+        log = AICallLog(
+            model_config_id=config.id,
+            use_case="test",
+            latency_ms=latency_ms,
+            success=False,
+            error_message=error_msg
+        )
+        db.add(log)
+        db.commit()
+        
+        return {
+            "success": False,
+            "response": None,
+            "latency_ms": latency_ms,
+            "error": f"豆包模型调用失败: {error_msg}"
+        }
+
+
+async def _test_openai_compatible_model(
+    config: AIModelConfig,
+    prompt: str,
+    start_time: float,
+    db: Session
+) -> dict:
+    """测试 OpenAI 兼容模型"""
     # 获取解密后的 API 密钥
     api_key = decrypt_api_key(config.api_key_encrypted) if config.api_key_encrypted else ""
-    
-    start_time = time.time()
     
     # 检查 API Key 是否配置
     if not api_key:
@@ -326,7 +406,7 @@ async def test_ai_model(
         
         payload = {
             "model": config.model_name,
-            "messages": [{"role": "user", "content": data.prompt}],
+            "messages": [{"role": "user", "content": prompt}],
             "max_tokens": 100
         }
         
