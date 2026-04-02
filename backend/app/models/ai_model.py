@@ -127,21 +127,21 @@ SCENE_LABELS = {
 # 兼容旧代码
 USE_CASE_LABELS = SCENE_LABELS
 
-# 预设模板
+# 预设模板（model_name 留空，用户需要根据实际情况填写）
 AI_MODEL_TEMPLATES = [
     {
-        "name": "豆包 Seed",
+        "name": "豆包",
         "provider": "doubao",
         "base_url": "https://integration.coze.cn/api/v3",
-        "model_name": "doubao-seed-1-8-251228",
-        "description": "豆包 Seed 模型，Multimodal Agent 优化"
+        "model_name": "",
+        "description": "豆包模型，通过 coze_coding_dev_sdk 调用"
     },
     {
-        "name": "OpenAI GPT-4",
+        "name": "OpenAI",
         "provider": "openai",
         "base_url": "https://api.openai.com/v1",
-        "model_name": "gpt-4o",
-        "description": "OpenAI GPT-4 模型，能力强"
+        "model_name": "",
+        "description": "OpenAI GPT 系列模型"
     },
     {
         "name": "Ollama 本地",

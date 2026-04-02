@@ -705,25 +705,36 @@ async def get_llm_analysis(
     db_session: Session = None
 ) -> str:
     """使用LLM进行深度SQL分析（带超时控制）"""
-    from app.utils.llm_client import get_llm_client, DEFAULT_MODEL
-    from app.models.ai_model import get_ai_model_config_for_use_case
+    from app.utils.llm_client import get_llm_client
+    from app.models.ai_model import get_ai_config_for_scene
     
-    # 尝试从 AI 模型配置表获取模型
-    model_name = DEFAULT_MODEL
-    temperature = 0.3
-    max_tokens = 4096
-    timeout = LLM_TIMEOUT
+    # 从场景配置获取模型参数
+    if not db_session:
+        return "错误：未提供数据库会话，无法获取 AI 配置"
     
-    if db_session:
-        ai_config = get_ai_model_config_for_use_case(db_session, "sql_optimize")
-        if ai_config:
-            model_name = ai_config.model_name
-            temperature = ai_config.temperature
-            max_tokens = ai_config.max_tokens
-            timeout = ai_config.timeout
-            logger.info(f"[SQL优化器] 使用 AI 模型配置: {ai_config.name}, 模型: {model_name}")
-        else:
-            logger.info(f"[SQL优化器] 未找到 sql_optimize 配置，使用默认模型: {model_name}")
+    model_config, scene_config = get_ai_config_for_scene(db_session, "sql_optimize")
+    
+    if not model_config:
+        return "错误：未配置 SQL 优化场景的 AI 模型，请在「系统管理 > AI模型配置」中配置场景关联"
+    
+    if not model_config.is_enabled:
+        return f"错误：关联的模型「{model_config.name}」已被禁用，请启用或更换模型"
+    
+    # 使用场景配置中的参数
+    model_name = model_config.model_name
+    temperature = model_config.temperature
+    max_tokens = model_config.max_tokens
+    timeout = model_config.timeout
+    
+    # 场景自定义参数覆盖
+    if scene_config and scene_config.custom_params:
+        custom = scene_config.custom_params
+        if "temperature" in custom:
+            temperature = custom["temperature"]
+        if "max_tokens" in custom:
+            max_tokens = custom["max_tokens"]
+    
+    logger.info(f"[SQL优化器] 使用模型: {model_config.name} ({model_name})")
     
     # 构建上下文
     context = {
@@ -792,7 +803,10 @@ async def get_llm_analysis(
             
     except asyncio.TimeoutError:
         logger.warning(f"[SQL优化器] LLM 分析超时 ({timeout}秒)")
-        return "LLM分析超时，请稍后重试"
+        return f"LLM分析超时（{timeout}秒），请稍后重试或调整模型超时配置"
+    except ValueError as e:
+        logger.error(f"[SQL优化器] 配置错误: {e}")
+        return f"配置错误: {str(e)}"
     except Exception as e:
         logger.error(f"[SQL优化器] LLM 分析失败: {e}")
         return f"LLM分析失败: {str(e)}"

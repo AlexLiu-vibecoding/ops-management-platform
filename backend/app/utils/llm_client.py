@@ -2,6 +2,9 @@
 LLM 客户端工具
 
 使用 coze_coding_dev_sdk 调用豆包大模型
+
+注意：model 参数为必传参数，不再有默认值。
+调用前必须确保已配置好场景关联的模型。
 """
 import os
 import time
@@ -9,10 +12,6 @@ import logging
 from typing import List, Optional, Dict, Any, AsyncGenerator
 
 logger = logging.getLogger(__name__)
-
-# 默认模型配置
-DEFAULT_MODEL = "doubao-seed-1-8-251228"  # Multimodal Agent 优化模型
-DEFAULT_MODEL_LITE = "doubao-seed-1-6-lite-251015"  # Lite 模型，更轻量
 
 
 class LLMClient:
@@ -49,7 +48,6 @@ class LLMClient:
                     result.append(SystemMessage(content=content))
                 elif role == "user":
                     result.append(HumanMessage(content=content))
-                # 忽略其他角色，因为 AIMessage 通常用于多轮对话
         else:
             if system_prompt:
                 result.append(SystemMessage(content=system_prompt))
@@ -64,7 +62,6 @@ class LLMClient:
         if isinstance(content, str):
             return content
         elif isinstance(content, list):
-            # 处理 multimodal 响应
             if content and isinstance(content[0], str):
                 return " ".join(content)
             else:
@@ -80,7 +77,7 @@ class LLMClient:
         messages: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
-        model: str = DEFAULT_MODEL,
+        model: str = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs
@@ -92,13 +89,19 @@ class LLMClient:
             messages: 消息列表，格式 [{"role": "user", "content": "..."}]
             system_prompt: 系统提示词
             user_message: 用户消息
-            model: 模型名称
+            model: 模型名称（必传）
             temperature: 温度参数
             max_tokens: 最大输出 token 数
             
         Returns:
             模型响应文本
+            
+        Raises:
+            ValueError: model 参数未提供
         """
+        if not model:
+            raise ValueError("model 参数为必传项，请先在系统管理 > AI模型配置 中配置场景关联的模型")
+        
         start_time = time.time()
         
         try:
@@ -134,7 +137,7 @@ class LLMClient:
         messages: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
-        model: str = DEFAULT_MODEL,
+        model: str = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs
@@ -146,14 +149,20 @@ class LLMClient:
             messages: 消息列表
             system_prompt: 系统提示词
             user_message: 用户消息
-            model: 模型名称
+            model: 模型名称（必传）
             temperature: 温度参数
             max_tokens: 最大输出 token 数
             
         Returns:
             模型响应文本
+            
+        Raises:
+            ValueError: model 参数未提供
         """
         import asyncio
+        
+        if not model:
+            raise ValueError("model 参数为必传项，请先在系统管理 > AI模型配置 中配置场景关联的模型")
         
         start_time = time.time()
         
@@ -169,8 +178,6 @@ class LLMClient:
             
             logger.info(f"[LLM] 开始异步调用模型: {model}, 消息数: {len(formatted_messages)}")
             
-            # coze SDK 的 invoke 是同步的，使用线程池包装
-            # 注意：必须使用关键字参数，避免参数位置错乱
             response = await asyncio.to_thread(
                 client.invoke,
                 messages=formatted_messages,
@@ -178,9 +185,6 @@ class LLMClient:
                 temperature=temperature,
                 max_tokens=max_tokens
             )
-            
-            # 或者使用流式调用获得更好的响应体验
-            # 这里先用同步调用确保稳定性
             
             result = self._extract_content(response)
             logger.info(f"[LLM] 异步调用完成，耗时: {time.time() - start_time:.2f}秒, 输出长度: {len(result)}字符")
@@ -196,7 +200,7 @@ class LLMClient:
         messages: Optional[List[Dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
-        model: str = DEFAULT_MODEL,
+        model: str = None,
         temperature: float = 0.7,
         max_tokens: int = 4096,
         **kwargs
@@ -208,13 +212,19 @@ class LLMClient:
             messages: 消息列表
             system_prompt: 系统提示词
             user_message: 用户消息
-            model: 模型名称
+            model: 模型名称（必传）
             temperature: 温度参数
             max_tokens: 最大输出 token 数
             
         Yields:
             模型响应文本片段
+            
+        Raises:
+            ValueError: model 参数未提供
         """
+        if not model:
+            raise ValueError("model 参数为必传项，请先在系统管理 > AI模型配置 中配置场景关联的模型")
+        
         ctx = self._new_context(method="invoke")
         client = self._coze_client(ctx=ctx)
         

@@ -14,7 +14,6 @@ from app.models import (
     AlertRecord, RDBInstance, RedisInstance, SlowQuery,
     PerformanceMetric, LockWait, ReplicationStatus
 )
-from app.utils.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -68,23 +67,28 @@ class AlertAIAnalyzer:
             # 2. 构建 AI 分析提示词
             prompt = cls._build_analysis_prompt(alert, context)
             
-            # 3. 调用 AI 分析（使用新的多模型服务）
-            from app.services.ai_model_service import call_with_fallback
-            analysis, model_used = call_with_fallback(
+            # 3. 通过场景配置调用 AI
+            from app.services.ai_model_service import call_with_scene
+            
+            analysis, model_used = call_with_scene(
                 db=db,
-                use_case="alert_analysis",
+                scene="alert_analysis",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.3,  # 低温度保证稳定性
                 max_tokens=1024
             )
             
             if analysis:
-                logger.info(f"AI 分析完成，使用模型: {model_used.name if model_used else '默认'}")
+                logger.info(f"AI 分析完成，使用模型: {model_used.name if model_used else '未知'}")
                 # 格式化分析结果
                 return cls._format_analysis(analysis)
             
             return None
             
+        except RuntimeError as e:
+            # 配置错误，记录日志但不影响告警发送
+            logger.warning(f"AI 分析配置问题: {e}")
+            return None
         except Exception as e:
             logger.error(f"AI 分析告警失败: {e}")
             return None
