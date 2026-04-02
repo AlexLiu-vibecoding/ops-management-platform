@@ -83,54 +83,6 @@
       </el-table>
     </el-card>
 
-    <!-- 绑定管理 -->
-    <el-card shadow="never" class="section-card mt-4">
-      <template #header>
-        <div class="card-header">
-          <div class="header-left">
-            <span class="title">通知绑定</span>
-            <el-tag type="info" size="small">将通道绑定到特定业务场景</el-tag>
-          </div>
-          <el-button type="primary" @click="handleAddBinding" v-permission="'notification:binding_manage'">
-            <el-icon><Plus /></el-icon>
-            添加绑定
-          </el-button>
-        </div>
-      </template>
-      
-      <el-table :data="bindings" style="width: 100%" v-loading="bindingsLoading">
-        <el-table-column prop="channel_name" label="通道" width="150" />
-        <el-table-column prop="notification_type_label" label="通知类型" width="120" align="center">
-          <template #default="{ row }">
-            <el-tag :type="getNotificationTypeTag(row.notification_type)" size="small">
-              {{ row.notification_type_label }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="绑定范围" min-width="200">
-          <template #default="{ row }">
-            <span v-if="row.environment_name">{{ row.environment_name }}</span>
-            <span v-else-if="row.rdb_instance_name">{{ row.rdb_instance_name }}</span>
-            <span v-else-if="row.redis_instance_name">{{ row.redis_instance_name }}</span>
-            <span v-else-if="row.scheduled_task_name">{{ row.scheduled_task_name }}</span>
-            <span v-else class="text-gray-400">全部</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180">
-          <template #default="{ row }">
-            {{ formatDateTime(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right" align="center">
-          <template #default="{ row }">
-            <el-button type="danger" link size="small" @click="handleDeleteBinding(row)">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
     <!-- 选中通道后的规则管理 -->
     <template v-if="selectedChannel">
       <!-- 静默规则管理 -->
