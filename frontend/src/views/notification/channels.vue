@@ -619,7 +619,8 @@ const loadChannels = async () => {
   channelsLoading.value = true
   try {
     const res = await notificationApi.getChannels()
-    channels.value = res.data.items || []
+    // API 直接返回数组
+    channels.value = Array.isArray(res) ? res : (res.data?.items || [])
   } catch (error) {
     console.error('加载通道失败:', error)
     ElMessage.error('加载通道失败')

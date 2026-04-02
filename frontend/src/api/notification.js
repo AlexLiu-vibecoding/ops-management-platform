@@ -10,7 +10,7 @@ export const notificationApi = {
 
   // 获取通道类型列表
   getChannelTypes() {
-    return request.get('/notification/channels/types')
+    return request.get('/notification/channels/channel-types')
   },
 
   // 获取通道详情

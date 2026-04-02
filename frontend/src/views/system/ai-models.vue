@@ -240,7 +240,7 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="Temperature">
-              <el-slider v-model="form.temperature" :min="0" :max="2" :step="0.1" show-input />
+              <el-input-number v-model="form.temperature" :min="0" :max="2" :step="0.1" :precision="1" style="width: 100%" />
             </el-form-item>
           </el-col>
           <el-col :span="12">

@@ -148,6 +148,24 @@ def decrypt_channel_config(config: dict, channel_type: str) -> dict:
     return config
 
 
+# ==================== Static Routes (MUST be defined before dynamic routes) ====================
+
+@router.get("/channel-types")
+async def get_channel_types(
+    current_user: User = Depends(get_current_user)
+):
+    """获取支持的通道类型"""
+    return [
+        {"value": "dingtalk", "label": "钉钉"},
+        {"value": "wechat", "label": "企业微信"},
+        {"value": "feishu", "label": "飞书"},
+        {"value": "email", "label": "邮件"},
+        {"value": "webhook", "label": "Webhook"}
+    ]
+
+
+# ==================== CRUD Routes ====================
+
 @router.get("")
 async def list_channels(
     channel_type: Optional[str] = None,
@@ -185,19 +203,7 @@ async def list_channels(
     return {"items": result, "total": len(result)}
 
 
-@router.get("/types")
-async def get_channel_types(
-    current_user: User = Depends(get_current_user)
-):
-    """获取支持的通道类型"""
-    return [
-        {"value": "dingtalk", "label": "钉钉"},
-        {"value": "wechat", "label": "企业微信"},
-        {"value": "feishu", "label": "飞书"},
-        {"value": "email", "label": "邮件"},
-        {"value": "webhook", "label": "Webhook"}
-    ]
-
+# ==================== Dynamic Routes (MUST be defined after static routes) ====================
 
 @router.get("/{channel_id}")
 async def get_channel(
