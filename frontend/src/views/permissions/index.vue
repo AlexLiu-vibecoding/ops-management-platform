@@ -279,7 +279,11 @@ const moduleNames = {
   approval: '变更管理',
   monitor: '监控管理',
   script: '脚本管理',
-  system: '系统管理'
+  system: '系统管理',
+  notification: '通知管理',
+  audit: '审计管理',
+  scheduled_task: '定时任务',
+  ai: 'AI配置'
 }
 
 const getModuleName = (module) => moduleNames[module] || module
