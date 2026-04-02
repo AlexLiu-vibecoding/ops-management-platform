@@ -83,6 +83,54 @@
       </el-table>
     </el-card>
 
+    <!-- 绑定管理 -->
+    <el-card shadow="never" class="section-card mt-4">
+      <template #header>
+        <div class="card-header">
+          <div class="header-left">
+            <span class="title">通知绑定</span>
+            <el-tag type="info" size="small">将通道绑定到特定业务场景</el-tag>
+          </div>
+          <el-button type="primary" @click="handleAddBinding" v-permission="'notification:binding_manage'">
+            <el-icon><Plus /></el-icon>
+            添加绑定
+          </el-button>
+        </div>
+      </template>
+      
+      <el-table :data="bindings" style="width: 100%" v-loading="bindingsLoading">
+        <el-table-column prop="channel_name" label="通道" width="150" />
+        <el-table-column prop="notification_type_label" label="通知类型" width="120" align="center">
+          <template #default="{ row }">
+            <el-tag :type="getNotificationTypeTag(row.notification_type)" size="small">
+              {{ row.notification_type_label }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="绑定范围" min-width="200">
+          <template #default="{ row }">
+            <span v-if="row.environment_name">{{ row.environment_name }}</span>
+            <span v-else-if="row.rdb_instance_name">{{ row.rdb_instance_name }}</span>
+            <span v-else-if="row.redis_instance_name">{{ row.redis_instance_name }}</span>
+            <span v-else-if="row.scheduled_task_name">{{ row.scheduled_task_name }}</span>
+            <span v-else class="text-gray-400">全部</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="created_at" label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.created_at) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button type="danger" link size="small" @click="handleDeleteBinding(row)">
+              删除
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
     <!-- 选中通道后的规则管理 -->
     <template v-if="selectedChannel">
       <!-- 静默规则管理 -->
@@ -221,6 +269,63 @@
             </template>
           </el-table-column>
         </el-table>
+      </el-card>
+
+      <!-- 通知绑定管理 -->
+      <el-card shadow="never" class="section-card mt-4">
+        <template #header>
+          <div class="card-header">
+            <div class="header-left">
+              <span class="title">通知绑定</span>
+              <el-tag type="info" size="small">通道: {{ selectedChannel.name }}</el-tag>
+            </div>
+            <el-button type="primary" size="small" @click="handleAddBinding">
+              <el-icon><Plus /></el-icon>
+              添加绑定
+            </el-button>
+          </div>
+        </template>
+        
+        <el-table :data="bindings" style="width: 100%" v-loading="bindingsLoading">
+          <el-table-column prop="notification_type" label="通知类型" min-width="120">
+            <template #default="{ row }">
+              <el-tag size="small">
+                {{ notificationTypes.find(t => t.value === row.notification_type)?.label || row.notification_type }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="绑定范围" min-width="200">
+            <template #default="{ row }">
+              <div v-if="row.environment_name">
+                <el-tag size="small" type="info">环境: {{ row.environment_name }}</el-tag>
+              </div>
+              <div v-else-if="row.rdb_instance_name">
+                <el-tag size="small" type="warning">MySQL/PG: {{ row.rdb_instance_name }}</el-tag>
+              </div>
+              <div v-else-if="row.redis_instance_name">
+                <el-tag size="small" type="danger">Redis: {{ row.redis_instance_name }}</el-tag>
+              </div>
+              <div v-else-if="row.scheduled_task_name">
+                <el-tag size="small" type="success">任务: {{ row.scheduled_task_name }}</el-tag>
+              </div>
+              <span v-else class="text-gray-400">全局绑定</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="创建时间" width="180">
+            <template #default="{ row }">
+              {{ formatDateTime(row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="100" fixed="right" align="center">
+            <template #default="{ row }">
+              <el-button type="danger" link size="small" @click="handleDeleteBinding(row)">
+                删除
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        
+        <el-empty v-if="!bindingsLoading && bindings.length === 0" description="暂无绑定" />
       </el-card>
     </template>
 
@@ -497,6 +602,56 @@
         <el-button type="primary" @click="handleSaveRateLimitRule" :loading="rateLimitDialog.loading">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 绑定对话框 -->
+    <el-dialog
+      v-model="bindingDialog.visible"
+      title="添加通知绑定"
+      width="500px"
+      destroy-on-close
+    >
+      <el-form :model="bindingForm" label-width="100px">
+        <el-form-item label="通知类型" required>
+          <el-select v-model="bindingForm.notification_type" placeholder="请选择通知类型" style="width: 100%">
+            <el-option
+              v-for="item in notificationTypes"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="环境">
+          <el-select v-model="bindingForm.environment_id" placeholder="选择环境（可选）" clearable style="width: 100%">
+            <el-option v-for="env in environments" :key="env.id" :label="env.name" :value="env.id" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="MySQL/PG实例">
+          <el-select v-model="bindingForm.rdb_instance_id" placeholder="选择实例（可选）" clearable style="width: 100%">
+            <el-option v-for="inst in rdbInstances" :key="inst.id" :label="inst.name" :value="inst.id" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="Redis实例">
+          <el-select v-model="bindingForm.redis_instance_id" placeholder="选择实例（可选）" clearable style="width: 100%">
+            <el-option v-for="inst in redisInstances" :key="inst.id" :label="inst.name" :value="inst.id" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="定时任务">
+          <el-select v-model="bindingForm.scheduled_task_id" placeholder="选择任务（可选）" clearable style="width: 100%">
+            <el-option v-for="task in scheduledTasks" :key="task.id" :label="task.name" :value="task.id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <el-button @click="bindingDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="submitBinding" :loading="bindingDialog.submitting">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -506,6 +661,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { notificationApi } from '@/api/notification'
 import { formatDate as formatDateUtil } from '@/utils/format'
+import request from '@/api/index'
 
 // 通道相关
 const channels = ref([])
@@ -520,6 +676,37 @@ const silenceLoading = ref(false)
 // 频率限制相关
 const rateLimitRules = ref([])
 const rateLimitLoading = ref(false)
+
+// 绑定管理
+const bindings = ref([])
+const bindingsLoading = ref(false)
+
+const bindingDialog = reactive({
+  visible: false,
+  submitting: false
+})
+
+const bindingForm = reactive({
+  channel_id: null,
+  notification_type: '',
+  environment_id: null,
+  rdb_instance_id: null,
+  redis_instance_id: null,
+  scheduled_task_id: null
+})
+
+const notificationTypes = [
+  { value: 'approval', label: '审批通知' },
+  { value: 'alert', label: '告警通知' },
+  { value: 'scheduled_task', label: '定时任务通知' },
+  { value: 'operation', label: '审计日志通知' }
+]
+
+// 绑定数据源
+const environments = ref([])
+const rdbInstances = ref([])
+const redisInstances = ref([])
+const scheduledTasks = ref([])
 
 // 星期几
 const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
@@ -645,6 +832,7 @@ const handleChannelSelect = (row) => {
   if (row) {
     loadSilenceRules(row.id)
     loadRateLimits(row.id)
+    loadBindings(row.id)
   }
 }
 
@@ -673,6 +861,79 @@ const loadRateLimits = async (channelId) => {
     ElMessage.error('加载频率限制失败')
   } finally {
     rateLimitLoading.value = false
+  }
+}
+
+// 加载通道绑定
+const loadBindings = async (channelId) => {
+  bindingsLoading.value = true
+  try {
+    const res = await notificationApi.getChannelBindings(channelId)
+    bindings.value = res.items || []
+  } catch (error) {
+    console.error('加载绑定失败:', error)
+    // 404 表示暂无绑定，显示空列表
+    if (error.response?.status !== 404) {
+      ElMessage.error('加载绑定失败')
+    }
+    bindings.value = []
+  } finally {
+    bindingsLoading.value = false
+  }
+}
+
+// 添加绑定
+const handleAddBinding = () => {
+  bindingForm.channel_id = selectedChannel.value.id
+  bindingForm.notification_type = ''
+  bindingForm.environment_id = null
+  bindingForm.rdb_instance_id = null
+  bindingForm.redis_instance_id = null
+  bindingForm.scheduled_task_id = null
+  bindingDialog.visible = true
+}
+
+// 编辑绑定
+const handleEditBinding = (row) => {
+  bindingForm.channel_id = selectedChannel.value.id
+  bindingForm.notification_type = row.notification_type
+  bindingForm.environment_id = row.environment_id
+  bindingForm.rdb_instance_id = row.rdb_instance_id
+  bindingForm.redis_instance_id = row.redis_instance_id
+  bindingForm.scheduled_task_id = row.scheduled_task_id
+  bindingDialog.visible = true
+}
+
+// 删除绑定
+const handleDeleteBinding = async (row) => {
+  try {
+    await ElMessageBox.confirm('确定删除此绑定？', '确认删除', {
+      type: 'warning'
+    })
+    await notificationApi.deleteChannelBinding(selectedChannel.value.id, row.id)
+    ElMessage.success('删除成功')
+    loadBindings(selectedChannel.value.id)
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除绑定失败:', error)
+      ElMessage.error(error.response?.data?.detail || '删除失败')
+    }
+  }
+}
+
+// 提交绑定
+const submitBinding = async () => {
+  bindingDialog.submitting = true
+  try {
+    await notificationApi.createChannelBinding(selectedChannel.value.id, bindingForm)
+    ElMessage.success('添加成功')
+    bindingDialog.visible = false
+    loadBindings(selectedChannel.value.id)
+  } catch (error) {
+    console.error('添加绑定失败:', error)
+    ElMessage.error(error.response?.data?.detail || '添加失败')
+  } finally {
+    bindingDialog.submitting = false
   }
 }
 
@@ -963,6 +1224,19 @@ const handleDeleteRateLimitRule = async (row) => {
 // 工具函数
 const formatDate = (date) => formatDateUtil(date)
 
+const formatDateTime = (date) => {
+  if (!date) return '-'
+  const d = new Date(date)
+  return d.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  })
+}
+
 const maskWebhook = (url) => {
   if (!url) return '-'
   try {
@@ -1002,10 +1276,31 @@ const getAlertLevelTag = (level) => {
   return map[level] || ''
 }
 
+// 加载绑定数据源
+const loadBindingDataSources = async () => {
+  try {
+    // 并行加载所有数据源
+    const [envRes, rdbRes, redisRes, taskRes] = await Promise.all([
+      request.get('/environments').catch(() => ({ items: [] })),
+      request.get('/rdb-instances').catch(() => ({ items: [] })),
+      request.get('/redis-instances').catch(() => ({ items: [] })),
+      request.get('/scheduled-tasks').catch(() => ({ items: [] }))
+    ])
+    
+    environments.value = envRes.items || envRes || []
+    rdbInstances.value = rdbRes.items || rdbRes || []
+    redisInstances.value = redisRes.items || redisRes || []
+    scheduledTasks.value = taskRes.items || taskRes || []
+  } catch (error) {
+    console.error('加载数据源失败:', error)
+  }
+}
+
 // 初始化
 onMounted(() => {
   loadChannels()
   loadChannelTypes()
+  loadBindingDataSources()
 })
 </script>
 

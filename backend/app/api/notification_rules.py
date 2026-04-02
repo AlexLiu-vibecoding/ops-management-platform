@@ -14,7 +14,7 @@ from app.models.permissions import PermissionCode
 from app.deps import get_current_user, require_permissions
 
 
-router = APIRouter(tags=["通知规则管理"])
+router = APIRouter(prefix="/notification", tags=["通知规则管理"])
 
 
 # ==================== Schemas ====================

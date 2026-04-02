@@ -80,5 +80,22 @@ export const notificationApi = {
   // 删除频率限制
   deleteRateLimit(channelId, ruleId) {
     return request.delete(`/notification/channels/${channelId}/rate-limits/${ruleId}`)
+  },
+
+  // ============ 通道绑定 ============
+
+  // 获取通道的绑定列表
+  getChannelBindings(channelId, params) {
+    return request.get(`/notification/channels/${channelId}/bindings`, { params })
+  },
+
+  // 创建绑定
+  createChannelBinding(channelId, data) {
+    return request.post(`/notification/channels/${channelId}/bindings`, data)
+  },
+
+  // 删除绑定
+  deleteChannelBinding(channelId, bindingId) {
+    return request.delete(`/notification/channels/${channelId}/bindings/${bindingId}`)
   }
 }

@@ -327,3 +327,145 @@ async def test_channel(
 
     # TODO: 实现实际的通知发送测试
     return {"message": "测试成功", "detail": "通知已发送，请检查接收情况"}
+
+
+# ==================== 通道绑定管理 ====================
+
+from app.models import NotificationBinding, Environment
+from app.models.instances import RDBInstance, RedisInstance
+
+NOTIFICATION_TYPE_LABELS = {
+    "approval": "审批通知",
+    "alert": "告警通知",
+    "scheduled_task": "定时任务通知",
+    "operation": "审计日志通知"
+}
+
+
+class ChannelBindingCreate(BaseModel):
+    """创建通道绑定"""
+    notification_type: str = Field(..., description="通知类型: approval/alert/scheduled_task/operation")
+    environment_id: Optional[int] = None
+    rdb_instance_id: Optional[int] = None
+    redis_instance_id: Optional[int] = None
+    scheduled_task_id: Optional[int] = None
+
+
+@router.get("/{channel_id}/bindings")
+async def list_channel_bindings(
+    channel_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取通道的绑定列表"""
+    # 检查通道是否存在
+    channel = db.query(NotificationChannel).filter_by(id=channel_id).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="通道不存在")
+
+    bindings = db.query(NotificationBinding).filter_by(channel_id=channel_id).all()
+
+    result = []
+    for b in bindings:
+        # 获取关联数据
+        env_name = None
+        rdb_name = None
+        redis_name = None
+        task_name = None
+
+        if b.environment_id:
+            env = db.query(Environment).filter_by(id=b.environment_id).first()
+            env_name = env.name if env else None
+
+        if b.rdb_instance_id:
+            rdb = db.query(RDBInstance).filter_by(id=b.rdb_instance_id).first()
+            rdb_name = rdb.name if rdb else None
+
+        if b.redis_instance_id:
+            redis = db.query(RedisInstance).filter_by(id=b.redis_instance_id).first()
+            redis_name = redis.name if redis else None
+
+        if b.scheduled_task_id:
+            from app.models import ScheduledTask
+            task = db.query(ScheduledTask).filter_by(id=b.scheduled_task_id).first()
+            task_name = task.name if task else None
+
+        result.append({
+            "id": b.id,
+            "channel_id": b.channel_id,
+            "notification_type": b.notification_type,
+            "notification_type_label": NOTIFICATION_TYPE_LABELS.get(b.notification_type, b.notification_type),
+            "environment_id": b.environment_id,
+            "environment_name": env_name,
+            "rdb_instance_id": b.rdb_instance_id,
+            "rdb_instance_name": rdb_name,
+            "redis_instance_id": b.redis_instance_id,
+            "redis_instance_name": redis_name,
+            "scheduled_task_id": b.scheduled_task_id,
+            "scheduled_task_name": task_name,
+            "created_at": b.created_at.isoformat() if b.created_at else None
+        })
+
+    return {"items": result}
+
+
+@router.post("/{channel_id}/bindings")
+async def create_channel_binding(
+    channel_id: int,
+    data: ChannelBindingCreate,
+    current_user: User = Depends(require_permissions([PermissionCode.NOTIFICATION_CHANNEL_MANAGE])),
+    db: Session = Depends(get_db)
+):
+    """创建通道绑定"""
+    # 检查通道是否存在
+    channel = db.query(NotificationChannel).filter_by(id=channel_id).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="通道不存在")
+
+    # 检查是否已存在相同绑定
+    existing = db.query(NotificationBinding).filter(
+        NotificationBinding.channel_id == channel_id,
+        NotificationBinding.notification_type == data.notification_type,
+        NotificationBinding.environment_id == data.environment_id,
+        NotificationBinding.rdb_instance_id == data.rdb_instance_id,
+        NotificationBinding.redis_instance_id == data.redis_instance_id,
+        NotificationBinding.scheduled_task_id == data.scheduled_task_id
+    ).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="该绑定已存在")
+
+    binding = NotificationBinding(
+        channel_id=channel_id,
+        notification_type=data.notification_type,
+        environment_id=data.environment_id,
+        rdb_instance_id=data.rdb_instance_id,
+        redis_instance_id=data.redis_instance_id,
+        scheduled_task_id=data.scheduled_task_id
+    )
+    db.add(binding)
+    db.commit()
+
+    return {"message": "绑定创建成功"}
+
+
+@router.delete("/{channel_id}/bindings/{binding_id}")
+async def delete_channel_binding(
+    channel_id: int,
+    binding_id: int,
+    current_user: User = Depends(require_permissions([PermissionCode.NOTIFICATION_CHANNEL_MANAGE])),
+    db: Session = Depends(get_db)
+):
+    """删除通道绑定"""
+    binding = db.query(NotificationBinding).filter(
+        NotificationBinding.id == binding_id,
+        NotificationBinding.channel_id == channel_id
+    ).first()
+
+    if not binding:
+        raise HTTPException(status_code=404, detail="绑定不存在")
+
+    db.delete(binding)
+    db.commit()
+
+    return {"message": "绑定删除成功"}
