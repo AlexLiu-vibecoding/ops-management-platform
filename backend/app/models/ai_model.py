@@ -109,6 +109,28 @@ class AICallLog(Base):
     model_config = relationship("AIModelConfig", backref="call_logs")
 
 
+class AIAvailableModel(Base):
+    """可用模型列表 - 从提供商获取的模型清单"""
+    __tablename__ = "ai_available_models"
+    
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    provider = Column(String(50), nullable=False, index=True, comment="提供商: openai/doubao/ollama/custom")
+    model_id = Column(String(100), nullable=False, comment="模型标识")
+    model_name = Column(String(200), nullable=False, comment="模型显示名称")
+    model_type = Column(String(30), default="chat", comment="模型类型: chat/completion/embedding")
+    context_window = Column(Integer, comment="上下文窗口大小")
+    is_available = Column(Boolean, default=True, comment="是否可用")
+    raw_data = Column(JSON, comment="原始数据(提供商返回的完整信息)")
+    fetched_at = Column(DateTime, default=datetime.now, comment="获取时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    
+    # 联合唯一约束：同一提供商下模型 ID 唯一
+    __table_args__ = (
+        {"unique_constraint": ("provider", "model_id")},
+    )
+
+
 # 提供商标签映射
 PROVIDER_LABELS = {
     "openai": "OpenAI",

@@ -49,6 +49,19 @@ export const aiModelsApi = {
     return request.get('/ai-models/templates')
   },
 
+  // ========== 可用模型 ==========
+
+  // 获取可用模型列表
+  getAvailableModels(provider = null) {
+    const params = provider ? { provider } : {}
+    return request.get('/ai-models/available-models', { params })
+  },
+
+  // 刷新可用模型列表
+  refreshAvailableModels() {
+    return request.post('/ai-models/available-models/refresh')
+  },
+
   // ========== 场景配置 ==========
   
   // 获取所有场景配置

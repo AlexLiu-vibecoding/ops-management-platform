@@ -68,6 +68,14 @@ class ApprovalScheduler:
             replace_existing=True
         )
         
+        # 添加 AI 可用模型刷新任务：每天凌晨0点执行
+        self.scheduler.add_job(
+            self.refresh_ai_available_models,
+            trigger=CronTrigger(hour=0, minute=5),
+            id="refresh_ai_available_models",
+            replace_existing=True
+        )
+        
         self.scheduler.start()
         logger.info("审批定时执行调度器已启动")
     
@@ -419,6 +427,130 @@ class ApprovalScheduler:
             
         except Exception as e:
             logger.error(f"清理过期分析历史失败: {e}")
+            db.rollback()
+        finally:
+            db.close()
+    
+    async def refresh_ai_available_models(self):
+        """
+        刷新 AI 可用模型列表
+        
+        每天 0:05 执行，从各提供商 API 获取最新模型列表
+        """
+        import httpx
+        from app.models.ai_model import AIModelConfig, AIAvailableModel
+        from app.services.ai_model_service import decrypt_api_key
+        
+        db = SessionLocal()
+        try:
+            logger.info("开始刷新 AI 可用模型列表")
+            
+            # 获取所有启用的模型配置
+            configs = db.query(AIModelConfig).filter(AIModelConfig.is_enabled == True).all()
+            providers = set(c.provider for c in configs)
+            
+            refreshed_count = 0
+            
+            for provider in providers:
+                try:
+                    if provider == "doubao":
+                        # 豆包模型列表
+                        models = [
+                            {"model_id": "doubao-seed-1-8-251228", "model_name": "Doubao Seed 1.8 (251228)", "model_type": "chat", "context_window": 128000},
+                            {"model_id": "doubao-pro-32k", "model_name": "Doubao Pro 32K", "model_type": "chat", "context_window": 32768},
+                            {"model_id": "doubao-lite-4k", "model_name": "Doubao Lite 4K", "model_type": "chat", "context_window": 4096},
+                            {"model_id": "doubao-pro-128k", "model_name": "Doubao Pro 128K", "model_type": "chat", "context_window": 128000},
+                            {"model_id": "doubao-pro-256k", "model_name": "Doubao Pro 256K", "model_type": "chat", "context_window": 256000},
+                        ]
+                    else:
+                        # OpenAI 兼容 API
+                        provider_configs = [c for c in configs if c.provider == provider]
+                        if not provider_configs:
+                            continue
+                        
+                        config = provider_configs[0]
+                        api_key = decrypt_api_key(config.api_key_encrypted) if config.api_key_encrypted else ""
+                        
+                        base_url = config.base_url.rstrip('/')
+                        models_url = f"{base_url}/models"
+                        
+                        headers = {}
+                        if api_key:
+                            headers["Authorization"] = f"Bearer {api_key}"
+                        
+                        try:
+                            async with httpx.AsyncClient(timeout=30) as client:
+                                response = await client.get(models_url, headers=headers)
+                            
+                            if response.status_code != 200:
+                                logger.warning(f"获取 {provider} 模型列表失败: {response.status_code}")
+                                continue
+                            
+                            data = response.json()
+                            model_list = data.get("data", data) if isinstance(data, dict) else data
+                            
+                            models = []
+                            for model in model_list:
+                                if isinstance(model, dict):
+                                    model_id = model.get("id", model.get("name", ""))
+                                    if model_id:
+                                        model_type = "chat"
+                                        if "embed" in model_id.lower():
+                                            model_type = "embedding"
+                                        elif "whisper" in model_id.lower() or "tts" in model_id.lower():
+                                            continue
+                                        
+                                        models.append({
+                                            "model_id": model_id,
+                                            "model_name": model.get("name", model_id),
+                                            "model_type": model_type,
+                                            "context_window": model.get("context_window"),
+                                            "raw_data": model
+                                        })
+                        except Exception as e:
+                            logger.error(f"获取 {provider} 模型列表异常: {e}")
+                            continue
+                    
+                    # 更新数据库
+                    for model_info in models:
+                        existing = db.query(AIAvailableModel).filter(
+                            AIAvailableModel.provider == provider,
+                            AIAvailableModel.model_id == model_info["model_id"]
+                        ).first()
+                        
+                        if existing:
+                            existing.model_name = model_info.get("model_name", existing.model_name)
+                            existing.model_type = model_info.get("model_type", existing.model_type)
+                            existing.context_window = model_info.get("context_window")
+                            existing.is_available = model_info.get("is_available", True)
+                            existing.raw_data = model_info.get("raw_data")
+                            existing.fetched_at = datetime.now()
+                            existing.updated_at = datetime.now()
+                        else:
+                            new_model = AIAvailableModel(
+                                provider=provider,
+                                model_id=model_info["model_id"],
+                                model_name=model_info.get("model_name", model_info["model_id"]),
+                                model_type=model_info.get("model_type", "chat"),
+                                context_window=model_info.get("context_window"),
+                                is_available=model_info.get("is_available", True),
+                                raw_data=model_info.get("raw_data"),
+                                fetched_at=datetime.now()
+                            )
+                            db.add(new_model)
+                            refreshed_count += 1
+                    
+                    db.commit()
+                    logger.info(f"刷新 {provider} 模型列表成功: {len(models)} 个模型")
+                    
+                except Exception as e:
+                    logger.error(f"刷新 {provider} 模型列表失败: {e}")
+                    db.rollback()
+            
+            logger.info(f"AI 可用模型列表刷新完成，新增 {refreshed_count} 个模型")
+            
+        except Exception as e:
+            logger.error(f"刷新 AI 可用模型列表失败: {e}")
             db.rollback()
         finally:
             db.close()

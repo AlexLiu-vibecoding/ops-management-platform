@@ -196,7 +196,35 @@
           </div>
         </el-form-item>
         <el-form-item label="模型名称" prop="model_name">
-          <el-input v-model="form.model_name" placeholder="gpt-4o / qwen2.5:7b" />
+          <div class="model-name-select">
+            <el-select
+              v-model="form.model_name"
+              filterable
+              allow-create
+              default-first-option
+              placeholder="选择或输入模型名称"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="model in currentProviderModels"
+                :key="model.model_id"
+                :label="model.model_name"
+                :value="model.model_id"
+              />
+            </el-select>
+            <el-button 
+              type="primary" 
+              link 
+              @click="handleRefreshModels"
+              :loading="refreshingModels"
+              title="从提供商刷新模型列表"
+            >
+              <el-icon><Refresh /></el-icon>
+            </el-button>
+          </div>
+          <div class="form-hint" v-if="currentProviderModels.length === 0">
+            暂无可用模型列表，请手动输入或点击刷新按钮
+          </div>
         </el-form-item>
 
         <el-divider content-position="left">参数配置</el-divider>
@@ -368,6 +396,8 @@ const handleSaveScene = async () => {
 const loading = ref(false)
 const modelList = ref([])
 const providers = ref([])
+const availableModels = ref({})
+const refreshingModels = ref(false)
 
 const formRef = ref()
 const dialog = reactive({
@@ -410,6 +440,11 @@ const testDialog = reactive({
 
 const enabledModels = computed(() => modelList.value.filter(m => m.is_enabled))
 
+const currentProviderModels = computed(() => {
+  const models = availableModels.value[form.provider] || []
+  return models
+})
+
 const getProviderTagType = (provider) => {
   const types = {
     'doubao': 'primary',
@@ -437,6 +472,32 @@ const fetchProviders = async () => {
     providers.value = await aiModelsApi.getProviders()
   } catch (error) {
     console.error('获取提供商失败:', error)
+  }
+}
+
+const fetchAvailableModels = async () => {
+  try {
+    const result = await aiModelsApi.getAvailableModels()
+    availableModels.value = result.by_provider || {}
+  } catch (error) {
+    console.error('获取可用模型失败:', error)
+  }
+}
+
+const handleRefreshModels = async () => {
+  refreshingModels.value = true
+  try {
+    const result = await aiModelsApi.refreshAvailableModels()
+    if (result.errors && result.errors.length > 0) {
+      ElMessage.warning(`部分刷新失败: ${result.errors.join(', ')}`)
+    } else {
+      ElMessage.success(`刷新成功: ${JSON.stringify(result.refreshed)}`)
+    }
+    await fetchAvailableModels()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '刷新失败')
+  } finally {
+    refreshingModels.value = false
   }
 }
 
@@ -588,6 +649,7 @@ onMounted(() => {
   fetchSceneConfigs()
   fetchList()
   fetchProviders()
+  fetchAvailableModels()
 })
 </script>
 
@@ -627,6 +689,19 @@ onMounted(() => {
 
 .form-hint {
   font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
+}
+
+.model-name-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.model-name-select .el-select {
+  flex: 1;
+}
   color: var(--el-text-color-secondary);
   margin-top: 4px;
 }
