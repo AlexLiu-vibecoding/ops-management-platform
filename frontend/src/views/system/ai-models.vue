@@ -702,7 +702,4 @@ onMounted(() => {
 .model-name-select .el-select {
   flex: 1;
 }
-  color: var(--el-text-color-secondary);
-  margin-top: 4px;
-}
 </style>
