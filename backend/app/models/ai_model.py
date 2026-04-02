@@ -95,6 +95,37 @@ USE_CASE_LABELS = {
     "inspection": "智能巡检"
 }
 
+
+def get_ai_model_config_for_use_case(db, use_case: str):
+    """
+    获取指定使用场景的 AI 模型配置
+    
+    Args:
+        db: 数据库会话
+        use_case: 使用场景 (如 'sql_optimize', 'alert_analysis')
+        
+    Returns:
+        AIModelConfig 对象或 None
+    """
+    from sqlalchemy import desc
+    
+    # 优先获取默认模型
+    default_config = db.query(AIModelConfig).filter(
+        AIModelConfig.is_enabled == True,
+        AIModelConfig.is_default == True
+    ).first()
+    
+    if default_config and (use_case in (default_config.use_cases or []) or not default_config.use_cases):
+        return default_config
+    
+    # 否则获取支持该使用场景的、优先级最高的模型
+    config = db.query(AIModelConfig).filter(
+        AIModelConfig.is_enabled == True,
+        AIModelConfig.use_cases.contains([use_case])
+    ).order_by(desc(AIModelConfig.priority)).first()
+    
+    return config
+
 # 预设模板
 AI_MODEL_TEMPLATES = [
     {

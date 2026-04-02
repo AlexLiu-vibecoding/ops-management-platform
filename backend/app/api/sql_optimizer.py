@@ -701,10 +701,29 @@ async def get_llm_analysis(
     explain_result: List[Dict],
     table_schemas: List[Dict],
     db_type: str = "mysql",
-    db_version: str = "8.0"
+    db_version: str = "8.0",
+    db_session: Session = None
 ) -> str:
     """使用LLM进行深度SQL分析（带超时控制）"""
     from app.utils.llm_client import get_llm_client, DEFAULT_MODEL
+    from app.models.ai_model import get_ai_model_config_for_use_case
+    
+    # 尝试从 AI 模型配置表获取模型
+    model_name = DEFAULT_MODEL
+    temperature = 0.3
+    max_tokens = 4096
+    timeout = LLM_TIMEOUT
+    
+    if db_session:
+        ai_config = get_ai_model_config_for_use_case(db_session, "sql_optimize")
+        if ai_config:
+            model_name = ai_config.model_name
+            temperature = ai_config.temperature
+            max_tokens = ai_config.max_tokens
+            timeout = ai_config.timeout
+            logger.info(f"[SQL优化器] 使用 AI 模型配置: {ai_config.name}, 模型: {model_name}")
+        else:
+            logger.info(f"[SQL优化器] 未找到 sql_optimize 配置，使用默认模型: {model_name}")
     
     # 构建上下文
     context = {
@@ -752,7 +771,7 @@ async def get_llm_analysis(
     try:
         client = get_llm_client()
         
-        logger.info(f"[SQL优化器] 开始 LLM 分析, SQL长度: {len(sql)}")
+        logger.info(f"[SQL优化器] 开始 LLM 分析, SQL长度: {len(sql)}, 模型: {model_name}")
         
         # 使用 asyncio 等待，设置超时
         response = await asyncio.wait_for(
@@ -761,18 +780,18 @@ async def get_llm_analysis(
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_message}
                 ],
-                model=DEFAULT_MODEL,
-                temperature=0.3,
-                max_tokens=4096
+                model=model_name,
+                temperature=temperature,
+                max_tokens=max_tokens
             ),
-            timeout=LLM_TIMEOUT
+            timeout=timeout
         )
         
         logger.info(f"[SQL优化器] LLM 分析完成, 响应长度: {len(response)}")
         return response
             
     except asyncio.TimeoutError:
-        logger.warning(f"[SQL优化器] LLM 分析超时 ({LLM_TIMEOUT}秒)")
+        logger.warning(f"[SQL优化器] LLM 分析超时 ({timeout}秒)")
         return "LLM分析超时，请稍后重试"
     except Exception as e:
         logger.error(f"[SQL优化器] LLM 分析失败: {e}")
@@ -1074,7 +1093,8 @@ async def analyze_sql(
                 explain_rows,
                 schemas_for_llm,
                 db_type,  # 使用实际连接检测到的数据库类型
-                db_version
+                db_version,
+                db_session=db  # 传入数据库会话以获取 AI 模型配置
             )
         
         # 计算风险等级
