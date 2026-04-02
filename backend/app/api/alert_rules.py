@@ -18,6 +18,262 @@ from app.deps import get_super_admin
 router = APIRouter(prefix="/alert-rules", tags=["告警规则"])
 
 
+# ==================== 选项列表 API ====================
+
+@router.get("/types/list")
+async def get_alert_types():
+    """获取告警规则类型列表"""
+    return [
+        {"value": "metric", "label": "指标告警"},
+        {"value": "log", "label": "日志告警"},
+        {"value": "event", "label": "事件告警"},
+        {"value": "composite", "label": "复合告警"}
+    ]
+
+
+@router.get("/operators/list")
+async def get_operators():
+    """获取运算符列表"""
+    return [
+        {"value": "gt", "label": "大于"},
+        {"value": "gte", "label": "大于等于"},
+        {"value": "lt", "label": "小于"},
+        {"value": "lte", "label": "小于等于"},
+        {"value": "eq", "label": "等于"},
+        {"value": "neq", "label": "不等于"},
+        {"value": "contains", "label": "包含"},
+        {"value": "not_contains", "label": "不包含"}
+    ]
+
+
+@router.get("/aggregations/list")
+async def get_aggregation_methods():
+    """获取聚合方式列表"""
+    return [
+        {"value": "avg", "label": "平均值"},
+        {"value": "max", "label": "最大值"},
+        {"value": "min", "label": "最小值"},
+        {"value": "sum", "label": "求和"},
+        {"value": "count", "label": "计数"},
+        {"value": "p95", "label": "P95"},
+        {"value": "p99", "label": "P99"}
+    ]
+
+
+@router.get("/severities/list")
+async def get_severities():
+    """获取告警级别列表"""
+    return [
+        {"value": "critical", "label": "严重"},
+        {"value": "high", "label": "高"},
+        {"value": "medium", "label": "中"},
+        {"value": "low", "label": "低"},
+        {"value": "info", "label": "信息"}
+    ]
+
+
+# ==================== 告警规则 CRUD API ====================
+
+from app.models.alert_rule import AlertRule, RULE_TYPE_LABELS, OPERATOR_LABELS, AGGREGATION_LABELS, SEVERITY_CONFIG
+from app.deps import get_current_user
+
+
+class AlertRuleCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    rule_type: str = Field(..., min_length=1)
+    instance_scope: str = Field("all")
+    instance_ids: Optional[List[int]] = None
+    metric_name: Optional[str] = None
+    operator: str = Field(">")
+    threshold: float = Field(0)
+    duration: int = Field(60)
+    aggregation: str = Field("avg")
+    severity: str = Field("warning")
+    silence_duration: int = Field(300)
+    notify_enabled: bool = Field(True)
+    is_enabled: bool = Field(True)
+
+
+class AlertRuleUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    rule_type: Optional[str] = None
+    instance_scope: Optional[str] = None
+    instance_ids: Optional[List[int]] = None
+    metric_name: Optional[str] = None
+    operator: Optional[str] = None
+    threshold: Optional[float] = None
+    duration: Optional[int] = None
+    aggregation: Optional[str] = None
+    severity: Optional[str] = None
+    silence_duration: Optional[int] = None
+    notify_enabled: Optional[bool] = None
+    is_enabled: Optional[bool] = None
+
+
+@router.get("")
+async def list_alert_rules(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = None,
+    rule_type: Optional[str] = None,
+    is_enabled: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """获取告警规则列表"""
+    query = db.query(AlertRule)
+    
+    if search:
+        query = query.filter(AlertRule.name.ilike(f"%{search}%"))
+    if rule_type:
+        query = query.filter(AlertRule.rule_type == rule_type)
+    if is_enabled is not None:
+        query = query.filter(AlertRule.is_enabled == is_enabled)
+    
+    total = query.count()
+    rules = query.order_by(desc(AlertRule.created_at)) \
+        .offset((page - 1) * limit) \
+        .limit(limit) \
+        .all()
+    
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "name": r.name,
+                "description": r.description,
+                "rule_type": r.rule_type,
+                "instance_scope": r.instance_scope,
+                "instance_ids": r.instance_ids or [],
+                "metric_name": r.metric_name,
+                "operator": r.operator,
+                "threshold": r.threshold,
+                "duration": r.duration,
+                "aggregation": r.aggregation,
+                "severity": r.severity,
+                "silence_duration": r.silence_duration,
+                "notify_enabled": r.notify_enabled,
+                "is_enabled": r.is_enabled,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None
+            }
+            for r in rules
+        ],
+        "total": total,
+        "page": page,
+        "limit": limit
+    }
+
+
+@router.get("/{rule_id}")
+async def get_alert_rule(
+    rule_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """获取告警规则详情"""
+    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="规则不存在")
+    
+    return {
+        "id": rule.id,
+        "name": rule.name,
+        "description": rule.description,
+        "rule_type": rule.rule_type,
+        "instance_scope": rule.instance_scope,
+        "instance_ids": rule.instance_ids or [],
+        "metric_name": rule.metric_name,
+        "operator": rule.operator,
+        "threshold": rule.threshold,
+        "duration": rule.duration,
+        "aggregation": rule.aggregation,
+        "severity": rule.severity,
+        "silence_duration": rule.silence_duration,
+        "notify_enabled": rule.notify_enabled,
+        "is_enabled": rule.is_enabled,
+        "created_at": rule.created_at.isoformat() if rule.created_at else None,
+        "updated_at": rule.updated_at.isoformat() if rule.updated_at else None
+    }
+
+
+@router.post("")
+async def create_alert_rule(
+    data: AlertRuleCreate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_super_admin)
+):
+    """创建告警规则"""
+    existing = db.query(AlertRule).filter(AlertRule.name == data.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="规则名称已存在")
+    
+    rule = AlertRule(**data.model_dump())
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    
+    return {"id": rule.id, "message": "创建成功"}
+
+
+@router.put("/{rule_id}")
+async def update_alert_rule(
+    rule_id: int,
+    data: AlertRuleUpdate,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_super_admin)
+):
+    """更新告警规则"""
+    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="规则不存在")
+    
+    if data.name and data.name != rule.name:
+        existing = db.query(AlertRule).filter(AlertRule.name == data.name).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="规则名称已存在")
+    
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(rule, field, value)
+    
+    db.commit()
+    return {"message": "更新成功"}
+
+
+@router.delete("/{rule_id}")
+async def delete_alert_rule(
+    rule_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_super_admin)
+):
+    """删除告警规则"""
+    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="规则不存在")
+    
+    db.delete(rule)
+    db.commit()
+    return {"message": "删除成功"}
+
+
+@router.post("/{rule_id}/toggle")
+async def toggle_alert_rule(
+    rule_id: int,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_super_admin)
+):
+    """启用/禁用告警规则"""
+    rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="规则不存在")
+    
+    rule.is_enabled = not rule.is_enabled
+    db.commit()
+    return {"message": "操作成功", "is_enabled": rule.is_enabled}
+
+
 # ==================== Schemas ====================
 
 class AlertAggregationRuleCreate(BaseModel):
