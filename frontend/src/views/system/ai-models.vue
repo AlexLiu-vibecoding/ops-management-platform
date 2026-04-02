@@ -80,12 +80,11 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="model_name" label="模型" min-width="200">
+          <el-table-column prop="model_name" label="模型标识" min-width="200">
             <template #default="{ row }">
-              <div class="model-cell">
-                <span class="model-name-text">{{ row.model_name }}</span>
-                <span class="model-url">{{ row.base_url }}</span>
-              </div>
+              <el-tooltip :content="`API: ${row.base_url}`" placement="top">
+                <span class="model-id">{{ row.model_name }}</span>
+              </el-tooltip>
             </template>
           </el-table-column>
           <el-table-column prop="priority" label="优先级" width="80" align="center" />
@@ -98,22 +97,13 @@
               />
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="180" fixed="right" align="center">
+          <el-table-column label="操作" width="200" fixed="right" align="center">
             <template #default="{ row }">
-              <el-button type="primary" link @click="handleEdit(row)">
-                <el-icon><Edit /></el-icon>编辑
-              </el-button>
-              <el-button type="success" link @click="handleTest(row)">
-                <el-icon><Connection /></el-icon>测试
-              </el-button>
-              <el-button 
-                v-if="isAdmin" 
-                type="danger" 
-                link 
-                @click="handleDelete(row)"
-              >
-                <el-icon><Delete /></el-icon>删除
-              </el-button>
+              <div class="action-btns">
+                <el-button type="primary" text size="small" @click="handleEdit(row)">编辑</el-button>
+                <el-button type="success" text size="small" @click="handleTest(row)">测试</el-button>
+                <el-button v-if="isAdmin" type="danger" text size="small" @click="handleDelete(row)">删除</el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -236,21 +226,14 @@
 
         <el-divider content-position="left">参数配置</el-divider>
         <el-row :gutter="20">
-          <el-col :span="8">
+          <el-col :span="12">
             <el-form-item label="最大 Token">
               <el-input-number v-model="form.max_tokens" :min="1" :max="128000" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
-            <el-form-item label="超时时间">
-              <el-input-number v-model="form.timeout" :min="1" :max="300" style="width: 100%">
-                <template #append>秒</template>
-              </el-input-number>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="优先级">
-              <el-input-number v-model="form.priority" :min="0" :max="100" style="width: 100%" />
+          <el-col :span="12">
+            <el-form-item label="超时时间(秒)">
+              <el-input-number v-model="form.timeout" :min="1" :max="300" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -261,20 +244,24 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="是否启用">
-              <el-switch v-model="form.is_enabled" />
-              <span class="switch-label">{{ form.is_enabled ? '已启用' : '已禁用' }}</span>
+            <el-form-item label="优先级">
+              <el-input-number v-model="form.priority" :min="0" :max="100" style="width: 100%" />
+              <div class="form-hint">数值越大优先级越高</div>
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="描述">
-          <el-input 
-            v-model="form.description" 
-            type="textarea" 
-            :rows="2" 
-            placeholder="模型配置的描述说明（可选）" 
-          />
-        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="是否启用">
+              <el-switch v-model="form.is_enabled" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="描述">
+              <el-input v-model="form.description" placeholder="可选" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
         <el-button @click="dialog.visible = false">取消</el-button>
@@ -336,7 +323,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { aiModelsApi } from '@/api/aiModels'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Edit, Delete, Connection } from '@element-plus/icons-vue'
+import { Plus, Refresh } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
@@ -691,24 +678,19 @@ onMounted(() => {
   font-weight: 500;
 }
 
-.model-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.model-name-text {
-  font-weight: 500;
+.model-id {
   color: var(--el-text-color-primary);
+  cursor: pointer;
 }
 
-.model-url {
-  font-size: 12px;
-  color: var(--el-text-color-placeholder);
-  max-width: 200px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.action-btns {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+}
+
+.action-btns .el-button {
+  padding: 4px 8px;
 }
 
 .form-hint {
@@ -725,27 +707,5 @@ onMounted(() => {
 
 .model-name-select .el-select {
   flex: 1;
-}
-
-.switch-label {
-  margin-left: 8px;
-  font-size: 13px;
-  color: var(--el-text-color-secondary);
-}
-
-/* 表格操作按钮间距 */
-:deep(.el-table .el-button + .el-button) {
-  margin-left: 8px;
-}
-
-/* 表单分隔线样式 */
-:deep(.el-divider__text) {
-  font-weight: 500;
-  color: var(--el-text-color-primary);
-}
-
-/* 对话框表单样式 */
-:deep(.el-dialog__body) {
-  padding-top: 10px;
 }
 </style>
