@@ -34,19 +34,14 @@ export const aiModelsApi = {
     return request.post(`/ai-models/${id}/test`, { prompt })
   },
 
-  // 设为默认模型
-  setDefault(id) {
-    return request.post(`/ai-models/${id}/set-default`)
-  },
-
   // 获取支持的提供商列表
   getProviders() {
     return request.get('/ai-models/providers')
   },
 
-  // 获取使用场景列表
-  getUseCases() {
-    return request.get('/ai-models/use-cases')
+  // 获取场景列表
+  getScenes() {
+    return request.get('/ai-models/scenes')
   },
 
   // 获取预设模板列表
@@ -54,8 +49,30 @@ export const aiModelsApi = {
     return request.get('/ai-models/templates')
   },
 
+  // ========== 场景配置 ==========
+  
+  // 获取所有场景配置
+  getSceneConfigs() {
+    return request.get('/ai-models/scene-configs/list')
+  },
+
+  // 获取单个场景配置
+  getSceneConfig(scene) {
+    return request.get(`/ai-models/scene-configs/${scene}`)
+  },
+
+  // 更新场景配置
+  updateSceneConfig(scene, data) {
+    return request.put(`/ai-models/scene-configs/${scene}`, data)
+  },
+
   // 获取调用统计
   getCallStats(days = 7) {
     return request.get('/ai-models/stats/call-logs', { params: { days } })
+  },
+
+  // 兼容旧 API
+  getUseCases() {
+    return request.get('/ai-models/scenes')
   }
 }

@@ -1,14 +1,16 @@
 """
 AI 模型配置 API
 
-管理 AI 模型通道配置，支持多模型、主备切换、交叉验证。
+架构：
+- AIModelConfig: AI 模型配置（底座）
+- AISceneConfig: 场景配置，关联到具体的模型
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from sqlalchemy import desc
+from sqlalchemy import desc, func, Integer
 from pydantic import BaseModel, Field
-from typing import Optional, List
-from datetime import datetime
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timedelta
 import time
 import logging
 
@@ -16,8 +18,9 @@ from app.database import get_db
 from app.deps import get_current_user, get_super_admin
 from app.models import User
 from app.models.ai_model import (
-    AIModelConfig, AICallLog, AIProvider, AIModelType,
-    PROVIDER_LABELS, USE_CASE_LABELS, AI_MODEL_TEMPLATES
+    AIModelConfig, AISceneConfig, AICallLog,
+    PROVIDER_LABELS, SCENE_LABELS, AI_MODEL_TEMPLATES,
+    init_default_scene_configs
 )
 from app.utils.auth import aes_cipher
 
@@ -40,9 +43,7 @@ class AIModelConfigCreate(BaseModel):
     temperature: float = Field(0.7, ge=0, le=2, description="温度参数")
     timeout: int = Field(30, ge=1, le=300, description="超时时间")
     is_enabled: bool = Field(True, description="是否启用")
-    is_default: bool = Field(False, description="是否默认通道")
     priority: int = Field(0, ge=0, le=100, description="优先级")
-    use_cases: List[str] = Field(default_factory=list, description="使用场景")
     description: Optional[str] = Field(None, max_length=200, description="描述")
 
 
@@ -56,10 +57,16 @@ class AIModelConfigUpdate(BaseModel):
     temperature: Optional[float] = Field(None, ge=0, le=2)
     timeout: Optional[int] = Field(None, ge=1, le=300)
     is_enabled: Optional[bool] = None
-    is_default: Optional[bool] = None
     priority: Optional[int] = Field(None, ge=0, le=100)
-    use_cases: Optional[List[str]] = None
     description: Optional[str] = Field(None, max_length=200)
+
+
+class AISceneConfigUpdate(BaseModel):
+    """更新场景配置"""
+    model_config_id: int = Field(..., description="关联的模型配置ID")
+    custom_prompt: Optional[str] = Field(None, description="自定义提示词")
+    custom_params: Optional[Dict[str, Any]] = Field(None, description="自定义参数")
+    is_enabled: bool = Field(True, description="是否启用")
 
 
 class AIModelTestRequest(BaseModel):
@@ -95,7 +102,6 @@ def decrypt_api_key(encrypted: str) -> str:
 
 def config_to_response(config: AIModelConfig) -> dict:
     """转换配置为响应格式"""
-    use_cases = config.use_cases or []
     return {
         "id": config.id,
         "name": config.name,
@@ -109,10 +115,7 @@ def config_to_response(config: AIModelConfig) -> dict:
         "temperature": config.temperature,
         "timeout": config.timeout,
         "is_enabled": config.is_enabled,
-        "is_default": config.is_default,
         "priority": config.priority,
-        "use_cases": use_cases,
-        "use_case_labels": [USE_CASE_LABELS.get(uc, uc) for uc in use_cases],
         "description": config.description,
         "created_by": config.created_by,
         "created_at": config.created_at,
@@ -120,13 +123,38 @@ def config_to_response(config: AIModelConfig) -> dict:
     }
 
 
-# ==================== API Endpoints ====================
+def scene_config_to_response(scene_config: AISceneConfig) -> dict:
+    """转换场景配置为响应格式"""
+    model_info = None
+    if scene_config.model_config:
+        model_info = {
+            "id": scene_config.model_config.id,
+            "name": scene_config.model_config.name,
+            "provider": scene_config.model_config.provider,
+            "model_name": scene_config.model_config.model_name,
+            "is_enabled": scene_config.model_config.is_enabled
+        }
+    
+    return {
+        "id": scene_config.id,
+        "scene": scene_config.scene,
+        "scene_label": SCENE_LABELS.get(scene_config.scene, scene_config.scene),
+        "model_config_id": scene_config.model_config_id,
+        "model_config": model_info,
+        "custom_prompt": scene_config.custom_prompt,
+        "custom_params": scene_config.custom_params,
+        "is_enabled": scene_config.is_enabled,
+        "created_at": scene_config.created_at,
+        "updated_at": scene_config.updated_at
+    }
+
+
+# ==================== 模型配置 API ====================
 
 @router.get("")
 async def list_ai_models(
     is_enabled: Optional[bool] = None,
     provider: Optional[str] = None,
-    use_case: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -138,9 +166,6 @@ async def list_ai_models(
     
     if provider:
         query = query.filter(AIModelConfig.provider == provider)
-    
-    if use_case:
-        query = query.filter(AIModelConfig.use_cases.contains([use_case]))
     
     configs = query.order_by(desc(AIModelConfig.priority), desc(AIModelConfig.created_at)).all()
     
@@ -156,12 +181,12 @@ async def get_providers(current_user: User = Depends(get_current_user)):
     ]
 
 
-@router.get("/use-cases")
-async def get_use_cases(current_user: User = Depends(get_current_user)):
-    """获取使用场景列表"""
+@router.get("/scenes")
+async def get_scenes(current_user: User = Depends(get_current_user)):
+    """获取支持的场景列表"""
     return [
         {"value": k, "label": v}
-        for k, v in USE_CASE_LABELS.items()
+        for k, v in SCENE_LABELS.items()
     ]
 
 
@@ -196,10 +221,6 @@ async def create_ai_model(
     if existing:
         raise HTTPException(status_code=400, detail="配置名称已存在")
     
-    # 如果设为默认，取消其他默认
-    if data.is_default:
-        db.query(AIModelConfig).filter(AIModelConfig.is_default == True).update({"is_default": False})
-    
     # 创建配置
     config = AIModelConfig(
         name=data.name,
@@ -212,9 +233,7 @@ async def create_ai_model(
         temperature=data.temperature,
         timeout=data.timeout,
         is_enabled=data.is_enabled,
-        is_default=data.is_default,
         priority=data.priority,
-        use_cases=data.use_cases,
         description=data.description,
         created_by=current_user.id
     )
@@ -222,6 +241,11 @@ async def create_ai_model(
     db.add(config)
     db.commit()
     db.refresh(config)
+    
+    # 如果是第一个模型，自动初始化场景配置
+    total_models = db.query(AIModelConfig).count()
+    if total_models == 1:
+        init_default_scene_configs(db)
     
     return {"id": config.id, "message": "创建成功"}
 
@@ -243,13 +267,6 @@ async def update_ai_model(
         existing = db.query(AIModelConfig).filter(AIModelConfig.name == data.name).first()
         if existing:
             raise HTTPException(status_code=400, detail="配置名称已存在")
-    
-    # 如果设为默认，取消其他默认
-    if data.is_default:
-        db.query(AIModelConfig).filter(
-            AIModelConfig.is_default == True,
-            AIModelConfig.id != model_id
-        ).update({"is_default": False})
     
     # 更新字段
     update_data = data.model_dump(exclude_unset=True)
@@ -279,9 +296,16 @@ async def delete_ai_model(
     if not config:
         raise HTTPException(status_code=404, detail="模型配置不存在")
     
-    # 不允许删除默认配置
-    if config.is_default:
-        raise HTTPException(status_code=400, detail="不能删除默认模型配置")
+    # 检查是否有关联的场景配置
+    linked_scenes = db.query(AISceneConfig).filter(
+        AISceneConfig.model_config_id == model_id
+    ).count()
+    
+    if linked_scenes > 0:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"该模型被 {linked_scenes} 个场景使用，请先修改场景配置"
+        )
     
     db.delete(config)
     db.commit()
@@ -338,7 +362,7 @@ async def _test_doubao_model(
         # 记录成功日志
         log = AICallLog(
             model_config_id=config.id,
-            use_case="test",
+            scene="test",
             latency_ms=latency_ms,
             success=True
         )
@@ -360,7 +384,7 @@ async def _test_doubao_model(
         # 记录失败日志
         log = AICallLog(
             model_config_id=config.id,
-            use_case="test",
+            scene="test",
             latency_ms=latency_ms,
             success=False,
             error_message=error_msg
@@ -383,6 +407,8 @@ async def _test_openai_compatible_model(
     db: Session
 ) -> dict:
     """测试 OpenAI 兼容模型"""
+    import httpx
+    
     # 获取解密后的 API 密钥
     api_key = decrypt_api_key(config.api_key_encrypted) if config.api_key_encrypted else ""
     
@@ -396,9 +422,6 @@ async def _test_openai_compatible_model(
         }
     
     try:
-        import httpx
-        
-        # 直接使用 httpx 调用 API，更好地处理各种响应格式
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {api_key}"
@@ -427,8 +450,6 @@ async def _test_openai_compatible_model(
         
         latency_ms = int((time.time() - start_time) * 1000)
         
-        logger.info(f"AI model test response status: {response.status_code}")
-        
         if response.status_code != 200:
             error_detail = response.text
             try:
@@ -437,15 +458,12 @@ async def _test_openai_compatible_model(
                     error_detail = error_json["error"].get("message", str(error_json["error"]))
                 elif "message" in error_json:
                     error_detail = error_json["message"]
-                elif "code" in error_json:
-                    error_detail = f"错误码: {error_json.get('code')}, 消息: {error_json.get('message', response.text)}"
             except:
                 pass
             
-            # 记录失败日志
             log = AICallLog(
                 model_config_id=config.id,
-                use_case="test",
+                scene="test",
                 latency_ms=latency_ms,
                 success=False,
                 error_message=error_detail
@@ -462,27 +480,15 @@ async def _test_openai_compatible_model(
         
         # 解析响应
         result = response.json()
-        
-        # 处理不同格式的响应
         response_text = ""
         if "choices" in result and result["choices"]:
-            # OpenAI 标准格式
             response_text = result["choices"][0].get("message", {}).get("content", "")
-        elif "data" in result:
-            # 某些 API 返回 data 字段
-            response_text = str(result["data"])
-        elif "output" in result:
-            # 豆包/火山引擎格式
-            response_text = str(result["output"])
-        elif "result" in result:
-            response_text = str(result["result"])
         else:
             response_text = str(result)
         
-        # 记录成功日志
         log = AICallLog(
             model_config_id=config.id,
-            use_case="test",
+            scene="test",
             latency_ms=latency_ms,
             success=True
         )
@@ -491,7 +497,7 @@ async def _test_openai_compatible_model(
         
         return {
             "success": True,
-            "response": response_text[:500],  # 限制响应长度
+            "response": response_text[:500],
             "latency_ms": latency_ms,
             "error": None
         }
@@ -508,10 +514,9 @@ async def _test_openai_compatible_model(
         latency_ms = int((time.time() - start_time) * 1000)
         logger.error(f"AI model test error: {str(e)}")
         
-        # 记录失败日志
         log = AICallLog(
             model_config_id=config.id,
-            use_case="test",
+            scene="test",
             latency_ms=latency_ms,
             success=False,
             error_message=str(e)
@@ -527,30 +532,78 @@ async def _test_openai_compatible_model(
         }
 
 
-@router.post("/{model_id}/set-default")
-async def set_default_model(
-    model_id: int,
+# ==================== 场景配置 API ====================
+
+@router.get("/scene-configs/list")
+async def list_scene_configs(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取所有场景配置"""
+    # 确保所有场景都有配置
+    init_default_scene_configs(db)
+    
+    configs = db.query(AISceneConfig).all()
+    return [scene_config_to_response(c) for c in configs]
+
+
+@router.get("/scene-configs/{scene}")
+async def get_scene_config(
+    scene: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取单个场景配置"""
+    config = db.query(AISceneConfig).filter(AISceneConfig.scene == scene).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="场景配置不存在")
+    return scene_config_to_response(config)
+
+
+@router.put("/scene-configs/{scene}")
+async def update_scene_config(
+    scene: str,
+    data: AISceneConfigUpdate,
     current_user: User = Depends(get_super_admin),
     db: Session = Depends(get_db)
 ):
-    """设置默认模型（仅超级管理员）"""
-    config = db.query(AIModelConfig).filter(AIModelConfig.id == model_id).first()
-    if not config:
-        raise HTTPException(status_code=404, detail="模型配置不存在")
+    """更新场景配置（仅超级管理员）"""
+    # 验证场景是否有效
+    if scene not in SCENE_LABELS:
+        raise HTTPException(status_code=400, detail="无效的场景标识")
     
-    if not config.is_enabled:
-        raise HTTPException(status_code=400, detail="不能将禁用的模型设为默认")
+    # 验证模型配置是否存在
+    model_config = db.query(AIModelConfig).filter(AIModelConfig.id == data.model_config_id).first()
+    if not model_config:
+        raise HTTPException(status_code=400, detail="模型配置不存在")
     
-    # 取消其他默认
-    db.query(AIModelConfig).filter(AIModelConfig.is_default == True).update({"is_default": False})
+    if not model_config.is_enabled:
+        raise HTTPException(status_code=400, detail="不能使用已禁用的模型")
     
-    # 设置当前为默认
-    config.is_default = True
-    config.priority = 100  # 默认模型优先级最高
+    # 获取或创建场景配置
+    scene_config = db.query(AISceneConfig).filter(AISceneConfig.scene == scene).first()
+    
+    if not scene_config:
+        scene_config = AISceneConfig(
+            scene=scene,
+            model_config_id=data.model_config_id,
+            custom_prompt=data.custom_prompt,
+            custom_params=data.custom_params,
+            is_enabled=data.is_enabled
+        )
+        db.add(scene_config)
+    else:
+        scene_config.model_config_id = data.model_config_id
+        scene_config.custom_prompt = data.custom_prompt
+        scene_config.custom_params = data.custom_params
+        scene_config.is_enabled = data.is_enabled
+    
     db.commit()
     
-    return {"message": f"已将 {config.name} 设为默认模型"}
+    return {"message": "更新成功"}
 
+
+# ==================== 调用统计 API ====================
 
 @router.get("/stats/call-logs")
 async def get_call_stats(
@@ -559,9 +612,6 @@ async def get_call_stats(
     db: Session = Depends(get_db)
 ):
     """获取 AI 调用统计"""
-    from datetime import timedelta
-    from sqlalchemy import func
-    
     start_date = datetime.now() - timedelta(days=days)
     
     # 按模型统计
@@ -588,4 +638,15 @@ async def get_call_stats(
             "total_tokens": (stat.total_input_tokens or 0) + (stat.total_output_tokens or 0)
         }
         for stat in model_stats
+    ]
+
+
+# ==================== 兼容旧 API ====================
+
+@router.get("/use-cases")
+async def get_use_cases(current_user: User = Depends(get_current_user)):
+    """获取使用场景列表（兼容旧 API）"""
+    return [
+        {"value": k, "label": v}
+        for k, v in SCENE_LABELS.items()
     ]

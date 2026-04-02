@@ -3,85 +3,157 @@
     <!-- 顶部说明 -->
     <el-alert type="info" :closable="false" show-icon class="info-alert">
       <template #title>
-        配置 AI 模型通道，支持多模型调用、主备切换和交叉验证。
-        系统会按优先级选择可用模型，确保 AI 分析功能的稳定性。
+        配置 AI 模型作为底座，然后将模型关联到具体的业务场景。
+        支持多模型配置，不同场景可使用不同的模型。
       </template>
     </el-alert>
 
-    <!-- 操作栏 -->
-    <div class="toolbar">
-      <el-button type="primary" @click="handleAdd" v-if="isAdmin">
-        <el-icon><Plus /></el-icon>新增模型配置
-      </el-button>
-      <el-button @click="fetchList">
-        <el-icon><Refresh /></el-icon>刷新
-      </el-button>
-    </div>
+    <!-- Tab 切换 -->
+    <el-tabs v-model="activeTab" class="main-tabs">
+      <el-tab-pane label="场景配置" name="scenes">
+        <div class="toolbar">
+          <el-button @click="fetchSceneConfigs">
+            <el-icon><Refresh /></el-icon>刷新
+          </el-button>
+        </div>
+        
+        <el-table :data="sceneConfigs" v-loading="sceneLoading" stripe>
+          <el-table-column prop="scene_label" label="场景" width="150">
+            <template #default="{ row }">
+              <el-tag type="primary">{{ row.scene_label }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="关联模型" min-width="200">
+            <template #default="{ row }">
+              <div v-if="row.model_config" class="model-info">
+                <span class="model-name">{{ row.model_config.name }}</span>
+                <el-tag 
+                  :type="row.model_config.provider === 'doubao' ? 'primary' : 'success'" 
+                  size="small"
+                >
+                  {{ row.model_config.provider }}
+                </el-tag>
+                <el-tag 
+                  v-if="!row.model_config.is_enabled" 
+                  type="danger" 
+                  size="small"
+                >
+                  已禁用
+                </el-tag>
+              </div>
+              <el-text v-else type="warning">未配置</el-text>
+            </template>
+          </el-table-column>
+          <el-table-column prop="is_enabled" label="状态" width="100" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.is_enabled ? 'success' : 'danger'">
+                {{ row.is_enabled ? '启用' : '禁用' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="120" align="center">
+            <template #default="{ row }">
+              <el-button type="primary" link @click="handleEditScene(row)">
+                配置
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
 
-    <!-- 模型列表 -->
-    <el-table :data="modelList" v-loading="loading" stripe>
-      <el-table-column prop="name" label="配置名称" min-width="150">
-        <template #default="{ row }">
-          <div class="model-name">
-            <span>{{ row.name }}</span>
-            <el-tag v-if="row.is_default" type="success" size="small">默认</el-tag>
-          </div>
-        </template>
-      </el-table-column>
-      <el-table-column prop="provider_label" label="提供商" width="130">
-        <template #default="{ row }">
-          <el-tag :type="getProviderTagType(row.provider)" effect="plain">
-            {{ row.provider_label }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="model_name" label="模型" min-width="180">
-        <template #default="{ row }">
-          <el-tooltip :content="row.base_url" placement="top">
-            <span class="model-info">{{ row.model_name }}</span>
-          </el-tooltip>
-        </template>
-      </el-table-column>
-      <el-table-column prop="use_case_labels" label="使用场景" min-width="150">
-        <template #default="{ row }">
-          <el-tag v-for="uc in row.use_case_labels" :key="uc" size="small" class="use-case-tag">
-            {{ uc }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column prop="priority" label="优先级" width="80" align="center" />
-      <el-table-column prop="is_enabled" label="状态" width="80" align="center">
-        <template #default="{ row }">
-          <el-switch
-            v-model="row.is_enabled"
-            :disabled="!isAdmin"
-            @change="toggleEnabled(row)"
-          />
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right" align="center">
-        <template #default="{ row }">
-          <TableActions :row="row" :actions="getActions(row)" :max-primary="2"
-            @edit="handleEdit(row)" @test="handleTest(row)"
-            @setDefault="handleSetDefault(row)" @delete="handleDelete(row)" />
-        </template>
-      </el-table-column>
-    </el-table>
+      <el-tab-pane label="模型底座" name="models">
+        <div class="toolbar">
+          <el-button type="primary" @click="handleAdd" v-if="isAdmin">
+            <el-icon><Plus /></el-icon>新增模型
+          </el-button>
+          <el-button @click="fetchList">
+            <el-icon><Refresh /></el-icon>刷新
+          </el-button>
+        </div>
 
-    <!-- 新增/编辑对话框 -->
+        <el-table :data="modelList" v-loading="loading" stripe>
+          <el-table-column prop="name" label="配置名称" min-width="150" />
+          <el-table-column prop="provider_label" label="提供商" width="130">
+            <template #default="{ row }">
+              <el-tag :type="getProviderTagType(row.provider)" effect="plain">
+                {{ row.provider_label }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="model_name" label="模型" min-width="180">
+            <template #default="{ row }">
+              <el-tooltip :content="row.base_url" placement="top">
+                <span class="model-info-text">{{ row.model_name }}</span>
+              </el-tooltip>
+            </template>
+          </el-table-column>
+          <el-table-column prop="priority" label="优先级" width="80" align="center" />
+          <el-table-column prop="is_enabled" label="状态" width="80" align="center">
+            <template #default="{ row }">
+              <el-switch
+                v-model="row.is_enabled"
+                :disabled="!isAdmin"
+                @change="toggleEnabled(row)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="150" fixed="right" align="center">
+            <template #default="{ row }">
+              <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+              <el-button type="primary" link @click="handleTest(row)">测试</el-button>
+              <el-button 
+                v-if="isAdmin" 
+                type="danger" 
+                link 
+                @click="handleDelete(row)"
+              >删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-tab-pane>
+    </el-tabs>
+
+    <!-- 场景配置对话框 -->
+    <el-dialog v-model="sceneDialog.visible" title="配置场景" width="500px">
+      <el-form :model="sceneForm" label-width="100px">
+        <el-form-item label="场景">
+          <el-tag type="primary">{{ sceneForm.scene_label }}</el-tag>
+        </el-form-item>
+        <el-form-item label="关联模型" required>
+          <el-select v-model="sceneForm.model_config_id" style="width: 100%">
+            <el-option
+              v-for="model in enabledModels"
+              :key="model.id"
+              :label="`${model.name} (${model.provider_label})`"
+              :value="model.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="是否启用">
+          <el-switch v-model="sceneForm.is_enabled" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="sceneDialog.visible = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveScene" :loading="sceneDialog.submitting">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 新增/编辑模型对话框 -->
     <el-dialog
       v-model="dialog.visible"
-      :title="dialog.isEdit ? '编辑配置' : '新增配置'"
+      :title="dialog.isEdit ? '编辑模型' : '新增模型'"
       width="650px"
       @close="resetForm"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
-        <!-- 基本信息 -->
         <el-divider content-position="left">基本信息</el-divider>
         <el-row :gutter="20">
           <el-col :span="24">
             <el-form-item label="配置名称" prop="name">
-              <el-input v-model="form.name" placeholder="如：豆包生产通道" />
+              <el-input v-model="form.name" placeholder="如：豆包生产模型" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -108,7 +180,6 @@
           </el-col>
         </el-row>
 
-        <!-- 连接配置 -->
         <el-divider content-position="left">连接配置</el-divider>
         <el-form-item label="API 地址" prop="base_url">
           <el-input v-model="form.base_url" placeholder="https://api.example.com/v1" />
@@ -128,7 +199,6 @@
           <el-input v-model="form.model_name" placeholder="gpt-4o / qwen2.5:7b" />
         </el-form-item>
 
-        <!-- 参数配置 -->
         <el-divider content-position="left">参数配置</el-divider>
         <el-row :gutter="20">
           <el-col :span="12">
@@ -156,18 +226,6 @@
           </el-col>
         </el-row>
 
-        <!-- 高级配置 -->
-        <el-divider content-position="left">高级配置</el-divider>
-        <el-form-item label="使用场景">
-          <el-checkbox-group v-model="form.use_cases">
-            <el-checkbox v-for="uc in useCases" :key="uc.value" :value="uc.value">
-              {{ uc.label }}
-            </el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
-        <el-form-item label="描述">
-          <el-input v-model="form.description" type="textarea" :rows="2" placeholder="可选描述" />
-        </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="是否启用">
@@ -175,8 +233,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="设为默认">
-              <el-switch v-model="form.is_default" />
+            <el-form-item label="描述">
+              <el-input v-model="form.description" placeholder="可选描述" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -242,17 +300,75 @@ import { aiModelsApi } from '@/api/aiModels'
 import { useUserStore } from '@/stores/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
-import TableActions from '@/components/TableActions.vue'
 
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
 
+const activeTab = ref('scenes')
+
+// ========== 场景配置 ==========
+const sceneLoading = ref(false)
+const sceneConfigs = ref([])
+
+const sceneDialog = reactive({
+  visible: false,
+  submitting: false
+})
+
+const sceneForm = reactive({
+  scene: '',
+  scene_label: '',
+  model_config_id: null,
+  is_enabled: true
+})
+
+const fetchSceneConfigs = async () => {
+  sceneLoading.value = true
+  try {
+    sceneConfigs.value = await aiModelsApi.getSceneConfigs()
+  } catch (error) {
+    console.error('获取场景配置失败:', error)
+    ElMessage.error('获取场景配置失败')
+  } finally {
+    sceneLoading.value = false
+  }
+}
+
+const handleEditScene = (row) => {
+  sceneForm.scene = row.scene
+  sceneForm.scene_label = row.scene_label
+  sceneForm.model_config_id = row.model_config_id
+  sceneForm.is_enabled = row.is_enabled
+  sceneDialog.visible = true
+}
+
+const handleSaveScene = async () => {
+  if (!sceneForm.model_config_id) {
+    ElMessage.warning('请选择关联模型')
+    return
+  }
+
+  sceneDialog.submitting = true
+  try {
+    await aiModelsApi.updateSceneConfig(sceneForm.scene, {
+      model_config_id: sceneForm.model_config_id,
+      is_enabled: sceneForm.is_enabled
+    })
+    ElMessage.success('保存成功')
+    sceneDialog.visible = false
+    fetchSceneConfigs()
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '保存失败')
+  } finally {
+    sceneDialog.submitting = false
+  }
+}
+
+// ========== 模型配置 ==========
 const loading = ref(false)
 const modelList = ref([])
 const providers = ref([])
-const useCases = ref([])
 
-// 对话框
 const formRef = ref()
 const dialog = reactive({
   visible: false,
@@ -260,7 +376,6 @@ const dialog = reactive({
   submitting: false
 })
 
-// 表单
 const form = reactive({
   name: '',
   provider: 'doubao',
@@ -273,13 +388,10 @@ const form = reactive({
   temperature: 0.7,
   timeout: 30,
   is_enabled: true,
-  is_default: false,
   priority: 0,
-  use_cases: ['alert_analysis'],
   description: ''
 })
 
-// 表单校验规则
 const rules = {
   name: [{ required: true, message: '请输入配置名称', trigger: 'blur' }],
   provider: [{ required: true, message: '请选择提供商', trigger: 'change' }],
@@ -287,7 +399,6 @@ const rules = {
   model_name: [{ required: true, message: '请输入模型名称', trigger: 'blur' }]
 }
 
-// 测试对话框
 const testDialog = reactive({
   visible: false,
   modelId: null,
@@ -297,7 +408,8 @@ const testDialog = reactive({
   result: null
 })
 
-// 获取提供商标签类型
+const enabledModels = computed(() => modelList.value.filter(m => m.is_enabled))
+
 const getProviderTagType = (provider) => {
   const types = {
     'doubao': 'primary',
@@ -308,22 +420,6 @@ const getProviderTagType = (provider) => {
   return types[provider] || 'info'
 }
 
-// 获取操作按钮
-const getActions = (row) => {
-  const actions = [
-    { key: 'test', label: '测试', event: 'test', primary: true },
-    { key: 'edit', label: '编辑', event: 'edit', primary: true }
-  ]
-  if (!row.is_default) {
-    actions.push({ key: 'setDefault', label: '设为默认', event: 'setDefault' })
-  }
-  if (!row.is_default && isAdmin.value) {
-    actions.push({ key: 'delete', label: '删除', event: 'delete', danger: true })
-  }
-  return actions.filter(a => a.primary || isAdmin.value)
-}
-
-// 获取列表
 const fetchList = async () => {
   loading.value = true
   try {
@@ -336,25 +432,17 @@ const fetchList = async () => {
   }
 }
 
-// 获取基础数据
-const fetchBaseData = async () => {
+const fetchProviders = async () => {
   try {
-    const [providersRes, useCasesRes] = await Promise.all([
-      aiModelsApi.getProviders(),
-      aiModelsApi.getUseCases()
-    ])
-    providers.value = providersRes
-    useCases.value = useCasesRes
+    providers.value = await aiModelsApi.getProviders()
   } catch (error) {
-    console.error('获取基础数据失败:', error)
+    console.error('获取提供商失败:', error)
   }
 }
 
-// 提供商变更
 const handleProviderChange = (provider) => {
-  // 根据提供商设置默认 API 地址
   const defaults = {
-    'doubao': 'https://ark.cn-beijing.volces.com/api/v3',
+    'doubao': 'https://integration.coze.cn/api/v3',
     'openai': 'https://api.openai.com/v1',
     'ollama': 'http://localhost:11434/v1'
   }
@@ -363,14 +451,12 @@ const handleProviderChange = (provider) => {
   }
 }
 
-// 新增
 const handleAdd = () => {
   dialog.isEdit = false
   resetFormData()
   dialog.visible = true
 }
 
-// 编辑
 const handleEdit = (row) => {
   dialog.isEdit = true
   Object.assign(form, {
@@ -386,15 +472,12 @@ const handleEdit = (row) => {
     temperature: row.temperature,
     timeout: row.timeout,
     is_enabled: row.is_enabled,
-    is_default: row.is_default,
     priority: row.priority,
-    use_cases: row.use_cases || [],
     description: row.description || ''
   })
   dialog.visible = true
 }
 
-// 重置表单
 const resetFormData = () => {
   Object.assign(form, {
     id: null,
@@ -409,20 +492,16 @@ const resetFormData = () => {
     temperature: 0.7,
     timeout: 30,
     is_enabled: true,
-    is_default: false,
     priority: 0,
-    use_cases: ['alert_analysis'],
     description: ''
   })
 }
 
-// 重置表单
 const resetForm = () => {
   formRef.value?.resetFields()
   resetFormData()
 }
 
-// 提交
 const handleSubmit = async () => {
   try {
     await formRef.value.validate()
@@ -445,6 +524,7 @@ const handleSubmit = async () => {
 
     dialog.visible = false
     fetchList()
+    fetchSceneConfigs()
   } catch (error) {
     ElMessage.error(error.response?.data?.detail || '操作失败')
   } finally {
@@ -452,18 +532,17 @@ const handleSubmit = async () => {
   }
 }
 
-// 切换启用状态
 const toggleEnabled = async (row) => {
   try {
     await aiModelsApi.update(row.id, { is_enabled: row.is_enabled })
     ElMessage.success(row.is_enabled ? '已启用' : '已禁用')
+    fetchSceneConfigs()
   } catch (error) {
     row.is_enabled = !row.is_enabled
     ElMessage.error('操作失败')
   }
 }
 
-// 测试
 const handleTest = (row) => {
   testDialog.modelId = row.id
   testDialog.modelName = row.name
@@ -471,7 +550,6 @@ const handleTest = (row) => {
   testDialog.visible = true
 }
 
-// 执行测试
 const executeTest = async () => {
   if (!testDialog.prompt.trim()) {
     ElMessage.warning('请输入测试提示词')
@@ -493,21 +571,6 @@ const executeTest = async () => {
   }
 }
 
-// 设为默认
-const handleSetDefault = async (row) => {
-  try {
-    await ElMessageBox.confirm(`确定将 "${row.name}" 设为默认模型？`, '确认')
-    await aiModelsApi.setDefault(row.id)
-    ElMessage.success('已设为默认模型')
-    fetchList()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '操作失败')
-    }
-  }
-}
-
-// 删除
 const handleDelete = async (row) => {
   try {
     await ElMessageBox.confirm(`确定删除 "${row.name}"？`, '确认删除', { type: 'warning' })
@@ -522,8 +585,9 @@ const handleDelete = async (row) => {
 }
 
 onMounted(() => {
+  fetchSceneConfigs()
   fetchList()
-  fetchBaseData()
+  fetchProviders()
 })
 </script>
 
@@ -536,25 +600,29 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.main-tabs {
+  margin-bottom: 16px;
+}
+
 .toolbar {
   margin-bottom: 16px;
   display: flex;
   gap: 10px;
 }
 
-.model-name {
+.model-info {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.model-info {
-  color: var(--el-text-color-secondary);
-  font-size: 13px;
+.model-name {
+  font-weight: 500;
 }
 
-.use-case-tag {
-  margin-right: 4px;
+.model-info-text {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .form-hint {
