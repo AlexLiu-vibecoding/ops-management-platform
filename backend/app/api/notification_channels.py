@@ -205,7 +205,7 @@ async def list_channels(
 
 # ==================== Dynamic Routes (MUST be defined after static routes) ====================
 
-@router.get("/{channel_id}")
+@router.get("/detail/{channel_id}")
 async def get_channel(
     channel_id: int,
     current_user: User = Depends(get_current_user),
@@ -215,9 +215,9 @@ async def get_channel(
     ch = db.query(NotificationChannel).filter_by(id=channel_id).first()
     if not ch:
         raise HTTPException(status_code=404, detail="通道不存在")
-    
+
     config = decrypt_channel_config(ch.config, ch.channel_type)
-    
+
     return {
         "id": ch.id,
         "name": ch.name,
@@ -266,7 +266,7 @@ async def create_channel(
     return {"id": channel.id, "message": "创建成功"}
 
 
-@router.put("/{channel_id}")
+@router.put("/detail/{channel_id}")
 async def update_channel(
     channel_id: int,
     data: ChannelUpdate,
@@ -277,28 +277,28 @@ async def update_channel(
     channel = db.query(NotificationChannel).filter_by(id=channel_id).first()
     if not channel:
         raise HTTPException(status_code=404, detail="通道不存在")
-    
+
     # 检查名称重复
     if data.name and data.name != channel.name:
         existing = db.query(NotificationChannel).filter_by(name=data.name).first()
         if existing:
             raise HTTPException(status_code=400, detail="通道名称已存在")
         channel.name = data.name
-    
+
     if data.config:
         channel.config = encrypt_channel_config(data.config, channel.channel_type)
-    
+
     if data.is_enabled is not None:
         channel.is_enabled = data.is_enabled
-    
+
     if data.description is not None:
         channel.description = data.description
-    
+
     db.commit()
     return {"message": "更新成功"}
 
 
-@router.delete("/{channel_id}")
+@router.delete("/detail/{channel_id}")
 async def delete_channel(
     channel_id: int,
     current_user: User = Depends(require_permissions([PermissionCode.NOTIFICATION_CHANNEL_MANAGE])),
@@ -308,13 +308,13 @@ async def delete_channel(
     channel = db.query(NotificationChannel).filter_by(id=channel_id).first()
     if not channel:
         raise HTTPException(status_code=404, detail="通道不存在")
-    
+
     db.delete(channel)
     db.commit()
     return {"message": "删除成功"}
 
 
-@router.post("/{channel_id}/test")
+@router.post("/detail/{channel_id}/test")
 async def test_channel(
     channel_id: int,
     current_user: User = Depends(require_permissions([PermissionCode.NOTIFICATION_CHANNEL_MANAGE])),
@@ -324,6 +324,6 @@ async def test_channel(
     channel = db.query(NotificationChannel).filter_by(id=channel_id).first()
     if not channel:
         raise HTTPException(status_code=404, detail="通道不存在")
-    
+
     # TODO: 实现实际的通知发送测试
     return {"message": "测试成功", "detail": "通知已发送，请检查接收情况"}

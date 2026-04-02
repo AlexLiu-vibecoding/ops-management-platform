@@ -15,7 +15,7 @@ export const notificationApi = {
 
   // 获取通道详情
   getChannelDetail(id) {
-    return request.get(`/notification/channels/${id}`)
+    return request.get(`/notification/channels/detail/${id}`)
   },
 
   // 创建通道
@@ -25,17 +25,17 @@ export const notificationApi = {
 
   // 更新通道
   updateChannel(id, data) {
-    return request.put(`/notification/channels/${id}`, data)
+    return request.put(`/notification/channels/detail/${id}`, data)
   },
 
   // 删除通道
   deleteChannel(id) {
-    return request.delete(`/notification/channels/${id}`)
+    return request.delete(`/notification/channels/detail/${id}`)
   },
 
   // 测试通道
   testChannel(id) {
-    return request.post(`/notification/channels/${id}/test`)
+    return request.post(`/notification/channels/detail/${id}/test`)
   },
 
   // ============ 静默规则 ============
