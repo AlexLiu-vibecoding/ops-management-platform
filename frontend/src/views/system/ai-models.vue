@@ -256,12 +256,15 @@
               <el-switch v-model="form.is_enabled" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="描述">
-              <el-input v-model="form.description" placeholder="可选" />
-            </el-form-item>
-          </el-col>
         </el-row>
+        <el-form-item label="描述">
+          <el-input 
+            v-model="form.description" 
+            type="textarea" 
+            :rows="2" 
+            placeholder="模型配置的描述说明（可选）" 
+          />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialog.visible = false">取消</el-button>
