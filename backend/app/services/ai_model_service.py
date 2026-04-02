@@ -27,6 +27,37 @@ def decrypt_api_key(encrypted: str) -> str:
         return ""
 
 
+def _call_doubao_model(
+    config: AIModelConfig,
+    messages: List[Dict[str, str]],
+    temperature: Optional[float] = None,
+    max_tokens: Optional[int] = None
+) -> str:
+    """
+    调用豆包模型（使用 coze_coding_dev_sdk）
+    """
+    from app.utils.llm_client import get_llm_client
+    
+    client = get_llm_client()
+    
+    # 豆包模型名
+    model_name = config.model_name
+    
+    # 参数
+    actual_temp = temperature if temperature is not None else config.temperature
+    actual_max_tokens = max_tokens or config.max_tokens
+    
+    # 同步调用
+    response = client.invoke(
+        messages=messages,
+        model=model_name,
+        temperature=actual_temp,
+        max_tokens=actual_max_tokens
+    )
+    
+    return response
+
+
 def get_scene_model(db: Session, scene: str) -> Optional[AIModelConfig]:
     """
     获取场景关联的模型配置
@@ -92,6 +123,11 @@ def call_model(
     Raises:
         RuntimeError: 模型调用失败
     """
+    # 豆包模型使用特殊的 LLM Client
+    if config.provider == "doubao":
+        return _call_doubao_model(config, messages, temperature, max_tokens)
+    
+    # 其他模型使用标准 OpenAI 格式
     import httpx
     
     api_key = decrypt_api_key(config.api_key_encrypted) if config.api_key_encrypted else ""

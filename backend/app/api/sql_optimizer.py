@@ -705,36 +705,10 @@ async def get_llm_analysis(
     db_session: Session = None
 ) -> str:
     """使用LLM进行深度SQL分析（带超时控制）"""
-    from app.utils.llm_client import get_llm_client
-    from app.models.ai_model import get_ai_config_for_scene
+    from app.services.ai_model_service import call_with_scene_async
     
-    # 从场景配置获取模型参数
     if not db_session:
         return "错误：未提供数据库会话，无法获取 AI 配置"
-    
-    model_config, scene_config = get_ai_config_for_scene(db_session, "sql_optimize")
-    
-    if not model_config:
-        return "错误：未配置 SQL 优化场景的 AI 模型，请在「系统管理 > AI模型配置」中配置场景关联"
-    
-    if not model_config.is_enabled:
-        return f"错误：关联的模型「{model_config.name}」已被禁用，请启用或更换模型"
-    
-    # 使用场景配置中的参数
-    model_name = model_config.model_name
-    temperature = model_config.temperature
-    max_tokens = model_config.max_tokens
-    timeout = model_config.timeout
-    
-    # 场景自定义参数覆盖
-    if scene_config and scene_config.custom_params:
-        custom = scene_config.custom_params
-        if "temperature" in custom:
-            temperature = custom["temperature"]
-        if "max_tokens" in custom:
-            max_tokens = custom["max_tokens"]
-    
-    logger.info(f"[SQL优化器] 使用模型: {model_config.name} ({model_name})")
     
     # 构建上下文
     context = {
@@ -780,31 +754,24 @@ async def get_llm_analysis(
 请给出详细的优化建议。"""
 
     try:
-        client = get_llm_client()
+        logger.info(f"[SQL优化器] 开始 LLM 分析, SQL长度: {len(sql)}")
         
-        logger.info(f"[SQL优化器] 开始 LLM 分析, SQL长度: {len(sql)}, 模型: {model_name}")
-        
-        # 使用 asyncio 等待，设置超时
-        response = await asyncio.wait_for(
-            client.ainvoke(
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
-                model=model_name,
-                temperature=temperature,
-                max_tokens=max_tokens
-            ),
-            timeout=timeout
+        # 使用场景配置调用 AI（统一日志记录）
+        response, model_used = await call_with_scene_async(
+            db=db_session,
+            scene="sql_optimize",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            temperature=0.3,
+            max_tokens=4096
         )
         
-        logger.info(f"[SQL优化器] LLM 分析完成, 响应长度: {len(response)}")
+        logger.info(f"[SQL优化器] LLM 分析完成, 响应长度: {len(response)}, 模型: {model_used.name if model_used else '未知'}")
         return response
             
-    except asyncio.TimeoutError:
-        logger.warning(f"[SQL优化器] LLM 分析超时 ({timeout}秒)")
-        return f"LLM分析超时（{timeout}秒），请稍后重试或调整模型超时配置"
-    except ValueError as e:
+    except RuntimeError as e:
         logger.error(f"[SQL优化器] 配置错误: {e}")
         return f"配置错误: {str(e)}"
     except Exception as e:

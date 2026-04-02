@@ -196,19 +196,6 @@ async def get_templates(current_user: User = Depends(get_current_user)):
     return AI_MODEL_TEMPLATES
 
 
-@router.get("/{model_id}")
-async def get_ai_model(
-    model_id: int,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    """获取单个 AI 模型配置"""
-    config = db.query(AIModelConfig).filter(AIModelConfig.id == model_id).first()
-    if not config:
-        raise HTTPException(status_code=404, detail="模型配置不存在")
-    return config_to_response(config)
-
-
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_ai_model(
     data: AIModelConfigCreate,
@@ -650,3 +637,18 @@ async def get_use_cases(current_user: User = Depends(get_current_user)):
         {"value": k, "label": v}
         for k, v in SCENE_LABELS.items()
     ]
+
+
+# ==================== 动态路由（必须放在最后）====================
+
+@router.get("/{model_id}")
+async def get_ai_model(
+    model_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取单个 AI 模型配置"""
+    config = db.query(AIModelConfig).filter(AIModelConfig.id == model_id).first()
+    if not config:
+        raise HTTPException(status_code=404, detail="模型配置不存在")
+    return config_to_response(config)
