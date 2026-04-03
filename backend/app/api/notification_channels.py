@@ -200,7 +200,6 @@ async def list_channels(
             "is_enabled": ch.is_enabled,
             "description": ch.description,
             "silence_rules_count": len(ch.silence_rules),
-            "rate_limits_count": len(ch.rate_limits),
             "created_at": ch.created_at,
             "updated_at": ch.updated_at
         })
