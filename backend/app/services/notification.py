@@ -277,14 +277,14 @@ class NotificationService:
         return f"{domain}/api/approvals/dingtalk-action?token={token}"
     
     @staticmethod
-    def decrypt_webhook(encrypted_webhook: str) -> str:
-        """解密 webhook 地址"""
-        return aes_cipher.decrypt(encrypted_webhook)
-    
-    @staticmethod
     def decrypt_secret(encrypted_secret: str) -> str:
         """解密密钥"""
-        return aes_cipher.decrypt(encrypted_secret)
+        if not encrypted_secret:
+            return ""
+        try:
+            return aes_cipher.decrypt(encrypted_secret)
+        except Exception:
+            return ""
     
     @staticmethod
     def generate_dingtalk_sign(secret: str) -> tuple:
@@ -678,7 +678,6 @@ class NotificationService:
         """
         import logging
         from app.models.notification_new import NotificationChannel
-        from app.utils.encryption import decrypt_secret
         
         logger = logging.getLogger(__name__)
         
@@ -779,7 +778,7 @@ class NotificationService:
                     # 解密 secret
                     secret = None
                     if secret_encrypted:
-                        secret = decrypt_secret(secret_encrypted)
+                        secret = NotificationService.decrypt_secret(secret_encrypted)
                     
                     # 构建消息
                     message = {

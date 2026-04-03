@@ -24,21 +24,9 @@ from app.models import (
 )
 from app.models.notification_new import NotificationChannel
 from app.services.notification import NotificationService
-from app.utils.auth import aes_cipher
-
-def decrypt_secret(encrypted_secret: str) -> str:
-    """解密密钥"""
-    if not encrypted_secret:
-        return ""
-    try:
-        return aes_cipher.decrypt(encrypted_secret)
-    except Exception as e:
-        logger.warning(f"解密密钥失败: {str(e)}")
-        return ""
 from app.schemas import MessageResponse
 from app.deps import get_current_user, require_permission
 from app.utils.redis_client import redis_client
-from app.utils.auth import aes_cipher
 import logging
 
 logger = logging.getLogger(__name__)
@@ -225,7 +213,7 @@ async def send_script_notification(
                 # 解密 secret
                 secret = None
                 if secret_encrypted:
-                    secret = decrypt_secret(secret_encrypted)
+                    secret = NotificationService.decrypt_secret(secret_encrypted)
                 
                 # 关键词验证
                 message_content = content

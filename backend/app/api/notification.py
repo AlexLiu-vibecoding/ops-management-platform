@@ -17,7 +17,6 @@ from app.database import get_db
 from app.models import NotificationBinding, User, ScheduledTask
 from app.models.notification_new import NotificationChannel
 from app.schemas import MessageResponse
-from app.utils.auth import aes_cipher
 from app.deps import get_super_admin, get_current_user
 
 router = APIRouter(prefix="/notification", tags=["通知管理"])
@@ -69,25 +68,6 @@ class BindingCreate(BaseModel):
 
 
 # ==================== Helper Functions ====================
-
-def encrypt_secret(secret: str) -> str:
-    """加密密钥"""
-    return aes_cipher.encrypt(secret)
-
-
-def decrypt_secret(encrypted_secret: str) -> str:
-    """解密密钥"""
-    if not encrypted_secret:
-        return ""
-    try:
-        return aes_cipher.decrypt(encrypted_secret)
-    except Exception as e:
-        # 解密失败时返回空字符串，避免影响查询
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.warning(f"解密密钥失败: {str(e)}")
-        return ""
-
 
 def generate_dingtalk_sign(secret: str) -> tuple:
     """生成钉钉加签"""
