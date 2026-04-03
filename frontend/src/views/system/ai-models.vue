@@ -117,7 +117,12 @@
           <el-tag type="primary">{{ sceneForm.scene_label }}</el-tag>
         </el-form-item>
         <el-form-item label="关联模型" required>
-          <el-select v-model="sceneForm.model_config_id" style="width: 100%">
+          <el-select 
+            v-model="sceneForm.model_config_id" 
+            style="width: 100%"
+            placeholder="请选择关联模型"
+            clearable
+          >
             <el-option
               v-for="model in enabledModels"
               :key="model.id"
@@ -364,8 +369,13 @@ const fetchSceneConfigs = async () => {
 const handleEditScene = (row) => {
   sceneForm.scene = row.scene
   sceneForm.scene_label = row.scene_label
-  sceneForm.model_config_id = row.model_config_id
+  // 确保 model_config_id 是数字类型，与 el-select 的 value 类型匹配
+  sceneForm.model_config_id = row.model_config_id ? Number(row.model_config_id) : null
   sceneForm.is_enabled = row.is_enabled
+  // 如果模型列表未加载，先加载
+  if (modelList.value.length === 0) {
+    fetchList()
+  }
   sceneDialog.visible = true
 }
 
@@ -517,7 +527,7 @@ const handleAdd = () => {
   dialog.visible = true
 }
 
-const handleEdit = (row) => {
+const handleEdit = async (row) => {
   dialog.isEdit = true
   Object.assign(form, {
     id: row.id,
@@ -535,6 +545,8 @@ const handleEdit = (row) => {
     priority: row.priority,
     description: row.description || ''
   })
+  // 加载可用模型列表，确保模型名称选择器能正常显示
+  await fetchAvailableModels()
   dialog.visible = true
 }
 
