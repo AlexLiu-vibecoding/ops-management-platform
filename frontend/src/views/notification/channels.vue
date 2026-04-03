@@ -793,7 +793,7 @@ const loadSilenceRules = async (channelId) => {
   silenceLoading.value = true
   try {
     const res = await notificationApi.getSilenceRules(channelId)
-    silenceRules.value = res.data.items || []
+    silenceRules.value = res.items || []
   } catch (error) {
     console.error('加载静默规则失败:', error)
     ElMessage.error('加载静默规则失败')
@@ -807,7 +807,7 @@ const loadRateLimits = async (channelId) => {
   rateLimitLoading.value = true
   try {
     const res = await notificationApi.getRateLimits(channelId)
-    rateLimitRules.value = res.data.items || []
+    rateLimitRules.value = res.items || []
   } catch (error) {
     console.error('加载频率限制失败:', error)
     ElMessage.error('加载频率限制失败')
