@@ -156,7 +156,8 @@ async def init_default_data():
     from app.database import SessionLocal
     from app.models import User, Environment, UserRole, GlobalConfig, DingTalkChannel, SystemInitState
     from app.utils.auth import hash_password
-    
+    from app.services.permission_service import permission_service
+
     db: Session = SessionLocal()
     try:
         # 检查是否已完成初始化
@@ -164,7 +165,7 @@ async def init_default_data():
             SystemInitState.step == "system_init",
             SystemInitState.status == "completed"
         ).first()
-        
+
         # 如果系统未初始化，跳过管理员创建（等待配置向导）
         if not init_state:
             logger.info("System not initialized, please complete initialization via setup wizard")
@@ -181,7 +182,7 @@ async def init_default_data():
                 logger.info("Creating default environment configuration")
             db.commit()
             return
-        
+
         # 检查是否存在超级管理员
         if not db.query(User).filter(User.role == UserRole.SUPER_ADMIN).first():
             # 创建默认超级管理员
@@ -195,7 +196,7 @@ async def init_default_data():
             )
             db.add(admin)
             logger.info("Creating default super admin: admin")
-        
+
         # 检查是否存在环境
         if not db.query(Environment).first():
             # 创建默认环境
@@ -208,7 +209,7 @@ async def init_default_data():
             for env in environments:
                 db.add(env)
             logger.info("Creating default environment configuration")
-        
+
         # 创建默认全局配置
         default_configs = [
             ("monitor_slow_query_enabled", "true", "慢查询监控全局开关"),
@@ -222,18 +223,23 @@ async def init_default_data():
             ("performance_data_retention_days", "30", "性能数据保留天数"),
             ("snapshot_retention_days", "7", "快照保留天数"),
         ]
-        
+
         for key, value, desc in default_configs:
             if not db.query(GlobalConfig).filter(GlobalConfig.config_key == key).first():
                 config = GlobalConfig(config_key=key, config_value=value, description=desc)
                 db.add(config)
-        
+
         # 开发环境：自动创建测试用的 PostgreSQL 实例
         await init_dev_instance(db)
-        
+
         db.commit()
         logger.info("Default data initialization complete")
-        
+
+        # 预热权限缓存
+        logger.info("Warming up permission cache...")
+        permission_service.warmup_cache(db)
+        logger.info("Permission cache warmed up successfully")
+
     except Exception as e:
         logger.error(f"Default data initialization failed: {e}")
         db.rollback()

@@ -31,16 +31,18 @@ class PermissionService:
     def has_permission(self, user: User, permission_code: str) -> bool:
         """
         检查用户是否拥有指定权限
-        
+
         Args:
             user: 用户对象
             permission_code: 权限编码
-        
+
         Returns:
             是否有权限
         """
         # 获取用户角色的权限列表（包括超级管理员也从数据库获取）
-        permissions = self.get_role_permissions(user.role)
+        # 处理 role 类型：如果是 UserRole enum，获取其字符串值
+        role_value = user.role.value if isinstance(user.role, UserRole) else user.role
+        permissions = self.get_role_permissions(role_value)
         return permission_code in permissions
     
     def get_role_permissions(self, role: str) -> Set[str]:
@@ -77,11 +79,11 @@ class PermissionService:
     def check_permission(self, user: User, permission_code: str) -> None:
         """
         检查权限，无权限时抛出异常
-        
+
         Args:
             user: 用户对象
             permission_code: 权限编码
-        
+
         Raises:
             HTTPException: 权限不足
         """
@@ -90,7 +92,20 @@ class PermissionService:
                 status_code=403,
                 detail=f"无权限: {permission_code}"
             )
-    
+
+    def clear_cache(self) -> None:
+        """清除权限缓存"""
+        self._permission_cache.clear()
+
+    def warmup_cache(self) -> None:
+        """预热权限缓存，加载所有角色的权限"""
+        all_roles = [
+            'super_admin', 'approval_admin', 'operator', 
+            'developer', 'readonly'
+        ]
+        for role in all_roles:
+            self.get_role_permissions(role)
+
     # ==================== 数据权限 ====================
     
     def get_user_environment_ids(self, user: User) -> Set[int]:
