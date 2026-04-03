@@ -689,14 +689,29 @@ class NotificationService:
             logger.info(f"任务 {task.id} 失败但未配置失败通知，跳过")
             return
         
-        # 获取通知通道ID列表
-        if not task.notify_channels:
-            logger.info(f"任务 {task.id} 未配置通知通道，跳过")
-            return
+        # 收集通知通道ID列表（从任务配置和全局绑定）
+        channel_ids = []
         
-        channel_ids = [int(cid.strip()) for cid in task.notify_channels.split(",") if cid.strip().isdigit()]
+        # 1. 从任务自身的 notify_channels 获取
+        if task.notify_channels:
+            channel_ids.extend([int(cid.strip()) for cid in task.notify_channels.split(",") if cid.strip().isdigit()])
+        
+        # 2. 从 NotificationBinding 获取全局或特定任务的通知绑定
+        bindings = db.query(NotificationBinding).filter(
+            NotificationBinding.notification_type == "scheduled_task"
+        ).all()
+        
+        for binding in bindings:
+            # 如果绑定指定了特定任务，只匹配该任务
+            if binding.scheduled_task_id and binding.scheduled_task_id != task.id:
+                continue
+            channel_ids.append(binding.channel_id)
+        
+        # 去重
+        channel_ids = list(set(channel_ids))
+        
         if not channel_ids:
-            logger.info(f"任务 {task.id} 通知通道ID无效，跳过")
+            logger.info(f"任务 {task.id} 未配置通知通道，跳过")
             return
         
         # 构建通知内容
