@@ -4,6 +4,66 @@
 
 OpsCenter 是一站式运维管理平台，采用 Python FastAPI + SQLAlchemy 技术栈。
 
+## 测试覆盖率
+
+### 当前状态
+
+- **覆盖率目标**: 30% (pytest.ini 配置)
+- **当前覆盖率**: 38.95%
+- **测试文件位置**: `tests/`
+
+### 测试结构
+
+```
+tests/
+├── conftest.py           # 测试配置和 fixtures
+├── unit/                 # 单元测试
+│   ├── __init__.py
+│   ├── test_auth.py      # 认证工具测试
+│   └── test_models.py    # 数据模型测试
+├── integration/          # 集成测试
+│   ├── __init__.py
+│   ├── test_auth_api.py
+│   ├── test_users_api.py
+│   ├── test_environments_api.py
+│   └── test_scripts_api.py
+└── e2e/                  # 端到端测试
+    └── ...
+```
+
+### 运行测试
+
+```bash
+# 运行所有测试
+cd backend && python -m pytest tests/
+
+# 运行单元测试
+python -m pytest tests/unit/ -v
+
+# 运行带覆盖率报告
+python -m pytest tests/ --cov=app --cov-report=html
+
+# 查看 HTML 覆盖率报告
+open htmlcov/index.html
+```
+
+### Fixtures 说明
+
+conftest.py 提供的 fixtures:
+
+| Fixture | 说明 |
+|---------|------|
+| `db_session` | 内存 SQLite 数据库会话 |
+| `client` | 同步测试客户端 |
+| `super_admin_token` | 超级管理员 JWT Token |
+| `operator_token` | 普通运维用户 Token |
+| `approval_admin_token` | 审批管理员 Token |
+| `auth_headers` | 普通用户认证头 |
+| `admin_headers` | 管理员认证头 |
+| `create_test_user` | 创建测试用户的工厂函数 |
+| `create_test_environment` | 创建测试环境的工厂函数 |
+| `create_test_script` | 创建测试脚本的工厂函数 |
+
 ## 分层架构
 
 ```

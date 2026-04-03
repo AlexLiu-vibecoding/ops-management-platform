@@ -240,3 +240,126 @@ def test_rdb_instance(db_session, test_environment):
     db_session.commit()
     db_session.refresh(instance)
     return instance
+
+
+@pytest.fixture(scope="function")
+def auth_headers(operator_token):
+    """普通用户认证头"""
+    return {"Authorization": f"Bearer {operator_token}"}
+
+
+@pytest.fixture(scope="function")
+def admin_headers(super_admin_token):
+    """管理员认证头"""
+    return {"Authorization": f"Bearer {super_admin_token}"}
+
+
+@pytest.fixture(scope="function")
+def approval_headers(approval_admin_token):
+    """审批管理员认证头"""
+    return {"Authorization": f"Bearer {approval_admin_token}"}
+
+
+@pytest.fixture(scope="function")
+def create_test_user(db_session):
+    """创建测试用户的工厂函数"""
+    def _create_user(username, password="testpass", role=UserRole.DEVELOPER, **kwargs):
+        user = User(
+            username=username,
+            password_hash=hash_password(password),
+            real_name=kwargs.get("real_name", f"User {username}"),
+            email=kwargs.get("email", f"{username}@test.com"),
+            role=role,
+            status=kwargs.get("status", True)
+        )
+        db_session.add(user)
+        db_session.commit()
+        db_session.refresh(user)
+        return user
+    return _create_user
+
+
+@pytest.fixture(scope="function")
+def create_test_environment(db_session):
+    """创建测试环境的工厂函数"""
+    def _create_env(name, code, **kwargs):
+        env = Environment(
+            name=name,
+            code=code,
+            color=kwargs.get("color", "#1890FF"),
+            require_approval=kwargs.get("require_approval", False),
+            status=kwargs.get("status", True),
+            description=kwargs.get("description")
+        )
+        db_session.add(env)
+        db_session.commit()
+        db_session.refresh(env)
+        return env
+    return _create_env
+
+
+@pytest.fixture(scope="function")
+def create_test_script(db_session, create_test_user):
+    """创建测试脚本的工厂函数"""
+    from app.models import Script, ScriptType
+    
+    def _create_script(name, script_type=ScriptType.PYTHON, content=None, **kwargs):
+        # 创建用户（如果没有指定）
+        user = kwargs.get("created_by")
+        if user is None:
+            user = create_test_user(f"script_creator_{name}")
+        
+        if content is None:
+            if script_type == ScriptType.PYTHON:
+                content = f"print('Hello from {name}')"
+            elif script_type == ScriptType.BASH:
+                content = f"#!/bin/bash\necho 'Hello from {name}'"
+            else:
+                content = f"-- Script {name}"
+        
+        script = Script(
+            name=name,
+            script_type=script_type,
+            content=content,
+            description=kwargs.get("description", f"Test script: {name}"),
+            created_by=user.id,
+            is_enabled=kwargs.get("is_enabled", True)
+        )
+        db_session.add(script)
+        db_session.commit()
+        db_session.refresh(script)
+        return script
+    return _create_script
+
+
+@pytest.fixture(scope="function")
+def create_test_notification_channel(db_session, create_test_user):
+    """创建测试通知通道的工厂函数"""
+    from app.models import NotificationChannel
+    
+    def _create_channel(name, channel_type="webhook", **kwargs):
+        user = kwargs.get("created_by")
+        if user is None:
+            user = create_test_user(f"channel_creator_{name}")
+        
+        channel = NotificationChannel(
+            name=name,
+            channel_type=channel_type,
+            config=kwargs.get("config", {"url": "http://test.com/webhook"}),
+            description=kwargs.get("description", f"Test channel: {name}"),
+            created_by=user.id,
+            is_enabled=kwargs.get("is_enabled", True)
+        )
+        db_session.add(channel)
+        db_session.commit()
+        db_session.refresh(channel)
+        return channel
+    return _create_channel
+
+
+@pytest.fixture(scope="function")
+def event_loop():
+    """创建事件循环供异步测试使用"""
+    loop = asyncio.get_event_loop_policy().new_event_loop()
+    yield loop
+    loop.close()
