@@ -232,8 +232,6 @@ class DingTalkChannel(Base):
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
-    
-    notification_bindings = relationship("NotificationBinding", back_populates="channel")
 
 
 class NotificationBinding(Base):
@@ -241,15 +239,13 @@ class NotificationBinding(Base):
     __tablename__ = "notification_bindings"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    channel_id = Column(Integer, ForeignKey("dingtalk_channels.id", ondelete="CASCADE"), nullable=False)
+    channel_id = Column(Integer, nullable=False, comment="通道ID (notification_channels.id)")
     notification_type = Column(String(50), nullable=False, comment="通知类型")
     environment_id = Column(Integer, ForeignKey("environments.id", ondelete="CASCADE"), comment="环境ID")
     rdb_instance_id = Column(Integer, ForeignKey("rdb_instances.id", ondelete="CASCADE"), comment="RDB实例ID")
     redis_instance_id = Column(Integer, ForeignKey("redis_instances.id", ondelete="CASCADE"), comment="Redis实例ID")
     scheduled_task_id = Column(Integer, ForeignKey("scheduled_tasks.id", ondelete="CASCADE"), comment="定时任务ID")
     created_at = Column(DateTime, default=datetime.now)
-    
-    channel = relationship("DingTalkChannel", back_populates="notification_bindings")
 
 
 class NotificationLog(Base):
