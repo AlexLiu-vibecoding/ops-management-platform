@@ -202,10 +202,10 @@
             <el-select
               v-model="form.model_name"
               filterable
-              allow-create
-              default-first-option
-              placeholder="选择或输入模型名称"
+              clearable
+              placeholder="请选择模型名称"
               style="width: 100%"
+              :disabled="currentProviderModels.length === 0"
             >
               <el-option
                 v-for="model in currentProviderModels"
@@ -214,9 +214,9 @@
                 :value="model.model_id"
               />
             </el-select>
-            <el-button 
-              type="primary" 
-              link 
+            <el-button
+              type="primary"
+              link
               @click="handleRefreshModels"
               :loading="refreshingModels"
               title="从提供商刷新模型列表"
@@ -225,7 +225,10 @@
             </el-button>
           </div>
           <div class="form-hint" v-if="currentProviderModels.length === 0">
-            暂无可用模型列表，请手动输入或点击刷新按钮
+            暂无可用模型列表，请先点击刷新按钮获取
+          </div>
+          <div class="form-hint" v-else>
+            共 {{ currentProviderModels.length }} 个可用模型
           </div>
         </el-form-item>
 
@@ -520,6 +523,9 @@ const handleProviderChange = async (provider) => {
     form.base_url = defaults[provider]
   }
 
+  // 清空模型名称，避免保留上一个提供商的模型ID
+  form.model_name = ''
+
   // 如果可用模型列表未加载，先加载
   if (Object.keys(availableModels.value).length === 0) {
     await fetchAvailableModels()
@@ -527,7 +533,7 @@ const handleProviderChange = async (provider) => {
 
   // 自动填充模型名称为该提供商的第一个可用模型
   const models = availableModels.value[provider] || []
-  if (models.length > 0 && !form.model_name) {
+  if (models.length > 0) {
     // 优先选择推荐的模型，否则选择第一个
     const recommendedModel = models.find(m => m.is_recommended)
     form.model_name = recommendedModel ? recommendedModel.model_id : models[0].model_id
