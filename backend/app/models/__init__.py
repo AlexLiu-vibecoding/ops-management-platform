@@ -1153,7 +1153,7 @@ __all__ = [
     'OptimizationSuggestion', 'SlowQueryCollectionTask', 'SlowLogFile',
     
     # 通知系统 (新)
-    'NotificationChannel', 'ChannelSilenceRule', 'ChannelRateLimit',
+    'NotificationChannel', 'ChannelSilenceRule',
     
     # AI 模型配置
     'AIModelConfig', 'AICallLog', 'AIProvider', 'AIModelType',
@@ -1179,7 +1179,7 @@ from app.models.change_window import ChangeWindow, WEEKDAY_LABELS, WINDOW_TYPE_L
 from app.models.sql_optimization import OptimizationSuggestion, SlowQueryCollectionTask, SlowLogFile
 
 # 导入通知系统模型
-from app.models.notification_new import NotificationChannel, ChannelSilenceRule, ChannelRateLimit
+from app.models.notification_new import NotificationChannel, ChannelSilenceRule
 
 # 导入 AI 模型配置
 from app.models.ai_model import AIModelConfig, AICallLog, AIProvider, AIModelType, PROVIDER_LABELS, USE_CASE_LABELS

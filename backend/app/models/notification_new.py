@@ -23,7 +23,6 @@ class NotificationChannel(Base):
     
     # 关联
     silence_rules = relationship("ChannelSilenceRule", back_populates="channel", cascade="all, delete-orphan")
-    rate_limits = relationship("ChannelRateLimit", back_populates="channel", cascade="all, delete-orphan")
 
 
 class ChannelSilenceRule(Base):
@@ -54,30 +53,3 @@ class ChannelSilenceRule(Base):
     
     # 关联
     channel = relationship("NotificationChannel", back_populates="silence_rules")
-
-
-class ChannelRateLimit(Base):
-    """通道频率限制"""
-    __tablename__ = "channel_rate_limits"
-    
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    channel_id = Column(Integer, ForeignKey("notification_channels.id", ondelete="CASCADE"), nullable=False, comment="通道ID")
-    name = Column(String(100), nullable=False, comment="规则名称")
-    description = Column(String(200), comment="规则描述")
-
-    # 匹配条件 (可选)
-    instance_type = Column(String(20), comment="实例类型: rdb/redis")
-    instance_id = Column(Integer, comment="实例ID")
-    metric_type = Column(String(32), comment="指标类型")
-
-    # 频率限制
-    limit_window = Column(Integer, default=300, comment="时间窗口(秒)")
-    max_notifications = Column(Integer, default=5, comment="最大通知数")
-    cooldown_period = Column(Integer, default=600, comment="冷却期(秒)")
-    
-    is_enabled = Column(Boolean, default=True, comment="是否启用")
-    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
-    
-    # 关联
-    channel = relationship("NotificationChannel", back_populates="rate_limits")

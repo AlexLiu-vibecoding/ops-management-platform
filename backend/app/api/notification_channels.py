@@ -10,7 +10,7 @@ import json
 
 from app.database import get_db
 from app.models import User, NotificationLog
-from app.models.notification_new import NotificationChannel, ChannelSilenceRule, ChannelRateLimit
+from app.models.notification_new import NotificationChannel, ChannelSilenceRule
 from app.models.permissions import PermissionCode
 from app.deps import get_current_user, require_permissions
 from app.utils.auth import aes_cipher
