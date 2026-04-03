@@ -34,13 +34,12 @@ class ChannelSilenceRule(Base):
     channel_id = Column(Integer, ForeignKey("notification_channels.id", ondelete="CASCADE"), nullable=False, comment="通道ID")
     name = Column(String(100), nullable=False, comment="规则名称")
     description = Column(String(200), comment="规则描述")
-    
+
     # 匹配条件 (可选)
-    alert_level = Column(String(16), comment="告警级别")
     instance_type = Column(String(20), comment="实例类型: rdb/redis")
     instance_id = Column(Integer, comment="实例ID")
     metric_type = Column(String(32), comment="指标类型")
-    
+
     # 静默配置
     silence_type = Column(String(20), default="once", comment="静默类型: once/daily/weekly")
     start_time = Column(DateTime, comment="开始时间(一次性)")
@@ -65,13 +64,12 @@ class ChannelRateLimit(Base):
     channel_id = Column(Integer, ForeignKey("notification_channels.id", ondelete="CASCADE"), nullable=False, comment="通道ID")
     name = Column(String(100), nullable=False, comment="规则名称")
     description = Column(String(200), comment="规则描述")
-    
+
     # 匹配条件 (可选)
-    alert_level = Column(String(16), comment="告警级别")
     instance_type = Column(String(20), comment="实例类型: rdb/redis")
     instance_id = Column(Integer, comment="实例ID")
     metric_type = Column(String(32), comment="指标类型")
-    
+
     # 频率限制
     limit_window = Column(Integer, default=300, comment="时间窗口(秒)")
     max_notifications = Column(Integer, default=5, comment="最大通知数")
