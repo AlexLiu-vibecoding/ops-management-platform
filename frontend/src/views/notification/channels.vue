@@ -699,7 +699,8 @@ const loadChannels = async () => {
 const loadChannelTypes = async () => {
   try {
     const res = await notificationApi.getChannelTypes()
-    channelTypes.value = res.data || []
+    // 后端直接返回数组，不是 { data: [...] } 格式
+    channelTypes.value = Array.isArray(res) ? res : (res.data || [])
   } catch (error) {
     console.error('加载通道类型失败:', error)
   }
