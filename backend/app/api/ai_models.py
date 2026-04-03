@@ -761,16 +761,24 @@ async def refresh_available_models(
 def _fetch_doubao_models() -> List[Dict]:
     """
     获取豆包可用模型列表
-    
-    豆包模型通过 SDK 调用，这里返回常用模型列表
+
+    豆包模型通过 SDK 调用，这里返回 SDK 支持的标准模型列表
+    参考: /skills/public/prod/llm/python/README.md
     """
-    # 豆包常用模型列表
+    # SDK 支持的标准豆包模型列表
     return [
-        {"model_id": "doubao-seed-1-8-251228", "model_name": "Doubao Seed 1.8 (251228)", "model_type": "chat", "context_window": 128000},
-        {"model_id": "doubao-pro-32k", "model_name": "Doubao Pro 32K", "model_type": "chat", "context_window": 32768},
-        {"model_id": "doubao-lite-4k", "model_name": "Doubao Lite 4K", "model_type": "chat", "context_window": 4096},
-        {"model_id": "doubao-pro-128k", "model_name": "Doubao Pro 128K", "model_type": "chat", "context_window": 128000},
-        {"model_id": "doubao-pro-256k", "model_name": "Doubao Pro 256K", "model_type": "chat", "context_window": 256000},
+        # Seed 2.0 系列
+        {"model_id": "doubao-seed-2-0-pro-260215", "model_name": "Doubao Seed 2.0 Pro (旗舰)", "model_type": "chat", "context_window": 128000, "is_recommended": True},
+        {"model_id": "doubao-seed-2-0-lite-260215", "model_name": "Doubao Seed 2.0 Lite (均衡)", "model_type": "chat", "context_window": 128000},
+        {"model_id": "doubao-seed-2-0-mini-260215", "model_name": "Doubao Seed 2.0 Mini (轻量)", "model_type": "chat", "context_window": 256000},
+        # Seed 1.8 系列
+        {"model_id": "doubao-seed-1-8-251228", "model_name": "Doubao Seed 1.8 (多模态Agent)", "model_type": "chat", "context_window": 128000},
+        # Seed 1.6 系列
+        {"model_id": "doubao-seed-1-6-251015", "model_name": "Doubao Seed 1.6 (通用)", "model_type": "chat", "context_window": 128000},
+        {"model_id": "doubao-seed-1-6-lite-251015", "model_name": "Doubao Seed 1.6 Lite (高性价比)", "model_type": "chat", "context_window": 128000},
+        {"model_id": "doubao-seed-1-6-vision-250815", "model_name": "Doubao Seed 1.6 Vision (视觉)", "model_type": "chat", "context_window": 128000},
+        {"model_id": "doubao-seed-1-6-flash-250615", "model_name": "Doubao Seed 1.6 Flash (极速)", "model_type": "chat", "context_window": 128000},
+        {"model_id": "doubao-seed-1-6-thinking-250715", "model_name": "Doubao Seed 1.6 Thinking (深度)", "model_type": "chat", "context_window": 128000},
     ]
 
 
