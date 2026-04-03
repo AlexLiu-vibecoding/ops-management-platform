@@ -107,44 +107,48 @@ CHANNEL_TYPE_LABELS = {
 
 
 def encrypt_channel_config(config: dict, channel_type: str) -> dict:
-    """加密通道配置中的敏感信息"""
+    """加密通道配置中的敏感信息
+
+    注意：只加密真正敏感的字段（如密钥、密码），webhook URL 明文存储
+    因为 webhook URL 虽然包含 token，但需要频繁使用，加密会带来不必要的麻烦
+    """
     config = config.copy()
-    
+
     if channel_type == "dingtalk":
-        if config.get("webhook"):
-            config["webhook_encrypted"] = encrypt_secret(config["webhook"])
-            del config["webhook"]
+        # 只加密 secret（密钥），webhook URL 明文存储
         if config.get("secret"):
             config["secret_encrypted"] = encrypt_secret(config["secret"])
             del config["secret"]
+        # webhook 保持明文
     elif channel_type == "email":
+        # 只加密密码，其他保持明文
         if config.get("password"):
             config["password_encrypted"] = encrypt_secret(config["password"])
             del config["password"]
     elif channel_type == "webhook":
-        if config.get("url"):
-            config["url_encrypted"] = encrypt_secret(config["url"])
-            del config["url"]
-    
+        # 自定义 webhook 的 URL 保持明文，不加密
+        pass
+
     return config
 
 
 def decrypt_channel_config(config: dict, channel_type: str) -> dict:
-    """解密通道配置中的敏感信息"""
+    """解密通道配置中的敏感信息
+
+    注意：webhook URL 保持明文存储，不需要解密
+    """
     config = config.copy() if config else {}
-    
+
     if channel_type == "dingtalk":
-        if config.get("webhook_encrypted"):
-            config["webhook"] = decrypt_secret(config["webhook_encrypted"])
+        # 只解密 secret（密钥），webhook 保持明文
         if config.get("secret_encrypted"):
             config["secret"] = decrypt_secret(config["secret_encrypted"])
     elif channel_type == "email":
+        # 只解密密码
         if config.get("password_encrypted"):
             config["password"] = decrypt_secret(config["password_encrypted"])
-    elif channel_type == "webhook":
-        if config.get("url_encrypted"):
-            config["url"] = decrypt_secret(config["url_encrypted"])
-    
+    # webhook 类型和自定义 webhook 都是明文存储，无需解密
+
     return config
 
 
