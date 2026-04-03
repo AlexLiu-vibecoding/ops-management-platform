@@ -312,7 +312,7 @@ async def send_script_notification(
 
 async def execute_script_async(
     execution_id: int,
-    script: Script,
+    script_id: int,
     params: Dict[str, Any],
     timeout: int
 ):
@@ -321,7 +321,7 @@ async def execute_script_async(
     
     Args:
         execution_id: 执行记录ID
-        script: 脚本对象
+        script_id: 脚本ID
         params: 执行参数
         timeout: 超时时间
     """
@@ -329,6 +329,12 @@ async def execute_script_async(
     
     db = SessionLocal()
     try:
+        # 在新的 Session 中重新查询脚本和执行记录，避免 Session 绑定问题
+        script = db.query(Script).filter(Script.id == script_id).first()
+        if not script:
+            logger.error(f"脚本不存在: {script_id}")
+            return
+        
         execution = db.query(ScriptExecution).filter(
             ScriptExecution.id == execution_id
         ).first()
@@ -728,7 +734,7 @@ async def execute_script(
         background_tasks.add_task(
             execute_script_async,
             execution.id,
-            script,
+            script.id,
             exec_data.params,
             timeout
         )
@@ -742,7 +748,7 @@ async def execute_script(
         # 同步执行
         await execute_script_async(
             execution.id,
-            script,
+            script.id,
             exec_data.params,
             timeout
         )
