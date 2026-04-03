@@ -100,9 +100,9 @@ def decrypt_api_key(encrypted: str) -> str:
         return ""
 
 
-def config_to_response(config: AIModelConfig) -> dict:
+def config_to_response(config: AIModelConfig, db: Session = None) -> dict:
     """转换配置为响应格式"""
-    return {
+    result = {
         "id": config.id,
         "name": config.name,
         "provider": config.provider,
@@ -119,8 +119,21 @@ def config_to_response(config: AIModelConfig) -> dict:
         "description": config.description,
         "created_by": config.created_by,
         "created_at": config.created_at,
-        "updated_at": config.updated_at
+        "updated_at": config.updated_at,
+        "is_model_available": None  # 默认为None，表示未检查
     }
+
+    # 如果提供了db，检查模型是否在可用列表中
+    if db:
+        from app.models.ai_model import AIAvailableModel
+        available_model = db.query(AIAvailableModel).filter(
+            AIAvailableModel.provider == config.provider,
+            AIAvailableModel.model_id == config.model_name,
+            AIAvailableModel.is_available == True
+        ).first()
+        result["is_model_available"] = available_model is not None
+
+    return result
 
 
 def scene_config_to_response(scene_config: AISceneConfig) -> dict:
@@ -168,8 +181,8 @@ async def list_ai_models(
         query = query.filter(AIModelConfig.provider == provider)
     
     configs = query.order_by(desc(AIModelConfig.priority), desc(AIModelConfig.created_at)).all()
-    
-    return [config_to_response(c) for c in configs]
+
+    return [config_to_response(c, db) for c in configs]
 
 
 @router.get("/providers")
@@ -717,17 +730,19 @@ async def refresh_available_models(
                     models = []
             
             # 更新数据库
+            current_model_ids = set()
             for model_info in models:
+                current_model_ids.add(model_info["model_id"])
                 existing = db.query(AIAvailableModel).filter(
                     AIAvailableModel.provider == provider,
                     AIAvailableModel.model_id == model_info["model_id"]
                 ).first()
-                
+
                 if existing:
                     existing.model_name = model_info.get("model_name", existing.model_name)
                     existing.model_type = model_info.get("model_type", existing.model_type)
                     existing.context_window = model_info.get("context_window")
-                    existing.is_available = model_info.get("is_available", True)
+                    existing.is_available = True  # 确保新列表中的模型标记为可用
                     existing.raw_data = model_info.get("raw_data")
                     existing.fetched_at = datetime.now()
                     existing.updated_at = datetime.now()
@@ -738,14 +753,27 @@ async def refresh_available_models(
                         model_name=model_info.get("model_name", model_info["model_id"]),
                         model_type=model_info.get("model_type", "chat"),
                         context_window=model_info.get("context_window"),
-                        is_available=model_info.get("is_available", True),
+                        is_available=True,
                         raw_data=model_info.get("raw_data"),
                         fetched_at=datetime.now()
                     )
                     db.add(new_model)
-            
+
+            # 将该提供商不在新列表中的模型标记为不可用
+            unavailable_count = db.query(AIAvailableModel).filter(
+                AIAvailableModel.provider == provider,
+                AIAvailableModel.model_id.notin_(current_model_ids),
+                AIAvailableModel.is_available == True
+            ).update({
+                "is_available": False,
+                "updated_at": datetime.now()
+            }, synchronize_session=False)
+
             db.commit()
-            refreshed[provider] = len(models)
+            refreshed[provider] = {
+                "added_updated": len(models),
+                "marked_unavailable": unavailable_count
+            }
             
         except Exception as e:
             errors.append(f"{provider}: {str(e)}")
@@ -850,4 +878,4 @@ async def get_ai_model(
     config = db.query(AIModelConfig).filter(AIModelConfig.id == model_id).first()
     if not config:
         raise HTTPException(status_code=404, detail="模型配置不存在")
-    return config_to_response(config)
+    return config_to_response(config, db)
