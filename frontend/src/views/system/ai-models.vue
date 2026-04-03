@@ -510,7 +510,7 @@ const handleRefreshModels = async () => {
   }
 }
 
-const handleProviderChange = (provider) => {
+const handleProviderChange = async (provider) => {
   const defaults = {
     'doubao': 'https://integration.coze.cn/api/v3',
     'openai': 'https://api.openai.com/v1',
@@ -519,7 +519,12 @@ const handleProviderChange = (provider) => {
   if (defaults[provider] && !form.base_url) {
     form.base_url = defaults[provider]
   }
-  
+
+  // 如果可用模型列表未加载，先加载
+  if (Object.keys(availableModels.value).length === 0) {
+    await fetchAvailableModels()
+  }
+
   // 自动填充模型名称为该提供商的第一个可用模型
   const models = availableModels.value[provider] || []
   if (models.length > 0 && !form.model_name) {
@@ -529,14 +534,25 @@ const handleProviderChange = (provider) => {
   }
 }
 
-const handleAdd = () => {
+const handleAdd = async () => {
   dialog.isEdit = false
   resetFormData()
+  // 加载可用模型列表
+  await fetchAvailableModels()
+  // 自动填充默认模型名称
+  const models = availableModels.value[form.provider] || []
+  if (models.length > 0) {
+    const recommendedModel = models.find(m => m.is_recommended)
+    form.model_name = recommendedModel ? recommendedModel.model_id : models[0].model_id
+  }
   dialog.visible = true
 }
 
 const handleEdit = async (row) => {
   dialog.isEdit = true
+  // 先加载可用模型列表，确保模型名称选择器能正常显示
+  await fetchAvailableModels()
+  // 然后再设置表单数据
   Object.assign(form, {
     id: row.id,
     name: row.name,
@@ -553,8 +569,6 @@ const handleEdit = async (row) => {
     priority: row.priority,
     description: row.description || ''
   })
-  // 加载可用模型列表，确保模型名称选择器能正常显示
-  await fetchAvailableModels()
   dialog.visible = true
 }
 
