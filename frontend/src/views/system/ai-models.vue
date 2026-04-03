@@ -454,6 +454,22 @@ const enabledModels = computed(() => modelList.value.filter(m => m.is_enabled))
 
 const currentProviderModels = computed(() => {
   const models = availableModels.value[form.provider] || []
+
+  // 编辑时，如果当前模型不在可用列表中（历史不可用模型），临时添加到选项
+  if (dialog.isEdit && form.model_name) {
+    const exists = models.find(m => m.model_id === form.model_name)
+    if (!exists) {
+      return [
+        ...models,
+        {
+          model_id: form.model_name,
+          model_name: `${form.model_name}（当前配置，已不可用）`,
+          is_deprecated: true
+        }
+      ]
+    }
+  }
+
   return models
 })
 
@@ -556,13 +572,17 @@ const handleAdd = async () => {
 
 const handleEdit = async (row) => {
   dialog.isEdit = true
-  // 先加载可用模型列表，确保模型名称选择器能正常显示
+  // 先重置表单，设置provider（这会影响currentProviderModels计算）
+  resetFormData()
+  form.provider = row.provider
+
+  // 加载可用模型列表
   await fetchAvailableModels()
-  // 然后再设置表单数据
+
+  // 设置其他表单数据
   Object.assign(form, {
     id: row.id,
     name: row.name,
-    provider: row.provider,
     base_url: row.base_url,
     api_key: '',
     api_key_masked: row.api_key_masked,
