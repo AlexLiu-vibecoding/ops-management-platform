@@ -23,13 +23,12 @@ class SilenceRuleCreate(BaseModel):
     """创建静默规则"""
     name: str = Field(..., max_length=100, description="规则名称")
     description: Optional[str] = Field(None, max_length=200, description="规则描述")
-    
+
     # 匹配条件
-    alert_level: Optional[str] = Field(None, description="告警级别")
     instance_type: Optional[str] = Field(None, description="实例类型: rdb/redis")
     instance_id: Optional[int] = Field(None, description="实例ID")
     metric_type: Optional[str] = Field(None, description="指标类型")
-    
+
     # 静默配置
     silence_type: str = Field("once", description="静默类型: once/daily/weekly")
     start_time: Optional[datetime] = Field(None, description="开始时间(一次性)")
@@ -37,7 +36,7 @@ class SilenceRuleCreate(BaseModel):
     time_start: Optional[str] = Field(None, description="开始时间 HH:MM")
     time_end: Optional[str] = Field(None, description="结束时间 HH:MM")
     weekdays: Optional[List[int]] = Field(None, description="星期几 [0-6], 0=周一")
-    
+
     is_enabled: bool = Field(True, description="是否启用")
 
 
@@ -45,7 +44,6 @@ class SilenceRuleUpdate(BaseModel):
     """更新静默规则"""
     name: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = Field(None, max_length=200)
-    alert_level: Optional[str] = None
     instance_type: Optional[str] = None
     instance_id: Optional[int] = None
     metric_type: Optional[str] = None
@@ -62,18 +60,17 @@ class RateLimitCreate(BaseModel):
     """创建频率限制"""
     name: str = Field(..., max_length=100, description="规则名称")
     description: Optional[str] = Field(None, max_length=200, description="规则描述")
-    
+
     # 匹配条件
-    alert_level: Optional[str] = Field(None, description="告警级别")
     instance_type: Optional[str] = Field(None, description="实例类型: rdb/redis")
     instance_id: Optional[int] = Field(None, description="实例ID")
     metric_type: Optional[str] = Field(None, description="指标类型")
-    
+
     # 频率限制
     limit_window: int = Field(300, description="时间窗口(秒)")
     max_notifications: int = Field(5, description="最大通知数")
     cooldown_period: int = Field(600, description="冷却期(秒)")
-    
+
     is_enabled: bool = Field(True, description="是否启用")
 
 
@@ -81,7 +78,6 @@ class RateLimitUpdate(BaseModel):
     """更新频率限制"""
     name: Optional[str] = Field(None, max_length=100)
     description: Optional[str] = Field(None, max_length=200)
-    alert_level: Optional[str] = None
     instance_type: Optional[str] = None
     instance_id: Optional[int] = None
     metric_type: Optional[str] = None
@@ -109,7 +105,6 @@ def silence_rule_to_dict(rule: ChannelSilenceRule) -> dict:
         "channel_id": rule.channel_id,
         "name": rule.name,
         "description": rule.description,
-        "alert_level": rule.alert_level,
         "instance_type": rule.instance_type,
         "instance_id": rule.instance_id,
         "metric_type": rule.metric_type,
@@ -179,7 +174,6 @@ async def create_silence_rule(
         channel_id=channel_id,
         name=data.name,
         description=data.description,
-        alert_level=data.alert_level,
         instance_type=data.instance_type,
         instance_id=data.instance_id,
         metric_type=data.metric_type,
@@ -252,7 +246,6 @@ def rate_limit_to_dict(rule: ChannelRateLimit) -> dict:
         "channel_id": rule.channel_id,
         "name": rule.name,
         "description": rule.description,
-        "alert_level": rule.alert_level,
         "instance_type": rule.instance_type,
         "instance_id": rule.instance_id,
         "metric_type": rule.metric_type,
@@ -310,7 +303,6 @@ async def create_rate_limit(
         channel_id=channel_id,
         name=data.name,
         description=data.description,
-        alert_level=data.alert_level,
         instance_type=data.instance_type,
         instance_id=data.instance_id,
         metric_type=data.metric_type,

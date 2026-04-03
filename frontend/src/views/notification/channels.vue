@@ -187,9 +187,6 @@
             <el-table-column label="匹配条件" min-width="150">
               <template #default="{ row }">
                 <div class="match-conditions">
-                  <el-tag v-if="row.alert_level" :type="getAlertLevelTag(row.alert_level)" size="small" class="mr-1">
-                    {{ row.alert_level }}
-                  </el-tag>
                   <el-tag v-if="row.instance_type" size="small" class="mr-1">
                     {{ row.instance_type }}
                   </el-tag>
@@ -295,9 +292,6 @@
             <el-table-column label="匹配条件" min-width="150">
               <template #default="{ row }">
                 <div class="match-conditions">
-                  <el-tag v-if="row.alert_level" :type="getAlertLevelTag(row.alert_level)" size="small" class="mr-1">
-                    {{ row.alert_level }}
-                  </el-tag>
                   <el-tag v-if="row.instance_type" size="small" class="mr-1">
                     {{ row.instance_type }}
                   </el-tag>
@@ -594,14 +588,6 @@
           </el-form-item>
         </template>
 
-        <el-form-item label="告警级别">
-          <el-select v-model="silenceDialog.form.alert_level" placeholder="全部级别" clearable style="width: 100%">
-            <el-option label="紧急" value="critical" />
-            <el-option label="警告" value="warning" />
-            <el-option label="提醒" value="info" />
-          </el-select>
-        </el-form-item>
-
         <el-form-item label="实例类型">
           <el-select v-model="silenceDialog.form.instance_type" placeholder="全部类型" clearable style="width: 100%">
             <el-option label="MySQL/PG" value="rdb" />
@@ -656,14 +642,6 @@
         <el-form-item label="冷却期(秒)" prop="cooldown_period">
           <el-input-number v-model="rateLimitDialog.form.cooldown_period" :min="60" :step="60" style="width: 100%" />
           <div class="form-hint">超过限制后暂停发送的时长</div>
-        </el-form-item>
-
-        <el-form-item label="告警级别">
-          <el-select v-model="rateLimitDialog.form.alert_level" placeholder="全部级别" clearable style="width: 100%">
-            <el-option label="紧急" value="critical" />
-            <el-option label="警告" value="warning" />
-            <el-option label="提醒" value="info" />
-          </el-select>
         </el-form-item>
 
         <el-form-item label="实例类型">
@@ -856,7 +834,6 @@ const silenceDialog = reactive({
     weekdays: [],
     date_range: [],
     instance_type: '',
-    alert_level: '',
     metric_type: '',
     is_enabled: true
   }
@@ -875,7 +852,6 @@ const rateLimitDialog = reactive({
     max_notifications: 5,
     cooldown_period: 600,
     instance_type: '',
-    alert_level: '',
     metric_type: '',
     is_enabled: true
   }
@@ -1007,8 +983,8 @@ const loadBindingData = async () => {
   try {
     const [envRes, rdbRes, redisRes, taskRes] = await Promise.all([
       request.get('/environments'),
-      request.get('/instances/rdb'),
-      request.get('/instances/redis'),
+      request.get('/rdb-instances'),
+      request.get('/redis-instances'),
       request.get('/scheduled-tasks')
     ])
     environments.value = envRes.items || []
@@ -1184,7 +1160,6 @@ const handleAddSilenceRule = () => {
     weekdays: [],
     date_range: [],
     instance_type: '',
-    alert_level: '',
     metric_type: '',
     is_enabled: true
   }
@@ -1204,7 +1179,6 @@ const handleEditSilenceRule = (row) => {
     weekdays: row.weekdays || [],
     date_range: row.start_time && row.end_time ? [row.start_time, row.end_time] : [],
     instance_type: row.instance_type || '',
-    alert_level: row.alert_level || '',
     metric_type: row.metric_type || '',
     is_enabled: row.is_enabled
   }
@@ -1275,7 +1249,6 @@ const handleAddRateLimitRule = () => {
     max_notifications: 5,
     cooldown_period: 600,
     instance_type: '',
-    alert_level: '',
     metric_type: '',
     is_enabled: true
   }
@@ -1293,7 +1266,6 @@ const handleEditRateLimitRule = (row) => {
     max_notifications: row.max_notifications,
     cooldown_period: row.cooldown_period,
     instance_type: row.instance_type || '',
-    alert_level: row.alert_level || '',
     metric_type: row.metric_type || '',
     is_enabled: row.is_enabled
   }
@@ -1375,15 +1347,6 @@ const getSilenceTypeTag = (type) => {
     period: 'danger'
   }
   return map[type] || 'info'
-}
-
-const getAlertLevelTag = (level) => {
-  const map = {
-    critical: 'danger',
-    warning: 'warning',
-    info: 'info'
-  }
-  return map[level] || 'info'
 }
 
 const formatDate = (date) => {
