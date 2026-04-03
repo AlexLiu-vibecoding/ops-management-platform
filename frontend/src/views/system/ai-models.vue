@@ -519,6 +519,14 @@ const handleProviderChange = (provider) => {
   if (defaults[provider] && !form.base_url) {
     form.base_url = defaults[provider]
   }
+  
+  // 自动填充模型名称为该提供商的第一个可用模型
+  const models = availableModels.value[provider] || []
+  if (models.length > 0 && !form.model_name) {
+    // 优先选择推荐的模型，否则选择第一个
+    const recommendedModel = models.find(m => m.is_recommended)
+    form.model_name = recommendedModel ? recommendedModel.model_id : models[0].model_id
+  }
 }
 
 const handleAdd = () => {

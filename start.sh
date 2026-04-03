@@ -146,7 +146,7 @@ build_frontend() {
         npm install
         npm run build
     elif [ -f "yarn.lock" ]; then
-        yarn install
+        yarn instal
         yarn build
     fi
     
