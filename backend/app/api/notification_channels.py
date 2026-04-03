@@ -9,11 +9,12 @@ from datetime import datetime
 import json
 
 from app.database import get_db
-from app.models import User
+from app.models import User, NotificationLog
 from app.models.notification_new import NotificationChannel, ChannelSilenceRule, ChannelRateLimit
 from app.models.permissions import PermissionCode
 from app.deps import get_current_user, require_permissions
 from app.utils.auth import aes_cipher
+from app.services.notification import NotificationService
 
 
 # ==================== Helper Functions ====================
@@ -324,7 +325,7 @@ async def test_channel(
     current_user: User = Depends(require_permissions([PermissionCode.NOTIFICATION_CHANNEL_MANAGE])),
     db: Session = Depends(get_db)
 ):
-    """测试通道 - 发送测试消息"""
+    """测试通道 - 发送测试消息并记录到通知历史"""
     import logging
     logger = logging.getLogger(__name__)
     
@@ -340,20 +341,30 @@ async def test_channel(
     if isinstance(config, str):
         config = json.loads(config)
     
-    # 构建测试消息
+    # 构建测试消息内容
+    test_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    message_text = f"### OpsCenter 测试通知\n\n**通道名称**: {channel.name}\n\n**通道类型**: {CHANNEL_TYPE_LABELS.get(channel.channel_type, channel.channel_type)}\n\n**测试时间**: {test_time}\n\n**发送用户**: {current_user.username}\n\n---\n\n✅ 如果您收到此消息，说明通道配置正确，通知功能正常。"
+    
+    # 构建钉钉消息格式
     test_message = {
         "msgtype": "markdown",
         "markdown": {
             "title": "测试通知",
-            "text": f"### OpsCenter 测试通知\n\n"
-                    f"**通道名称**: {channel.name}\n\n"
-                    f"**通道类型**: {CHANNEL_TYPE_LABELS.get(channel.channel_type, channel.channel_type)}\n\n"
-                    f"**测试时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-                    f"**发送用户**: {current_user.username}\n\n"
-                    f"---\n\n"
-                    f"✅ 如果您收到此消息，说明通道配置正确，通知功能正常。"
+            "text": message_text
         }
     }
+    
+    # 创建通知日志记录（初始状态为 pending）
+    log = NotificationService.create_notification_log(
+        db=db,
+        notification_type="scheduled_task",  # 使用 scheduled_task 类型表示测试/系统通知
+        sub_type="channel_test",
+        title=f"通道测试 - {channel.name}",
+        content=message_text,
+        channel_id=channel.id,
+        channel_name=channel.name,
+        status="pending"
+    )
     
     # 根据通道类型发送测试消息
     if channel.channel_type == "dingtalk":
@@ -364,6 +375,11 @@ async def test_channel(
         keywords = config.get("keywords", [])
         
         if not webhook:
+            # 更新日志为失败状态
+            NotificationService.update_notification_log(
+                db, log, status="failed", 
+                error_message="Webhook 地址未配置"
+            )
             raise HTTPException(status_code=400, detail="Webhook 地址未配置")
         
         # 解密 secret
@@ -375,17 +391,33 @@ async def test_channel(
         try:
             result = await _send_dingtalk_test(webhook, test_message, auth_type, secret, keywords)
             if result["success"]:
+                # 更新日志为成功状态
+                NotificationService.update_notification_log(
+                    db, log, status="success",
+                    response_code=200,
+                    response_data=result.get('response_data', {})
+                )
                 return {
                     "message": "测试成功",
                     "detail": f"钉钉消息已发送，请检查接收情况\n钉钉返回: {result.get('response_data', {})}"
                 }
             else:
+                # 更新日志为失败状态
+                NotificationService.update_notification_log(
+                    db, log, status="failed",
+                    error_message=result.get('error_message', '未知错误')
+                )
                 raise HTTPException(
                     status_code=400, 
                     detail=f"发送失败: {result.get('error_message', '未知错误')}"
                 )
         except Exception as e:
             logger.error(f"钉钉测试消息发送失败: {e}")
+            # 更新日志为失败状态
+            NotificationService.update_notification_log(
+                db, log, status="failed",
+                error_message=str(e)
+            )
             raise HTTPException(status_code=500, detail=f"发送失败: {str(e)}")
     
     elif channel.channel_type == "webhook":
@@ -395,6 +427,10 @@ async def test_channel(
         headers = config.get("headers", {})
         
         if not webhook:
+            NotificationService.update_notification_log(
+                db, log, status="failed",
+                error_message="Webhook 地址未配置"
+            )
             raise HTTPException(status_code=400, detail="Webhook 地址未配置")
         
         try:
@@ -405,15 +441,30 @@ async def test_channel(
                 else:
                     response = await client.post(webhook, json=test_message, headers=headers)
                 
+                # 更新日志状态
+                status = "success" if response.status_code < 400 else "failed"
+                NotificationService.update_notification_log(
+                    db, log, status=status,
+                    response_code=response.status_code
+                )
+                
                 return {
                     "message": "测试完成",
                     "detail": f"Webhook 调用完成\nHTTP 状态: {response.status_code}\n响应: {response.text[:200]}"
                 }
         except Exception as e:
+            NotificationService.update_notification_log(
+                db, log, status="failed",
+                error_message=str(e)
+            )
             raise HTTPException(status_code=500, detail=f"调用失败: {str(e)}")
     
     else:
         # 其他类型通道暂不支持测试
+        NotificationService.update_notification_log(
+            db, log, status="failed",
+            error_message=f"暂不支持 {channel.channel_type} 类型的通道测试"
+        )
         raise HTTPException(status_code=400, detail=f"暂不支持 {channel.channel_type} 类型的通道测试")
 
 

@@ -262,8 +262,8 @@ class NotificationLog(Base):
     notification_type = Column(String(50), nullable=False, comment="通知类型: approval/alert/scheduled_task")
     sub_type = Column(String(50), comment="细分类型: DDL/DML/critical/warning等")
     
-    # 通知渠道
-    channel_id = Column(Integer, ForeignKey("dingtalk_channels.id", ondelete="SET NULL"), comment="通道ID")
+    # 通知渠道 - 支持多种通道类型（钉钉/企微/飞书/邮件/Webhook）
+    channel_id = Column(Integer, comment="通道ID (notification_channels.id)")
     channel_name = Column(String(100), comment="通道名称(冗余)")
     
     # 关联资源
@@ -287,9 +287,6 @@ class NotificationLog(Base):
     # 时间信息
     sent_at = Column(DateTime, comment="发送时间")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
-    
-    # 关系
-    channel = relationship("DingTalkChannel")
 
 
 class NotificationTemplate(Base):
