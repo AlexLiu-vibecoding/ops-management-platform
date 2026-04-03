@@ -12,7 +12,7 @@ from croniter import croniter
 from app.database import get_db
 from app.models import (
     ScheduledInspection, InspectionExecution, RDBInstance, 
-    Environment, User, DingTalkChannel
+    Environment, User
 )
 from app.schemas import MessageResponse
 from app.deps import get_current_user, get_operator

@@ -20,8 +20,21 @@ from app.database import get_db
 from app.models import (
     Script, ScriptExecution, ScheduledTask,
     ScriptType, ExecutionStatus, TriggerType,
-    User, UserRole, DingTalkChannel
+    User, UserRole
 )
+from app.models.notification_new import NotificationChannel
+from app.services.notification import NotificationService
+from app.utils.auth import aes_cipher
+
+def decrypt_secret(encrypted_secret: str) -> str:
+    """解密密钥"""
+    if not encrypted_secret:
+        return ""
+    try:
+        return aes_cipher.decrypt(encrypted_secret)
+    except Exception as e:
+        logger.warning(f"解密密钥失败: {str(e)}")
+        return ""
 from app.schemas import MessageResponse
 from app.deps import get_current_user, require_permission
 from app.utils.redis_client import redis_client
@@ -142,9 +155,10 @@ async def send_script_notification(
     if not channel_ids:
         return
     
-    channels = db.query(DingTalkChannel).filter(
-        DingTalkChannel.id.in_(channel_ids),
-        DingTalkChannel.is_enabled == True
+    # 使用新的通知通道系统
+    channels = db.query(NotificationChannel).filter(
+        NotificationChannel.id.in_(channel_ids),
+        NotificationChannel.is_enabled == True
     ).all()
     
     if not channels:
@@ -177,55 +191,135 @@ async def send_script_notification(
             error_preview += "..."
         content += f"\n错误信息：\n{error_preview}"
     
-    # 发送通知
+    # 发送通知 - 支持多种通道类型
     for channel in channels:
         try:
-            webhook = aes_cipher.decrypt(channel.webhook_encrypted) if channel.webhook_encrypted else None
-            if not webhook:
-                continue
+            # 记录通知日志
+            log = NotificationService.create_notification_log(
+                db=db,
+                notification_type="script_execution",
+                sub_type=execution.status.value if execution.status else "unknown",
+                title=f"脚本执行通知 - {script.name}",
+                content=content,
+                channel_id=channel.id,
+                channel_name=channel.name,
+                status="pending"
+            )
             
-            # 如果是加签验证，生成签名
-            if channel.auth_type == "sign" and channel.secret_encrypted:
+            # 根据通道类型发送通知
+            if channel.channel_type == "dingtalk":
+                # 钉钉通知
+                config = channel.config or {}
+                webhook = config.get("webhook")
+                auth_type = config.get("auth_type", "none")
+                secret_encrypted = config.get("secret")
+                keywords = config.get("keywords", [])
+                
+                if not webhook:
+                    NotificationService.update_notification_log(
+                        db, log, status="failed",
+                        error_message="Webhook 地址未配置"
+                    )
+                    continue
+                
+                # 解密 secret
+                secret = None
+                if secret_encrypted:
+                    secret = decrypt_secret(secret_encrypted)
+                
+                # 关键词验证
+                message_content = content
+                if auth_type == "keyword" and keywords:
+                    if isinstance(keywords, list) and keywords:
+                        message_content = f"{content}\n{keywords[0]}"
+                    elif isinstance(keywords, str):
+                        message_content = f"{content}\n{keywords}"
+                
+                # 生成加签
                 import hmac
                 import hashlib
                 import base64
                 import time
                 import urllib.parse
                 
-                secret = aes_cipher.decrypt(channel.secret_encrypted)
-                timestamp = str(round(time.time() * 1000))
-                string_to_sign = f"{timestamp}\n{secret}"
-                hmac_code = hmac.new(
-                    secret.encode('utf-8'),
-                    string_to_sign.encode('utf-8'),
-                    digestmod=hashlib.sha256
-                ).digest()
-                sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
-                separator = "&" if "?" in webhook else "?"
-                webhook = f"{webhook}{separator}timestamp={timestamp}&sign={sign}"
-            
-            # 关键词验证
-            message_content = content
-            if channel.auth_type == "keyword" and channel.keywords:
-                keywords = channel.keywords if isinstance(channel.keywords, list) else json.loads(channel.keywords)
-                if keywords:
-                    message_content = f"{content}\n{keywords[0]}"
-            
-            # 发送消息
-            async with httpx.AsyncClient() as client:
-                response = await client.post(
-                    webhook,
-                    json={"msgtype": "text", "text": {"content": message_content}},
-                    timeout=10
+                full_webhook = webhook
+                if auth_type == "signature" and secret:
+                    timestamp = str(round(time.time() * 1000))
+                    string_to_sign = f"{timestamp}\n{secret}"
+                    hmac_code = hmac.new(
+                        secret.encode('utf-8'),
+                        string_to_sign.encode('utf-8'),
+                        digestmod=hashlib.sha256
+                    ).digest()
+                    sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+                    separator = "&" if "?" in webhook else "?"
+                    full_webhook = f"{webhook}{separator}timestamp={timestamp}&sign={sign}"
+                
+                # 发送消息
+                async with httpx.AsyncClient() as client:
+                    response = await client.post(
+                        full_webhook,
+                        json={"msgtype": "text", "text": {"content": message_content}},
+                        timeout=10
+                    )
+                    result = response.json()
+                    if result.get("errcode", 0) != 0:
+                        error_msg = result.get("errmsg", "未知错误")
+                        logger.warning(f"通知发送失败: {error_msg}")
+                        NotificationService.update_notification_log(
+                            db, log, status="failed",
+                            error_message=error_msg,
+                            response_code=result.get("errcode", 500)
+                        )
+                    else:
+                        logger.info(f"脚本执行通知发送成功: 脚本ID={script.id}, 通道ID={channel.id}")
+                        NotificationService.update_notification_log(
+                            db, log, status="success",
+                            response_code=200,
+                            response_data=result
+                        )
+                        
+            elif channel.channel_type == "webhook":
+                # 自定义 Webhook
+                config = channel.config or {}
+                webhook = config.get("webhook")
+                method = config.get("method", "POST")
+                headers = config.get("headers", {})
+                
+                if not webhook:
+                    NotificationService.update_notification_log(
+                        db, log, status="failed",
+                        error_message="Webhook 地址未配置"
+                    )
+                    continue
+                
+                async with httpx.AsyncClient(timeout=10) as client:
+                    if method.upper() == "GET":
+                        response = await client.get(webhook, headers=headers)
+                    else:
+                        response = await client.post(webhook, json={"content": content}, headers=headers)
+                    
+                    status_code = "success" if response.status_code < 400 else "failed"
+                    NotificationService.update_notification_log(
+                        db, log, status=status_code,
+                        response_code=response.status_code
+                    )
+                    logger.info(f"脚本执行Webhook通知发送完成: 脚本ID={script.id}, 通道ID={channel.id}, 状态={response.status_code}")
+            else:
+                # 其他类型通道暂不支持
+                NotificationService.update_notification_log(
+                    db, log, status="failed",
+                    error_message=f"暂不支持 {channel.channel_type} 类型的通道"
                 )
-                result = response.json()
-                if result.get("errcode", 0) != 0:
-                    logger.warning(f"通知发送失败: {result.get('errmsg')}")
-                else:
-                    logger.info(f"脚本执行通知发送成功: 脚本ID={script.id}, 通道ID={channel.id}")
+                logger.warning(f"不支持的通道类型: {channel.channel_type}")
                     
         except Exception as e:
             logger.error(f"发送通知到通道 {channel.id} 失败: {e}")
+            if 'log' in locals():
+                NotificationService.update_notification_log(
+                    db, log, status="failed",
+                    error_message=str(e)
+                )
 
 
 async def execute_script_async(

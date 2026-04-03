@@ -13,10 +13,11 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import (
-    DingTalkChannel, NotificationBinding, ApprovalRecord, 
+    NotificationBinding, ApprovalRecord, 
     ApprovalStatus, RDBInstance, RedisInstance, User, ScheduledTask, ScriptExecution,
     NotificationLog
 )
+from app.models.notification_new import NotificationChannel
 from app.utils.auth import aes_cipher
 
 
@@ -569,9 +570,9 @@ class NotificationService:
         
         # 发送通知
         for binding in bindings:
-            channel = db.query(DingTalkChannel).filter(
-                DingTalkChannel.id == binding.channel_id,
-                DingTalkChannel.is_enabled == True
+            channel = db.query(NotificationChannel).filter(
+                NotificationChannel.id == binding.channel_id,
+                NotificationChannel.is_enabled == True
             ).first()
             
             if not channel:
@@ -581,10 +582,20 @@ class NotificationService:
             if binding.environment_id and approval.environment_id != binding.environment_id:
                 continue
             
-            webhook = NotificationService.decrypt_webhook(channel.webhook_encrypted)
+            # 获取通道配置
+            config = channel.config or {}
+            webhook = config.get("webhook")
+            auth_type = config.get("auth_type", "none")
+            secret_encrypted = config.get("secret")
+            keywords = config.get("keywords", [])
+            
+            if not webhook:
+                continue
+            
+            # 解密密钥
             secret = None
-            if channel.auth_type == "sign" and channel.secret_encrypted:
-                secret = NotificationService.decrypt_secret(channel.secret_encrypted)
+            if secret_encrypted:
+                secret = NotificationService.decrypt_secret(secret_encrypted)
             
             # AI 分析增强（根据全局配置决定是否启用）
             final_content = content
@@ -666,6 +677,9 @@ class NotificationService:
             success: 是否执行成功
         """
         import logging
+        from app.models.notification_new import NotificationChannel
+        from app.utils.encryption import decrypt_secret
+        
         logger = logging.getLogger(__name__)
         
         # 检查是否需要通知
@@ -674,6 +688,16 @@ class NotificationService:
             return
         if not success and not task.notify_on_fail:
             logger.info(f"任务 {task.id} 失败但未配置失败通知，跳过")
+            return
+        
+        # 获取通知通道ID列表
+        if not task.notify_channels:
+            logger.info(f"任务 {task.id} 未配置通知通道，跳过")
+            return
+        
+        channel_ids = [int(cid.strip()) for cid in task.notify_channels.split(",") if cid.strip().isdigit()]
+        if not channel_ids:
+            logger.info(f"任务 {task.id} 通知通道ID无效，跳过")
             return
         
         # 构建通知内容
@@ -707,76 +731,120 @@ class NotificationService:
 **错误信息**
 {error_preview}"""
         
-        # 获取通知绑定 - 定时任务类型
-        bindings = db.query(NotificationBinding).filter(
-            NotificationBinding.notification_type == "scheduled_task"
+        # 使用新的通知通道系统
+        channels = db.query(NotificationChannel).filter(
+            NotificationChannel.id.in_(channel_ids),
+            NotificationChannel.is_enabled == True
         ).all()
         
-        logger.info(f"找到 {len(bindings)} 个定时任务通知绑定")
+        logger.info(f"找到 {len(channels)} 个启用的通知通道")
         
-        if not bindings:
-            logger.warning("没有找到定时任务通知绑定")
+        if not channels:
+            logger.warning("没有找到有效的通知通道")
             return
         
         # 发送通知
-        for binding in bindings:
-            logger.info(f"处理绑定: channel_id={binding.channel_id}, scheduled_task_id={binding.scheduled_task_id}")
-            
-            channel = db.query(DingTalkChannel).filter(
-                DingTalkChannel.id == binding.channel_id,
-                DingTalkChannel.is_enabled == True
-            ).first()
-            
-            if not channel:
-                logger.warning(f"通道 {binding.channel_id} 不存在或未启用")
-                continue
-            
-            # 如果绑定指定了特定任务，只发送给该任务
-            if binding.scheduled_task_id:
-                if binding.scheduled_task_id != task.id:
-                    logger.info(f"绑定指定任务 {binding.scheduled_task_id}，当前任务 {task.id}，跳过")
-                    continue
-            
-            logger.info(f"准备发送通知到通道: {channel.name}")
-            
-            webhook = NotificationService.decrypt_webhook(channel.webhook_encrypted)
-            secret = None
-            if channel.auth_type == "sign" and channel.secret_encrypted:
-                secret = NotificationService.decrypt_secret(channel.secret_encrypted)
-            
-            message = {
-                "msgtype": "markdown",
-                "markdown": {
-                    "title": title,
-                    "text": content
-                }
-            }
-            
-            # 创建通知日志
-            log = NotificationService.create_notification_log(
-                db=db,
-                notification_type="scheduled_task",
-                title=title,
-                content=content,
-                sub_type="success" if success else "failed",
-                channel_id=channel.id,
-                channel_name=channel.name
-            )
-            
-            result = await NotificationService.send_dingtalk_message(
-                webhook, message, channel.auth_type, secret, channel.keywords
-            )
-            logger.info(f"通知发送结果: {result}")
-            
-            # 更新日志状态
-            NotificationService.update_notification_log(
-                db=db,
-                log=log,
-                status="success" if result["success"] else "failed",
-                error_message=result.get("error_message"),
-                response_code=result.get("response_code"),
-                response_data=result.get("response_data")
-            )
+        for channel in channels:
+            try:
+                logger.info(f"准备发送通知到通道: {channel.name} (类型: {channel.channel_type})")
+                
+                # 创建通知日志
+                log = NotificationService.create_notification_log(
+                    db=db,
+                    notification_type="scheduled_task",
+                    title=title,
+                    content=content,
+                    sub_type="success" if success else "failed",
+                    channel_id=channel.id,
+                    channel_name=channel.name,
+                    status="pending"
+                )
+                
+                # 根据通道类型发送通知
+                if channel.channel_type == "dingtalk":
+                    config = channel.config or {}
+                    webhook = config.get("webhook")
+                    auth_type = config.get("auth_type", "none")
+                    secret_encrypted = config.get("secret")
+                    keywords = config.get("keywords", [])
+                    
+                    if not webhook:
+                        logger.warning(f"通道 {channel.name} 未配置 webhook")
+                        NotificationService.update_notification_log(
+                            db, log, status="failed",
+                            error_message="Webhook 地址未配置"
+                        )
+                        continue
+                    
+                    # 解密 secret
+                    secret = None
+                    if secret_encrypted:
+                        secret = decrypt_secret(secret_encrypted)
+                    
+                    # 构建消息
+                    message = {
+                        "msgtype": "markdown",
+                        "markdown": {
+                            "title": title,
+                            "text": content
+                        }
+                    }
+                    
+                    # 发送钉钉消息
+                    result = await NotificationService.send_dingtalk_message(
+                        webhook, message, auth_type, secret, keywords
+                    )
+                    logger.info(f"通知发送结果: {result}")
+                    
+                    # 更新日志状态
+                    NotificationService.update_notification_log(
+                        db=db,
+                        log=log,
+                        status="success" if result["success"] else "failed",
+                        error_message=result.get("error_message"),
+                        response_code=result.get("response_code"),
+                        response_data=result.get("response_data")
+                    )
+                    
+                elif channel.channel_type == "webhook":
+                    config = channel.config or {}
+                    webhook = config.get("webhook")
+                    method = config.get("method", "POST")
+                    headers = config.get("headers", {})
+                    
+                    if not webhook:
+                        logger.warning(f"通道 {channel.name} 未配置 webhook")
+                        NotificationService.update_notification_log(
+                            db, log, status="failed",
+                            error_message="Webhook 地址未配置"
+                        )
+                        continue
+                    
+                    import httpx
+                    async with httpx.AsyncClient(timeout=10) as client:
+                        if method.upper() == "GET":
+                            response = await client.get(webhook, headers=headers)
+                        else:
+                            payload = {"title": title, "content": content}
+                            response = await client.post(webhook, json=payload, headers=headers)
+                        
+                        status_code = "success" if response.status_code < 400 else "failed"
+                        NotificationService.update_notification_log(
+                            db, log, status=status_code,
+                            response_code=response.status_code
+                        )
+                        logger.info(f"Webhook通知发送完成: 状态={response.status_code}")
+                        
+                else:
+                    # 其他类型通道暂不支持
+                    logger.warning(f"不支持的通道类型: {channel.channel_type}")
+                    NotificationService.update_notification_log(
+                        db, log, status="failed",
+                        error_message=f"暂不支持 {channel.channel_type} 类型的通道"
+                    )
+                    
+            except Exception as e:
+                logger.error(f"发送通知到通道 {channel.name} 失败: {e}")
 
 
     @staticmethod
@@ -888,9 +956,9 @@ class NotificationService:
         for binding in bindings:
             logger.info(f"处理绑定: channel_id={binding.channel_id}")
             
-            channel = db.query(DingTalkChannel).filter(
-                DingTalkChannel.id == binding.channel_id,
-                DingTalkChannel.is_enabled == True
+            channel = db.query(NotificationChannel).filter(
+                NotificationChannel.id == binding.channel_id,
+                NotificationChannel.is_enabled == True
             ).first()
             
             if not channel:
@@ -917,10 +985,21 @@ class NotificationService:
             
             logger.info(f"准备发送告警通知到通道: {channel.name}")
             
-            webhook = NotificationService.decrypt_webhook(channel.webhook_encrypted)
+            # 获取通道配置
+            config = channel.config or {}
+            webhook = config.get("webhook")
+            auth_type = config.get("auth_type", "none")
+            secret_encrypted = config.get("secret")
+            keywords = config.get("keywords", [])
+            
+            if not webhook:
+                logger.warning(f"通道 {channel.name} 未配置 webhook")
+                continue
+            
+            # 解密密钥
             secret = None
-            if channel.auth_type == "sign" and channel.secret_encrypted:
-                secret = NotificationService.decrypt_secret(channel.secret_encrypted)
+            if secret_encrypted:
+                secret = NotificationService.decrypt_secret(secret_encrypted)
             
             message = {
                 "msgtype": "markdown",

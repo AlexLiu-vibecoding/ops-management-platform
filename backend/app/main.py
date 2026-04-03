@@ -154,7 +154,7 @@ async def init_default_data():
     """初始化默认数据"""
     from sqlalchemy.orm import Session
     from app.database import SessionLocal
-    from app.models import User, Environment, UserRole, GlobalConfig, DingTalkChannel, SystemInitState
+    from app.models import User, Environment, UserRole, GlobalConfig, SystemInitState
     from app.utils.auth import hash_password
     db: Session = SessionLocal()
     try:

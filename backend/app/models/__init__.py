@@ -218,22 +218,6 @@ class GlobalConfig(Base):
 
 # ==================== 通知配置 ====================
 
-class DingTalkChannel(Base):
-    """钉钉通道表"""
-    __tablename__ = "dingtalk_channels"
-    
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    name = Column(String(100), unique=True, nullable=False, comment="通道名称")
-    webhook_encrypted = Column(String(500), nullable=False, comment="加密后的Webhook地址")
-    auth_type = Column(String(20), default="none", comment="验证类型")
-    secret_encrypted = Column(String(200), comment="加密后的加签密钥")
-    keywords = Column(JSON, comment="关键词列表")
-    description = Column(String(200), comment="描述")
-    is_enabled = Column(Boolean, default=True, comment="是否启用")
-    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
-
-
 class NotificationBinding(Base):
     """通知绑定表"""
     __tablename__ = "notification_bindings"
@@ -632,13 +616,13 @@ class AlertEscalationRule(Base):
     trigger_minutes = Column(Integer, default=30, comment="触发时间(分钟)")
     escalation_level = Column(String(16), comment="升级后的级别")
     escalation_notification = Column(Boolean, default=True, comment="是否发送升级通知")
-    additional_channel_id = Column(Integer, ForeignKey("dingtalk_channels.id", ondelete="SET NULL"), comment="额外通知通道ID")
+    additional_channel_id = Column(Integer, ForeignKey("notification_channels.id", ondelete="SET NULL"), comment="额外通知通道ID")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     priority = Column(Integer, default=0, comment="优先级")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
     
-    additional_channel = relationship("DingTalkChannel")
+    additional_channel = relationship("NotificationChannel")
 
 
 class LockWait(Base):
@@ -1097,7 +1081,7 @@ __all__ = [
     'MonitorSwitch', 'GlobalConfig',
     
     # 通知配置
-    'DingTalkChannel', 'NotificationBinding',
+    'NotificationBinding',
     
     # 审批管理
     'ApprovalRecord',

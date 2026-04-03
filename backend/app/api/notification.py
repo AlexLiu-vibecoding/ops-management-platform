@@ -14,7 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from app.database import get_db
-from app.models import DingTalkChannel, NotificationBinding, User, ScheduledTask
+from app.models import NotificationBinding, User, ScheduledTask
+from app.models.notification_new import NotificationChannel
 from app.schemas import MessageResponse
 from app.utils.auth import aes_cipher
 from app.deps import get_super_admin, get_current_user
@@ -137,12 +138,12 @@ async def list_bindings(
     
     result = []
     for b in bindings:
-        channel = db.query(DingTalkChannel).filter(DingTalkChannel.id == b.channel_id).first()
+        channel = db.query(NotificationChannel).filter(NotificationChannel.id == b.channel_id).first()
         result.append({
             "id": b.id,
             "channel_id": b.channel_id,
             "channel_name": channel.name if channel else None,
-            "channel_type": "dingtalk",
+            "channel_type": channel.channel_type if channel else "dingtalk",
             "notification_type": b.notification_type,
             "notification_type_label": NOTIFICATION_TYPE_LABELS.get(b.notification_type, b.notification_type),
             "environment_id": b.environment_id,
@@ -166,7 +167,7 @@ async def create_binding(
 ):
     """创建通知绑定"""
     # 检查通道是否存在
-    channel = db.query(DingTalkChannel).filter(DingTalkChannel.id == data.channel_id).first()
+    channel = db.query(NotificationChannel).filter(NotificationChannel.id == data.channel_id).first()
     if not channel:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="通知通道不存在")
     
