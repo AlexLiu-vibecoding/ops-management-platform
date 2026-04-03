@@ -1,289 +1,435 @@
 <template>
   <div class="notification-channels-page">
-    <!-- 通道管理 -->
-    <el-card shadow="never" class="section-card">
-      <template #header>
-        <div class="card-header">
-          <div class="header-left">
-            <span class="title">通知通道</span>
-            <el-tag type="info" size="small">统一管理钉钉、企微、飞书等通道</el-tag>
-          </div>
-          <el-button type="primary" @click="handleAddChannel" v-permission="'notification:channel_manage'">
-            <el-icon><Plus /></el-icon>
-            添加通道
-          </el-button>
-        </div>
-      </template>
-      
-      <el-table :data="channels" style="width: 100%" v-loading="channelsLoading"
-                highlight-current-row @current-change="handleChannelSelect">
-        <el-table-column prop="name" label="通道名称" min-width="150">
-          <template #default="{ row }">
-            <div class="channel-name">
-              <span>{{ row.name }}</span>
-              <el-tag v-if="!row.is_enabled" type="danger" size="small" class="ml-2">已禁用</el-tag>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="channel_type_label" label="通道类型" width="120" align="center">
-          <template #default="{ row }">
-            <el-tag :type="getChannelTypeTag(row.channel_type)" size="small">
-              {{ row.channel_type_label }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="配置信息" min-width="200">
-          <template #default="{ row }">
-            <div class="config-info" v-if="row.config">
-              <span v-if="row.channel_type === 'dingtalk'" class="text-sm text-gray-500">
-                {{ maskWebhook(row.config.webhook) }}
-              </span>
-              <span v-else-if="row.channel_type === 'email'" class="text-sm text-gray-500">
-                {{ row.config.smtp_host }}:{{ row.config.smtp_port }}
-              </span>
-              <span v-else-if="row.channel_type === 'webhook'" class="text-sm text-gray-500">
-                {{ maskWebhook(row.config.url) }}
-              </span>
-              <span v-else class="text-sm text-gray-500">已配置</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="规则统计" width="160" align="center">
-          <template #default="{ row }">
-            <div class="rules-count">
-              <el-tag size="small" class="mr-2">
-                静默: {{ row.silence_rules_count || 0 }}
-              </el-tag>
-              <el-tag size="small">
-                频率: {{ row.rate_limits_count || 0 }}
-              </el-tag>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="is_enabled" label="状态" width="80" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
-              {{ row.is_enabled ? '启用' : '禁用' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" min-width="150" fixed="right" align="center">
-          <template #default="{ row }">
-            <el-button type="primary" link size="small" @click.stop="handleTestChannel(row)">
-              测试
-            </el-button>
-            <el-button type="primary" link size="small" @click.stop="handleEditChannel(row)">
-              编辑
-            </el-button>
-            <el-button type="danger" link size="small" @click.stop="handleDeleteChannel(row)">
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <!-- 选中通道后的规则管理 -->
-    <template v-if="selectedChannel">
-      <!-- 静默规则管理 -->
-      <el-card shadow="never" class="section-card mt-4">
-        <template #header>
-          <div class="card-header">
-            <div class="header-left">
-              <span class="title">静默规则</span>
-              <el-tag type="info" size="small">通道: {{ selectedChannel.name }}</el-tag>
-            </div>
-            <el-button type="primary" size="small" @click="handleAddSilenceRule" v-permission="'notification:silence_manage'">
-              <el-icon><Plus /></el-icon>
-              添加规则
-            </el-button>
-          </div>
-        </template>
-        
-        <el-table :data="silenceRules" style="width: 100%" v-loading="silenceLoading">
-          <el-table-column prop="name" label="规则名称" min-width="120" />
-          <el-table-column prop="silence_type_label" label="类型" width="100" align="center">
-            <template #default="{ row }">
-              <el-tag :type="getSilenceTypeTag(row.silence_type)" size="small">
-                {{ row.silence_type_label }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="生效时间" min-width="180">
-            <template #default="{ row }">
-              <template v-if="row.time_start && row.time_end">
-                {{ row.time_start }} - {{ row.time_end }}
-              </template>
-              <template v-else-if="row.start_time && row.end_time">
-                {{ formatDate(row.start_time) }} 至 {{ formatDate(row.end_time) }}
-              </template>
-              <span v-else class="text-gray-400">-</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="weekdays_label" label="生效星期" width="140">
-            <template #default="{ row }">
-              <span v-if="row.weekdays_label">{{ row.weekdays_label }}</span>
-              <span v-else class="text-gray-400">-</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="匹配条件" min-width="150">
-            <template #default="{ row }">
-              <div class="match-conditions">
-                <el-tag v-if="row.alert_level" :type="getAlertLevelTag(row.alert_level)" size="small" class="mr-1">
-                  {{ row.alert_level }}
-                </el-tag>
-                <el-tag v-if="row.instance_type" size="small" class="mr-1">
-                  {{ row.instance_type }}
-                </el-tag>
-                <el-tag v-if="row.metric_type" size="small">
-                  {{ row.metric_type }}
-                </el-tag>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column prop="is_enabled" label="状态" width="80" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
-                {{ row.is_enabled ? '启用' : '禁用' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" min-width="100" fixed="right" align="center">
-            <template #default="{ row }">
-              <el-button type="primary" link size="small" @click="handleEditSilenceRule(row)">
-                编辑
-              </el-button>
-              <el-button type="danger" link size="small" @click="handleDeleteSilenceRule(row)">
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
-
-      <!-- 频率限制规则管理 -->
-      <el-card shadow="never" class="section-card mt-4">
-        <template #header>
-          <div class="card-header">
-            <div class="header-left">
-              <span class="title">频率限制</span>
-              <el-tag type="info" size="small">通道: {{ selectedChannel.name }}</el-tag>
-            </div>
-            <el-button type="primary" size="small" @click="handleAddRateLimitRule" v-permission="'notification:rate_limit_manage'">
-              <el-icon><Plus /></el-icon>
-              添加规则
-            </el-button>
-          </div>
-        </template>
-        
-        <el-table :data="rateLimitRules" style="width: 100%" v-loading="rateLimitLoading">
-          <el-table-column prop="name" label="规则名称" min-width="120" />
-          <el-table-column label="限制配置" min-width="200">
-            <template #default="{ row }">
-              <div class="rate-limit-info">
-                <el-tag size="small" type="warning">
-                  {{ row.max_notifications }}次 / {{ row.limit_window }}秒
-                </el-tag>
-                <span class="text-gray-500 text-xs ml-2">冷却期: {{ row.cooldown_period }}秒</span>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column label="匹配条件" min-width="150">
-            <template #default="{ row }">
-              <div class="match-conditions">
-                <el-tag v-if="row.alert_level" :type="getAlertLevelTag(row.alert_level)" size="small" class="mr-1">
-                  {{ row.alert_level }}
-                </el-tag>
-                <el-tag v-if="row.instance_type" size="small" class="mr-1">
-                  {{ row.instance_type }}
-                </el-tag>
-                <el-tag v-if="row.metric_type" size="small">
-                  {{ row.metric_type }}
-                </el-tag>
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column prop="is_enabled" label="状态" width="80" align="center">
-            <template #default="{ row }">
-              <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
-                {{ row.is_enabled ? '启用' : '禁用' }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" min-width="100" fixed="right" align="center">
-            <template #default="{ row }">
-              <el-button type="primary" link size="small" @click="handleEditRateLimitRule(row)">
-                编辑
-              </el-button>
-              <el-button type="danger" link size="small" @click="handleDeleteRateLimitRule(row)">
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
-
-      <!-- 通知绑定管理 -->
-      <el-card shadow="never" class="section-card mt-4">
-        <template #header>
-          <div class="card-header">
-            <div class="header-left">
-              <span class="title">通知绑定</span>
-              <el-tag type="info" size="small">通道: {{ selectedChannel.name }}</el-tag>
-            </div>
-            <el-button type="primary" size="small" @click="handleAddBinding">
-              <el-icon><Plus /></el-icon>
-              添加绑定
-            </el-button>
-          </div>
-        </template>
-        
-        <el-table :data="bindings" style="width: 100%" v-loading="bindingsLoading">
-          <el-table-column prop="notification_type" label="通知类型" min-width="120">
-            <template #default="{ row }">
-              <el-tag size="small">
-                {{ notificationTypes.find(t => t.value === row.notification_type)?.label || row.notification_type }}
-              </el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="绑定范围" min-width="200">
-            <template #default="{ row }">
-              <div v-if="row.environment_name">
-                <el-tag size="small" type="info">环境: {{ row.environment_name }}</el-tag>
-              </div>
-              <div v-else-if="row.rdb_instance_name">
-                <el-tag size="small" type="warning">MySQL/PG: {{ row.rdb_instance_name }}</el-tag>
-              </div>
-              <div v-else-if="row.redis_instance_name">
-                <el-tag size="small" type="danger">Redis: {{ row.redis_instance_name }}</el-tag>
-              </div>
-              <div v-else-if="row.scheduled_task_name">
-                <el-tag size="small" type="success">任务: {{ row.scheduled_task_name }}</el-tag>
-              </div>
-              <span v-else class="text-gray-400">全局绑定</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="created_at" label="创建时间" width="180">
-            <template #default="{ row }">
-              {{ formatDateTime(row.created_at) }}
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right" align="center">
-            <template #default="{ row }">
-              <el-button type="danger" link size="small" @click="handleDeleteBinding(row)">
-                删除
-              </el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-        
-        <el-empty v-if="!bindingsLoading && bindings.length === 0" description="暂无绑定" />
-      </el-card>
-    </template>
-
-    <div v-else class="no-channel-selected mt-4">
-      <el-empty description="请选择一个通道查看和管理规则" />
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <div class="header-left">
+        <h2 class="page-title">通知管理</h2>
+        <span class="page-desc">统一管理通知通道、静默规则、频率限制和通知绑定</span>
+      </div>
     </div>
+
+    <!-- Tab 切换 -->
+    <el-tabs v-model="activeTab" class="channel-tabs" type="border-card">
+      <!-- Tab 1: 通知通道 -->
+      <el-tab-pane label="通知通道" name="channels">
+        <template #label>
+          <span class="tab-label">
+            <el-icon><Message /></el-icon>
+            <span>通知通道</span>
+          </span>
+        </template>
+        
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header">
+              <div class="header-left">
+                <span class="title">通道列表</span>
+                <el-tag type="info" size="small">钉钉、企微、飞书、邮件、Webhook</el-tag>
+              </div>
+              <el-button type="primary" @click="handleAddChannel" v-permission="'notification:channel_manage'">
+                <el-icon><Plus /></el-icon>
+                添加通道
+              </el-button>
+            </div>
+          </template>
+          
+          <el-table :data="channels" style="width: 100%" v-loading="channelsLoading">
+            <el-table-column prop="name" label="通道名称" min-width="150">
+              <template #default="{ row }">
+                <div class="channel-name">
+                  <span>{{ row.name }}</span>
+                  <el-tag v-if="!row.is_enabled" type="danger" size="small" class="ml-2">已禁用</el-tag>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="channel_type_label" label="通道类型" width="120" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getChannelTypeTag(row.channel_type)" size="small">
+                  {{ row.channel_type_label }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="配置信息" min-width="200">
+              <template #default="{ row }">
+                <div class="config-info" v-if="row.config">
+                  <span v-if="row.channel_type === 'dingtalk'" class="text-sm text-gray-500">
+                    {{ maskWebhook(row.config.webhook) }}
+                  </span>
+                  <span v-else-if="row.channel_type === 'email'" class="text-sm text-gray-500">
+                    {{ row.config.smtp_host }}:{{ row.config.smtp_port }}
+                  </span>
+                  <span v-else-if="row.channel_type === 'webhook'" class="text-sm text-gray-500">
+                    {{ maskWebhook(row.config.url) }}
+                  </span>
+                  <span v-else class="text-sm text-gray-500">已配置</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="规则统计" width="160" align="center">
+              <template #default="{ row }">
+                <div class="rules-count">
+                  <el-tag size="small" class="mr-2">
+                    静默: {{ row.silence_rules_count || 0 }}
+                  </el-tag>
+                  <el-tag size="small">
+                    频率: {{ row.rate_limits_count || 0 }}
+                  </el-tag>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="is_enabled" label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
+                  {{ row.is_enabled ? '启用' : '禁用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="180" fixed="right" align="center">
+              <template #default="{ row }">
+                <el-button type="primary" link size="small" @click="handleTestChannel(row)">
+                  测试
+                </el-button>
+                <el-button type="primary" link size="small" @click="handleEditChannel(row)">
+                  编辑
+                </el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteChannel(row)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-tab-pane>
+
+      <!-- Tab 2: 静默规则 -->
+      <el-tab-pane label="静默规则" name="silence">
+        <template #label>
+          <span class="tab-label">
+            <el-icon><Mute /></el-icon>
+            <span>静默规则</span>
+          </span>
+        </template>
+
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header">
+              <div class="header-left">
+                <span class="title">静默规则管理</span>
+                <el-tag type="info" size="small">在特定条件下暂停发送通知</el-tag>
+              </div>
+              <div class="header-right">
+                <el-select 
+                  v-model="selectedChannelId" 
+                  placeholder="请选择通道" 
+                  clearable 
+                  style="width: 200px; margin-right: 12px;"
+                  @change="onChannelChange"
+                >
+                  <el-option 
+                    v-for="channel in channels" 
+                    :key="channel.id" 
+                    :label="channel.name" 
+                    :value="channel.id" 
+                  />
+                </el-select>
+                <el-button 
+                  type="primary" 
+                  @click="handleAddSilenceRule" 
+                  v-permission="'notification:silence_manage'"
+                  :disabled="!selectedChannelId"
+                >
+                  <el-icon><Plus /></el-icon>
+                  添加规则
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <el-alert 
+            v-if="!selectedChannelId" 
+            title="请先选择通知通道" 
+            type="info" 
+            :closable="false"
+            class="mb-4"
+          />
+          
+          <el-table :data="silenceRules" style="width: 100%" v-loading="silenceLoading" v-else>
+            <el-table-column prop="name" label="规则名称" min-width="120" />
+            <el-table-column prop="silence_type_label" label="类型" width="100" align="center">
+              <template #default="{ row }">
+                <el-tag :type="getSilenceTypeTag(row.silence_type)" size="small">
+                  {{ row.silence_type_label }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="channel_name" label="所属通道" width="120">
+              <template #default="{ row }">
+                <span>{{ row.channel_name || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="生效时间" min-width="180">
+              <template #default="{ row }">
+                <template v-if="row.time_start && row.time_end">
+                  {{ row.time_start }} - {{ row.time_end }}
+                </template>
+                <template v-else-if="row.start_time && row.end_time">
+                  {{ formatDate(row.start_time) }} 至 {{ formatDate(row.end_time) }}
+                </template>
+                <span v-else class="text-gray-400">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="weekdays_label" label="生效星期" width="140">
+              <template #default="{ row }">
+                <span v-if="row.weekdays_label">{{ row.weekdays_label }}</span>
+                <span v-else class="text-gray-400">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="匹配条件" min-width="150">
+              <template #default="{ row }">
+                <div class="match-conditions">
+                  <el-tag v-if="row.alert_level" :type="getAlertLevelTag(row.alert_level)" size="small" class="mr-1">
+                    {{ row.alert_level }}
+                  </el-tag>
+                  <el-tag v-if="row.instance_type" size="small" class="mr-1">
+                    {{ row.instance_type }}
+                  </el-tag>
+                  <el-tag v-if="row.metric_type" size="small">
+                    {{ row.metric_type }}
+                  </el-tag>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="is_enabled" label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
+                  {{ row.is_enabled ? '启用' : '禁用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="120" fixed="right" align="center">
+              <template #default="{ row }">
+                <el-button type="primary" link size="small" @click="handleEditSilenceRule(row)">
+                  编辑
+                </el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteSilenceRule(row)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <el-empty v-if="selectedChannelId && silenceRules.length === 0 && !silenceLoading" description="暂无静默规则" />
+        </el-card>
+      </el-tab-pane>
+
+      <!-- Tab 3: 频率限制 -->
+      <el-tab-pane label="频率限制" name="rateLimit">
+        <template #label>
+          <span class="tab-label">
+            <el-icon><Timer /></el-icon>
+            <span>频率限制</span>
+          </span>
+        </template>
+
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header">
+              <div class="header-left">
+                <span class="title">频率限制管理</span>
+                <el-tag type="info" size="small">控制通知发送频率，避免消息轰炸</el-tag>
+              </div>
+              <div class="header-right">
+                <el-select 
+                  v-model="selectedChannelId" 
+                  placeholder="请选择通道" 
+                  clearable 
+                  style="width: 200px; margin-right: 12px;"
+                  @change="onChannelChange"
+                >
+                  <el-option 
+                    v-for="channel in channels" 
+                    :key="channel.id" 
+                    :label="channel.name" 
+                    :value="channel.id" 
+                  />
+                </el-select>
+                <el-button 
+                  type="primary" 
+                  @click="handleAddRateLimitRule" 
+                  v-permission="'notification:rate_limit_manage'"
+                  :disabled="!selectedChannelId"
+                >
+                  <el-icon><Plus /></el-icon>
+                  添加规则
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <el-alert 
+            v-if="!selectedChannelId" 
+            title="请先选择通知通道" 
+            type="info" 
+            :closable="false"
+            class="mb-4"
+          />
+          
+          <el-table :data="rateLimitRules" style="width: 100%" v-loading="rateLimitLoading" v-else>
+            <el-table-column prop="name" label="规则名称" min-width="120" />
+            <el-table-column prop="channel_name" label="所属通道" width="120">
+              <template #default="{ row }">
+                <span>{{ row.channel_name || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="限制配置" min-width="200">
+              <template #default="{ row }">
+                <div class="rate-config">
+                  <span>窗口: {{ formatDuration(row.limit_window) }}</span>
+                  <span class="mx-2">|</span>
+                  <span>最大: {{ row.max_notifications }} 条</span>
+                  <span class="mx-2">|</span>
+                  <span>冷却: {{ formatDuration(row.cooldown_period) }}</span>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="匹配条件" min-width="150">
+              <template #default="{ row }">
+                <div class="match-conditions">
+                  <el-tag v-if="row.alert_level" :type="getAlertLevelTag(row.alert_level)" size="small" class="mr-1">
+                    {{ row.alert_level }}
+                  </el-tag>
+                  <el-tag v-if="row.instance_type" size="small" class="mr-1">
+                    {{ row.instance_type }}
+                  </el-tag>
+                  <el-tag v-if="row.metric_type" size="small">
+                    {{ row.metric_type }}
+                  </el-tag>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="is_enabled" label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.is_enabled ? 'success' : 'danger'" size="small">
+                  {{ row.is_enabled ? '启用' : '禁用' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="100" fixed="right" align="center">
+              <template #default="{ row }">
+                <el-button type="primary" link size="small" @click="handleEditRateLimitRule(row)">
+                  编辑
+                </el-button>
+                <el-button type="danger" link size="small" @click="handleDeleteRateLimitRule(row)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <el-empty v-if="selectedChannelId && rateLimitRules.length === 0 && !rateLimitLoading" description="暂无频率限制规则" />
+        </el-card>
+      </el-tab-pane>
+
+      <!-- Tab 4: 通知绑定 -->
+      <el-tab-pane label="通知绑定" name="bindings">
+        <template #label>
+          <span class="tab-label">
+            <el-icon><Connection /></el-icon>
+            <span>通知绑定</span>
+          </span>
+        </template>
+
+        <el-card shadow="never">
+          <template #header>
+            <div class="card-header">
+              <div class="header-left">
+                <span class="title">通知绑定管理</span>
+                <el-tag type="info" size="small">配置通知触发的范围和对象</el-tag>
+              </div>
+              <div class="header-right">
+                <el-select 
+                  v-model="selectedChannelId" 
+                  placeholder="请选择通道" 
+                  clearable 
+                  style="width: 200px; margin-right: 12px;"
+                  @change="onChannelChange"
+                >
+                  <el-option 
+                    v-for="channel in channels" 
+                    :key="channel.id" 
+                    :label="channel.name" 
+                    :value="channel.id" 
+                  />
+                </el-select>
+                <el-button 
+                  type="primary" 
+                  @click="handleAddBinding" 
+                  v-permission="'notification:channel_manage'"
+                  :disabled="!selectedChannelId"
+                >
+                  <el-icon><Plus /></el-icon>
+                  添加绑定
+                </el-button>
+              </div>
+            </div>
+          </template>
+
+          <el-alert 
+            v-if="!selectedChannelId" 
+            title="请先选择通知通道" 
+            type="info" 
+            :closable="false"
+            class="mb-4"
+          />
+          
+          <el-table :data="bindings" style="width: 100%" v-loading="bindingsLoading" v-else>
+            <el-table-column prop="notification_type" label="通知类型" min-width="120">
+              <template #default="{ row }">
+                <el-tag size="small">
+                  {{ notificationTypes.find(t => t.value === row.notification_type)?.label || row.notification_type }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="channel_name" label="所属通道" width="120">
+              <template #default="{ row }">
+                <span>{{ row.channel_name || '-' }}</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="绑定范围" min-width="200">
+              <template #default="{ row }">
+                <div v-if="row.environment_name">
+                  <el-tag size="small" type="info">环境: {{ row.environment_name }}</el-tag>
+                </div>
+                <div v-else-if="row.rdb_instance_name">
+                  <el-tag size="small" type="warning">MySQL/PG: {{ row.rdb_instance_name }}</el-tag>
+                </div>
+                <div v-else-if="row.redis_instance_name">
+                  <el-tag size="small" type="danger">Redis: {{ row.redis_instance_name }}</el-tag>
+                </div>
+                <div v-else-if="row.scheduled_task_name">
+                  <el-tag size="small" type="success">任务: {{ row.scheduled_task_name }}</el-tag>
+                </div>
+                <span v-else class="text-gray-400">全局绑定</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="created_at" label="创建时间" width="180">
+              <template #default="{ row }">
+                {{ formatDateTime(row.created_at) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100" fixed="right" align="center">
+              <template #default="{ row }">
+                <el-button type="danger" link size="small" @click="handleDeleteBinding(row)">
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <el-empty v-if="selectedChannelId && bindings.length === 0 && !bindingsLoading" description="暂无绑定" />
+        </el-card>
+      </el-tab-pane>
+    </el-tabs>
 
     <!-- 通道对话框 -->
     <el-dialog
@@ -298,7 +444,7 @@
         </el-form-item>
 
         <el-form-item label="通道类型" prop="channel_type">
-          <el-select v-model="channelDialog.form.channel_type" placeholder="请选择通道类型" :disabled="channelDialog.isEdit">
+          <el-select v-model="channelDialog.form.channel_type" placeholder="请选择通道类型" :disabled="channelDialog.isEdit" style="width: 100%">
             <el-option v-for="t in channelTypes" :key="t.value" :label="t.label" :value="t.value" />
           </el-select>
         </el-form-item>
@@ -347,13 +493,13 @@
             <el-input-number v-model="channelDialog.form.config.smtp_port" :min="1" :max="65535" />
           </el-form-item>
           <el-form-item label="用户名" prop="config.username">
-            <el-input v-model="channelDialog.form.config.username" placeholder="邮箱用户名" />
+            <el-input v-model="channelDialog.form.config.username" placeholder="SMTP用户名" />
           </el-form-item>
           <el-form-item label="密码" prop="config.password">
-            <el-input v-model="channelDialog.form.config.password" type="password" placeholder="邮箱密码" show-password />
+            <el-input v-model="channelDialog.form.config.password" type="password" placeholder="SMTP密码" />
           </el-form-item>
           <el-form-item label="发件人" prop="config.from_addr">
-            <el-input v-model="channelDialog.form.config.from_addr" placeholder="发件人邮箱地址" />
+            <el-input v-model="channelDialog.form.config.from_addr" placeholder="发件人邮箱" />
           </el-form-item>
           <el-form-item label="使用TLS">
             <el-switch v-model="channelDialog.form.config.use_tls" />
@@ -363,22 +509,18 @@
         <!-- Webhook配置 -->
         <template v-if="channelDialog.form.channel_type === 'webhook'">
           <el-form-item label="URL" prop="config.url">
-            <el-input v-model="channelDialog.form.config.url" placeholder="https://example.com/webhook" />
+            <el-input v-model="channelDialog.form.config.url" placeholder="Webhook URL" />
           </el-form-item>
           <el-form-item label="请求方法">
-            <el-select v-model="channelDialog.form.config.method">
-              <el-option label="POST" value="POST" />
-              <el-option label="GET" value="GET" />
-            </el-select>
+            <el-radio-group v-model="channelDialog.form.config.method">
+              <el-radio value="POST">POST</el-radio>
+              <el-radio value="GET">GET</el-radio>
+            </el-radio-group>
           </el-form-item>
         </template>
 
-        <el-form-item label="是否启用">
-          <el-switch v-model="channelDialog.form.is_enabled" />
-        </el-form-item>
-
-        <el-form-item label="描述">
-          <el-input v-model="channelDialog.form.description" type="textarea" :rows="2" placeholder="通道描述" />
+        <el-form-item label="启用状态">
+          <el-switch v-model="channelDialog.form.is_enabled" active-text="启用" inactive-text="禁用" />
         </el-form-item>
       </el-form>
 
@@ -399,86 +541,87 @@
         <el-form-item label="规则名称" prop="name">
           <el-input v-model="silenceDialog.form.name" placeholder="请输入规则名称" />
         </el-form-item>
-        
+
         <el-form-item label="静默类型" prop="silence_type">
           <el-radio-group v-model="silenceDialog.form.silence_type">
-            <el-radio value="once">一次性</el-radio>
-            <el-radio value="daily">每日重复</el-radio>
-            <el-radio value="weekly">每周重复</el-radio>
+            <el-radio-button value="once">一次性</el-radio-button>
+            <el-radio-button value="daily">每日</el-radio-button>
+            <el-radio-button value="weekly">每周</el-radio-button>
+            <el-radio-button value="period">时间段</el-radio-button>
           </el-radio-group>
         </el-form-item>
 
-        <el-form-item label="时间段" v-if="silenceDialog.form.silence_type !== 'once'">
-          <el-col :span="11">
-            <el-time-select
+        <!-- 时间范围选择 -->
+        <template v-if="silenceDialog.form.silence_type === 'period'">
+          <el-form-item label="日期范围">
+            <el-date-picker
+              v-model="silenceDialog.form.date_range"
+              type="daterange"
+              start-placeholder="开始日期"
+              end-placeholder="结束日期"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              style="width: 100%"
+            />
+          </el-form-item>
+        </template>
+
+        <template v-if="silenceDialog.form.silence_type === 'daily' || silenceDialog.form.silence_type === 'weekly'">
+          <el-form-item label="生效时间">
+            <el-time-picker
               v-model="silenceDialog.form.time_start"
               placeholder="开始时间"
-              :max-time="silenceDialog.form.time_end"
+              format="HH:mm"
+              value-format="HH:mm"
+              style="width: 48%"
             />
-          </el-col>
-          <el-col :span="2" class="text-center">-</el-col>
-          <el-col :span="11">
-            <el-time-select
+            <span class="mx-2">至</span>
+            <el-time-picker
               v-model="silenceDialog.form.time_end"
               placeholder="结束时间"
-              :min-time="silenceDialog.form.time_start"
+              format="HH:mm"
+              value-format="HH:mm"
+              style="width: 48%"
             />
-          </el-col>
-        </el-form-item>
+          </el-form-item>
+        </template>
 
-        <el-form-item label="生效星期" v-if="silenceDialog.form.silence_type === 'weekly'">
-          <el-checkbox-group v-model="silenceDialog.form.weekdays">
-            <el-checkbox v-for="(day, index) in weekDays" :key="index" :value="index">
-              {{ day }}
-            </el-checkbox>
-          </el-checkbox-group>
-        </el-form-item>
+        <template v-if="silenceDialog.form.silence_type === 'weekly'">
+          <el-form-item label="生效星期">
+            <el-checkbox-group v-model="silenceDialog.form.weekdays">
+              <el-checkbox v-for="(day, index) in weekDays" :key="index" :label="index + 1">{{ day }}</el-checkbox>
+            </el-checkbox-group>
+          </el-form-item>
+        </template>
 
-        <el-form-item label="生效日期" v-if="silenceDialog.form.silence_type === 'once'">
-          <el-date-picker
-            v-model="silenceDialog.form.date_range"
-            type="datetimerange"
-            range-separator="至"
-            start-placeholder="开始时间"
-            end-placeholder="结束时间"
-            value-format="YYYY-MM-DD HH:mm:ss"
-          />
-        </el-form-item>
-
-        <el-form-item label="匹配条件">
-          <el-row :gutter="10">
-            <el-col :span="12">
-              <el-select v-model="silenceDialog.form.instance_type" placeholder="实例类型" clearable>
-                <el-option label="RDB" value="rdb" />
-                <el-option label="Redis" value="redis" />
-              </el-select>
-            </el-col>
-            <el-col :span="12">
-              <el-select v-model="silenceDialog.form.alert_level" placeholder="告警级别" clearable>
-                <el-option label="严重" value="critical" />
-                <el-option label="警告" value="warning" />
-                <el-option label="信息" value="info" />
-              </el-select>
-            </el-col>
-          </el-row>
-        </el-form-item>
-
-        <el-form-item label="指标类型">
-          <el-select v-model="silenceDialog.form.metric_type" placeholder="指标类型" clearable>
-            <el-option label="CPU使用率" value="cpu_usage" />
-            <el-option label="内存使用率" value="memory_usage" />
-            <el-option label="磁盘使用率" value="disk_usage" />
-            <el-option label="连接数" value="connections" />
-            <el-option label="慢查询" value="slow_queries" />
+        <el-form-item label="告警级别">
+          <el-select v-model="silenceDialog.form.alert_level" placeholder="全部级别" clearable style="width: 100%">
+            <el-option label="紧急" value="critical" />
+            <el-option label="警告" value="warning" />
+            <el-option label="提醒" value="info" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="是否启用">
-          <el-switch v-model="silenceDialog.form.is_enabled" />
+        <el-form-item label="实例类型">
+          <el-select v-model="silenceDialog.form.instance_type" placeholder="全部类型" clearable style="width: 100%">
+            <el-option label="MySQL/PG" value="rdb" />
+            <el-option label="Redis" value="redis" />
+          </el-select>
         </el-form-item>
 
-        <el-form-item label="描述">
-          <el-input v-model="silenceDialog.form.description" type="textarea" :rows="2" placeholder="规则描述" />
+        <el-form-item label="指标类型">
+          <el-select v-model="silenceDialog.form.metric_type" placeholder="全部指标" clearable style="width: 100%">
+            <el-option label="CPU" value="cpu" />
+            <el-option label="内存" value="memory" />
+            <el-option label="磁盘" value="disk" />
+            <el-option label="连接数" value="connections" />
+            <el-option label="QPS" value="qps" />
+            <el-option label="慢查询" value="slow_query" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="启用规则">
+          <el-switch v-model="silenceDialog.form.is_enabled" active-text="启用" inactive-text="禁用" />
         </el-form-item>
       </el-form>
 
@@ -488,10 +631,10 @@
       </template>
     </el-dialog>
 
-    <!-- 频率限制规则对话框 -->
+    <!-- 频率限制对话框 -->
     <el-dialog
       v-model="rateLimitDialog.visible"
-      :title="rateLimitDialog.isEdit ? '编辑频率限制规则' : '添加频率限制规则'"
+      :title="rateLimitDialog.isEdit ? '编辑频率限制' : '添加频率限制'"
       width="600px"
       destroy-on-close
     >
@@ -501,51 +644,48 @@
         </el-form-item>
 
         <el-form-item label="时间窗口(秒)" prop="limit_window">
-          <el-input-number v-model="rateLimitDialog.form.limit_window" :min="60" :max="86400" />
+          <el-input-number v-model="rateLimitDialog.form.limit_window" :min="60" :step="60" style="width: 100%" />
+          <div class="form-hint">在指定时间窗口内统计通知数量</div>
         </el-form-item>
 
         <el-form-item label="最大通知数" prop="max_notifications">
-          <el-input-number v-model="rateLimitDialog.form.max_notifications" :min="1" :max="100" />
+          <el-input-number v-model="rateLimitDialog.form.max_notifications" :min="1" :max="100" style="width: 100%" />
+          <div class="form-hint">时间窗口内允许发送的最大通知数量</div>
         </el-form-item>
 
         <el-form-item label="冷却期(秒)" prop="cooldown_period">
-          <el-input-number v-model="rateLimitDialog.form.cooldown_period" :min="60" :max="86400" />
+          <el-input-number v-model="rateLimitDialog.form.cooldown_period" :min="60" :step="60" style="width: 100%" />
+          <div class="form-hint">超过限制后暂停发送的时长</div>
         </el-form-item>
 
-        <el-form-item label="匹配条件">
-          <el-row :gutter="10">
-            <el-col :span="12">
-              <el-select v-model="rateLimitDialog.form.instance_type" placeholder="实例类型" clearable>
-                <el-option label="RDB" value="rdb" />
-                <el-option label="Redis" value="redis" />
-              </el-select>
-            </el-col>
-            <el-col :span="12">
-              <el-select v-model="rateLimitDialog.form.alert_level" placeholder="告警级别" clearable>
-                <el-option label="严重" value="critical" />
-                <el-option label="警告" value="warning" />
-                <el-option label="信息" value="info" />
-              </el-select>
-            </el-col>
-          </el-row>
-        </el-form-item>
-
-        <el-form-item label="指标类型">
-          <el-select v-model="rateLimitDialog.form.metric_type" placeholder="指标类型" clearable>
-            <el-option label="CPU使用率" value="cpu_usage" />
-            <el-option label="内存使用率" value="memory_usage" />
-            <el-option label="磁盘使用率" value="disk_usage" />
-            <el-option label="连接数" value="connections" />
-            <el-option label="慢查询" value="slow_queries" />
+        <el-form-item label="告警级别">
+          <el-select v-model="rateLimitDialog.form.alert_level" placeholder="全部级别" clearable style="width: 100%">
+            <el-option label="紧急" value="critical" />
+            <el-option label="警告" value="warning" />
+            <el-option label="提醒" value="info" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="是否启用">
-          <el-switch v-model="rateLimitDialog.form.is_enabled" />
+        <el-form-item label="实例类型">
+          <el-select v-model="rateLimitDialog.form.instance_type" placeholder="全部类型" clearable style="width: 100%">
+            <el-option label="MySQL/PG" value="rdb" />
+            <el-option label="Redis" value="redis" />
+          </el-select>
         </el-form-item>
 
-        <el-form-item label="描述">
-          <el-input v-model="rateLimitDialog.form.description" type="textarea" :rows="2" placeholder="规则描述" />
+        <el-form-item label="指标类型">
+          <el-select v-model="rateLimitDialog.form.metric_type" placeholder="全部指标" clearable style="width: 100%">
+            <el-option label="CPU" value="cpu" />
+            <el-option label="内存" value="memory" />
+            <el-option label="磁盘" value="disk" />
+            <el-option label="连接数" value="connections" />
+            <el-option label="QPS" value="qps" />
+            <el-option label="慢查询" value="slow_query" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="启用规则">
+          <el-switch v-model="rateLimitDialog.form.is_enabled" active-text="启用" inactive-text="禁用" />
         </el-form-item>
       </el-form>
 
@@ -608,24 +748,29 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, Message, Mute, Timer, Connection } from '@element-plus/icons-vue'
 import { notificationApi } from '@/api/notification'
 import { formatDate as formatDateUtil } from '@/utils/format'
 import request from '@/api/index'
 
-// 通道相关
+// 当前激活的 Tab
+const activeTab = ref('channels')
+
+// 选中的通道ID（用于静默规则、频率限制、通知绑定 Tab）
+const selectedChannelId = ref(null)
+
+// 通道列表
 const channels = ref([])
 const channelsLoading = ref(false)
-const selectedChannel = ref(null)
 const channelTypes = ref([])
 
-// 静默规则相关
+// 静默规则
 const silenceRules = ref([])
 const silenceLoading = ref(false)
 
-// 频率限制相关
+// 频率限制
 const rateLimitRules = ref([])
 const rateLimitLoading = ref(false)
 
@@ -673,6 +818,7 @@ const channelDialog = reactive({
   visible: false,
   isEdit: false,
   loading: false,
+  id: null,
   form: {
     name: '',
     channel_type: 'dingtalk',
@@ -758,7 +904,6 @@ const loadChannels = async () => {
   channelsLoading.value = true
   try {
     const res = await notificationApi.getChannels()
-    // API 返回 { items: [...], total: n }
     channels.value = res.items || []
   } catch (error) {
     console.error('加载通道失败:', error)
@@ -778,18 +923,27 @@ const loadChannelTypes = async () => {
   }
 }
 
-// 选择通道
-const handleChannelSelect = (row) => {
-  selectedChannel.value = row
-  if (row) {
-    loadSilenceRules(row.id)
-    loadRateLimits(row.id)
-    loadBindings(row.id)
+// 通道选择变化
+const onChannelChange = (channelId) => {
+  selectedChannelId.value = channelId
+  if (channelId) {
+    if (activeTab.value === 'silence') {
+      loadSilenceRules(channelId)
+    } else if (activeTab.value === 'rateLimit') {
+      loadRateLimits(channelId)
+    } else if (activeTab.value === 'bindings') {
+      loadBindings(channelId)
+    }
+  } else {
+    silenceRules.value = []
+    rateLimitRules.value = []
+    bindings.value = []
   }
 }
 
 // 加载静默规则
 const loadSilenceRules = async (channelId) => {
+  if (!channelId) return
   silenceLoading.value = true
   try {
     const res = await notificationApi.getSilenceRules(channelId)
@@ -804,6 +958,7 @@ const loadSilenceRules = async (channelId) => {
 
 // 加载频率限制
 const loadRateLimits = async (channelId) => {
+  if (!channelId) return
   rateLimitLoading.value = true
   try {
     const res = await notificationApi.getRateLimits(channelId)
@@ -818,13 +973,13 @@ const loadRateLimits = async (channelId) => {
 
 // 加载通道绑定
 const loadBindings = async (channelId) => {
+  if (!channelId) return
   bindingsLoading.value = true
   try {
     const res = await notificationApi.getChannelBindings(channelId)
     bindings.value = res.items || []
   } catch (error) {
     console.error('加载绑定失败:', error)
-    // 404 表示暂无绑定，显示空列表
     if (error.response?.status !== 404) {
       ElMessage.error('加载绑定失败')
     }
@@ -834,25 +989,49 @@ const loadBindings = async (channelId) => {
   }
 }
 
+// 监听 Tab 变化
+watch(activeTab, (newTab) => {
+  if (selectedChannelId.value) {
+    if (newTab === 'silence') {
+      loadSilenceRules(selectedChannelId.value)
+    } else if (newTab === 'rateLimit') {
+      loadRateLimits(selectedChannelId.value)
+    } else if (newTab === 'bindings') {
+      loadBindings(selectedChannelId.value)
+    }
+  }
+})
+
+// 加载绑定数据源
+const loadBindingData = async () => {
+  try {
+    const [envRes, rdbRes, redisRes, taskRes] = await Promise.all([
+      request.get('/environments'),
+      request.get('/instances/rdb'),
+      request.get('/instances/redis'),
+      request.get('/scheduled-tasks')
+    ])
+    environments.value = envRes.items || []
+    rdbInstances.value = rdbRes.items || []
+    redisInstances.value = redisRes.items || []
+    scheduledTasks.value = taskRes.items || []
+  } catch (error) {
+    console.error('加载绑定数据失败:', error)
+  }
+}
+
 // 添加绑定
 const handleAddBinding = () => {
-  bindingForm.channel_id = selectedChannel.value.id
+  if (!selectedChannelId.value) {
+    ElMessage.warning('请先选择通道')
+    return
+  }
+  bindingForm.channel_id = selectedChannelId.value
   bindingForm.notification_type = ''
   bindingForm.environment_id = null
   bindingForm.rdb_instance_id = null
   bindingForm.redis_instance_id = null
   bindingForm.scheduled_task_id = null
-  bindingDialog.visible = true
-}
-
-// 编辑绑定
-const handleEditBinding = (row) => {
-  bindingForm.channel_id = selectedChannel.value.id
-  bindingForm.notification_type = row.notification_type
-  bindingForm.environment_id = row.environment_id
-  bindingForm.rdb_instance_id = row.rdb_instance_id
-  bindingForm.redis_instance_id = row.redis_instance_id
-  bindingForm.scheduled_task_id = row.scheduled_task_id
   bindingDialog.visible = true
 }
 
@@ -862,9 +1041,9 @@ const handleDeleteBinding = async (row) => {
     await ElMessageBox.confirm('确定删除此绑定？', '确认删除', {
       type: 'warning'
     })
-    await notificationApi.deleteChannelBinding(selectedChannel.value.id, row.id)
+    await notificationApi.deleteChannelBinding(selectedChannelId.value, row.id)
     ElMessage.success('删除成功')
-    loadBindings(selectedChannel.value.id)
+    loadBindings(selectedChannelId.value)
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除绑定失败:', error)
@@ -877,10 +1056,10 @@ const handleDeleteBinding = async (row) => {
 const submitBinding = async () => {
   bindingDialog.submitting = true
   try {
-    await notificationApi.createChannelBinding(selectedChannel.value.id, bindingForm)
+    await notificationApi.createChannelBinding(selectedChannelId.value, bindingForm)
     ElMessage.success('添加成功')
     bindingDialog.visible = false
-    loadBindings(selectedChannel.value.id)
+    loadBindings(selectedChannelId.value)
   } catch (error) {
     console.error('添加绑定失败:', error)
     ElMessage.error(error.response?.data?.detail || '添加失败')
@@ -965,8 +1144,8 @@ const handleDeleteChannel = async (row) => {
     })
     await notificationApi.deleteChannel(row.id)
     ElMessage.success('删除成功')
-    if (selectedChannel.value?.id === row.id) {
-      selectedChannel.value = null
+    if (selectedChannelId.value === row.id) {
+      selectedChannelId.value = null
     }
     loadChannels()
   } catch (error) {
@@ -990,7 +1169,7 @@ const handleTestChannel = async (row) => {
 
 // 添加静默规则
 const handleAddSilenceRule = () => {
-  if (!selectedChannel.value) {
+  if (!selectedChannelId.value) {
     ElMessage.warning('请先选择通道')
     return
   }
@@ -1018,18 +1197,16 @@ const handleEditSilenceRule = (row) => {
   silenceDialog.id = row.id
   silenceDialog.form = {
     name: row.name,
-    description: row.description,
+    description: row.description || '',
     silence_type: row.silence_type,
     time_start: row.time_start || '',
     time_end: row.time_end || '',
     weekdays: row.weekdays || [],
+    date_range: row.start_time && row.end_time ? [row.start_time, row.end_time] : [],
     instance_type: row.instance_type || '',
     alert_level: row.alert_level || '',
     metric_type: row.metric_type || '',
     is_enabled: row.is_enabled
-  }
-  if (row.start_time && row.end_time) {
-    silenceDialog.form.date_range = [row.start_time, row.end_time]
   }
   silenceDialog.visible = true
 }
@@ -1043,23 +1220,20 @@ const handleSaveSilenceRule = async () => {
     silenceDialog.loading = true
     try {
       const data = { ...silenceDialog.form }
-      
-      // 处理日期范围
-      if (data.silence_type === 'once' && data.date_range?.length === 2) {
+      if (data.silence_type === 'period' && data.date_range && data.date_range.length === 2) {
         data.start_time = data.date_range[0]
         data.end_time = data.date_range[1]
       }
-      delete data.date_range
       
       if (silenceDialog.isEdit) {
-        await notificationApi.updateSilenceRule(selectedChannel.value.id, silenceDialog.id, data)
+        await notificationApi.updateSilenceRule(selectedChannelId.value, silenceDialog.id, data)
         ElMessage.success('更新成功')
       } else {
-        await notificationApi.createSilenceRule(selectedChannel.value.id, data)
+        await notificationApi.createSilenceRule(selectedChannelId.value, data)
         ElMessage.success('创建成功')
       }
       silenceDialog.visible = false
-      loadSilenceRules(selectedChannel.value.id)
+      loadSilenceRules(selectedChannelId.value)
     } catch (error) {
       console.error('保存静默规则失败:', error)
       ElMessage.error(error.response?.data?.detail || '保存失败')
@@ -1072,14 +1246,12 @@ const handleSaveSilenceRule = async () => {
 // 删除静默规则
 const handleDeleteSilenceRule = async (row) => {
   try {
-    await ElMessageBox.confirm('确定要删除该静默规则吗？', '确认删除', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm('确定删除此静默规则？', '确认删除', {
       type: 'warning'
     })
-    await notificationApi.deleteSilenceRule(selectedChannel.value.id, row.id)
+    await notificationApi.deleteSilenceRule(selectedChannelId.value, row.id)
     ElMessage.success('删除成功')
-    loadSilenceRules(selectedChannel.value.id)
+    loadSilenceRules(selectedChannelId.value)
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除静默规则失败:', error)
@@ -1090,7 +1262,7 @@ const handleDeleteSilenceRule = async (row) => {
 
 // 添加频率限制规则
 const handleAddRateLimitRule = () => {
-  if (!selectedChannel.value) {
+  if (!selectedChannelId.value) {
     ElMessage.warning('请先选择通道')
     return
   }
@@ -1116,7 +1288,7 @@ const handleEditRateLimitRule = (row) => {
   rateLimitDialog.id = row.id
   rateLimitDialog.form = {
     name: row.name,
-    description: row.description,
+    description: row.description || '',
     limit_window: row.limit_window,
     max_notifications: row.max_notifications,
     cooldown_period: row.cooldown_period,
@@ -1136,15 +1308,16 @@ const handleSaveRateLimitRule = async () => {
     
     rateLimitDialog.loading = true
     try {
+      const data = { ...rateLimitDialog.form }
       if (rateLimitDialog.isEdit) {
-        await notificationApi.updateRateLimit(selectedChannel.value.id, rateLimitDialog.id, rateLimitDialog.form)
+        await notificationApi.updateRateLimit(selectedChannelId.value, rateLimitDialog.id, data)
         ElMessage.success('更新成功')
       } else {
-        await notificationApi.createRateLimit(selectedChannel.value.id, rateLimitDialog.form)
+        await notificationApi.createRateLimit(selectedChannelId.value, data)
         ElMessage.success('创建成功')
       }
       rateLimitDialog.visible = false
-      loadRateLimits(selectedChannel.value.id)
+      loadRateLimits(selectedChannelId.value)
     } catch (error) {
       console.error('保存频率限制失败:', error)
       ElMessage.error(error.response?.data?.detail || '保存失败')
@@ -1157,14 +1330,12 @@ const handleSaveRateLimitRule = async () => {
 // 删除频率限制规则
 const handleDeleteRateLimitRule = async (row) => {
   try {
-    await ElMessageBox.confirm('确定要删除该频率限制规则吗？', '确认删除', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm('确定删除此频率限制规则？', '确认删除', {
       type: 'warning'
     })
-    await notificationApi.deleteRateLimit(selectedChannel.value.id, row.id)
+    await notificationApi.deleteRateLimit(selectedChannelId.value, row.id)
     ElMessage.success('删除成功')
-    loadRateLimits(selectedChannel.value.id)
+    loadRateLimits(selectedChannelId.value)
   } catch (error) {
     if (error !== 'cancel') {
       console.error('删除频率限制失败:', error)
@@ -1174,28 +1345,14 @@ const handleDeleteRateLimitRule = async (row) => {
 }
 
 // 工具函数
-const formatDate = (date) => formatDateUtil(date)
-
-const formatDateTime = (date) => {
-  if (!date) return '-'
-  const d = new Date(date)
-  return d.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  })
-}
-
 const maskWebhook = (url) => {
   if (!url) return '-'
   try {
     const urlObj = new URL(url)
-    return `${urlObj.protocol}//${urlObj.host}/***`
+    const path = urlObj.pathname
+    return `${urlObj.protocol}//${urlObj.hostname}/****${path.slice(-8)}`
   } catch {
-    return url.substring(0, 30) + '...'
+    return url.slice(0, 20) + '...'
   }
 }
 
@@ -1205,18 +1362,19 @@ const getChannelTypeTag = (type) => {
     wechat: 'success',
     feishu: 'warning',
     email: 'info',
-    webhook: ''
+    webhook: 'danger'
   }
-  return map[type] || ''
+  return map[type] || 'info'
 }
 
 const getSilenceTypeTag = (type) => {
   const map = {
-    once: 'warning',
-    daily: 'success',
-    weekly: 'primary'
+    once: 'info',
+    daily: 'warning',
+    weekly: 'success',
+    period: 'danger'
   }
-  return map[type] || ''
+  return map[type] || 'info'
 }
 
 const getAlertLevelTag = (level) => {
@@ -1225,81 +1383,173 @@ const getAlertLevelTag = (level) => {
     warning: 'warning',
     info: 'info'
   }
-  return map[level] || ''
+  return map[level] || 'info'
 }
 
-// 加载绑定数据源
-const loadBindingDataSources = async () => {
-  try {
-    // 并行加载所有数据源
-    const [envRes, rdbRes, redisRes, taskRes] = await Promise.all([
-      request.get('/environments').catch(() => ({ items: [] })),
-      request.get('/rdb-instances').catch(() => ({ items: [] })),
-      request.get('/redis-instances').catch(() => ({ items: [] })),
-      request.get('/scheduled-tasks').catch(() => ({ items: [] }))
-    ])
-    
-    environments.value = envRes.items || envRes || []
-    rdbInstances.value = rdbRes.items || rdbRes || []
-    redisInstances.value = redisRes.items || redisRes || []
-    scheduledTasks.value = taskRes.items || taskRes || []
-  } catch (error) {
-    console.error('加载数据源失败:', error)
-  }
+const formatDate = (date) => {
+  if (!date) return '-'
+  return formatDateUtil(date)
+}
+
+const formatDateTime = (date) => {
+  if (!date) return '-'
+  return formatDateUtil(date, 'YYYY-MM-DD HH:mm:ss')
+}
+
+const formatDuration = (seconds) => {
+  if (seconds < 60) return `${seconds}秒`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}分钟`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}小时`
+  return `${Math.floor(seconds / 86400)}天`
 }
 
 // 初始化
 onMounted(() => {
   loadChannels()
   loadChannelTypes()
-  loadBindingDataSources()
+  loadBindingData()
 })
 </script>
 
-<style scoped>
+<style scoped lang="scss">
 .notification-channels-page {
-  padding: 0;
-}
-
-.section-card {
-  margin-bottom: 16px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.header-left .title {
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.channel-name {
-  display: flex;
-  align-items: center;
-}
-
-.rules-count {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-}
-
-.match-conditions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-
-.no-channel-selected {
-  padding: 40px 0;
+  padding: 20px;
+  
+  .page-header {
+    margin-bottom: 20px;
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      
+      .page-title {
+        margin: 0;
+        font-size: 20px;
+        font-weight: 600;
+        color: #303133;
+      }
+      
+      .page-desc {
+        color: #909399;
+        font-size: 14px;
+      }
+    }
+  }
+  
+  .channel-tabs {
+    :deep(.el-tabs__header) {
+      margin-bottom: 0;
+    }
+    
+    :deep(.el-tabs__content) {
+      padding: 20px;
+      background: #fff;
+      border: 1px solid #dcdfe6;
+      border-top: none;
+    }
+    
+    .tab-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      
+      .el-icon {
+        font-size: 16px;
+      }
+    }
+  }
+  
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      
+      .title {
+        font-size: 16px;
+        font-weight: 600;
+      }
+    }
+    
+    .header-right {
+      display: flex;
+      align-items: center;
+    }
+  }
+  
+  .channel-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .config-info {
+    color: #606266;
+    font-size: 13px;
+  }
+  
+  .rules-count {
+    display: flex;
+    justify-content: center;
+    gap: 4px;
+  }
+  
+  .match-conditions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  
+  .rate-config {
+    color: #606266;
+    font-size: 13px;
+  }
+  
+  .truncate-text {
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  
+  .form-hint {
+    font-size: 12px;
+    color: #909399;
+    margin-top: 4px;
+  }
+  
+  .mb-4 {
+    margin-bottom: 16px;
+  }
+  
+  .mx-2 {
+    margin: 0 8px;
+  }
+  
+  .ml-2 {
+    margin-left: 8px;
+  }
+  
+  .mr-1 {
+    margin-right: 4px;
+  }
+  
+  .mr-2 {
+    margin-right: 8px;
+  }
+  
+  .text-gray-400 {
+    color: #c0c4cc;
+  }
+  
+  .text-sm {
+    font-size: 13px;
+  }
 }
 </style>
