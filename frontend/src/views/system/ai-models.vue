@@ -418,6 +418,9 @@ const dialog = reactive({
   submitting: false
 })
 
+// 存储当前编辑的模型名称（用于显示历史不可用模型）
+const editingModelName = ref('')
+
 const form = reactive({
   name: '',
   provider: 'doubao',
@@ -455,15 +458,16 @@ const enabledModels = computed(() => modelList.value.filter(m => m.is_enabled))
 const currentProviderModels = computed(() => {
   const models = availableModels.value[form.provider] || []
 
-  // 编辑时，如果当前模型不在可用列表中（历史不可用模型），临时添加到选项
-  if (dialog.isEdit && form.model_name) {
-    const exists = models.find(m => m.model_id === form.model_name)
+  // 如果当前模型不在可用列表中（历史不可用模型），临时添加到选项
+  const currentModel = editingModelName.value || form.model_name
+  if (currentModel) {
+    const exists = models.find(m => m.model_id === currentModel)
     if (!exists) {
       return [
         ...models,
         {
-          model_id: form.model_name,
-          model_name: `${form.model_name}（当前配置，已不可用）`,
+          model_id: currentModel,
+          model_name: `${currentModel}（当前配置，已不可用）`,
           is_deprecated: true
         }
       ]
@@ -558,6 +562,7 @@ const handleProviderChange = async (provider) => {
 
 const handleAdd = async () => {
   dialog.isEdit = false
+  editingModelName.value = ''  // 清空编辑状态
   resetFormData()
   // 加载可用模型列表
   await fetchAvailableModels()
@@ -572,6 +577,9 @@ const handleAdd = async () => {
 
 const handleEdit = async (row) => {
   dialog.isEdit = true
+  // 记录当前编辑的模型名称（用于兼容历史不可用模型）
+  editingModelName.value = row.model_name
+
   // 先重置表单，设置provider（这会影响currentProviderModels计算）
   resetFormData()
   form.provider = row.provider
