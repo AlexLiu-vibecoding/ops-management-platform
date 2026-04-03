@@ -97,14 +97,78 @@ class PermissionService:
         """清除权限缓存"""
         self._permission_cache.clear()
 
-    def warmup_cache(self) -> None:
+    def warmup_cache(self, db: Session) -> None:
         """预热权限缓存，加载所有角色的权限"""
-        all_roles = [
-            'super_admin', 'approval_admin', 'operator', 
-            'developer', 'readonly'
-        ]
-        for role in all_roles:
-            self.get_role_permissions(role)
+        # 临时保存原 db，使用传入的 db
+        original_db = self.db
+        self.db = db
+        try:
+            all_roles = [
+                'super_admin', 'approval_admin', 'operator',
+                'developer', 'readonly'
+            ]
+            for role in all_roles:
+                self.get_role_permissions(role)
+        except Exception as e:
+            # 预热失败不影响启动，记录日志即可
+            import logging
+            logging.getLogger(__name__).warning(f"Permission cache warmup failed: {e}")
+        finally:
+            self.db = original_db
+
+    def clear_cache(self) -> None:
+        """清除权限缓存"""
+        self._permission_cache.clear()  # 确保只有一个 clear_cache 方法
+
+    # 类级别的缓存清除方法（用于全局操作）
+    @classmethod
+    def clear_global_cache(cls) -> None:
+        """清除所有 PermissionService 实例的缓存"""
+        # 单例模式使用
+        if hasattr(cls, '_instance') and cls._instance is not None:
+            cls._instance._permission_cache.clear()  # type: ignore
+
+    @classmethod
+    def warmup_global_cache(cls, db: Session) -> None:
+        """预热全局缓存"""
+        if hasattr(cls, '_instance') and cls._instance is not None:
+            cls._instance.warmup_cache(db)  # type: ignore
+
+    def _get_instance_cache(self) -> dict:
+        """获取实例缓存（用于单例模式）"""
+        return self._permission_cache
+
+    @classmethod
+    def get_instance(cls, db: Session = None) -> 'PermissionService':
+        """获取 PermissionService 单例"""
+        if not hasattr(cls, '_instance') or cls._instance is None:
+            cls._instance = cls(db)
+        elif db is not None:
+            # 更新 db 引用
+            cls._instance.db = db  # type: ignore
+        return cls._instance  # type: ignore
+
+    @classmethod
+    def set_instance_db(cls, db: Session) -> None:
+        """设置单例的数据库会话"""
+        if hasattr(cls, '_instance') and cls._instance is not None:
+            cls._instance.db = db  # type: ignore
+
+    # 类级别的单例引用（供外部直接访问缓存）
+    _instance: 'PermissionService' = None  # type: ignore  # 将在首次调用 get_instance 时初始化
+
+    def get_instance_cache(self) -> dict:
+        """获取当前实例的缓存"""
+        return self._permission_cache
+
+    def set_instance_db(self, db: Session) -> None:
+        """设置当前实例的数据库会话"""
+        self.db = db
+
+    def refresh_cache(self, db: Session) -> None:
+        """刷新缓存（清除并重新预热）"""
+        self.clear_cache()
+        self.warmup_cache(db)
 
     # ==================== 数据权限 ====================
     
@@ -280,11 +344,7 @@ class PermissionService:
                         self.db.add(role_perm)
         
         self.db.commit()
-    
-    def clear_cache(self) -> None:
-        """清除权限缓存"""
-        self._permission_cache.clear()
-    
+
     # ==================== 权限管理方法 ====================
     
     def get_permissions(self, module: Optional[str] = None, category: Optional[str] = None) -> List[Permission]:
@@ -639,5 +699,11 @@ class BatchOperationService:
         )
         self.db.add(log)
         self.db.commit()
-        
+
         return log
+
+
+# ==================== 单例导出 ====================
+# 创建全局 PermissionService 单例实例
+# 注意：db 参数需要在实际使用时通过 set_instance_db 设置
+permission_service = PermissionService.get_instance(None)

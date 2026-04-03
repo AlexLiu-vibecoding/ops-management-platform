@@ -156,8 +156,6 @@ async def init_default_data():
     from app.database import SessionLocal
     from app.models import User, Environment, UserRole, GlobalConfig, DingTalkChannel, SystemInitState
     from app.utils.auth import hash_password
-    from app.services.permission_service import permission_service
-
     db: Session = SessionLocal()
     try:
         # 检查是否已完成初始化
@@ -237,7 +235,9 @@ async def init_default_data():
 
         # 预热权限缓存
         logger.info("Warming up permission cache...")
-        permission_service.warmup_cache(db)
+        from app.services.permission_service import PermissionService
+        perm_service = PermissionService.get_instance(db)
+        perm_service.warmup_cache(db)
         logger.info("Permission cache warmed up successfully")
 
     except Exception as e:
