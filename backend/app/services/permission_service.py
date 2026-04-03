@@ -103,6 +103,8 @@ class PermissionService:
         original_db = self.db
         self.db = db
         try:
+            # 先清除旧缓存，确保加载最新数据
+            self._permission_cache.clear()
             all_roles = [
                 'super_admin', 'approval_admin', 'operator',
                 'developer', 'readonly'
