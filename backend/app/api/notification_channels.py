@@ -324,13 +324,170 @@ async def test_channel(
     current_user: User = Depends(require_permissions([PermissionCode.NOTIFICATION_CHANNEL_MANAGE])),
     db: Session = Depends(get_db)
 ):
-    """测试通道"""
+    """测试通道 - 发送测试消息"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     channel = db.query(NotificationChannel).filter_by(id=channel_id).first()
     if not channel:
         raise HTTPException(status_code=404, detail="通道不存在")
+    
+    if not channel.is_enabled:
+        raise HTTPException(status_code=400, detail="通道已禁用，请先启用通道")
+    
+    # 解析配置
+    config = channel.config
+    if isinstance(config, str):
+        config = json.loads(config)
+    
+    # 构建测试消息
+    test_message = {
+        "msgtype": "markdown",
+        "markdown": {
+            "title": "测试通知",
+            "text": f"### OpsCenter 测试通知\n\n"
+                    f"**通道名称**: {channel.name}\n\n"
+                    f"**通道类型**: {CHANNEL_TYPE_LABELS.get(channel.channel_type, channel.channel_type)}\n\n"
+                    f"**测试时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                    f"**发送用户**: {current_user.username}\n\n"
+                    f"---\n\n"
+                    f"✅ 如果您收到此消息，说明通道配置正确，通知功能正常。"
+        }
+    }
+    
+    # 根据通道类型发送测试消息
+    if channel.channel_type == "dingtalk":
+        # 钉钉通道测试
+        webhook = config.get("webhook")
+        auth_type = config.get("auth_type", "none")
+        secret_encrypted = config.get("secret")
+        keywords = config.get("keywords", [])
+        
+        if not webhook:
+            raise HTTPException(status_code=400, detail="Webhook 地址未配置")
+        
+        # 解密 secret
+        secret = ""
+        if secret_encrypted:
+            secret = decrypt_secret(secret_encrypted)
+        
+        # 发送测试消息
+        try:
+            result = await _send_dingtalk_test(webhook, test_message, auth_type, secret, keywords)
+            if result["success"]:
+                return {
+                    "message": "测试成功",
+                    "detail": f"钉钉消息已发送，请检查接收情况\n钉钉返回: {result.get('response_data', {})}"
+                }
+            else:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"发送失败: {result.get('error_message', '未知错误')}"
+                )
+        except Exception as e:
+            logger.error(f"钉钉测试消息发送失败: {e}")
+            raise HTTPException(status_code=500, detail=f"发送失败: {str(e)}")
+    
+    elif channel.channel_type == "webhook":
+        # 自定义 Webhook 测试
+        webhook = config.get("webhook")
+        method = config.get("method", "POST")
+        headers = config.get("headers", {})
+        
+        if not webhook:
+            raise HTTPException(status_code=400, detail="Webhook 地址未配置")
+        
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=10) as client:
+                if method.upper() == "GET":
+                    response = await client.get(webhook, headers=headers)
+                else:
+                    response = await client.post(webhook, json=test_message, headers=headers)
+                
+                return {
+                    "message": "测试完成",
+                    "detail": f"Webhook 调用完成\nHTTP 状态: {response.status_code}\n响应: {response.text[:200]}"
+                }
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"调用失败: {str(e)}")
+    
+    else:
+        # 其他类型通道暂不支持测试
+        raise HTTPException(status_code=400, detail=f"暂不支持 {channel.channel_type} 类型的通道测试")
 
-    # TODO: 实现实际的通知发送测试
-    return {"message": "测试成功", "detail": "通知已发送，请检查接收情况"}
+
+async def _send_dingtalk_test(
+    webhook: str, 
+    message: dict, 
+    auth_type: str = "none", 
+    secret: str = None,
+    keywords: list = None
+) -> dict:
+    """发送钉钉测试消息"""
+    import time
+    import hmac
+    import hashlib
+    import base64
+    import urllib.parse
+    import httpx
+    import logging
+    
+    logger = logging.getLogger(__name__)
+    
+    result = {
+        "success": False,
+        "response_code": None,
+        "response_data": None,
+        "error_message": None
+    }
+    
+    # 构建完整 webhook URL（加签）
+    full_webhook = webhook
+    if auth_type == "signature" and secret:
+        timestamp = str(round(time.time() * 1000))
+        string_to_sign = f"{timestamp}\n{secret}"
+        hmac_code = hmac.new(
+            secret.encode('utf-8'),
+            string_to_sign.encode('utf-8'),
+            digestmod=hashlib.sha256
+        ).digest()
+        sign = urllib.parse.quote_plus(base64.b64encode(hmac_code))
+        separator = "&" if "?" in webhook else "?"
+        full_webhook = f"{webhook}{separator}timestamp={timestamp}&sign={sign}"
+    
+    # 处理关键词验证
+    logger.info(f"处理钉钉消息: auth_type={auth_type}, keywords={keywords}")
+    if auth_type == "keyword" and keywords and len(keywords) > 0:
+        if message.get("msgtype") == "text":
+            message["text"]["content"] += f" {keywords[0]}"
+            logger.info(f"添加关键词到 text 消息: {keywords[0]}")
+        elif message.get("msgtype") == "markdown":
+            message["markdown"]["text"] += f"\n\n{keywords[0]}"
+            logger.info(f"添加关键词到 markdown 消息: {keywords[0]}")
+    else:
+        logger.warning(f"未添加关键词: auth_type={auth_type}, keywords={keywords}")
+    
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.post(full_webhook, json=message)
+            result["response_code"] = response.status_code
+            
+            if response.status_code == 200:
+                response_data = response.json()
+                result["response_data"] = response_data
+                result["success"] = response_data.get("errcode") == 0
+                if not result["success"]:
+                    result["error_message"] = response_data.get("errmsg", "未知错误")
+            else:
+                result["error_message"] = f"HTTP {response.status_code}"
+    except Exception as e:
+        result["error_message"] = str(e)
+    
+    return result
+
+
+# ==================== 通道绑定管理 ====================
 
 
 # ==================== 通道绑定管理 ====================
