@@ -69,13 +69,13 @@
         </el-table-column>
         <el-table-column label="操作" min-width="150" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="handleTestChannel(row)">
+            <el-button type="primary" link size="small" @click.stop="handleTestChannel(row)">
               测试
             </el-button>
-            <el-button type="primary" link size="small" @click="handleEditChannel(row)">
+            <el-button type="primary" link size="small" @click.stop="handleEditChannel(row)">
               编辑
             </el-button>
-            <el-button type="danger" link size="small" @click="handleDeleteChannel(row)">
+            <el-button type="danger" link size="small" @click.stop="handleDeleteChannel(row)">
               删除
             </el-button>
           </template>
