@@ -3,6 +3,23 @@ import vue from '@vitejs/plugin-vue'
 import path from 'path'
 
 export default defineConfig({
+  // Vitest 配置
+  test: {
+    globals: true,
+    environment: 'happy-dom',
+    include: ['tests/**/*.{test,spec}.{js,ts}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'tests/',
+        '**/*.d.ts',
+        '**/*.config.{js,ts}',
+        '**/dist/**'
+      ]
+    }
+  },
   plugins: [vue()],
   resolve: {
     alias: {
