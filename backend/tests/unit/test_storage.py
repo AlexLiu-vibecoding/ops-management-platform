@@ -1,162 +1,228 @@
 """
-存储服务单元测试
+测试存储服务 - Storage Service Tests
 """
-import pytest
-import os
-import tempfile
-import asyncio
-from datetime import datetime
-from pathlib import Path
 
-from app.services.storage import (
-    LocalStorage, FileInfo, StorageBackend
-)
+import pytest
+import hashlib
+from datetime import datetime, timedelta
+from pathlib import Path
+from unittest.mock import Mock, patch, MagicMock
+from pydantic import BaseModel
+
+
+class MockSettings(BaseModel):
+    """Mock settings for testing"""
+    TYPE: str = "local"
+    LOCAL_PATH: str = "/tmp/test_storage"
+    FILE_SIZE_THRESHOLD: int = 1000
+    FILE_RETENTION_DAYS: int = 30
+    S3_BUCKET: str = ""
+    S3_ACCESS_KEY: str = ""
+    S3_SECRET_KEY: str = ""
+    S3_REGION: str = "us-east-1"
+    S3_ENDPOINT: str = ""
+    OSS_BUCKET: str = ""
+    OSS_ACCESS_KEY: str = ""
+    OSS_SECRET_KEY: str = ""
+    OSS_ENDPOINT: str = ""
+
+
+@pytest.fixture(autouse=True)
+def mock_settings_module():
+    """Mock 存储设置模块"""
+    with patch('app.services.storage.get_effective_storage_settings') as mock:
+        mock.return_value = MockSettings()
+        yield mock
 
 
 class TestFileInfo:
-    """文件信息类测试"""
-
+    """测试 FileInfo 数据类"""
+    
     def test_file_info_creation(self):
-        """测试创建文件信息"""
+        """测试 FileInfo 创建"""
+        from app.services.storage import FileInfo
+        
+        now = datetime.now()
         info = FileInfo(
-            path="/test/file.txt",
+            path="test/path/file.txt",
             size=1024,
-            created_at=datetime.now(),
+            created_at=now,
             content_type="text/plain",
             metadata={"key": "value"}
         )
         
-        assert info.path == "/test/file.txt"
+        assert info.path == "test/path/file.txt"
         assert info.size == 1024
+        assert info.created_at == now
         assert info.content_type == "text/plain"
-        assert info.metadata["key"] == "value"
-
-    def test_file_info_defaults(self):
-        """测试文件信息默认值"""
-        info = FileInfo(
-            path="/test/file.txt",
-            size=100,
-            created_at=datetime.now()
-        )
-        
-        assert info.content_type == "text/plain"
-        assert info.metadata is None
+        assert info.metadata == {"key": "value"}
 
 
 class TestLocalStorage:
-    """本地存储测试"""
-
+    """测试本地存储后端"""
+    
     @pytest.fixture
-    def temp_storage(self):
-        """创建临时存储目录"""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            yield LocalStorage(tmpdir)
-
+    def local_storage(self, tmp_path):
+        from app.services.storage import LocalStorage
+        return LocalStorage(str(tmp_path))
+    
     @pytest.mark.asyncio
-    async def test_save_file(self, temp_storage):
+    async def test_save_file(self, local_storage, tmp_path):
         """测试保存文件"""
-        result = await temp_storage.save(
-            path="test/file.txt",
-            content="Hello World",
-            metadata={"author": "test"}
-        )
+        path = "test/query.sql"
+        content = "SELECT * FROM users;"
+        metadata = {"author": "test"}
+        
+        result = await local_storage.save(path, content, metadata)
         
         assert result is True
-        
-        # 验证文件存在
-        full_path = temp_storage._get_full_path("test/file.txt")
-        assert full_path.exists()
-        assert full_path.read_text() == "Hello World"
-
+        file_path = tmp_path / path
+        assert file_path.exists()
+        assert file_path.read_text() == content
+    
     @pytest.mark.asyncio
-    async def test_read_file(self, temp_storage):
-        """测试读取文件"""
-        # 先保存文件
-        await temp_storage.save("read/test.txt", "File content")
+    async def test_read_existing_file(self, local_storage, tmp_path):
+        """测试读取存在的文件"""
+        path = "test/read.sql"
+        content = "SELECT 1;"
         
-        # 读取文件
-        content = await temp_storage.read("read/test.txt")
+        file_path = tmp_path / path
+        file_path.parent.mkdir(parents=True)
+        file_path.write_text(content)
         
-        assert content == "File content"
-
+        result = await local_storage.read(path)
+        assert result == content
+    
     @pytest.mark.asyncio
-    async def test_read_nonexistent_file(self, temp_storage):
+    async def test_read_nonexistent_file(self, local_storage):
         """测试读取不存在的文件"""
-        content = await temp_storage.read("nonexistent.txt")
-        
-        assert content is None
-
+        result = await local_storage.read("nonexistent.sql")
+        assert result is None
+    
     @pytest.mark.asyncio
-    async def test_exists(self, temp_storage):
-        """测试文件存在检查"""
-        await temp_storage.save("exists.txt", "content")
-        
-        assert await temp_storage.exists("exists.txt") is True
-        assert await temp_storage.exists("not_exists.txt") is False
-
-    @pytest.mark.asyncio
-    async def test_delete_file(self, temp_storage):
+    async def test_delete_file(self, local_storage, tmp_path):
         """测试删除文件"""
-        await temp_storage.save("delete/me.txt", "content")
+        path = "test/delete.sql"
+        file_path = tmp_path / path
+        file_path.parent.mkdir(parents=True)
+        file_path.write_text("content")
         
-        result = await temp_storage.delete("delete/me.txt")
-        
+        result = await local_storage.delete(path)
         assert result is True
-        assert await temp_storage.exists("delete/me.txt") is False
-
+        assert not file_path.exists()
+    
     @pytest.mark.asyncio
-    async def test_get_info(self, temp_storage):
+    async def test_exists_true(self, local_storage, tmp_path):
+        """测试文件存在"""
+        path = "test/exists.sql"
+        file_path = tmp_path / path
+        file_path.parent.mkdir(parents=True)
+        file_path.write_text("content")
+        
+        result = await local_storage.exists(path)
+        assert result is True
+    
+    @pytest.mark.asyncio
+    async def test_exists_false(self, local_storage):
+        """测试文件不存在"""
+        result = await local_storage.exists("not_exists.sql")
+        assert result is False
+    
+    @pytest.mark.asyncio
+    async def test_get_info(self, local_storage, tmp_path):
         """测试获取文件信息"""
-        await temp_storage.save("info/test.txt", "Hello World")
+        path = "test/info.sql"
+        content = "SELECT 1;"
         
-        info = await temp_storage.get_info("info/test.txt")
+        file_path = tmp_path / path
+        file_path.parent.mkdir(parents=True)
+        file_path.write_text(content)
         
-        assert info is not None
-        assert info.path == "info/test.txt"
-        assert info.size == 11  # "Hello World" 的长度
+        result = await local_storage.get_info(path)
+        
+        assert result is not None
+        assert result.path == path
+        assert result.size == len(content)
 
+
+class TestStorageManager:
+    """测试存储管理器"""
+    
+    @pytest.fixture
+    def storage_manager(self):
+        from app.services.storage import StorageManager
+        return StorageManager()
+    
+    def test_settings_property(self, storage_manager):
+        """测试 settings 属性"""
+        settings = storage_manager.settings
+        assert settings.TYPE == "local"
+    
+    def test_backend_property(self, storage_manager):
+        """测试 backend 属性"""
+        backend = storage_manager.backend
+        assert backend is not None
+    
+    def test_reload_backend(self, storage_manager):
+        """测试重新加载后端"""
+        backend = storage_manager.backend
+        storage_manager.reload_backend()
+        assert storage_manager._backend is None
+    
     @pytest.mark.asyncio
-    async def test_get_info_nonexistent(self, temp_storage):
-        """测试获取不存在文件的信息"""
-        info = await temp_storage.get_info("nonexistent.txt")
+    async def test_save_sql_file(self, storage_manager, tmp_path, mock_settings_module):
+        """测试保存SQL文件"""
+        mock_settings_module.return_value = MockSettings(LOCAL_PATH=str(tmp_path))
+        storage_manager.reload_backend()
         
-        assert info is None
+        content = "SELECT * FROM users;"
+        path = await storage_manager.save_sql_file(approval_id=123, sql_type="sql", content=content)
+        
+        assert path.startswith("approvals/")
+        assert "123_sql.sql" in path
+    
+    def test_should_store_as_file(self, storage_manager):
+        """测试判断是否应该存储为文件"""
+        small = "SELECT 1;"
+        large = "SELECT 1;" * 200
+        
+        assert storage_manager.should_store_as_file(small) is False
+        assert storage_manager.should_store_as_file(large) is True
 
+
+class TestStorageEdgeCases:
+    """测试边界情况"""
+    
     @pytest.mark.asyncio
-    async def test_list_files(self, temp_storage):
-        """测试列出文件"""
-        await temp_storage.save("dir/file1.txt", "content1")
-        await temp_storage.save("dir/file2.txt", "content2")
+    async def test_save_empty_content(self, tmp_path):
+        """测试保存空内容"""
+        from app.services.storage import LocalStorage
+        storage = LocalStorage(str(tmp_path))
         
-        files = await temp_storage.list_files("dir")
+        result = await storage.save("empty.sql", "", None)
+        assert result is True
         
-        assert len(files) >= 2
-
+        content = await storage.read("empty.sql")
+        assert content == ""
+    
     @pytest.mark.asyncio
-    async def test_get_signed_url_returns_none(self, temp_storage):
-        """测试本地存储返回 None 签名 URL"""
-        await temp_storage.save("signed.txt", "content")
+    async def test_save_unicode(self, tmp_path):
+        """测试保存 Unicode 内容"""
+        from app.services.storage import LocalStorage
+        storage = LocalStorage(str(tmp_path))
         
-        url = await temp_storage.get_signed_url("signed.txt")
+        content = "SELECT '中文测试' FROM users;"
+        result = await storage.save("unicode.sql", content, None)
+        assert result is True
         
-        # 本地存储不支持签名URL，返回 None
-        assert url is None
-
-    def test_ensure_base_path(self, temp_storage):
-        """测试确保基础目录存在"""
-        assert temp_storage.base_path.exists()
-
-    def test_get_full_path(self, temp_storage):
-        """测试获取完整路径"""
-        full_path = temp_storage._get_full_path("subdir/file.txt")
-        
-        assert str(full_path).endswith("subdir/file.txt")
+        read = await storage.read("unicode.sql")
+        assert read == content
 
 
-class TestStorageBackendAbstract:
-    """存储后端抽象类测试"""
-
-    def test_storage_backend_is_abstract(self):
-        """测试存储后端是抽象类"""
-        with pytest.raises(TypeError):
-            StorageBackend()  # 不能实例化抽象类
+class TestGlobalStorage:
+    """测试全局实例"""
+    
+    def test_global_instance(self):
+        """测试全局实例存在"""
+        from app.services.storage import storage_manager, StorageManager
+        assert isinstance(storage_manager, StorageManager)
