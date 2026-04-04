@@ -161,11 +161,11 @@ async def create_notification_template(
             NotificationTemplate.notification_type == data.notification_type,
             NotificationTemplate.is_default
         ).update({"is_default": False})
-    
-    # 如果没有提供变量，使用默认变量
+
+    # 如果没有提供变量，设置为空列表
     if data.variables is None:
-        data.variables = get_default_variables(data.notification_type)
-    
+        data.variables = []
+
     template = NotificationTemplate(**data.model_dump())
     db.add(template)
     db.commit()

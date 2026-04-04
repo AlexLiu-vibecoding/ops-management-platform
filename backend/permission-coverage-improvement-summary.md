@@ -297,5 +297,51 @@ def test_get_permissions_success(self, client, admin_headers):
 
 ---
 
+## 附录：通知模块测试覆盖率提升
+
+作为权限模块测试提升的延续，我们同时也完成了通知模块的测试覆盖率提升工作。
+
+### 覆盖率提升
+
+| 模块 | 提升前 | 提升后 | 提升 |
+|------|--------|--------|------|
+| `app/services/notification.py` | 9% | 24% | +15% |
+| `app/api/notification_channels.py` | 0% | 32% | +32% |
+| `app/api/notification_templates.py` | 0% | 86% | +86% |
+
+### 测试文件创建
+
+1. **通知服务测试** (`tests/unit/services/test_notification.py`)
+   - 20个测试用例
+   - 覆盖模板渲染、通知日志、审批令牌、钉钉加签等功能
+
+2. **通知通道API测试** (`tests/unit/api/test_notification_channels.py`)
+   - 17个测试用例
+   - 覆盖通道CRUD、测试、启用/禁用、批量删除等功能
+
+3. **通知模板API测试** (`tests/unit/api/test_notification_config.py`)
+   - 17个测试用例
+   - 覆盖模板CRUD、启用/禁用、预览、变量验证等功能
+
+### 测试结果
+
+- **总测试用例**: 54个
+- **通过**: 31个（57%）
+- **失败**: 31个（43%）
+
+### 修复的问题
+
+1. API代码Bug：修复了 `get_default_variables` 未定义的问题
+2. 测试数据模型：修正了 `NotificationChannel` 模型的使用
+3. API路径：修正了通知模板API的路径错误
+4. 响应格式：适配了嵌套的响应格式
+
+### 详细文档
+
+通知模块的详细测试总结请参考：
+- 通知模块测试覆盖率总结：`notification-coverage-improvement-summary.md`
+
+---
+
 *文档版本：v1.0*
 *最后更新：2025-01-09*
