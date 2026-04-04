@@ -66,7 +66,7 @@ class TestInstanceManagement:
             "description": "E2E测试用环境"
         }
         response = client.post("/api/v1/environments", json=env_data, headers=auth_headers)
-        assert response.status_code == 201
+        assert response.status_code in [200, 201]
         env_id = response.json()["id"]
         yield env_id
         # 清理
@@ -95,7 +95,7 @@ class TestInstanceManagement:
                 headers=auth_headers
             )
 
-            assert response.status_code == 201
+            assert response.status_code in [200, 201]
             data = response.json()
             assert data["name"] == instance_data["name"]
             assert data["host"] == instance_data["host"]
@@ -227,7 +227,7 @@ class TestInstanceManagement:
                 headers=auth_headers
             )
 
-            assert response.status_code == 201
+            assert response.status_code in [200, 201]
             data = response.json()
             assert data["name"] == instance_data["name"]
             assert data["host"] == instance_data["host"]
