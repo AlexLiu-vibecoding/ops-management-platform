@@ -9,6 +9,7 @@
 - 任务执行: /api/v1/scheduled-tasks/{id}/execute
 """
 import pytest
+from tests.helpers.base_api_test import BaseErrorHandlingTest
 
 
 class TestScheduledTasksAPI:
@@ -65,13 +66,10 @@ class TestScheduledTasksAPI:
         assert response.status_code in [200, 404, 405]
 
 
-class TestScheduledTasksAPIErrorHandling:
+class TestScheduledTasksAPIErrorHandling(BaseErrorHandlingTest):
     """定时任务 API 错误处理测试类"""
 
-    def test_unauthorized_access(self, client):
-        """测试未授权访问"""
-        response = client.get("/api/v1/scheduled-tasks")
-        assert response.status_code == 401
+    endpoint_base = "scheduled-tasks"
 
     def test_create_task_invalid_cron(self, client, admin_headers):
         """测试创建任务时提供无效的 cron 表达式"""
@@ -81,7 +79,7 @@ class TestScheduledTasksAPIErrorHandling:
             "is_enabled": True
         }
         response = client.post(
-            "/api/v1/scheduled-tasks",
+            f"/api/v1/{self.endpoint_base}",
             json=task_data,
             headers=admin_headers
         )
@@ -89,5 +87,5 @@ class TestScheduledTasksAPIErrorHandling:
 
     def test_execute_nonexistent_task(self, client, admin_headers):
         """测试执行不存在的任务"""
-        response = client.post("/api/v1/scheduled-tasks/99999/execute", headers=admin_headers)
+        response = client.post(f"/api/v1/{self.endpoint_base}/99999/execute", headers=admin_headers)
         assert response.status_code in [404, 405]

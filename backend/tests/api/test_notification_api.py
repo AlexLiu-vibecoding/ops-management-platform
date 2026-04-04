@@ -10,6 +10,7 @@
 - 通知历史: /api/v1/notification-logs
 """
 import pytest
+from tests.helpers.base_api_test import BaseErrorHandlingTest
 
 
 class TestNotificationAPI:

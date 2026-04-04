@@ -7,6 +7,7 @@ Redis 管理相关 API 测试
 - Redis 管理: /api/v1/redis/*
 """
 import pytest
+from tests.helpers.base_api_test import BaseErrorHandlingTest
 
 
 class TestRedisInstancesAPI:
@@ -81,18 +82,15 @@ class TestRedisOperationsAPI:
         assert response.status_code in [200, 404]
 
 
-class TestRedisAPIErrorHandling:
+class TestRedisAPIErrorHandling(BaseErrorHandlingTest):
     """Redis API 错误处理测试类"""
 
-    def test_unauthorized_access(self, client):
-        """测试未授权访问"""
-        response = client.get("/api/v1/redis-instances")
-        assert response.status_code == 401
+    endpoint_base = "redis-instances"
 
     def test_create_instance_invalid_data(self, client, admin_headers):
         """测试创建实例时提供无效数据"""
         response = client.post(
-            "/api/v1/redis-instances",
+            f"/api/v1/{self.endpoint_base}",
             json={"name": "测试实例"},
             headers=admin_headers
         )

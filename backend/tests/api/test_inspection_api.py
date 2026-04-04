@@ -10,6 +10,7 @@
 - 定时巡检: /api/v1/scheduled-inspection
 """
 import pytest
+from tests.helpers.base_api_test import BaseErrorHandlingTest
 
 
 class TestInspectionAPI:
@@ -76,15 +77,12 @@ class TestInspectionAPI:
         assert response.status_code in [200, 201, 405, 422]
 
 
-class TestInspectionAPIErrorHandling:
+class TestInspectionAPIErrorHandling(BaseErrorHandlingTest):
     """巡检报告 API 错误处理测试类"""
 
-    def test_unauthorized_access(self, client):
-        """测试未授权访问"""
-        response = client.get("/api/v1/inspection/metrics")
-        assert response.status_code == 401
+    endpoint_base = "inspection/metrics"
 
     def test_get_nonexistent_metric(self, client, admin_headers):
         """测试获取不存在的巡检指标"""
-        response = client.get("/api/v1/inspection/metrics/99999", headers=admin_headers)
+        response = client.get(f"/api/v1/{self.endpoint_base}/99999", headers=admin_headers)
         assert response.status_code in [404, 405]

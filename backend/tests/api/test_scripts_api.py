@@ -9,6 +9,7 @@
 - 脚本执行: /api/v1/scripts/{id}/execute
 """
 import pytest
+from tests.helpers.base_api_test import BaseErrorHandlingTest
 
 
 class TestScriptsAPI:
@@ -63,18 +64,15 @@ class TestScriptsAPI:
         assert response.status_code in [200, 404, 405, 422]
 
 
-class TestScriptsAPIErrorHandling:
+class TestScriptsAPIErrorHandling(BaseErrorHandlingTest):
     """脚本管理 API 错误处理测试类"""
 
-    def test_unauthorized_access(self, client):
-        """测试未授权访问"""
-        response = client.get("/api/v1/scripts")
-        assert response.status_code == 401
+    endpoint_base = "scripts"
 
     def test_create_script_invalid_data(self, client, admin_headers):
         """测试创建脚本时提供无效数据"""
         response = client.post(
-            "/api/v1/scripts",
+            f"/api/v1/{self.endpoint_base}",
             json={"name": "测试脚本"},
             headers=admin_headers
         )
@@ -82,5 +80,5 @@ class TestScriptsAPIErrorHandling:
 
     def test_execute_nonexistent_script(self, client, admin_headers):
         """测试执行不存在的脚本"""
-        response = client.post("/api/v1/scripts/99999/execute", headers=admin_headers)
+        response = client.post(f"/api/v1/{self.endpoint_base}/99999/execute", headers=admin_headers)
         assert response.status_code in [404, 405, 422]

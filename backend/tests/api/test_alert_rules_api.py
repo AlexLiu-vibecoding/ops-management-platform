@@ -9,6 +9,7 @@
 - 规则开关: /api/v1/alert-rules/{rule_id}/toggle
 """
 import pytest
+from tests.helpers.base_api_test import BaseErrorHandlingTest
 
 
 class TestAlertRulesAPI:
@@ -65,18 +66,15 @@ class TestAlertRulesAPI:
         assert response.status_code in [200, 404, 422]
 
 
-class TestAlertRulesAPIErrorHandling:
+class TestAlertRulesAPIErrorHandling(BaseErrorHandlingTest):
     """告警规则 API 错误处理测试类"""
 
-    def test_unauthorized_access(self, client):
-        """测试未授权访问"""
-        response = client.get("/api/v1/alert-rules")
-        assert response.status_code == 401
+    endpoint_base = "alert-rules"
 
     def test_create_rule_invalid_data(self, client, admin_headers):
         """测试创建规则时提供无效数据"""
         response = client.post(
-            "/api/v1/alert-rules",
+            f"/api/v1/{self.endpoint_base}",
             json={"name": "测试规则"},
             headers=admin_headers
         )

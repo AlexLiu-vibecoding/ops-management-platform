@@ -10,6 +10,7 @@ AI 模型配置 API 测试
 - 场景配置: /api/v1/ai-models/scene-configs/*
 """
 import pytest
+from tests.helpers.base_api_test import BaseErrorHandlingTest
 
 
 class TestAIModelsAPI:
@@ -107,13 +108,10 @@ class TestAIModelsAPI:
         assert response.status_code in [200, 201]
 
 
-class TestAIModelsAPIErrorHandling:
+class TestAIModelsAPIErrorHandling(BaseErrorHandlingTest):
     """AI 模型配置 API 错误处理测试类"""
 
-    def test_unauthorized_access(self, client):
-        """测试未授权访问"""
-        response = client.get("/api/v1/ai-models")
-        assert response.status_code == 401
+    endpoint_base = "ai-models"
 
     def test_create_model_invalid_provider(self, client, admin_headers):
         """测试使用无效提供商创建模型"""
@@ -124,7 +122,7 @@ class TestAIModelsAPIErrorHandling:
             "model_name": "test-model"
         }
         response = client.post(
-            "/api/v1/ai-models",
+            f"/api/v1/{self.endpoint_base}",
             json=model_data,
             headers=admin_headers
         )
@@ -133,13 +131,13 @@ class TestAIModelsAPIErrorHandling:
 
     def test_get_nonexistent_model(self, client, admin_headers):
         """测试获取不存在的模型"""
-        response = client.get("/api/v1/ai-models/99999", headers=admin_headers)
+        response = client.get(f"/api/v1/{self.endpoint_base}/99999", headers=admin_headers)
         assert response.status_code in [404, 405]
 
     def test_update_nonexistent_model(self, client, admin_headers):
         """测试更新不存在的模型"""
         response = client.put(
-            "/api/v1/ai-models/99999",
+            f"/api/v1/{self.endpoint_base}/99999",
             json={"name": "新名称"},
             headers=admin_headers
         )
@@ -147,5 +145,5 @@ class TestAIModelsAPIErrorHandling:
 
     def test_delete_nonexistent_model(self, client, admin_headers):
         """测试删除不存在的模型"""
-        response = client.delete("/api/v1/ai-models/99999", headers=admin_headers)
+        response = client.delete(f"/api/v1/{self.endpoint_base}/99999", headers=admin_headers)
         assert response.status_code in [404, 405]
