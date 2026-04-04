@@ -458,7 +458,7 @@ async def _test_openai_compatible_model(
                     error_detail = error_json["error"].get("message", str(error_json["error"]))
                 elif "message" in error_json:
                     error_detail = error_json["message"]
-            except:
+            except Exception:
                 pass
             
             log = AICallLog(

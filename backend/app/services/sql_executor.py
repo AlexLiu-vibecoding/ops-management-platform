@@ -108,7 +108,7 @@ class SQLExecutor:
             if conn:
                 try:
                     conn.close()
-                except:
+                except Exception:
                     pass
     
     async def _execute_postgresql(
@@ -139,7 +139,7 @@ class SQLExecutor:
             if conn:
                 try:
                     conn.close()
-                except:
+                except Exception:
                     pass
     
     async def _execute_sql_statements(
@@ -309,7 +309,7 @@ class RedisExecutor:
             if redis_client:
                 try:
                     redis_client.close()
-                except:
+                except Exception:
                     pass
     
     def _execute_redis_command(self, redis_client: redis.Redis, cmd: str, args: list):

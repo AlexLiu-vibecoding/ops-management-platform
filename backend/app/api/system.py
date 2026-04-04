@@ -574,7 +574,7 @@ async def get_system_overview(
     try:
         from app.services.scheduler import approval_scheduler
         scheduler_running = approval_scheduler.running
-    except:
+    except Exception:
         pass
     
     return SystemOverview(

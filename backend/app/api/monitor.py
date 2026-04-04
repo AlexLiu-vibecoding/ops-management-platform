@@ -245,7 +245,7 @@ async def get_monitor_config(
                 result[config.config_key] = int(config.config_value)
             else:
                 result[config.config_key] = float(config.config_value)
-        except:
+        except Exception:
             result[config.config_key] = config.config_value
     
     return result
@@ -650,7 +650,7 @@ async def get_alert_rules_detail(
         import json
         try:
             saved_dict[config.config_key] = json.loads(config.config_value)
-        except:
+        except Exception:
             pass
     
     # 合并配置

@@ -412,7 +412,7 @@ class TaskScheduler:
             # 清理临时文件
             try:
                 os.unlink(script_path)
-            except:
+            except Exception:
                 pass
         
         # 更新执行时间

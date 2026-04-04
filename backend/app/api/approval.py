@@ -167,7 +167,7 @@ async def _generate_sql_rollback_with_data(
         if conn:
             try:
                 conn.close()
-            except:
+            except Exception:
                 pass
 
 
@@ -224,7 +224,7 @@ async def _generate_redis_rollback_with_data(
         if r:
             try:
                 r.close()
-            except:
+            except Exception:
                 pass
 
 

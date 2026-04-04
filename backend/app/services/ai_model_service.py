@@ -168,7 +168,7 @@ def call_model(
                 error_json = response.json()
                 if "error" in error_json:
                     error_detail = error_json["error"].get("message", str(error_json["error"]))
-            except:
+            except Exception:
                 pass
             raise RuntimeError(f"API 错误 ({response.status_code}): {error_detail}")
         
