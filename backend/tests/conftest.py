@@ -363,3 +363,73 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+# ==================== 通用 Mock Fixtures ====================
+# 这些 fixtures 用于服务层单元测试，减少重复定义
+
+@pytest.fixture(scope="function")
+def mock_db():
+    """创建模拟数据库会话"""
+    from unittest.mock import Mock
+    return Mock()
+
+
+@pytest.fixture(scope="function")
+def mock_alert():
+    """创建模拟告警记录"""
+    from unittest.mock import Mock
+    from datetime import datetime
+    from app.models import AlertRecord
+
+    alert = Mock(spec=AlertRecord)
+    alert.id = 1
+    alert.metric_type = "cpu_usage"
+    alert.alert_level = "P1"
+    alert.rdb_instance_id = 1
+    alert.redis_instance_id = None
+    alert.created_at = datetime.now()
+    return alert
+
+
+@pytest.fixture(scope="function")
+def mock_alert_rule():
+    """创建模拟告警聚合规则"""
+    from unittest.mock import Mock
+    from app.models import AlertAggregationRule
+
+    rule = Mock(spec=AlertAggregationRule)
+    rule.id = 1
+    rule.metric_type = "cpu_usage"
+    rule.alert_level = "P1"
+    rule.rdb_instance_id = 1
+    rule.redis_instance_id = None
+    rule.aggregation_window = 300
+    rule.priority = 10
+    rule.is_enabled = True
+    return rule
+
+
+@pytest.fixture(scope="function")
+def mock_silence_rule():
+    """创建模拟告警静默规则"""
+    from unittest.mock import Mock
+    from app.models import AlertSilenceRule
+
+    rule = Mock(spec=AlertSilenceRule)
+    rule.metric_type = "cpu_usage"
+    rule.alert_level = None
+    rule.rdb_instance_id = None
+    rule.redis_instance_id = None
+    rule.is_enabled = True
+    rule.start_time = None
+    rule.end_time = None
+    rule.recurrence_type = "once"
+    return rule
+
+
+@pytest.fixture(scope="function")
+def mock_redis_client():
+    """创建模拟 Redis 客户端"""
+    from unittest.mock import Mock
+    return Mock()

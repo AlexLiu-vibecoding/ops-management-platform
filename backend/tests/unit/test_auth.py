@@ -109,3 +109,51 @@ class TestJWTToken:
         payload = decode_access_token(token)
         
         assert payload is None
+
+
+class TestAESCipher:
+    """AES 加密测试"""
+
+    def test_encrypt_decrypt(self):
+        """测试加密和解密"""
+        from app.utils.auth import AESCipher
+        cipher = AESCipher()
+        plaintext = "Hello, World!"
+
+        encrypted = cipher.encrypt(plaintext)
+        decrypted = cipher.decrypt(encrypted)
+
+        assert encrypted != plaintext
+        assert decrypted == plaintext
+
+    def test_encrypt_empty_string(self):
+        """测试加密空字符串"""
+        from app.utils.auth import AESCipher
+        cipher = AESCipher()
+
+        encrypted = cipher.encrypt("")
+        decrypted = cipher.decrypt(encrypted)
+
+        assert decrypted == ""
+
+    def test_encrypt_long_text(self):
+        """测试加密长文本"""
+        from app.utils.auth import AESCipher
+        cipher = AESCipher()
+        plaintext = "A" * 1000
+
+        encrypted = cipher.encrypt(plaintext)
+        decrypted = cipher.decrypt(encrypted)
+
+        assert decrypted == plaintext
+
+    def test_decrypt_invalid_data(self):
+        """测试解密无效数据"""
+        from app.utils.auth import AESCipher
+        cipher = AESCipher()
+
+        # 解密无效数据应该抛出 ValueError
+        with pytest.raises(ValueError) as exc_info:
+            cipher.decrypt("invalid_data")
+
+        assert "解密失败" in str(exc_info.value)
