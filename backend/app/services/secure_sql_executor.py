@@ -66,12 +66,10 @@ class SecureSQLExecutor:
     # DCL 关键字
     DCL_KEYWORDS = ('GRANT', 'REVOKE')
     
-    # 危险操作模式
+    # 危险操作模式（不包括UPDATE/DELETE无WHERE的情况，由WHERE检查单独处理）
     DANGEROUS_PATTERNS = [
         r'\bDROP\s+(DATABASE|SCHEMA|TABLE)\b',
         r'\bTRUNCATE\s+(TABLE)?\b',
-        r'\bDELETE\s+FROM\b(?!\s+WHERE)',  # DELETE 无 WHERE
-        r'\bUPDATE\s+\w+\s+SET\b(?!\s+WHERE)',  # UPDATE 无 WHERE
         r'\bGRANT\s+ALL\b',
         r'\bDROP\s+USER\b',
     ]
@@ -135,38 +133,38 @@ class SecureSQLExecutor:
         sql_upper = sql.upper().strip()
         risks = []
         
-        # 检查危险操作
+        # 检查危险操作（排除UPDATE/DELETE无WHERE的情况，单独处理）
         for pattern in self.DANGEROUS_PATTERNS:
             if re.search(pattern, sql_upper, re.IGNORECASE):
                 risks.append(f"检测到危险操作: {pattern}")
-        
+
         # 检查 SQL 注入模式
         for pattern in self.INJECTION_PATTERNS:
             if re.search(pattern, sql_upper, re.IGNORECASE):
                 risks.append(f"疑似 SQL 注入: {pattern}")
-        
+
         # 根据语句类型和风险点确定风险等级
         statement_type = self.detect_statement_type(sql)
-        
+
         if risks:
             if any('DROP' in r or 'TRUNCATE' in r for r in risks):
                 return SQLRiskLevel.CRITICAL, risks
             return SQLRiskLevel.HIGH, risks
-        
+
         if statement_type == SQLStatementType.SELECT:
             return SQLRiskLevel.SAFE, []
-        
+
         if statement_type == SQLStatementType.DDL:
             return SQLRiskLevel.HIGH, ["DDL 操作"]
-        
+
         if statement_type in (SQLStatementType.UPDATE, SQLStatementType.DELETE):
             if 'WHERE' not in sql_upper:
                 return SQLRiskLevel.HIGH, ["无 WHERE 条件的修改操作"]
             return SQLRiskLevel.MEDIUM, []
-        
+
         if statement_type == SQLStatementType.INSERT:
             return SQLRiskLevel.LOW, []
-        
+
         return SQLRiskLevel.MEDIUM, []
     
     def validate_sql(self, sql: str, allow_dangerous: bool = False) -> tuple[bool, str]:
