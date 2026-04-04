@@ -19,9 +19,9 @@ from app.models.ai_model import (
 class TestAIModelConfigAPI:
     """AI 模型配置 API 测试"""
 
-    def test_list_ai_models(self, client: TestClient, auth_headers: dict):
+    def test_list_ai_models(self, client: TestClient, admin_headers: dict):
         """测试获取 AI 模型配置列表"""
-        response = client.get("/api/v1/ai-models", headers=auth_headers)
+        response = client.get("/api/v1/ai-models", headers=admin_headers)
         assert response.status_code == 200
         data = response.json()
         # 可能是分页格式或列表格式
@@ -30,7 +30,7 @@ class TestAIModelConfigAPI:
         else:
             assert isinstance(data, list)
 
-    def test_create_ai_model(self, client: TestClient, auth_headers: dict):
+    def test_create_ai_model(self, client: TestClient, admin_headers: dict):
         """测试创建 AI 模型配置"""
         model_data = {
             "name": "测试 OpenAI 配置",
@@ -49,16 +49,16 @@ class TestAIModelConfigAPI:
         response = client.post(
             "/api/v1/ai-models",
             json=model_data,
-            headers=auth_headers
+            headers=admin_headers
         )
-        assert response.status_code in [201, 200]
+        assert response.status_code in [200, 201]
         if response.status_code == 201:
             data = response.json()
             assert data["name"] == model_data["name"]
             assert data["provider"] == model_data["provider"]
             assert "id" in data
 
-    def test_create_ollama_model(self, client: TestClient, auth_headers: dict):
+    def test_create_ollama_model(self, client: TestClient, admin_headers: dict):
         """测试创建 Ollama 模型配置"""
         model_data = {
             "name": "本地 Ollama",
@@ -72,11 +72,11 @@ class TestAIModelConfigAPI:
         response = client.post(
             "/api/v1/ai-models",
             json=model_data,
-            headers=auth_headers
+            headers=admin_headers
         )
-        assert response.status_code in [201, 200]
+        assert response.status_code in [200, 201]
 
-    def test_get_ai_model_detail(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_get_ai_model_detail(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试获取 AI 模型配置详情"""
         # 先创建模型配置
         model = AIModelConfig(
@@ -98,7 +98,7 @@ class TestAIModelConfigAPI:
 
         response = client.get(
             f"/api/v1/ai-models/{model.id}",
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
         data = response.json()
@@ -108,7 +108,7 @@ class TestAIModelConfigAPI:
         if "api_key" in data:
             assert "***" in data["api_key"] or data["api_key"] == ""
 
-    def test_update_ai_model(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_update_ai_model(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试更新 AI 模型配置"""
         # 先创建模型配置
         model = AIModelConfig(
@@ -136,14 +136,14 @@ class TestAIModelConfigAPI:
         response = client.put(
             f"/api/v1/ai-models/{model.id}",
             json=update_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "新模型名称"
         assert data["is_enabled"] == False
 
-    def test_delete_ai_model(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_delete_ai_model(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试删除 AI 模型配置"""
         # 先创建模型配置
         model = AIModelConfig(
@@ -161,7 +161,7 @@ class TestAIModelConfigAPI:
 
         response = client.delete(
             f"/api/v1/ai-models/{model_id}",
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
 
@@ -169,7 +169,7 @@ class TestAIModelConfigAPI:
         deleted = db_session.query(AIModelConfig).filter_by(id=model_id).first()
         assert deleted is None
 
-    def test_test_ai_model(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_test_ai_model(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试 AI 模型连通性"""
         # 先创建模型配置
         model = AIModelConfig(
@@ -191,7 +191,7 @@ class TestAIModelConfigAPI:
         response = client.post(
             f"/api/v1/ai-models/{model.id}/test",
             json=test_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         # 可能成功或失败（取决于实际连接），但不应该500错误
         assert response.status_code in [200, 400, 502]
@@ -200,9 +200,9 @@ class TestAIModelConfigAPI:
 class TestAISceneConfigAPI:
     """AI 场景配置 API 测试"""
 
-    def test_list_ai_scenes(self, client: TestClient, auth_headers: dict):
+    def test_list_ai_scenes(self, client: TestClient, admin_headers: dict):
         """测试获取场景配置列表"""
-        response = client.get("/api/v1/ai-models/scenes", headers=auth_headers)
+        response = client.get("/api/v1/ai-models/scenes", headers=admin_headers)
         assert response.status_code == 200
         data = response.json()
         if isinstance(data, dict):
@@ -210,7 +210,7 @@ class TestAISceneConfigAPI:
         else:
             assert isinstance(data, list)
 
-    def test_get_scene_config(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_get_scene_config(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试获取场景配置"""
         # 先创建模型和场景配置
         model = AIModelConfig(
@@ -238,14 +238,14 @@ class TestAISceneConfigAPI:
 
         response = client.get(
             f"/api/v1/ai-models/scenes/{scene.id}",
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == scene.id
         assert data["scene"] == AIScene.sql_explain
 
-    def test_update_scene_config(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_update_scene_config(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试更新场景配置"""
         # 先创建模型和场景配置
         model = AIModelConfig(
@@ -279,15 +279,15 @@ class TestAISceneConfigAPI:
         response = client.put(
             f"/api/v1/ai-models/scenes/{scene.id}",
             json=update_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
         data = response.json()
         assert data["custom_prompt"] == "更新后的提示词"
 
-    def test_get_scene_templates(self, client: TestClient, auth_headers: dict):
+    def test_get_scene_templates(self, client: TestClient, admin_headers: dict):
         """测试获取场景模板"""
-        response = client.get("/api/v1/ai-models/scene-templates", headers=auth_headers)
+        response = client.get("/api/v1/ai-models/scene-templates", headers=admin_headers)
         assert response.status_code in [200, 404]
         if response.status_code == 200:
             data = response.json()
@@ -297,9 +297,9 @@ class TestAISceneConfigAPI:
 class TestAICallLogAPI:
     """AI 调用日志 API 测试"""
 
-    def test_list_ai_call_logs(self, client: TestClient, auth_headers: dict):
+    def test_list_ai_call_logs(self, client: TestClient, admin_headers: dict):
         """测试获取 AI 调用日志列表"""
-        response = client.get("/api/v1/ai-models/call-logs", headers=auth_headers)
+        response = client.get("/api/v1/ai-models/call-logs", headers=admin_headers)
         assert response.status_code == 200
         data = response.json()
         if isinstance(data, dict):
@@ -307,7 +307,7 @@ class TestAICallLogAPI:
         else:
             assert isinstance(data, list)
 
-    def test_get_call_log_detail(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_get_call_log_detail(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试获取调用日志详情"""
         # 先创建调用日志
         log = AICallLog(
@@ -326,28 +326,28 @@ class TestAICallLogAPI:
 
         response = client.get(
             f"/api/v1/ai-models/call-logs/{log.id}",
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code in [200, 404]
         if response.status_code == 200:
             data = response.json()
             assert data["id"] == log.id
 
-    def test_filter_call_logs_by_scene(self, client: TestClient, auth_headers: dict):
+    def test_filter_call_logs_by_scene(self, client: TestClient, admin_headers: dict):
         """测试按场景筛选调用日志"""
         response = client.get(
             "/api/v1/ai-models/call-logs",
             params={"scene": "sql_explain"},
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
 
-    def test_filter_call_logs_by_status(self, client: TestClient, auth_headers: dict):
+    def test_filter_call_logs_by_status(self, client: TestClient, admin_headers: dict):
         """测试按状态筛选调用日志"""
         response = client.get(
             "/api/v1/ai-models/call-logs",
             params={"status": "success"},
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
 
@@ -355,17 +355,17 @@ class TestAICallLogAPI:
 class TestAIProviderTemplatesAPI:
     """AI 提供商模板 API 测试"""
 
-    def test_get_provider_templates(self, client: TestClient, auth_headers: dict):
+    def test_get_provider_templates(self, client: TestClient, admin_headers: dict):
         """测试获取提供商模板"""
-        response = client.get("/api/v1/ai-models/templates", headers=auth_headers)
+        response = client.get("/api/v1/ai-models/templates", headers=admin_headers)
         assert response.status_code in [200, 404]
         if response.status_code == 200:
             data = response.json()
             assert isinstance(data, dict)
 
-    def test_get_provider_list(self, client: TestClient, auth_headers: dict):
+    def test_get_provider_list(self, client: TestClient, admin_headers: dict):
         """测试获取支持的提供商列表"""
-        response = client.get("/api/v1/ai-models/providers", headers=auth_headers)
+        response = client.get("/api/v1/ai-models/providers", headers=admin_headers)
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -377,35 +377,35 @@ class TestAIProviderTemplatesAPI:
 class TestAIModelAPIErrorHandling:
     """AI 模型 API 错误处理测试"""
 
-    def test_get_nonexistent_model(self, client: TestClient, auth_headers: dict):
+    def test_get_nonexistent_model(self, client: TestClient, admin_headers: dict):
         """测试获取不存在的模型配置"""
-        response = client.get("/api/v1/ai-models/99999", headers=auth_headers)
+        response = client.get("/api/v1/ai-models/99999", headers=admin_headers)
         assert response.status_code == 404
 
-    def test_update_nonexistent_model(self, client: TestClient, auth_headers: dict):
+    def test_update_nonexistent_model(self, client: TestClient, admin_headers: dict):
         """测试更新不存在的模型配置"""
         response = client.put(
             "/api/v1/ai-models/99999",
             json={"name": "新名称"},
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 404
 
-    def test_delete_nonexistent_model(self, client: TestClient, auth_headers: dict):
+    def test_delete_nonexistent_model(self, client: TestClient, admin_headers: dict):
         """测试删除不存在的模型配置"""
-        response = client.delete("/api/v1/ai-models/99999", headers=auth_headers)
+        response = client.delete("/api/v1/ai-models/99999", headers=admin_headers)
         assert response.status_code == 404
 
-    def test_test_nonexistent_model(self, client: TestClient, auth_headers: dict):
+    def test_test_nonexistent_model(self, client: TestClient, admin_headers: dict):
         """测试测试不存在的模型"""
         response = client.post(
             "/api/v1/ai-models/99999/test",
             json={"prompt": "test"},
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 404
 
-    def test_create_model_with_invalid_provider(self, client: TestClient, auth_headers: dict):
+    def test_create_model_with_invalid_provider(self, client: TestClient, admin_headers: dict):
         """测试使用无效提供商创建模型"""
         model_data = {
             "name": "测试模型",
@@ -416,17 +416,17 @@ class TestAIModelAPIErrorHandling:
         response = client.post(
             "/api/v1/ai-models",
             json=model_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code in [400, 422]
 
-    def test_create_model_without_required_fields(self, client: TestClient, auth_headers: dict):
+    def test_create_model_without_required_fields(self, client: TestClient, admin_headers: dict):
         """测试缺少必填字段创建模型"""
         # 缺少 provider
         response = client.post(
             "/api/v1/ai-models",
             json={"name": "无效模型", "base_url": "http://test.com"},
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 422
 
@@ -435,7 +435,7 @@ class TestAIModelAPIErrorHandling:
         response = client.get("/api/v1/ai-models")
         assert response.status_code == 401
 
-    def test_invalid_temperature_range(self, client: TestClient, auth_headers: dict):
+    def test_invalid_temperature_range(self, client: TestClient, admin_headers: dict):
         """测试无效的温度参数范围"""
         model_data = {
             "name": "测试模型",
@@ -447,6 +447,6 @@ class TestAIModelAPIErrorHandling:
         response = client.post(
             "/api/v1/ai-models",
             json=model_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code in [400, 422]

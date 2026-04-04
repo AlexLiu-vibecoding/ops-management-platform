@@ -15,9 +15,9 @@ from app.models import User, UserRole, Script, ScriptExecution, ScriptType, Exec
 class TestScriptCRUDAPI:
     """脚本 CRUD API 测试"""
 
-    def test_list_scripts(self, client: TestClient, auth_headers: dict):
+    def test_list_scripts(self, client: TestClient, admin_headers: dict):
         """测试获取脚本列表"""
-        response = client.get("/api/v1/scripts", headers=auth_headers)
+        response = client.get("/api/v1/scripts", headers=admin_headers)
         assert response.status_code == 200
         data = response.json()
         # 可能是分页格式或列表格式
@@ -26,7 +26,7 @@ class TestScriptCRUDAPI:
         else:
             assert isinstance(data, list)
 
-    def test_create_python_script(self, client: TestClient, auth_headers: dict):
+    def test_create_python_script(self, client: TestClient, admin_headers: dict):
         """测试创建 Python 脚本"""
         script_data = {
             "name": "测试 Python 脚本",
@@ -40,16 +40,16 @@ class TestScriptCRUDAPI:
         response = client.post(
             "/api/v1/scripts",
             json=script_data,
-            headers=auth_headers
+            headers=admin_headers
         )
-        assert response.status_code in [201, 200]
+        assert response.status_code in [200, 201]
         if response.status_code == 201:
             data = response.json()
             assert data["name"] == script_data["name"]
             assert data["script_type"] == "python"
             assert "id" in data
 
-    def test_create_bash_script(self, client: TestClient, auth_headers: dict):
+    def test_create_bash_script(self, client: TestClient, admin_headers: dict):
         """测试创建 Bash 脚本"""
         script_data = {
             "name": "测试 Bash 脚本",
@@ -61,11 +61,11 @@ class TestScriptCRUDAPI:
         response = client.post(
             "/api/v1/scripts",
             json=script_data,
-            headers=auth_headers
+            headers=admin_headers
         )
-        assert response.status_code in [201, 200]
+        assert response.status_code in [200, 201]
 
-    def test_create_sql_script(self, client: TestClient, auth_headers: dict):
+    def test_create_sql_script(self, client: TestClient, admin_headers: dict):
         """测试创建 SQL 脚本"""
         script_data = {
             "name": "测试 SQL 脚本",
@@ -76,11 +76,11 @@ class TestScriptCRUDAPI:
         response = client.post(
             "/api/v1/scripts",
             json=script_data,
-            headers=auth_headers
+            headers=admin_headers
         )
-        assert response.status_code in [201, 200]
+        assert response.status_code in [200, 201]
 
-    def test_get_script_detail(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_get_script_detail(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试获取脚本详情"""
         # 先创建脚本
         script = Script(
@@ -100,14 +100,14 @@ class TestScriptCRUDAPI:
 
         response = client.get(
             f"/api/v1/scripts/{script.id}",
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == script.id
         assert data["name"] == script.name
 
-    def test_update_script(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_update_script(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试更新脚本"""
         # 先创建脚本
         script = Script(
@@ -131,13 +131,13 @@ class TestScriptCRUDAPI:
         response = client.put(
             f"/api/v1/scripts/{script.id}",
             json=update_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "新脚本名称"
 
-    def test_delete_script(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_delete_script(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试删除脚本"""
         # 先创建脚本
         script = Script(
@@ -155,7 +155,7 @@ class TestScriptCRUDAPI:
 
         response = client.delete(
             f"/api/v1/scripts/{script_id}",
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
 
@@ -167,7 +167,7 @@ class TestScriptCRUDAPI:
 class TestScriptExecuteAPI:
     """脚本执行 API 测试"""
 
-    def test_execute_script_sync(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_execute_script_sync(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试同步执行脚本"""
         # 先创建脚本
         script = Script(
@@ -190,7 +190,7 @@ class TestScriptExecuteAPI:
         response = client.post(
             f"/api/v1/scripts/{script.id}/execute",
             json=exec_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         # 执行可能成功或失败，取决于环境
         assert response.status_code in [200, 500]
@@ -198,7 +198,7 @@ class TestScriptExecuteAPI:
             data = response.json()
             assert "status" in data
 
-    def test_execute_script_async(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_execute_script_async(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试异步执行脚本"""
         # 先创建脚本
         script = Script(
@@ -220,11 +220,11 @@ class TestScriptExecuteAPI:
         response = client.post(
             f"/api/v1/scripts/{script.id}/execute",
             json=exec_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code in [200, 202]
 
-    def test_execute_script_with_params(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_execute_script_with_params(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试带参数执行脚本"""
         # 先创建带参数模式的脚本
         script = Script(
@@ -249,11 +249,11 @@ class TestScriptExecuteAPI:
         response = client.post(
             f"/api/v1/scripts/{script.id}/execute",
             json=exec_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code in [200, 500]
 
-    def test_execute_disabled_script(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_execute_disabled_script(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试执行已禁用的脚本"""
         # 创建禁用的脚本
         script = Script(
@@ -272,7 +272,7 @@ class TestScriptExecuteAPI:
         response = client.post(
             f"/api/v1/scripts/{script.id}/execute",
             json=exec_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         # 应该返回错误
         assert response.status_code in [400, 403, 422]
@@ -281,7 +281,7 @@ class TestScriptExecuteAPI:
 class TestScriptExecutionRecordAPI:
     """脚本执行记录 API 测试"""
 
-    def test_list_script_executions(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_list_script_executions(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试获取脚本执行记录列表"""
         # 先创建脚本和执行记录
         script = Script(
@@ -306,7 +306,7 @@ class TestScriptExecutionRecordAPI:
 
         response = client.get(
             f"/api/v1/scripts/{script.id}/executions",
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 200
         data = response.json()
@@ -315,7 +315,7 @@ class TestScriptExecutionRecordAPI:
         else:
             assert isinstance(data, list)
 
-    def test_get_execution_detail(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_get_execution_detail(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试获取执行记录详情"""
         # 先创建脚本和执行记录
         script = Script(
@@ -341,14 +341,14 @@ class TestScriptExecutionRecordAPI:
 
         response = client.get(
             f"/api/v1/scripts/executions/{execution.id}",
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code in [200, 404]
         if response.status_code == 200:
             data = response.json()
             assert data["id"] == execution.id
 
-    def test_stop_execution(self, client: TestClient, auth_headers: dict, db_session: Session):
+    def test_stop_execution(self, client: TestClient, admin_headers: dict, db_session: Session):
         """测试停止正在执行的脚本"""
         # 先创建脚本和运行中的执行记录
         script = Script(
@@ -373,7 +373,7 @@ class TestScriptExecutionRecordAPI:
 
         response = client.post(
             f"/api/v1/scripts/executions/{execution.id}/stop",
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code in [200, 404]
 
@@ -381,35 +381,35 @@ class TestScriptExecutionRecordAPI:
 class TestScriptAPIErrorHandling:
     """脚本 API 错误处理测试"""
 
-    def test_get_nonexistent_script(self, client: TestClient, auth_headers: dict):
+    def test_get_nonexistent_script(self, client: TestClient, admin_headers: dict):
         """测试获取不存在的脚本"""
-        response = client.get("/api/v1/scripts/99999", headers=auth_headers)
+        response = client.get("/api/v1/scripts/99999", headers=admin_headers)
         assert response.status_code == 404
 
-    def test_update_nonexistent_script(self, client: TestClient, auth_headers: dict):
+    def test_update_nonexistent_script(self, client: TestClient, admin_headers: dict):
         """测试更新不存在的脚本"""
         response = client.put(
             "/api/v1/scripts/99999",
             json={"name": "新名称"},
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 404
 
-    def test_delete_nonexistent_script(self, client: TestClient, auth_headers: dict):
+    def test_delete_nonexistent_script(self, client: TestClient, admin_headers: dict):
         """测试删除不存在的脚本"""
-        response = client.delete("/api/v1/scripts/99999", headers=auth_headers)
+        response = client.delete("/api/v1/scripts/99999", headers=admin_headers)
         assert response.status_code == 404
 
-    def test_execute_nonexistent_script(self, client: TestClient, auth_headers: dict):
+    def test_execute_nonexistent_script(self, client: TestClient, admin_headers: dict):
         """测试执行不存在的脚本"""
         response = client.post(
             "/api/v1/scripts/99999/execute",
             json={"params": {}},
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 404
 
-    def test_create_script_with_invalid_type(self, client: TestClient, auth_headers: dict):
+    def test_create_script_with_invalid_type(self, client: TestClient, admin_headers: dict):
         """测试使用无效脚本类型创建"""
         script_data = {
             "name": "测试脚本",
@@ -419,17 +419,17 @@ class TestScriptAPIErrorHandling:
         response = client.post(
             "/api/v1/scripts",
             json=script_data,
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code in [400, 422]
 
-    def test_create_script_without_required_fields(self, client: TestClient, auth_headers: dict):
+    def test_create_script_without_required_fields(self, client: TestClient, admin_headers: dict):
         """测试缺少必填字段创建脚本"""
         # 缺少 content
         response = client.post(
             "/api/v1/scripts",
             json={"name": "无效脚本", "script_type": "python"},
-            headers=auth_headers
+            headers=admin_headers
         )
         assert response.status_code == 422
 
