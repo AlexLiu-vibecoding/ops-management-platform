@@ -78,7 +78,7 @@ class MemoryCache:
         """清理过期缓存"""
         now = time.time()
         count = 0
-        
+
         with self._lock:
             expired_keys = [
                 k for k, (_, expire_at) in self._cache.items()
@@ -87,7 +87,32 @@ class MemoryCache:
             for key in expired_keys:
                 del self._cache[key]
                 count += 1
-        
+
+        return count
+
+    def delete_pattern(self, pattern: str) -> int:
+        """
+        删除匹配模式的所有缓存
+
+        Args:
+            pattern: 键模式（支持通配符 *）
+
+        Returns:
+            删除的键数量
+        """
+        import fnmatch
+        count = 0
+
+        with self._lock:
+            # 转换通配符模式为正则表达式
+            keys_to_delete = [
+                k for k in self._cache.keys()
+                if fnmatch.fnmatch(k, pattern)
+            ]
+            for key in keys_to_delete:
+                del self._cache[key]
+                count += 1
+
         return count
 
 
@@ -284,23 +309,50 @@ class CacheService:
     def invalidate_pattern(self, pattern: str) -> int:
         """
         使匹配模式的所有缓存失效
-        
+
         Args:
             pattern: 键模式（支持通配符 *）
-        
+
         Returns:
             删除的键数量
         """
         count = 0
-        
+
+        # 清理内存缓存
+        count += self._memory_cache.delete_pattern(f"{self.KEY_PREFIX}{pattern}")
+
+        # 如果使用 Redis，也清理 Redis 缓存
         if self._use_redis:
             try:
                 keys = self._redis.keys(f"{self.KEY_PREFIX}{pattern}")
                 if keys:
-                    count = self._redis.delete(*keys)
+                    redis_count = self._redis.delete(*keys)
+                    # Redis 返回的是整数，但 mock 可能返回 mock 对象
+                    count = int(redis_count) if redis_count else count
             except Exception as e:
                 logger.warning(f"Redis 批量删除失败: {e}")
-        
+
+        return count
+
+    def clear(self) -> int:
+        """
+        清空所有缓存
+
+        Returns:
+            删除的键数量
+        """
+        # 清理内存缓存
+        count = self._memory_cache.clear()
+
+        # 如果使用 Redis，也清理 Redis 缓存
+        if self._use_redis:
+            try:
+                keys = self._redis.keys(f"{self.KEY_PREFIX}*")
+                if keys:
+                    self._redis.delete(*keys)
+            except Exception as e:
+                logger.warning(f"Redis 清空失败: {e}")
+
         return count
 
 

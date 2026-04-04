@@ -148,8 +148,9 @@ class TestAESCipher:
     def test_decrypt_invalid_data(self):
         """测试解密无效数据"""
         cipher = AESCipher()
-        
-        result = cipher.decrypt("invalid_data")
-        
-        # 解密失败应该返回 None 或原数据
-        assert result is None or result == "invalid_data"
+
+        # 解密无效数据应该抛出 ValueError
+        with pytest.raises(ValueError) as exc_info:
+            cipher.decrypt("invalid_data")
+
+        assert "解密失败" in str(exc_info.value)

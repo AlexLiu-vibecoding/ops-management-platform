@@ -318,6 +318,7 @@ class TestCacheService:
         """测试带Redis的失效模式"""
         mock_redis = Mock()
         mock_redis.keys.return_value = ["ops:user:1", "ops:user:2"]
+        mock_redis.delete.return_value = 2
         service = CacheService(redis_client=mock_redis)
 
         count = service.invalidate_pattern("user:*")

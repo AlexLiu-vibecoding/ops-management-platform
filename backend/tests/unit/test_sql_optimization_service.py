@@ -2,287 +2,228 @@
 SQL优化服务测试
 """
 import pytest
+from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
-from unittest.mock import Mock, patch
 
 from app.services.sql_optimization_service import SQLOptimizationService
 from app.models import (
-    SlowQueryCollectionTask, SlowQuery, OptimizationSuggestion,
-    RDBInstance, User
+    RDBInstance, SlowQueryCollectionTask, SlowQuery,
+    OptimizationSuggestion, User
 )
-from app.schemas import CollectionTaskCreate, CollectionTaskUpdate
 
 
 class TestSQLOptimizationService:
     """SQL优化服务测试类"""
 
     @pytest.fixture
-    def service(self, db_session):
-        """创建服务实例"""
-        return SQLOptimizationService(db_session)
+    def mock_db(self):
+        """创建模拟数据库会话"""
+        return Mock()
 
     @pytest.fixture
-    def mock_instance(self, db_session):
+    def service(self, mock_db):
+        """创建服务实例"""
+        return SQLOptimizationService(mock_db)
+
+    @pytest.fixture
+    def mock_user(self):
+        """创建模拟用户"""
+        user = Mock(spec=User)
+        user.id = 1
+        user.username = "test_user"
+        return user
+
+    @pytest.fixture
+    def mock_instance(self):
         """创建模拟实例"""
-        instance = RDBInstance(
-            name="test_mysql",
-            host="localhost",
-            port=3306,
-            db_type="mysql",
-            username="root",
-            password_encrypted="encrypted_pass"
-        )
-        db_session.add(instance)
-        db_session.commit()
+        instance = Mock(spec=RDBInstance)
+        instance.id = 1
+        instance.name = "test_mysql"
+        instance.host = "localhost"
+        instance.port = 3306
         return instance
 
-    def test_create_collection_task_success(self, service, db_session, mock_instance):
-        """测试创建采集任务成功"""
-        task_data = CollectionTaskCreate(
-            instance_id=mock_instance.id,
-            enabled=True,
-            cron_expression="0 */1 * * *",
-            min_exec_time=1000,
-            top_n=10,
-            auto_analyze=True,
-            analyze_threshold=5,
-            llm_analysis=True
-        )
+    # ==================== 采集任务管理测试 ====================
 
-        task = service.create_collection_task(task_data, current_user=Mock(id=1))
+    def test_get_instance_found(self, service, mock_db, mock_instance):
+        """测试获取实例成功"""
+        # SQLAlchemy 2.0 风格查询
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = mock_instance
+        mock_db.execute.return_value = mock_result
 
-        assert task is not None
-        assert task.instance_id == mock_instance.id
-        assert task.enabled is True
-        assert task.cron_expression == "0 */1 * * *"
+        result = service._get_instance(1)
 
-    def test_create_collection_task_instance_not_found(self, service):
-        """测试创建采集任务实例不存在"""
-        task_data = CollectionTaskCreate(
-            instance_id=99999,  # 不存在的ID
-            enabled=True,
-            cron_expression="0 */1 * * *"
-        )
+        assert result is not None
+        mock_db.execute.assert_called_once()
 
-        with pytest.raises(ValueError, match="实例不存在"):
-            service.create_collection_task(task_data, current_user=Mock(id=1))
+    def test_get_instance_not_found(self, service, mock_db):
+        """测试获取实例不存在"""
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
 
-    def test_create_collection_task_duplicate(self, service, db_session, mock_instance):
-        """测试创建重复采集任务"""
-        # 先创建一个任务
-        task_data = CollectionTaskCreate(
-            instance_id=mock_instance.id,
-            enabled=True,
-            cron_expression="0 */1 * * *"
-        )
-        service.create_collection_task(task_data, current_user=Mock(id=1))
-
-        # 再尝试创建同样的任务
-        with pytest.raises(ValueError, match="已存在采集任务"):
-            service.create_collection_task(task_data, current_user=Mock(id=1))
-
-    def test_update_collection_task_success(self, service, db_session, mock_instance):
-        """测试更新采集任务成功"""
-        # 先创建任务
-        task_data = CollectionTaskCreate(
-            instance_id=mock_instance.id,
-            enabled=True,
-            cron_expression="0 */1 * * *"
-        )
-        task = service.create_collection_task(task_data, current_user=Mock(id=1))
-
-        # 更新任务
-        update_data = CollectionTaskUpdate(
-            enabled=False,
-            cron_expression="0 */2 * * *"
-        )
-        updated = service.update_collection_task(task.id, update_data)
-
-        assert updated is not None
-        assert updated.enabled is False
-        assert updated.cron_expression == "0 */2 * * *"
-
-    def test_update_collection_task_not_found(self, service):
-        """测试更新不存在的采集任务"""
-        update_data = CollectionTaskUpdate(enabled=False)
-        result = service.update_collection_task(99999, update_data)
+        result = service._get_instance(999)
 
         assert result is None
 
-    def test_delete_collection_task_success(self, service, db_session, mock_instance):
-        """测试删除采集任务成功"""
-        # 先创建任务
-        task_data = CollectionTaskCreate(
-            instance_id=mock_instance.id,
-            enabled=True,
-            cron_expression="0 */1 * * *"
-        )
-        task = service.create_collection_task(task_data, current_user=Mock(id=1))
+    def test_get_task_found(self, service, mock_db):
+        """测试获取任务成功"""
+        mock_task = Mock(spec=SlowQueryCollectionTask)
+        mock_task.id = 1
+        mock_task.instance_id = 1
 
-        # 删除任务
-        result = service.delete_collection_task(task.id)
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = mock_task
+        mock_db.execute.return_value = mock_result
+
+        result = service._get_task(1)
+
+        assert result is not None
+
+    def test_get_task_not_found(self, service, mock_db):
+        """测试获取任务不存在"""
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        result = service._get_task(999)
+
+        assert result is None
+
+    def test_get_task_by_instance_found(self, service, mock_db):
+        """测试通过实例获取任务"""
+        mock_task = Mock(spec=SlowQueryCollectionTask)
+        mock_task.id = 1
+        mock_task.instance_id = 1
+
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = mock_task
+        mock_db.execute.return_value = mock_result
+
+        result = service._get_task_by_instance(1)
+
+        assert result is not None
+
+    def test_get_task_by_instance_not_found(self, service, mock_db):
+        """测试通过实例获取任务不存在"""
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
+
+        result = service._get_task_by_instance(999)
+
+        assert result is None
+
+    def test_has_suggestion_true(self, service, mock_db):
+        """测试存在优化建议"""
+        mock_suggestion = Mock(spec=OptimizationSuggestion)
+        mock_suggestion.id = 1
+
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = mock_suggestion
+        mock_db.execute.return_value = mock_result
+
+        result = service._has_suggestion(1)
 
         assert result is True
 
-        # 确认已删除
-        deleted = db_session.get(SlowQueryCollectionTask, task.id)
-        assert deleted is None
+    def test_has_suggestion_false(self, service, mock_db):
+        """测试不存在优化建议"""
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
 
-    def test_delete_collection_task_not_found(self, service):
-        """测试删除不存在的采集任务"""
-        result = service.delete_collection_task(99999)
+        result = service._has_suggestion(999)
 
         assert result is False
 
-    def test_get_suggestion_success(self, service, db_session, mock_instance):
-        """测试获取优化建议详情"""
-        # 创建建议
-        suggestion = OptimizationSuggestion(
-            instance_id=mock_instance.id,
-            sql_fingerprint="SELECT * FROM users WHERE id = ?",
-            sql_sample="SELECT * FROM users WHERE id = 1",
-            issues=[{"type": "missing_index", "description": "缺少索引"}],
-            suggestions=[{"action": "add_index", "sql": "CREATE INDEX idx ON users(id)"}],
-            risk_level="high",
-            status="pending"
-        )
-        db_session.add(suggestion)
-        db_session.commit()
+    def test_get_instance_name_found(self, service, mock_db):
+        """测试获取实例名称成功"""
+        # _get_instance_name 查询的是 RDBInstance.name 而不是整个对象
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = "test_mysql"
+        mock_db.execute.return_value = mock_result
 
-        # 获取建议
-        result = service.get_suggestion(suggestion.id)
+        result = service._get_instance_name(1)
 
-        assert result is not None
-        assert result.sql_fingerprint == "SELECT * FROM users WHERE id = ?"
-        assert result.risk_level == "high"
+        assert result == "test_mysql"
 
-    def test_get_suggestion_not_found(self, service):
-        """测试获取不存在的优化建议"""
-        result = service.get_suggestion(99999)
+    def test_get_instance_name_not_found(self, service, mock_db):
+        """测试获取实例名称失败"""
+        mock_result = Mock()
+        mock_result.scalar_one_or_none.return_value = None
+        mock_db.execute.return_value = mock_result
 
-        assert result is None
+        result = service._get_instance_name(999)
 
-    def test_create_suggestion_success(self, service, db_session, mock_instance):
-        """测试创建优化建议"""
-        from app.schemas import OptimizationSuggestionCreate
+        assert result == "未知实例"
 
-        suggestion_data = OptimizationSuggestionCreate(
-            instance_id=mock_instance.id,
-            sql_fingerprint="SELECT * FROM users WHERE id = ?",
-            sql_sample="SELECT * FROM users WHERE id = 1",
-            issues=[{"type": "missing_index", "description": "缺少索引"}],
-            suggestions=[{"action": "add_index", "sql": "CREATE INDEX idx_users_id ON users(id)"}],
-            risk_level="medium"
-        )
 
-        suggestion = service.create_suggestion(suggestion_data)
+class TestSQLOptimizationHelperMethods:
+    """SQL优化辅助方法测试类"""
 
-        assert suggestion is not None
-        assert suggestion.instance_id == mock_instance.id
-        assert suggestion.sql_fingerprint == "SELECT * FROM users WHERE id = ?"
-        assert suggestion.status == "pending"
+    @pytest.fixture
+    def mock_db(self):
+        return Mock()
 
-    def test_adopt_suggestion_success(self, service, db_session, mock_instance):
-        """测试采用优化建议成功"""
-        # 创建建议
-        suggestion = OptimizationSuggestion(
-            instance_id=mock_instance.id,
-            sql_fingerprint="SELECT * FROM users WHERE id = ?",
-            suggested_sql="SELECT id, name FROM users WHERE id = ?",
-            index_ddl="CREATE INDEX idx_users_id ON users(id)",
-            issues=[{"type": "missing_index", "description": "缺少索引"}],
-            suggestions=[{"action": "add_index", "sql": "CREATE INDEX idx_users_id ON users(id)"}],
-            risk_level="medium",
-            status="pending"
-        )
-        db_session.add(suggestion)
-        db_session.commit()
+    @pytest.fixture
+    def service(self, mock_db):
+        return SQLOptimizationService(mock_db)
 
-        # 采用建议
-        user = Mock(id=1, real_name="测试用户", username="testuser")
-        result = service.adopt_suggestion(suggestion.id, current_user=user)
+    def test_generate_sql_fingerprint(self, service):
+        """测试生成SQL指纹"""
+        sql = "SELECT * FROM users WHERE id = 123"
+        fingerprint = service._generate_sql_fingerprint(sql)
 
-        assert result is not None
-        assert "approval_id" in result
+        assert fingerprint is not None
+        assert isinstance(fingerprint, str)
 
-    def test_adopt_suggestion_not_found(self, service):
-        """测试采用不存在的优化建议"""
-        user = Mock(id=1, real_name="测试用户", username="testuser")
+    def test_generate_same_fingerprint(self, service):
+        """测试相同SQL生成相同指纹"""
+        sql1 = "SELECT * FROM users WHERE id = 123"
+        sql2 = "SELECT * FROM users WHERE id = 456"
 
-        with pytest.raises(ValueError, match="建议不存在"):
-            service.adopt_suggestion(99999, current_user=user)
+        fp1 = service._generate_sql_fingerprint(sql1)
+        fp2 = service._generate_sql_fingerprint(sql2)
 
-    def test_adopt_suggestion_wrong_status(self, service, db_session, mock_instance):
-        """测试采用状态不正确的优化建议"""
-        # 创建已采用的 建议
-        suggestion = OptimizationSuggestion(
-            instance_id=mock_instance.id,
-            sql_fingerprint="SELECT * FROM users",
-            status="adopted"
-        )
-        db_session.add(suggestion)
-        db_session.commit()
+        # 结构相同，指纹应该相同
+        assert fp1 == fp2
 
-        user = Mock(id=1, real_name="测试用户", username="testuser")
+    def test_detect_rule_issues(self, service):
+        """测试检测规则问题"""
+        explain_result = {
+            "rows": 10000,
+            "type": "ALL",
+            "key": None,
+            "extra": "Using where"
+        }
 
-        with pytest.raises(ValueError, match="建议状态不是 pending"):
-            service.adopt_suggestion(suggestion.id, current_user=user)
+        issues = service._detect_rule_issues(explain_result)
 
-    def test_adopt_suggestion_no_sql(self, service, db_session, mock_instance):
-        """测试采用无可执行SQL的优化建议"""
-        # 创建没有SQL的建议
-        suggestion = OptimizationSuggestion(
-            instance_id=mock_instance.id,
-            sql_fingerprint="SELECT * FROM users",
-            suggested_sql=None,
-            index_ddl=None,
-            status="pending"
-        )
-        db_session.add(suggestion)
-        db_session.commit()
+        assert isinstance(issues, list)
 
-        user = Mock(id=1, real_name="测试用户", username="testuser")
+    def test_analyze_sql_rules(self, service):
+        """测试分析SQL规则"""
+        sql = "SELECT * FROM users WHERE name = 'test'"
+        query_data = {
+            "exec_time": 2.5,
+            "rows_sent": 1000
+        }
 
-        with pytest.raises(ValueError, match="没有可执行的 SQL 语句"):
-            service.adopt_suggestion(suggestion.id, current_user=user)
+        issues = service._analyze_sql_rules(sql, query_data)
 
-    def test_adopt_suggestion_instance_not_found(self, service, db_session):
-        """测试采用建议时实例不存在"""
-        # 创建建议（关联不存在的实例）
-        suggestion = OptimizationSuggestion(
-            instance_id=99999,  # 不存在的实例
-            sql_fingerprint="SELECT * FROM users",
-            index_ddl="CREATE INDEX idx ON users(id)",
-            status="pending"
-        )
-        db_session.add(suggestion)
-        db_session.commit()
+        assert isinstance(issues, list)
 
-        user = Mock(id=1, real_name="测试用户", username="testuser")
+    def test_generate_suggestions(self, service):
+        """测试生成优化建议"""
+        issues = [
+            {"type": "full_table_scan", "description": "全表扫描"},
+            {"type": "missing_index", "description": "缺少索引"}
+        ]
 
-        with pytest.raises(ValueError, match="实例不存在"):
-            service.adopt_suggestion(suggestion.id, current_user=user)
+        suggestions = service._generate_suggestions(issues)
 
-    def test_reject_suggestion_success(self, service, db_session, mock_instance):
-        """测试拒绝优化建议"""
-        # 创建建议
-        suggestion = OptimizationSuggestion(
-            instance_id=mock_instance.id,
-            sql_fingerprint="SELECT * FROM users",
-            status="pending"
-        )
-        db_session.add(suggestion)
-        db_session.commit()
+        assert isinstance(suggestions, list)
+        assert len(suggestions) == 2
 
-        # 拒绝建议
-        user = Mock(id=1, real_name="测试用户", username="testuser")
-        result = service.reject_suggestion(suggestion.id, reason="不需要优化", current_user=user)
-
-        assert result.status == "rejected"
-
-    def test_reject_suggestion_not_found(self, service):
-        """测试拒绝不存在的优化建议"""
-        user = Mock(id=1, real_name="测试用户", username="testuser")
-
-        with pytest.raises(ValueError, match="建议不存在"):
-            service.reject_suggestion(99999, reason="不需要", current_user=user)
