@@ -14,7 +14,7 @@ router = APIRouter(prefix="/audit", tags=["审计日志"])
 
 
 # 操作类型中英文映射
-OPERATION_TYPE_MAP: Dict[str, Dict[str, str]] = {
+OPERATION_TYPE_MAP: dict[str, dict[str, str]] = {
     "login": {"zh": "登录", "en": "Login"},
     "logout": {"zh": "登出", "en": "Logout"},
     "create_instance": {"zh": "创建实例", "en": "Create Instance"},
@@ -178,7 +178,7 @@ async def export_audit_logs(
     
     # 写入表头
     writer.writerow([
-        'ID', '用户名', '实例', '环境', '操作类型', 
+        'ID', '用户名', '实例', '环境', '操作类型',
         '操作详情', '请求IP', '请求方法', '请求路径',
         '响应码', '响应消息', '执行时间(ms)', '创建时间'
     ])

@@ -141,9 +141,9 @@ class ApprovalScheduler:
             
             approvals = db.query(ApprovalRecord).filter(
                 ApprovalRecord.status == ApprovalStatus.APPROVED,
-                ApprovalRecord.scheduled_time != None,
+                ApprovalRecord.scheduled_time is not None,
                 ApprovalRecord.scheduled_time <= now,
-                ApprovalRecord.execute_time == None
+                ApprovalRecord.execute_time is None
             ).all()
             
             for approval in approvals:
@@ -302,7 +302,7 @@ class ApprovalScheduler:
                         ApprovalStatus.REJECTED,
                         ApprovalStatus.FAILED
                     ]),
-                    ApprovalRecord.sql_file_path != None
+                    ApprovalRecord.sql_file_path is not None
                 ).all()
                 
                 cleaned_count = 0
@@ -446,8 +446,8 @@ class ApprovalScheduler:
             logger.info("开始刷新 AI 可用模型列表")
             
             # 获取所有启用的模型配置
-            configs = db.query(AIModelConfig).filter(AIModelConfig.is_enabled == True).all()
-            providers = set(c.provider for c in configs)
+            configs = db.query(AIModelConfig).filter(AIModelConfig.is_enabled).all()
+            providers = {c.provider for c in configs}
             
             refreshed_count = 0
             

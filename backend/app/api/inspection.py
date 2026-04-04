@@ -11,8 +11,8 @@ import json
 
 from app.database import get_db
 from app.models import (
-    InspectMetric, InspectResult, InspectionReport, 
-    RDBInstance, User, SlowQuery, IndexAnalysis, 
+    InspectMetric, InspectResult, InspectionReport,
+    RDBInstance, User, SlowQuery, IndexAnalysis,
     ReplicationStatus, LongTransaction, LockWait
 )
 from app.schemas import MessageResponse
@@ -52,7 +52,7 @@ class InspectMetricUpdate(BaseModel):
 class InspectionRunRequest(BaseModel):
     """执行巡检请求"""
     instance_id: int = Field(..., description="实例ID")
-    modules: Optional[List[str]] = Field(None, description="检查模块列表，为空则检查全部")
+    modules: Optional[list[str]] = Field(None, description="检查模块列表，为空则检查全部")
 
 
 # ==================== Constants ====================
@@ -205,7 +205,7 @@ async def run_inspection(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="实例不存在")
     
     # 获取启用的巡检指标
-    query = db.query(InspectMetric).filter(InspectMetric.is_enabled == True)
+    query = db.query(InspectMetric).filter(InspectMetric.is_enabled)
     if data.modules:
         query = query.filter(InspectMetric.module.in_(data.modules))
     
@@ -246,7 +246,7 @@ async def run_inspection(
     }
 
 
-async def _run_single_check(instance: RDBInstance, metric: InspectMetric, db: Session, check_time: datetime) -> Dict[str, Any]:
+async def _run_single_check(instance: RDBInstance, metric: InspectMetric, db: Session, check_time: datetime) -> dict[str, Any]:
     """执行单个巡检检查"""
     
     status = "normal"

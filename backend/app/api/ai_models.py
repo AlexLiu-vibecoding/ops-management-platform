@@ -65,7 +65,7 @@ class AISceneConfigUpdate(BaseModel):
     """更新场景配置"""
     model_config_id: int = Field(..., description="关联的模型配置ID")
     custom_prompt: Optional[str] = Field(None, description="自定义提示词")
-    custom_params: Optional[Dict[str, Any]] = Field(None, description="自定义参数")
+    custom_params: Optional[dict[str, Any]] = Field(None, description="自定义参数")
     is_enabled: bool = Field(True, description="是否启用")
 
 
@@ -129,7 +129,7 @@ def config_to_response(config: AIModelConfig, db: Session = None) -> dict:
         available_model = db.query(AIAvailableModel).filter(
             AIAvailableModel.provider == config.provider,
             AIAvailableModel.model_id == config.model_name,
-            AIAvailableModel.is_available == True
+            AIAvailableModel.is_available
         ).first()
         result["is_model_available"] = available_model is not None
 
@@ -303,7 +303,7 @@ async def delete_ai_model(
     
     if linked_scenes > 0:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"该模型被 {linked_scenes} 个场景使用，请先修改场景配置"
         )
     
@@ -667,7 +667,7 @@ async def list_available_models(
     """
     from app.models.ai_model import AIAvailableModel
     
-    query = db.query(AIAvailableModel).filter(AIAvailableModel.is_available == True)
+    query = db.query(AIAvailableModel).filter(AIAvailableModel.is_available)
     
     if provider:
         query = query.filter(AIAvailableModel.provider == provider)
@@ -712,9 +712,9 @@ async def refresh_available_models(
     errors = []
     
     # 1. 获取所有启用的模型配置，按提供商分组
-    configs = db.query(AIModelConfig).filter(AIModelConfig.is_enabled == True).all()
+    configs = db.query(AIModelConfig).filter(AIModelConfig.is_enabled).all()
     
-    providers_to_fetch = set(c.provider for c in configs)
+    providers_to_fetch = {c.provider for c in configs}
     
     for provider in providers_to_fetch:
         try:
@@ -763,7 +763,7 @@ async def refresh_available_models(
             unavailable_count = db.query(AIAvailableModel).filter(
                 AIAvailableModel.provider == provider,
                 AIAvailableModel.model_id.notin_(current_model_ids),
-                AIAvailableModel.is_available == True
+                AIAvailableModel.is_available
             ).update({
                 "is_available": False,
                 "updated_at": datetime.now()
@@ -786,7 +786,7 @@ async def refresh_available_models(
     }
 
 
-def _fetch_doubao_models() -> List[Dict]:
+def _fetch_doubao_models() -> list[dict]:
     """
     获取豆包可用模型列表
 
@@ -810,7 +810,7 @@ def _fetch_doubao_models() -> List[Dict]:
     ]
 
 
-async def _fetch_openai_models(config: AIModelConfig) -> List[Dict]:
+async def _fetch_openai_models(config: AIModelConfig) -> list[dict]:
     """
     从 OpenAI 兼容 API 获取模型列表
     """

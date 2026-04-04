@@ -49,13 +49,13 @@ class ServiceContainer:
     """
     
     def __init__(self):
-        self._factories: Dict[Type, Callable] = {}
-        self._singletons: Dict[Type, Any] = {}
-        self._request_factories: Dict[Type, Callable] = {}
+        self._factories: dict[type, Callable] = {}
+        self._singletons: dict[type, Any] = {}
+        self._request_factories: dict[type, Callable] = {}
     
     def register_factory(
-        self, 
-        service_type: Type[T], 
+        self,
+        service_type: type[T],
         factory: Callable[..., T]
     ) -> None:
         """
@@ -67,7 +67,7 @@ class ServiceContainer:
         """
         self._factories[service_type] = factory
     
-    def register_singleton(self, service_type: Type[T], instance: T) -> None:
+    def register_singleton(self, service_type: type[T], instance: T) -> None:
         """
         注册单例实例
         
@@ -79,7 +79,7 @@ class ServiceContainer:
     
     def register_request_factory(
         self,
-        service_type: Type[T],
+        service_type: type[T],
         factory: Callable[[Session], T]
     ) -> None:
         """
@@ -93,7 +93,7 @@ class ServiceContainer:
         """
         self._request_factories[service_type] = factory
     
-    def get_singleton(self, service_type: Type[T]) -> Optional[T]:
+    def get_singleton(self, service_type: type[T]) -> Optional[T]:
         """
         获取单例实例
         
@@ -105,7 +105,7 @@ class ServiceContainer:
         """
         return self._singletons.get(service_type)
     
-    def get_factory(self, service_type: Type[T]) -> Optional[Callable]:
+    def get_factory(self, service_type: type[T]) -> Optional[Callable]:
         """
         获取服务工厂
         
@@ -117,7 +117,7 @@ class ServiceContainer:
         """
         return self._factories.get(service_type) or self._request_factories.get(service_type)
     
-    def create(self, service_type: Type[T], db: Session) -> T:
+    def create(self, service_type: type[T], db: Session) -> T:
         """
         创建服务实例
         
@@ -182,7 +182,7 @@ def ensure_services_registered() -> None:
 
 # ==================== FastAPI 依赖注入辅助函数 ====================
 
-def get_service(service_type: Type[T]) -> Callable:
+def get_service(service_type: type[T]) -> Callable:
     """
     创建 FastAPI 依赖项
     

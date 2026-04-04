@@ -8,13 +8,13 @@ from app.database import Base
 import enum
 
 
-class AggregationMethod(str, enum.Enum):
+class AggregationMethod(enum.StrEnum):
     """聚合方法枚举"""
     COUNT = "count"
     SUMMARY = "summary"
 
 
-class SilenceType(str, enum.Enum):
+class SilenceType(enum.StrEnum):
     """静默类型枚举"""
     ONCE = "once"
     DAILY = "daily"

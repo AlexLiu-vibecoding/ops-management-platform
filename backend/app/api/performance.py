@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database import get_db
 from app.models import (
-    PerformanceMetric, RDBInstance, MonitorSwitch, 
+    PerformanceMetric, RDBInstance, MonitorSwitch,
     MonitorType, User
 )
 from app.schemas import PerformanceMetricResponse, MessageResponse
@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 def generate_mock_metrics(instance_id: int, hours: int = 1):
     """生成模拟的性能数据用于演示"""
-    import os
     
     # 仅在开发环境生成模拟数据
     if os.getenv("COZE_PROJECT_ENV", "DEV") != "DEV":
@@ -307,7 +306,7 @@ async def get_performance_statistics(
     }
 
 
-@router.get("/overview", response_model=List[dict])
+@router.get("/overview", response_model=list[dict])
 async def get_performance_overview(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

@@ -6,14 +6,14 @@ import hmac
 import time
 import urllib.parse
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from typing import Optional, List, Dict, Any
 import httpx
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models import (
-    NotificationBinding, ApprovalRecord, 
+    NotificationBinding, ApprovalRecord,
     ApprovalStatus, RDBInstance, RedisInstance, User, ScheduledTask, ScriptExecution,
     NotificationLog
 )
@@ -43,8 +43,8 @@ class NotificationService:
         # 查询匹配的模板
         query = db.query(NotificationTemplate).filter(
             NotificationTemplate.notification_type == notification_type,
-            NotificationTemplate.is_enabled == True,
-            NotificationTemplate.is_default == True
+            NotificationTemplate.is_enabled,
+            NotificationTemplate.is_default
         )
         
         if sub_type:
@@ -109,7 +109,7 @@ class NotificationService:
         try:
             title = title_template.format(**kwargs)
             content = content_template.format(**kwargs)
-        except KeyError as e:
+        except KeyError:
             # 如果缺少变量，使用简单替换（替换存在的变量，保留不存在的）
             title = title_template
             content = content_template
@@ -187,7 +187,7 @@ class NotificationService:
         log.error_message = error_message
         log.response_code = response_code
         log.response_data = response_data
-        log.sent_at = datetime.now(timezone.utc)
+        log.sent_at = datetime.now(UTC)
         db.commit()
     
     @staticmethod
@@ -217,7 +217,7 @@ class NotificationService:
         return aes_cipher.encrypt(final_token)
     
     @staticmethod
-    def verify_approval_token(token: str) -> Optional[Dict[str, Any]]:
+    def verify_approval_token(token: str) -> Optional[dict[str, Any]]:
         """
         验证审批令牌
         
@@ -307,11 +307,11 @@ class NotificationService:
     @staticmethod
     async def send_dingtalk_message(
         webhook: str,
-        message: Dict[str, Any],
+        message: dict[str, Any],
         auth_type: str = "none",
         secret: str = None,
-        keywords: List[str] = None
-    ) -> Dict[str, Any]:
+        keywords: list[str] = None
+    ) -> dict[str, Any]:
         """
         发送钉钉消息
         
@@ -572,7 +572,7 @@ class NotificationService:
         for binding in bindings:
             channel = db.query(NotificationChannel).filter(
                 NotificationChannel.id == binding.channel_id,
-                NotificationChannel.is_enabled == True
+                NotificationChannel.is_enabled
             ).first()
             
             if not channel:
@@ -585,9 +585,9 @@ class NotificationService:
             # 获取通道配置
             config = channel.config or {}
             webhook = config.get("webhook")
-            auth_type = config.get("auth_type", "none")
+            config.get("auth_type", "none")
             secret_encrypted = config.get("secret")
-            keywords = config.get("keywords", [])
+            config.get("keywords", [])
             
             if not webhook:
                 continue
@@ -748,7 +748,7 @@ class NotificationService:
         # 使用新的通知通道系统
         channels = db.query(NotificationChannel).filter(
             NotificationChannel.id.in_(channel_ids),
-            NotificationChannel.is_enabled == True
+            NotificationChannel.is_enabled
         ).all()
         
         logger.info(f"找到 {len(channels)} 个启用的通知通道")
@@ -972,7 +972,7 @@ class NotificationService:
             
             channel = db.query(NotificationChannel).filter(
                 NotificationChannel.id == binding.channel_id,
-                NotificationChannel.is_enabled == True
+                NotificationChannel.is_enabled
             ).first()
             
             if not channel:
@@ -994,7 +994,7 @@ class NotificationService:
                         env_id = instance.environment_id
                 
                 if env_id and binding.environment_id != env_id:
-                    logger.info(f"环境不匹配，跳过")
+                    logger.info("环境不匹配，跳过")
                     continue
             
             logger.info(f"准备发送告警通知到通道: {channel.name}")
@@ -1002,9 +1002,9 @@ class NotificationService:
             # 获取通道配置
             config = channel.config or {}
             webhook = config.get("webhook")
-            auth_type = config.get("auth_type", "none")
+            config.get("auth_type", "none")
             secret_encrypted = config.get("secret")
-            keywords = config.get("keywords", [])
+            config.get("keywords", [])
             
             if not webhook:
                 logger.warning(f"通道 {channel.name} 未配置 webhook")

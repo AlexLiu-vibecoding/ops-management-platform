@@ -45,7 +45,7 @@ class PermissionService:
         permissions = self.get_role_permissions(role_value)
         return permission_code in permissions
     
-    def get_role_permissions(self, role: str) -> Set[str]:
+    def get_role_permissions(self, role: str) -> set[str]:
         """
         获取角色的权限列表
         
@@ -63,7 +63,7 @@ class PermissionService:
         # 从数据库获取
         role_perms = self.db.query(RolePermission).join(Permission).filter(
             RolePermission.role == role,
-            Permission.is_enabled == True
+            Permission.is_enabled
         ).all()
         
         if role_perms:
@@ -174,7 +174,7 @@ class PermissionService:
 
     # ==================== 数据权限 ====================
     
-    def get_user_environment_ids(self, user: User) -> Set[int]:
+    def get_user_environment_ids(self, user: User) -> set[int]:
         """
         获取用户可访问的环境ID列表
         
@@ -227,8 +227,8 @@ class PermissionService:
     # ==================== 保护级别检查 ====================
     
     def check_batch_operation_allowed(
-        self, 
-        user: User, 
+        self,
+        user: User,
         environment_id: int,
         operation_count: int
     ) -> tuple[bool, str]:
@@ -349,7 +349,7 @@ class PermissionService:
 
     # ==================== 权限管理方法 ====================
     
-    def get_permissions(self, module: Optional[str] = None, category: Optional[str] = None) -> List[Permission]:
+    def get_permissions(self, module: Optional[str] = None, category: Optional[str] = None) -> list[Permission]:
         """
         获取权限列表
         
@@ -391,7 +391,7 @@ class PermissionService:
         """
         return self.db.query(Permission).filter(Permission.id == permission_id).first()
     
-    def create_permission(self, code: str, name: str, category: str = "button", 
+    def create_permission(self, code: str, name: str, category: str = "button",
                           module: Optional[str] = None, description: Optional[str] = None,
                           parent_id: Optional[int] = None, sort_order: int = 0) -> Permission:
         """
@@ -468,7 +468,7 @@ class PermissionService:
     
     # ==================== 角色权限管理方法 ====================
     
-    def get_role_permission_ids(self, role: str) -> List[int]:
+    def get_role_permission_ids(self, role: str) -> list[int]:
         """
         获取角色的权限 ID 列表
         
@@ -493,7 +493,7 @@ class PermissionService:
         """
         return self.db.query(RolePermission).filter(RolePermission.role == role).count()
     
-    def update_role_permissions(self, role: str, permission_ids: List[int]) -> None:
+    def update_role_permissions(self, role: str, permission_ids: list[int]) -> None:
         """
         更新角色权限
         
@@ -513,7 +513,7 @@ class PermissionService:
     
     # ==================== 角色环境权限管理方法 ====================
     
-    def get_role_environment_ids(self, role: str) -> List[int]:
+    def get_role_environment_ids(self, role: str) -> list[int]:
         """
         获取角色的环境权限 ID 列表
         
@@ -538,7 +538,7 @@ class PermissionService:
         """
         return self.db.query(RoleEnvironment).filter(RoleEnvironment.role == role).count()
     
-    def update_role_environments(self, role: str, environment_ids: List[int]) -> None:
+    def update_role_environments(self, role: str, environment_ids: list[int]) -> None:
         """
         更新角色的环境权限
         
@@ -558,7 +558,7 @@ class PermissionService:
     
     # ==================== 用户角色管理方法 ====================
     
-    def get_users_by_role(self, role: str) -> List[User]:
+    def get_users_by_role(self, role: str) -> list[User]:
         """
         获取指定角色的用户列表
         
@@ -582,7 +582,7 @@ class PermissionService:
         """
         return self.db.query(User).filter(User.role == UserRole(role)).count()
     
-    def get_users_not_in_role(self, role: str, search: Optional[str] = None, limit: int = 100) -> List[User]:
+    def get_users_not_in_role(self, role: str, search: Optional[str] = None, limit: int = 100) -> list[User]:
         """
         获取不属于指定角色的用户列表
         
@@ -633,11 +633,11 @@ class BatchOperationService:
         self.permission_service = permission_service
     
     def filter_by_data_permission(
-        self, 
-        user: User, 
-        items: List, 
+        self,
+        user: User,
+        items: list,
         environment_field: str = "environment_id"
-    ) -> tuple[List, List]:
+    ) -> tuple[list, list]:
         """
         按数据权限过滤项目
         
@@ -668,7 +668,7 @@ class BatchOperationService:
         user: User,
         operation_type: str,
         resource_type: str,
-        resource_ids: List[int],
+        resource_ids: list[int],
         results: dict,
         request_ip: str = None
     ) -> BatchOperationLog:

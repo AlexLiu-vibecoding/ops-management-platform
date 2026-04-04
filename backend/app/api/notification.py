@@ -31,7 +31,7 @@ class ChannelCreate(BaseModel):
     webhook: Optional[str] = Field(None, description="Webhook地址")
     auth_type: str = Field("none", description="验证类型: none/keyword/sign/token")
     secret: Optional[str] = Field(None, description="密钥")
-    keywords: Optional[List[str]] = Field(None, description="关键词列表")
+    keywords: Optional[list[str]] = Field(None, description="关键词列表")
     # 邮件配置
     smtp_host: Optional[str] = None
     smtp_port: Optional[int] = 465
@@ -47,7 +47,7 @@ class ChannelUpdate(BaseModel):
     webhook: Optional[str] = None
     auth_type: Optional[str] = None
     secret: Optional[str] = None
-    keywords: Optional[List[str]] = None
+    keywords: Optional[list[str]] = None
     smtp_host: Optional[str] = None
     smtp_port: Optional[int] = None
     smtp_user: Optional[str] = None

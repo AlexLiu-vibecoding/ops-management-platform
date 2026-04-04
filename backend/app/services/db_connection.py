@@ -584,7 +584,7 @@ class RedisConnectionManager:
     def __init__(self):
         self._connection_cache: dict[int, Any] = {}
     
-    def _get_credentials(self, instance: 'RedisInstance') -> Tuple[str, int, Optional[str], int]:
+    def _get_credentials(self, instance: 'RedisInstance') -> tuple[str, int, Optional[str], int]:
         """
         获取 Redis 实例连接凭证
         
@@ -657,7 +657,7 @@ class RedisConnectionManager:
             if conn:
                 conn.close()
     
-    async def test_connection(self, instance: 'RedisInstance') -> Dict[str, Any]:
+    async def test_connection(self, instance: 'RedisInstance') -> dict[str, Any]:
         """
         测试 Redis 连接
         
@@ -677,7 +677,7 @@ class RedisConnectionManager:
         except Exception as e:
             return {'success': False, 'message': f'连接失败: {str(e)}'}
     
-    async def get_info(self, instance: 'RedisInstance') -> Dict[str, Any]:
+    async def get_info(self, instance: 'RedisInstance') -> dict[str, Any]:
         """
         获取 Redis 信息
         
@@ -687,7 +687,7 @@ class RedisConnectionManager:
         with self.connection(instance) as r:
             return r.info()
     
-    async def get_memory_stats(self, instance: 'RedisInstance') -> Dict[str, Any]:
+    async def get_memory_stats(self, instance: 'RedisInstance') -> dict[str, Any]:
         """
         获取 Redis 内存统计
         """
@@ -759,7 +759,7 @@ class ConnectionFactory:
 # 导出
 __all__ = [
     'DatabaseConnectionManager',
-    'RedisConnectionManager', 
+    'RedisConnectionManager',
     'ConnectionFactory',
     'db_manager',
     'redis_manager',

@@ -263,7 +263,7 @@ async def check_lock_waits(
     try:
         # 查询锁等待
         lock_query = """
-        SELECT 
+        SELECT
             r.trx_id AS waiting_trx_id,
             r.trx_mysql_thread_id AS waiting_thread_id,
             r.trx_query AS waiting_query,
@@ -389,7 +389,7 @@ async def check_long_transactions(
     try:
         # 查询长事务
         trx_query = """
-        SELECT 
+        SELECT
             trx_id,
             trx_mysql_thread_id,
             trx_started,

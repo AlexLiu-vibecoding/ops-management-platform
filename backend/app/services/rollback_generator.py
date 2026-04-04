@@ -62,7 +62,7 @@ class RollbackGenerator:
             SQLType.DELETE: re.compile(r'^\s*DELETE\s+FROM\s+[`"]?(\w+)[`"]?', re.IGNORECASE | re.MULTILINE),
         }
     
-    def analyze_sql(self, sql: str) -> List[Tuple[SQLType, str, str]]:
+    def analyze_sql(self, sql: str) -> list[tuple[SQLType, str, str]]:
         """
         分析SQL语句
         
@@ -91,7 +91,7 @@ class RollbackGenerator:
         
         return results
     
-    def generate_rollback_sql(self, sql: str, db_connection=None) -> List[RollbackResult]:
+    def generate_rollback_sql(self, sql: str, db_connection=None) -> list[RollbackResult]:
         """
         生成回滚SQL
         
@@ -112,9 +112,9 @@ class RollbackGenerator:
         return results
     
     def _generate_single_rollback(
-        self, 
-        sql_type: SQLType, 
-        table: Optional[str], 
+        self,
+        sql_type: SQLType,
+        table: Optional[str],
         original_sql: str,
         db_connection=None
     ) -> RollbackResult:
@@ -280,9 +280,9 @@ class RollbackGenerator:
             )
     
     def generate_data_backup_sql(
-        self, 
-        sql_type: SQLType, 
-        table: str, 
+        self,
+        sql_type: SQLType,
+        table: str,
         where_clause: Optional[str] = None
     ) -> str:
         """

@@ -217,7 +217,7 @@ class InstanceTestResult(BaseModel):
 class MonitorSwitchUpdate(BaseModel):
     """更新监控开关请求"""
     enabled: bool
-    config: Optional[Dict[str, Any]] = None
+    config: Optional[dict[str, Any]] = None
 
 
 class MonitorSwitchResponse(BaseModel):
@@ -228,7 +228,7 @@ class MonitorSwitchResponse(BaseModel):
     instance_id: int
     monitor_type: MonitorType
     enabled: bool
-    config: Optional[Dict[str, Any]]
+    config: Optional[dict[str, Any]]
     configured_at: datetime
 
 
@@ -245,7 +245,7 @@ class DingTalkChannelCreate(BaseModel):
     webhook: str = Field(..., max_length=500)
     auth_type: str = Field("none", description="验证类型：none/keyword/sign")
     secret: Optional[str] = Field(None, max_length=100, description="加签密钥")
-    keywords: Optional[List[str]] = Field(None, description="关键词列表")
+    keywords: Optional[list[str]] = Field(None, description="关键词列表")
     description: Optional[str] = Field(None, max_length=200)
 
 
@@ -255,7 +255,7 @@ class DingTalkChannelUpdate(BaseModel):
     webhook: Optional[str] = Field(None, max_length=500)
     auth_type: Optional[str] = Field(None, description="验证类型：none/keyword/sign")
     secret: Optional[str] = Field(None, max_length=100, description="加签密钥")
-    keywords: Optional[List[str]] = Field(None, description="关键词列表")
+    keywords: Optional[list[str]] = Field(None, description="关键词列表")
     description: Optional[str] = Field(None, max_length=200)
     is_enabled: Optional[bool] = None
 
@@ -268,7 +268,7 @@ class DingTalkChannelResponse(BaseModel):
     name: str
     description: Optional[str]
     auth_type: str
-    keywords: Optional[List[str]]
+    keywords: Optional[list[str]]
     is_enabled: bool
     created_at: datetime
 
@@ -289,10 +289,10 @@ class ApprovalCreate(BaseModel):
     instance_id: int
     database_mode: Optional[str] = Field("single", description="数据库选择模式: single/multiple/pattern/all/auto")
     database_name: Optional[str] = Field(None, description="单库模式时的数据库名")
-    database_list: Optional[List[str]] = Field(None, description="多库模式时的数据库列表")
+    database_list: Optional[list[str]] = Field(None, description="多库模式时的数据库列表")
     database_pattern: Optional[str] = Field(None, description="通配符模式")
     matched_database_count: Optional[int] = Field(None, description="通配符匹配的数据库数量")
-    parsed_databases: Optional[List[str]] = Field(None, description="SQL解析出的数据库列表")
+    parsed_databases: Optional[list[str]] = Field(None, description="SQL解析出的数据库列表")
     sql_content: str
     sql_line_count: Optional[int] = Field(None, description="SQL行数")
     affected_rows_estimate: Optional[int] = Field(None, description="预估影响行数")
@@ -318,7 +318,7 @@ class ApprovalResponse(BaseModel):
     instance_id: int
     database_mode: Optional[str] = Field(None, description="数据库选择模式")
     database_name: Optional[str]
-    database_list: Optional[List[str]] = Field(None, description="多库列表")
+    database_list: Optional[list[str]] = Field(None, description="多库列表")
     database_pattern: Optional[str] = Field(None, description="通配符模式")
     matched_database_count: Optional[int] = Field(None, description="匹配数量")
     database_target: Optional[str] = Field(None, description="目标数据库描述")
@@ -389,8 +389,8 @@ class SQLExecuteResponse(BaseModel):
     success: bool
     message: str
     affected_rows: Optional[int] = None
-    columns: Optional[List[str]] = None
-    data: Optional[List[Dict[str, Any]]] = None
+    columns: Optional[list[str]] = None
+    data: Optional[list[dict[str, Any]]] = None
     execution_time: Optional[float] = None
     snapshot_id: Optional[int] = None
 
@@ -438,7 +438,7 @@ class IndexOperationRequest(BaseModel):
     table_name: str
     operation: str  # create/drop
     index_name: Optional[str] = None
-    columns: Optional[List[str]] = None
+    columns: Optional[list[str]] = None
     index_type: str = "BTREE"
 
 
@@ -500,7 +500,7 @@ class PaginatedResponse(BaseModel):
     total: int
     page: int
     page_size: int
-    data: List[Any]
+    data: list[Any]
 
 
 # ============ 菜单配置相关 ============
@@ -515,7 +515,7 @@ class MenuConfigCreate(BaseModel):
     is_visible: bool = Field(True, description="是否显示")
     is_enabled: bool = Field(True, description="是否启用")
     permission: Optional[str] = Field(None, max_length=100, description="访问所需权限码")
-    meta: Optional[Dict[str, Any]] = Field(None, description="其他配置")
+    meta: Optional[dict[str, Any]] = Field(None, description="其他配置")
 
 
 class MenuConfigUpdate(BaseModel):
@@ -529,7 +529,7 @@ class MenuConfigUpdate(BaseModel):
     is_visible: Optional[bool] = None
     is_enabled: Optional[bool] = None
     permission: Optional[str] = Field(None, max_length=100)
-    meta: Optional[Dict[str, Any]] = None
+    meta: Optional[dict[str, Any]] = None
 
 
 class MenuConfigResponse(BaseModel):
@@ -546,9 +546,9 @@ class MenuConfigResponse(BaseModel):
     is_visible: bool
     is_enabled: bool
     permission: Optional[str]
-    meta: Optional[Dict[str, Any]]
+    meta: Optional[dict[str, Any]]
     created_at: datetime
-    children: Optional[List['MenuConfigResponse']] = None
+    children: Optional[list['MenuConfigResponse']] = None
 
 
 class MenuItemResponse(BaseModel):
@@ -557,7 +557,7 @@ class MenuItemResponse(BaseModel):
     name: str
     path: str
     icon: Optional[str]
-    children: Optional[List['MenuItemResponse']] = None
+    children: Optional[list['MenuItemResponse']] = None
 
 
 # ============ SQL优化器相关 ============
@@ -565,7 +565,7 @@ class TableSchemaSyncRequest(BaseModel):
     """表结构同步请求"""
     instance_id: int = Field(..., description="实例ID")
     database_name: Optional[str] = Field(None, description="数据库名，不传则同步所有库")
-    table_names: Optional[List[str]] = Field(None, description="指定表名列表")
+    table_names: Optional[list[str]] = Field(None, description="指定表名列表")
 
 
 class ColumnInfo(BaseModel):
@@ -582,7 +582,7 @@ class ColumnInfo(BaseModel):
 class IndexInfo(BaseModel):
     """索引信息"""
     name: str
-    columns: List[str]
+    columns: list[str]
     unique: bool = False
     primary: bool = False
     type: Optional[str] = None
@@ -603,8 +603,8 @@ class TableSchemaResponse(BaseModel):
     data_size: int
     index_size: int
     table_comment: Optional[str]
-    columns: List[ColumnInfo]
-    indexes: List[IndexInfo]
+    columns: list[ColumnInfo]
+    indexes: list[IndexInfo]
     sync_time: datetime
 
 
@@ -647,14 +647,14 @@ class SQLAnalysisResponse(BaseModel):
     """SQL分析响应"""
     sql_text: str
     sql_normalized: str
-    explain_result: List[ExplainRow]
-    rule_issues: List[RuleIssue]
+    explain_result: list[ExplainRow]
+    rule_issues: list[RuleIssue]
     llm_suggestions: Optional[str] = None
     optimized_sql: Optional[str] = None
     risk_level: str
     analysis_time: float
-    summary: Dict[str, Any] = Field(default_factory=dict, description="分析摘要")
-    auto_sync_info: Optional[Dict[str, Any]] = Field(default=None, description="自动同步表结构信息")
+    summary: dict[str, Any] = Field(default_factory=dict, description="分析摘要")
+    auto_sync_info: Optional[dict[str, Any]] = Field(default=None, description="自动同步表结构信息")
 
 
 # ============ SQL 优化闭环相关 ============
@@ -684,15 +684,15 @@ class OptimizationSuggestionCreate(BaseModel):
     slow_query_id: Optional[int] = None
     sql_fingerprint: str
     sql_sample: Optional[str] = None
-    issues: List[Dict[str, Any]]
-    suggestions: List[Dict[str, Any]]
+    issues: list[dict[str, Any]]
+    suggestions: list[dict[str, Any]]
     suggested_sql: Optional[str] = None
     index_ddl: Optional[str] = None
     rollback_sql: Optional[str] = None
     risk_level: str = "low"
     confidence: Optional[float] = None
     expected_improvement: Optional[str] = None
-    table_schemas_used: Optional[List[Dict]] = None
+    table_schemas_used: Optional[list[dict]] = None
     analysis_time: Optional[float] = None
     llm_model: Optional[str] = None
 
@@ -716,8 +716,8 @@ class OptimizationSuggestionResponse(BaseModel):
     slow_query_id: Optional[int]
     sql_fingerprint: str
     sql_sample: Optional[str]
-    issues: List[Dict[str, Any]]
-    suggestions: List[Dict[str, Any]]
+    issues: list[dict[str, Any]]
+    suggestions: list[dict[str, Any]]
     suggested_sql: Optional[str]
     index_ddl: Optional[str]
     rollback_sql: Optional[str]
@@ -782,7 +782,7 @@ class CollectionTaskResponse(BaseModel):
 
 class CollectionTaskListResponse(BaseModel):
     """采集任务列表响应"""
-    items: List[CollectionTaskResponse]
+    items: list[CollectionTaskResponse]
     total: int
     page: int
     page_size: int
@@ -790,7 +790,7 @@ class CollectionTaskListResponse(BaseModel):
 
 class SuggestionListResponse(BaseModel):
     """优化建议列表响应"""
-    items: List[OptimizationSuggestionResponse]
+    items: list[OptimizationSuggestionResponse]
     total: int
     page: int
     page_size: int

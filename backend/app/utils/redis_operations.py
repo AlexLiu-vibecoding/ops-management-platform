@@ -62,7 +62,7 @@ class RedisInstanceClient:
             self._client.close()
             self._client = None
     
-    def test_connection(self) -> Tuple[bool, str, Optional[str]]:
+    def test_connection(self) -> tuple[bool, str, Optional[str]]:
         """
         测试连接
         返回: (成功标志, 消息, 版本号)
@@ -78,14 +78,14 @@ class RedisInstanceClient:
         except Exception as e:
             return False, f"连接异常: {str(e)}", None
     
-    def get_info(self, section: str = "default") -> Dict[str, Any]:
+    def get_info(self, section: str = "default") -> dict[str, Any]:
         """获取 Redis 信息"""
         try:
             return self.client.info(section)
         except Exception:
             return {}
     
-    def get_server_info(self) -> Dict[str, Any]:
+    def get_server_info(self) -> dict[str, Any]:
         """获取服务器信息"""
         info = self.get_info("server")
         return {
@@ -101,7 +101,7 @@ class RedisInstanceClient:
             "tcp_port": info.get("tcp_port"),
         }
     
-    def get_memory_info(self) -> Dict[str, Any]:
+    def get_memory_info(self) -> dict[str, Any]:
         """获取内存信息"""
         info = self.get_info("memory")
         return {
@@ -121,7 +121,7 @@ class RedisInstanceClient:
             "mem_allocator": info.get("mem_allocator", ""),
         }
     
-    def get_stats_info(self) -> Dict[str, Any]:
+    def get_stats_info(self) -> dict[str, Any]:
         """获取统计信息"""
         info = self.get_info("stats")
         return {
@@ -139,7 +139,7 @@ class RedisInstanceClient:
             "keyspace_misses": info.get("keyspace_misses", 0),
         }
     
-    def get_clients_info(self) -> Dict[str, Any]:
+    def get_clients_info(self) -> dict[str, Any]:
         """获取客户端信息"""
         info = self.get_info("clients")
         return {
@@ -149,7 +149,7 @@ class RedisInstanceClient:
             "blocked_clients": info.get("blocked_clients", 0),
         }
     
-    def get_keyspace_info(self) -> Dict[str, Any]:
+    def get_keyspace_info(self) -> dict[str, Any]:
         """获取键空间信息"""
         info = self.get_info("keyspace")
         return info or {}
@@ -161,7 +161,7 @@ class RedisInstanceClient:
         except Exception:
             return 0
     
-    def get_key_info(self, key: str) -> Dict[str, Any]:
+    def get_key_info(self, key: str) -> dict[str, Any]:
         """获取键信息"""
         try:
             key_type = self.client.type(key)
@@ -232,7 +232,7 @@ class RedisInstanceClient:
         pattern: str = "*",
         count: int = 100,
         cursor: int = 0
-    ) -> Tuple[int, List[str]]:
+    ) -> tuple[int, list[str]]:
         """
         扫描键
         返回: (新游标, 键列表)
@@ -243,7 +243,7 @@ class RedisInstanceClient:
         except Exception:
             return 0, []
     
-    def find_keys(self, pattern: str = "*", limit: int = 1000) -> List[str]:
+    def find_keys(self, pattern: str = "*", limit: int = 1000) -> list[str]:
         """查找键（简化版，限制数量）"""
         keys = []
         cursor = 0
@@ -285,7 +285,7 @@ class RedisInstanceClient:
         except Exception:
             return False
     
-    def get_config(self, pattern: str = "*") -> Dict[str, str]:
+    def get_config(self, pattern: str = "*") -> dict[str, str]:
         """获取配置"""
         try:
             config_list = self.client.config_get(pattern)
@@ -293,7 +293,7 @@ class RedisInstanceClient:
         except Exception:
             return {}
     
-    def get_slowlog(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def get_slowlog(self, limit: int = 10) -> list[dict[str, Any]]:
         """获取慢查询日志"""
         try:
             slowlog = self.client.slowlog_get(limit)
@@ -309,7 +309,7 @@ class RedisInstanceClient:
         except Exception:
             return []
     
-    def get_client_list(self) -> List[Dict[str, Any]]:
+    def get_client_list(self) -> list[dict[str, Any]]:
         """获取客户端列表"""
         try:
             clients = self.client.client_list()

@@ -12,9 +12,9 @@ class StartupCheck:
     """启动检查器"""
     
     def __init__(self):
-        self.errors: List[str] = []
-        self.warnings: List[str] = []
-        self.passed: List[str] = []
+        self.errors: list[str] = []
+        self.warnings: list[str] = []
+        self.passed: list[str] = []
     
     def check_python_version(self) -> bool:
         """检查 Python 版本"""
@@ -167,7 +167,7 @@ class StartupCheck:
             self.errors.append(f"模块检查失败: {e}")
             return False
     
-    def run_all_checks(self) -> Tuple[bool, List[str], List[str], List[str]]:
+    def run_all_checks(self) -> tuple[bool, list[str], list[str], list[str]]:
         """运行所有检查"""
         print("\n" + "=" * 60)
         print("  运维管理平台 - 启动自检")

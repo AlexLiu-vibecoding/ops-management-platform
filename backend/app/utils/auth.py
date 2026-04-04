@@ -4,7 +4,7 @@
 import os
 import hashlib
 import base64
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from typing import Optional, Dict, Any
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -44,7 +44,7 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password + settings.PASSWORD_SALT, hashed_password)
 
 
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """
     创建JWT访问令牌
     
@@ -60,16 +60,16 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     if "sub" in to_encode and not isinstance(to_encode["sub"], str):
         to_encode["sub"] = str(to_encode["sub"])
     if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
+        expire = datetime.now(UTC) + expires_delta
     else:
-        expire = datetime.now(timezone.utc) + timedelta(hours=settings.ACCESS_TOKEN_EXPIRE_HOURS)
+        expire = datetime.now(UTC) + timedelta(hours=settings.ACCESS_TOKEN_EXPIRE_HOURS)
     
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 
-def decode_access_token(token: str) -> Optional[Dict[str, Any]]:
+def decode_access_token(token: str) -> Optional[dict[str, Any]]:
     """
     解码JWT访问令牌
     
@@ -163,7 +163,7 @@ class AESCipher:
             
             return plaintext.decode('utf-8')
         except Exception as e:
-            raise ValueError(f"解密失败: {str(e)}")
+            raise ValueError(f"解密失败: {str(e)}") from None
 
 
 # 创建全局AES加密实例

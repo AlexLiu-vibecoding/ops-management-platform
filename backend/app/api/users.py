@@ -137,7 +137,7 @@ async def get_user_environments(
 @router.post("/{user_id}/environments", response_model=MessageResponse)
 async def bind_user_environments(
     user_id: int,
-    environment_ids: List[int],
+    environment_ids: list[int],
     current_user: User = Depends(get_super_admin),
     db: Session = Depends(get_db)
 ):

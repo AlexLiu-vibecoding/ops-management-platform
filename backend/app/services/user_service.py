@@ -52,12 +52,12 @@ class UserService(BaseService[User]):
         return self.db.query(User).filter(User.email == email).first()
     
     def get_multi_with_count(
-        self, 
-        skip: int = 0, 
+        self,
+        skip: int = 0,
         limit: int = 20,
         role: Optional[UserRole] = None,
         status: Optional[bool] = None
-    ) -> tuple[List[User], int]:
+    ) -> tuple[list[User], int]:
         """
         获取用户列表及总数
         
@@ -335,7 +335,7 @@ class UserService(BaseService[User]):
     
     # ==================== 环境权限方法 ====================
     
-    def get_user_environments(self, user_id: int) -> Dict[str, Any]:
+    def get_user_environments(self, user_id: int) -> dict[str, Any]:
         """
         获取用户的环境权限
         

@@ -10,7 +10,7 @@
 import re
 import logging
 from typing import Tuple, Optional, List, Dict, Any, Union
-from enum import Enum
+from enum import Enum, StrEnum
 
 from app.models import RDBInstance
 from app.services.db_connection import db_manager, DatabaseConnectionError, DatabaseExecutionError
@@ -23,7 +23,7 @@ from app.core.exceptions import (
 logger = logging.getLogger(__name__)
 
 
-class SQLStatementType(str, Enum):
+class SQLStatementType(StrEnum):
     """SQL 语句类型"""
     SELECT = "SELECT"
     INSERT = "INSERT"
@@ -34,7 +34,7 @@ class SQLStatementType(str, Enum):
     OTHER = "OTHER"
 
 
-class SQLRiskLevel(str, Enum):
+class SQLRiskLevel(StrEnum):
     """SQL 风险等级"""
     SAFE = "safe"           # 只读查询
     LOW = "low"             # 单行修改
@@ -122,7 +122,7 @@ class SecureSQLExecutor:
         
         return SQLStatementType.OTHER
     
-    def assess_risk_level(self, sql: str) -> Tuple[SQLRiskLevel, List[str]]:
+    def assess_risk_level(self, sql: str) -> tuple[SQLRiskLevel, list[str]]:
         """
         评估 SQL 风险等级
         
@@ -169,7 +169,7 @@ class SecureSQLExecutor:
         
         return SQLRiskLevel.MEDIUM, []
     
-    def validate_sql(self, sql: str, allow_dangerous: bool = False) -> Tuple[bool, str]:
+    def validate_sql(self, sql: str, allow_dangerous: bool = False) -> tuple[bool, str]:
         """
         验证 SQL 语句
         
@@ -200,10 +200,10 @@ class SecureSQLExecutor:
         self,
         instance: RDBInstance,
         sql: str,
-        params: Optional[Union[tuple, dict]] = None,
+        params: Optional[tuple | dict] = None,
         database: Optional[str] = None,
         fetch: bool = True
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         执行单条查询（参数化）
         
@@ -266,7 +266,7 @@ class SecureSQLExecutor:
         database: Optional[str] = None,
         stop_on_error: bool = True,
         allow_dangerous: bool = False
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         执行 SQL 脚本（多条语句）
         
@@ -348,7 +348,7 @@ class SecureSQLExecutor:
         except DatabaseConnectionError as e:
             raise QueryExecutionException(f"数据库连接失败: {str(e)}")
     
-    def _parse_script(self, script: str) -> List[str]:
+    def _parse_script(self, script: str) -> list[str]:
         """
         解析 SQL 脚本，分割为独立语句
         

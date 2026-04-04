@@ -495,7 +495,7 @@ async def check_redis_instance_status(
 
 # ============ Redis 慢日志 API ============
 
-@router.get("/{instance_id}/slowlog", response_model=List[RedisSlowLogResponse])
+@router.get("/{instance_id}/slowlog", response_model=list[RedisSlowLogResponse])
 async def get_redis_slowlog(
     instance_id: int,
     limit: int = Query(50, ge=1, le=500),

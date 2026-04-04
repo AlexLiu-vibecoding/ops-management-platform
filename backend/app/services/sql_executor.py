@@ -23,7 +23,7 @@ class SQLExecutor:
     # 查询语句前缀
     QUERY_PREFIXES = ('SELECT', 'SHOW', 'DESC', 'DESCRIBE', 'EXPLAIN', 'WITH')
     
-    async def execute_for_approval(self, approval: ApprovalRecord, instance: RDBInstance) -> Tuple[bool, str, int]:
+    async def execute_for_approval(self, approval: ApprovalRecord, instance: RDBInstance) -> tuple[bool, str, int]:
         """
         执行审批工单中的SQL
         
@@ -82,12 +82,12 @@ class SQLExecutor:
         return sql_content
     
     async def _execute_mysql(
-        self, 
-        instance: RDBInstance, 
-        password: str, 
-        database: Optional[str], 
+        self,
+        instance: RDBInstance,
+        password: str,
+        database: Optional[str],
         sql_content: str
-    ) -> Tuple[bool, str, int]:
+    ) -> tuple[bool, str, int]:
         """执行MySQL SQL"""
         conn = None
         try:
@@ -112,12 +112,12 @@ class SQLExecutor:
                     pass
     
     async def _execute_postgresql(
-        self, 
-        instance: RDBInstance, 
-        password: str, 
-        database: Optional[str], 
+        self,
+        instance: RDBInstance,
+        password: str,
+        database: Optional[str],
         sql_content: str
-    ) -> Tuple[bool, str, int]:
+    ) -> tuple[bool, str, int]:
         """执行PostgreSQL SQL"""
         conn = None
         try:
@@ -143,11 +143,11 @@ class SQLExecutor:
                     pass
     
     async def _execute_sql_statements(
-        self, 
-        conn, 
-        sql_content: str, 
+        self,
+        conn,
+        sql_content: str,
         db_type: str
-    ) -> Tuple[bool, str, int]:
+    ) -> tuple[bool, str, int]:
         """
         执行SQL语句
         
@@ -202,7 +202,7 @@ class SQLExecutor:
         """判断是否为查询语句"""
         return sql_upper.startswith(self.QUERY_PREFIXES)
     
-    def _build_result_message(self, results: list, total_affected: int) -> Tuple[bool, str, int]:
+    def _build_result_message(self, results: list, total_affected: int) -> tuple[bool, str, int]:
         """构建结果消息"""
         if not results:
             return True, "执行完成: 无有效SQL语句", 0

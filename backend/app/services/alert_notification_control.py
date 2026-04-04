@@ -45,7 +45,7 @@ class AlertSilenceService:
         
         # 查询启用的静默规则，按优先级降序
         rules = db.query(AlertSilenceRule).filter(
-            AlertSilenceRule.is_enabled == True
+            AlertSilenceRule.is_enabled
         ).order_by(desc(AlertSilenceRule.created_at)).all()
         
         for rule in rules:
@@ -153,7 +153,7 @@ class AlertRateLimitService:
         
         # 查询启用的频率限制规则，按优先级降序
         rules = db.query(AlertRateLimitRule).filter(
-            AlertRateLimitRule.is_enabled == True
+            AlertRateLimitRule.is_enabled
         ).order_by(desc(AlertRateLimitRule.priority)).all()
         
         for rule in rules:
@@ -186,8 +186,8 @@ class AlertRateLimitService:
     
     @staticmethod
     def _check_rule(
-        rule: AlertRateLimitRule, 
-        instance_key: str, 
+        rule: AlertRateLimitRule,
+        instance_key: str,
         now: datetime,
         db: Session,
         alert: AlertRecord
@@ -250,11 +250,11 @@ class AlertRateLimitService:
             db: 数据库会话
             alert: 告警记录
         """
-        now = datetime.now()
+        datetime.now()
         
         # 查询匹配的频率限制规则
         rules = db.query(AlertRateLimitRule).filter(
-            AlertRateLimitRule.is_enabled == True
+            AlertRateLimitRule.is_enabled
         ).order_by(desc(AlertRateLimitRule.priority)).all()
         
         for rule in rules:
@@ -279,7 +279,7 @@ class AlertAggregationService:
     def should_aggregate_alert(db: Session, alert: AlertRecord) -> Optional[AlertAggregationRule]:
         """检查告警是否应该被聚合"""
         rules = db.query(AlertAggregationRule).filter(
-            AlertAggregationRule.is_enabled == True
+            AlertAggregationRule.is_enabled
         ).order_by(desc(AlertAggregationRule.priority)).all()
         
         for rule in rules:
@@ -310,7 +310,7 @@ class AlertAggregationService:
                 AlertAggregation.rdb_instance_id == alert.rdb_instance_id,
                 AlertAggregation.redis_instance_id == alert.redis_instance_id,
                 AlertAggregation.started_at >= window_start,
-                AlertAggregation.ended_at == None
+                AlertAggregation.ended_at is None
             )
         ).first()
         
@@ -399,10 +399,10 @@ class AlertEscalationService:
         
         rules = db.query(AlertEscalationRule).filter(
             and_(
-                AlertEscalationRule.is_enabled == True,
+                AlertEscalationRule.is_enabled,
                 or_(
                     AlertEscalationRule.alert_level == alert.alert_level,
-                    AlertEscalationRule.alert_level == None
+                    AlertEscalationRule.alert_level is None
                 )
             )
         ).order_by(desc(AlertEscalationRule.priority)).all()

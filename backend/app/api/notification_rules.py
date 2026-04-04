@@ -35,7 +35,7 @@ class SilenceRuleCreate(BaseModel):
     end_time: Optional[datetime] = Field(None, description="结束时间(一次性)")
     time_start: Optional[str] = Field(None, description="开始时间 HH:MM")
     time_end: Optional[str] = Field(None, description="结束时间 HH:MM")
-    weekdays: Optional[List[int]] = Field(None, description="星期几 [0-6], 0=周一")
+    weekdays: Optional[list[int]] = Field(None, description="星期几 [0-6], 0=周一")
 
     is_enabled: bool = Field(True, description="是否启用")
 
@@ -52,7 +52,7 @@ class SilenceRuleUpdate(BaseModel):
     end_time: Optional[datetime] = None
     time_start: Optional[str] = None
     time_end: Optional[str] = None
-    weekdays: Optional[List[int]] = None
+    weekdays: Optional[list[int]] = None
     is_enabled: Optional[bool] = None
 
 
@@ -91,7 +91,7 @@ def silence_rule_to_dict(rule: ChannelSilenceRule) -> dict:
     }
 
 
-def format_weekdays(weekdays: List[int]) -> str:
+def format_weekdays(weekdays: list[int]) -> str:
     """格式化星期几"""
     if not weekdays:
         return "-"

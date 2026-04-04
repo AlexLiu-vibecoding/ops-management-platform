@@ -40,7 +40,7 @@ class AlertAggregationService:
         """
         # 查询启用的聚合规则，按优先级降序
         rules = db.query(AlertAggregationRule).filter(
-            AlertAggregationRule.is_enabled == True
+            AlertAggregationRule.is_enabled
         ).order_by(AlertAggregationRule.priority.desc()).all()
         
         for rule in rules:
@@ -84,7 +84,7 @@ class AlertAggregationService:
                 AlertAggregation.rdb_instance_id == alert.rdb_instance_id,
                 AlertAggregation.redis_instance_id == alert.redis_instance_id,
                 AlertAggregation.started_at >= window_start,
-                AlertAggregation.ended_at == None  # 未结束的聚合
+                AlertAggregation.ended_at is None  # 未结束的聚合
             )
         ).first()
         
@@ -193,7 +193,7 @@ class AlertSilenceService:
         
         # 查询启用的静默规则
         rules = db.query(AlertSilenceRule).filter(
-            AlertSilenceRule.is_enabled == True
+            AlertSilenceRule.is_enabled
         ).all()
         
         for rule in rules:
@@ -279,10 +279,10 @@ class AlertEscalationService:
         # 查询匹配的升级规则
         rules = db.query(AlertEscalationRule).filter(
             and_(
-                AlertEscalationRule.is_enabled == True,
+                AlertEscalationRule.is_enabled,
                 or_(
                     AlertEscalationRule.alert_level == alert.alert_level,
-                    AlertEscalationRule.alert_level == None
+                    AlertEscalationRule.alert_level is None
                 )
             )
         ).order_by(AlertEscalationRule.priority.desc()).all()

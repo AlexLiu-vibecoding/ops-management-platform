@@ -40,7 +40,7 @@ from functools import wraps
 
 
 # 上下文变量，用于请求链路追踪
-_request_context: ContextVar[Dict[str, Any]] = ContextVar("request_context", default={})
+_request_context: ContextVar[dict[str, Any]] = ContextVar("request_context")
 
 
 class LogContext:
@@ -91,7 +91,7 @@ class StructuredLogRecord:
         self.context = _request_context.get()
         self.extra = extra
     
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """转换为字典"""
         result = {
             "timestamp": self.timestamp,
@@ -316,7 +316,7 @@ class StructuredLogger:
 
 
 # 日志器缓存
-_loggers: Dict[str, StructuredLogger] = {}
+_loggers: dict[str, StructuredLogger] = {}
 
 
 def get_logger(name: str, json_format: bool = True) -> StructuredLogger:

@@ -34,7 +34,7 @@ def get_instance_type(instance: RDBInstance) -> str:
     return "mysql"
 
 
-def check_sql_risk(sql: str) -> Dict[str, Any]:
+def check_sql_risk(sql: str) -> dict[str, Any]:
     """
     检查SQL风险
     返回风险等级和是否允许执行
@@ -221,7 +221,7 @@ async def execute_sql(
                 message="查询成功",
                 affected_rows=affected_rows,
                 columns=columns,
-                data=[dict(zip(columns, row)) for row in data] if data else [],
+                data=[dict(zip(columns, row, strict=False)) for row in data] if data else [],
                 execution_time=(datetime.now() - start_time).total_seconds(),
                 snapshot_id=snapshot_id
             )
@@ -269,7 +269,7 @@ async def execute_sql(
     return result
 
 
-@router.get("/databases/{instance_id}", response_model=List[str])
+@router.get("/databases/{instance_id}", response_model=list[str])
 async def list_databases(
     instance_id: int,
     current_user: User = Depends(get_current_user),
@@ -309,7 +309,7 @@ async def list_databases(
         )
 
 
-@router.get("/tables/{instance_id}/{database}", response_model=List[str])
+@router.get("/tables/{instance_id}/{database}", response_model=list[str])
 async def list_tables(
     instance_id: int,
     database: str,
@@ -331,9 +331,9 @@ async def list_tables(
         if db_type == "postgresql":
             # PostgreSQL: 查询 public schema 下的表
             cursor.execute("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
                 ORDER BY table_name
             """)
         else:

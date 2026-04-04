@@ -90,9 +90,9 @@ class TaskScheduler:
         try:
             # 查询所有启用了 RDS 监控的实例
             rds_instances = db.query(RDBInstance).filter(
-                RDBInstance.is_rds == True,
-                RDBInstance.rds_instance_id != None,
-                RDBInstance.status == True  # 只采集在线实例
+                RDBInstance.is_rds,
+                RDBInstance.rds_instance_id is not None,
+                RDBInstance.status  # 只采集在线实例
             ).all()
             
             if not rds_instances:
@@ -399,7 +399,7 @@ class TaskScheduler:
                 execution.error_output = stderr.decode('utf-8', errors='replace')
                 execution.exit_code = process.returncode
                 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 process.kill()
                 execution.status = ExecutionStatus.TIMEOUT
                 execution.error_output = f"脚本执行超时（{script.timeout}秒）"

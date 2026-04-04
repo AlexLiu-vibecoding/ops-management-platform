@@ -5,7 +5,7 @@ AWS RDS 性能指标采集器
 import os
 import re
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, UTC
 from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 
@@ -247,7 +247,7 @@ class RDSMetricsCollector:
                 raise
         return self._rds_client
     
-    def test_connection(self) -> Dict[str, Any]:
+    def test_connection(self) -> dict[str, Any]:
         """
         测试 AWS 连接是否正常
         
@@ -273,7 +273,7 @@ class RDSMetricsCollector:
         except Exception as e:
             return {"success": False, "message": f"连接测试失败: {str(e)}"}
     
-    def get_instance_info(self, db_instance_identifier: str) -> Optional[Dict[str, Any]]:
+    def get_instance_info(self, db_instance_identifier: str) -> Optional[dict[str, Any]]:
         """
         获取 RDS 实例信息
         
@@ -320,11 +320,11 @@ class RDSMetricsCollector:
         db_instance_identifier: str,
         metric_name: str,
         period: int = 300,
-        statistics: List[str] = None,
+        statistics: list[str] = None,
         unit: str = None,
         start_time: datetime = None,
         end_time: datetime = None
-    ) -> Dict[str, float]:
+    ) -> dict[str, float]:
         """
         获取单个指标的 CloudWatch 数据
         
@@ -343,9 +343,9 @@ class RDSMetricsCollector:
         if statistics is None:
             statistics = ["Average"]
         if start_time is None:
-            start_time = datetime.now(timezone.utc) - timedelta(minutes=10)
+            start_time = datetime.now(UTC) - timedelta(minutes=10)
         if end_time is None:
-            end_time = datetime.now(timezone.utc)
+            end_time = datetime.now(UTC)
         
         try:
             cw = self._get_cloudwatch_client()
@@ -510,7 +510,7 @@ class RDSMetricsCollector:
         
         return metrics
     
-    def to_performance_dict(self, metrics: RDSMetrics) -> Dict[str, Any]:
+    def to_performance_dict(self, metrics: RDSMetrics) -> dict[str, Any]:
         """
         将 RDSMetrics 转换为性能指标字典格式（用于存储到数据库）
         
@@ -538,7 +538,7 @@ class RDSMetricsCollector:
 _collector_instance: Optional[RDSMetricsCollector] = None
 
 # 环境级别的采集器缓存
-_environment_collectors: Dict[int, RDSMetricsCollector] = {}
+_environment_collectors: dict[int, RDSMetricsCollector] = {}
 
 
 def get_aws_credentials_from_environment(environment_id: int) -> Optional[dict]:

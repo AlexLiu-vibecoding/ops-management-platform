@@ -314,7 +314,7 @@ async def ignore_alert(
 
 @router.post("/batch-acknowledge", response_model=MessageResponse)
 async def batch_acknowledge_alerts(
-    alert_ids: List[int],
+    alert_ids: list[int],
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):

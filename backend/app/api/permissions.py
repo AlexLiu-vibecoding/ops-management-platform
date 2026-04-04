@@ -46,27 +46,27 @@ class PermissionUpdate(BaseModel):
 
 class RolePermissionUpdate(BaseModel):
     role: str
-    permission_ids: List[int]
+    permission_ids: list[int]
 
 
 class RoleCreate(BaseModel):
     role: str
-    permission_ids: List[int] = []
+    permission_ids: list[int] = []
 
 
 class RoleEnvironmentUpdate(BaseModel):
     """角色环境权限更新"""
-    environment_ids: List[int]
+    environment_ids: list[int]
 
 
 class RoleUsersUpdate(BaseModel):
     """角色用户更新"""
-    user_ids: List[int]
+    user_ids: list[int]
 
 
 class BatchAddUsersToRole(BaseModel):
     """批量添加用户到角色"""
-    user_ids: List[int]
+    user_ids: list[int]
 
 
 # ==================== 角色定义（集中管理） ====================
@@ -350,7 +350,7 @@ async def get_role_environments(
     environment_ids = service.get_role_environment_ids(role)
     
     # 获取所有环境
-    all_envs = db.query(Environment).filter(Environment.status == True).order_by(Environment.id).all()
+    all_envs = db.query(Environment).filter(Environment.status).order_by(Environment.id).all()
     
     return {
         "role": role,

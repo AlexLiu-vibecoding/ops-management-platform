@@ -12,7 +12,7 @@ import logging
 
 from app.database import get_db
 from app.models import (
-    SlowQuery, RDBInstance, MonitorSwitch, 
+    SlowQuery, RDBInstance, MonitorSwitch,
     MonitorType, User
 )
 from app.schemas import SlowQueryResponse, MessageResponse
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # ============ API 路由 ============
 
-@router.get("/{instance_id}", response_model=List[SlowQueryResponse])
+@router.get("/{instance_id}", response_model=list[SlowQueryResponse])
 async def list_slow_queries(
     instance_id: int,
     limit: int = 100,
@@ -70,7 +70,7 @@ async def list_slow_queries(
     return [SlowQueryResponse.model_validate(q) for q in queries]
 
 
-@router.get("/{instance_id}/top", response_model=List[SlowQueryResponse])
+@router.get("/{instance_id}/top", response_model=list[SlowQueryResponse])
 async def get_top_slow_queries(
     instance_id: int,
     hours: int = 24,
@@ -322,7 +322,7 @@ async def sync_slow_queries(
     return result
 
 
-@router.get("/{instance_id}/databases", response_model=List[str])
+@router.get("/{instance_id}/databases", response_model=list[str])
 async def get_instance_databases(
     instance_id: int,
     current_user: User = Depends(get_current_user),
@@ -345,7 +345,7 @@ async def get_instance_databases(
     return await slow_query_collector.get_instance_databases(instance)
 
 
-@router.get("/{instance_id}/realtime", response_model=List[dict])
+@router.get("/{instance_id}/realtime", response_model=list[dict])
 async def get_realtime_slow_queries(
     instance_id: int,
     limit: int = 50,
@@ -379,7 +379,7 @@ async def get_realtime_slow_queries(
     )
 
 
-@router.get("/{instance_id}/statement-analysis", response_model=List[dict])
+@router.get("/{instance_id}/statement-analysis", response_model=list[dict])
 async def get_statement_analysis(
     instance_id: int,
     limit: int = 100,

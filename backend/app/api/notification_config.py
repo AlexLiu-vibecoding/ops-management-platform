@@ -10,7 +10,7 @@ from datetime import datetime
 
 from app.database import get_db
 from app.models import (
-    AlertSilenceRule, AlertRateLimitRule, 
+    AlertSilenceRule, AlertRateLimitRule,
     User, RDBInstance, RedisInstance
 )
 from app.models.permissions import PermissionCode
@@ -40,7 +40,7 @@ class SilenceRuleCreate(BaseModel):
     end_date: Optional[datetime] = Field(None, description="生效结束日期")
     time_start: Optional[str] = Field(None, description="开始时间 HH:MM")
     time_end: Optional[str] = Field(None, description="结束时间 HH:MM")
-    weekdays: Optional[List[int]] = Field(None, description="允许的星期几 [0-6]，0=周一")
+    weekdays: Optional[list[int]] = Field(None, description="允许的星期几 [0-6]，0=周一")
     
     is_enabled: bool = Field(True, description="是否启用")
     priority: int = Field(0, description="优先级")
@@ -61,7 +61,7 @@ class SilenceRuleUpdate(BaseModel):
     end_date: Optional[datetime] = None
     time_start: Optional[str] = None
     time_end: Optional[str] = None
-    weekdays: Optional[List[int]] = None
+    weekdays: Optional[list[int]] = None
     
     is_enabled: Optional[bool] = None
     priority: Optional[int] = None

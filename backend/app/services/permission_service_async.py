@@ -73,7 +73,7 @@ class AsyncPermissionService:
         permissions = await self.get_role_permissions(user.role)
         return permission_code in permissions
     
-    async def get_role_permissions(self, role: str) -> Set[str]:
+    async def get_role_permissions(self, role: str) -> set[str]:
         """
         获取角色的权限列表（异步查询）
         
@@ -93,7 +93,7 @@ class AsyncPermissionService:
             select(RolePermission, Permission)
             .join(Permission, RolePermission.permission_id == Permission.id)
             .where(RolePermission.role == role)
-            .where(Permission.is_enabled == True)
+            .where(Permission.is_enabled)
         )
         
         rows = result.all()
@@ -114,7 +114,7 @@ class AsyncPermissionService:
         
         return permissions
     
-    async def get_user_environment_ids(self, user: User) -> Set[int]:
+    async def get_user_environment_ids(self, user: User) -> set[int]:
         """
         获取用户可访问的环境ID列表
         
@@ -153,7 +153,7 @@ class AsyncPermissionService:
         env_ids = await self.get_user_environment_ids(user)
         return environment_id in env_ids
     
-    async def get_all_permissions(self) -> List[Permission]:
+    async def get_all_permissions(self) -> list[Permission]:
         """
         获取所有权限定义
         
@@ -162,12 +162,12 @@ class AsyncPermissionService:
         """
         result = await self.db.execute(
             select(Permission)
-            .where(Permission.is_enabled == True)
+            .where(Permission.is_enabled)
             .order_by(Permission.category, Permission.code)
         )
         return list(result.scalars().all())
     
-    async def get_role_permissions_with_details(self, role: str) -> List[dict]:
+    async def get_role_permissions_with_details(self, role: str) -> list[dict]:
         """
         获取角色的权限详情（包含权限名称和描述）
         
@@ -181,7 +181,7 @@ class AsyncPermissionService:
             select(Permission)
             .join(RolePermission, RolePermission.permission_id == Permission.id)
             .where(RolePermission.role == role)
-            .where(Permission.is_enabled == True)
+            .where(Permission.is_enabled)
         )
         
         permissions = []

@@ -14,7 +14,7 @@ from app.deps import get_current_user
 router = APIRouter(prefix="/dashboard", tags=["仪表盘"])
 
 
-@router.get("/stats", response_model=Dict[str, Any])
+@router.get("/stats", response_model=dict[str, Any])
 async def get_dashboard_stats(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -24,8 +24,8 @@ async def get_dashboard_stats(
     # 1. 数据库实例统计 (RDB + Redis)
     total_rdb = db.query(RDBInstance).count()
     total_redis = db.query(RedisInstance).count()
-    online_rdb = db.query(RDBInstance).filter(RDBInstance.status == True).count()
-    online_redis = db.query(RedisInstance).filter(RedisInstance.status == True).count()
+    online_rdb = db.query(RDBInstance).filter(RDBInstance.status).count()
+    online_redis = db.query(RedisInstance).filter(RedisInstance.status).count()
     total_instances = total_rdb + total_redis
     online_instances = online_rdb + online_redis
     

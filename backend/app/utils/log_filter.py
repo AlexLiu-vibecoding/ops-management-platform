@@ -13,7 +13,7 @@
 """
 import re
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, UTC
 from typing import Any, Optional
 
 
@@ -160,10 +160,9 @@ class StructuredLogFormatter(logging.Formatter):
     
     def format(self, record: logging.LogRecord) -> str:
         import json
-        from datetime import datetime
         
         log_data = {
-            "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),

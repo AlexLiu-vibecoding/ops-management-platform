@@ -35,7 +35,7 @@ class DatabaseConfigUpdate(BaseModel):
 
 class DatabaseConfigResponse(BaseModel):
     """数据库配置响应"""
-    items: List[DatabaseTypeConfig]
+    items: list[DatabaseTypeConfig]
 
 
 # 数据库类型默认配置
@@ -462,7 +462,7 @@ async def test_aws_connection(
             success=False,
             message="AWS 凭证无效，请检查 Access Key ID 和 Secret Access Key"
         )
-    except EndpointConnectionError as e:
+    except EndpointConnectionError:
         return AwsConnectionTestResponse(
             success=False,
             message=f"无法连接到 AWS 端点 ({region})，请检查区域设置"
@@ -505,7 +505,7 @@ class SecurityConfigResponse(BaseModel):
     aes_key: str
     password_salt: str
     token_expire_hours: int
-    password_policy: Dict[str, Any]
+    password_policy: dict[str, Any]
 
 
 @router.get("/security-config", response_model=SecurityConfigResponse)

@@ -66,12 +66,12 @@ class AsyncUserService(AsyncBaseService[User]):
         return result.scalar_one_or_none()
     
     async def get_multi_with_count(
-        self, 
-        skip: int = 0, 
+        self,
+        skip: int = 0,
         limit: int = 20,
         role: Optional[UserRole] = None,
         status: Optional[bool] = None
-    ) -> tuple[List[User], int]:
+    ) -> tuple[list[User], int]:
         """
         获取用户列表及总数
         

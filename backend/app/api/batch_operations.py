@@ -22,7 +22,7 @@ router = APIRouter(prefix="/batch", tags=["批量操作"])
 class BatchOperationRequest(BaseModel):
     """批量操作请求"""
     action: str  # delete, enable, disable, approve, reject
-    ids: List[int]
+    ids: list[int]
     params: Optional[dict] = None  # 额外参数
 
 
@@ -33,7 +33,7 @@ class BatchOperationResponse(BaseModel):
     succeeded: int
     failed: int
     no_permission: int
-    results: List[dict] = []  # 可选的详细结果列表
+    results: list[dict] = []  # 可选的详细结果列表
 
 
 # ==================== 实例批量操作 ====================

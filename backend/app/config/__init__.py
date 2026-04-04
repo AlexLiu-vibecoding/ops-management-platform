@@ -53,7 +53,7 @@ from app.config.core import (
 )
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     """
     获取配置实例（单例，缓存）

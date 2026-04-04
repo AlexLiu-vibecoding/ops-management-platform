@@ -25,14 +25,14 @@ class ChangeWindowCreate(BaseModel):
     name: str = Field(..., description="窗口名称")
     description: Optional[str] = Field(None, description="描述")
     window_type: str = Field("allowed", description="窗口类型: forbidden(封禁) 或 allowed(允许)")
-    environment_ids: Optional[List[int]] = Field(None, description="应用环境ID列表")
+    environment_ids: Optional[list[int]] = Field(None, description="应用环境ID列表")
     # 日期范围
     start_date: Optional[str] = Field(None, description="生效开始日期 YYYY-MM-DD")
     end_date: Optional[str] = Field(None, description="生效结束日期 YYYY-MM-DD")
     # 时间范围
     start_time: str = Field(..., description="开始时间 HH:MM")
     end_time: str = Field(..., description="结束时间 HH:MM")
-    weekdays: Optional[List[int]] = Field(None, description="允许的星期 0-6（0=周一）")
+    weekdays: Optional[list[int]] = Field(None, description="允许的星期 0-6（0=周一）")
     allow_emergency: bool = Field(False, description="允许紧急变更")
     require_approval: bool = Field(True, description="需要审批")
     min_approvers: int = Field(1, description="最小审批人数")
@@ -44,12 +44,12 @@ class ChangeWindowUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     window_type: Optional[str] = Field(None, description="窗口类型: forbidden(封禁) 或 allowed(允许)")
-    environment_ids: Optional[List[int]] = None
+    environment_ids: Optional[list[int]] = None
     start_date: Optional[str] = Field(None, description="生效开始日期 YYYY-MM-DD")
     end_date: Optional[str] = Field(None, description="生效结束日期 YYYY-MM-DD")
     start_time: Optional[str] = None
     end_time: Optional[str] = None
-    weekdays: Optional[List[int]] = None
+    weekdays: Optional[list[int]] = None
     allow_emergency: Optional[bool] = None
     require_approval: Optional[bool] = None
     min_approvers: Optional[int] = None
@@ -332,7 +332,7 @@ async def check_change_window(
     
     # 查找该环境的变更窗口
     windows = db.query(ChangeWindow).filter(
-        ChangeWindow.is_enabled == True
+        ChangeWindow.is_enabled
     ).all()
     
     # 过滤出适用于该环境的窗口
@@ -439,20 +439,16 @@ def _check_single_window(window: ChangeWindow, dt: datetime) -> dict:
             return result
     
     # 检查日期范围
-    date_matched = True
     if window.start_date and window.end_date:
         check_date = dt.date()
         if not (window.start_date <= check_date <= window.end_date):
-            date_matched = False
             result["reason"] = f"不在日期范围内 ({window.start_date} ~ {window.end_date})"
             return result
     
     # 检查星期
-    weekday_matched = True
     if window.weekdays:
         weekday = dt.weekday()  # 0-6, Monday=0
         if weekday not in window.weekdays:
-            weekday_matched = False
             result["reason"] = f"星期{['一', '二', '三', '四', '五', '六', '日'][weekday]}不在允许范围内"
             return result
     
@@ -464,7 +460,7 @@ def _check_single_window(window: ChangeWindow, dt: datetime) -> dict:
     return result
 
 
-def _get_weekdays_label(weekdays: Optional[List[int]]) -> str:
+def _get_weekdays_label(weekdays: Optional[list[int]]) -> str:
     """获取星期标签"""
     if not weekdays:
         return "每天"

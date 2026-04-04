@@ -180,7 +180,7 @@ def require_permission(permission_code: str):
     return permission_checker
 
 
-def require_permissions(permission_codes: List[str]):
+def require_permissions(permission_codes: list[str]):
     """
     检查用户是否拥有任意一个指定功能权限（OR关系）
     
@@ -216,7 +216,7 @@ def require_permissions(permission_codes: List[str]):
 
 # ==================== 环境权限校验 ====================
 
-def get_user_environment_ids(db: Session, user: User) -> List[int]:
+def get_user_environment_ids(db: Session, user: User) -> list[int]:
     """
     获取用户可访问的环境ID列表
     

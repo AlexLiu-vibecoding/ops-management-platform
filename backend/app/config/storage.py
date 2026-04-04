@@ -41,14 +41,14 @@ class StorageConfig(BaseSettings):
     
     # 本地存储配置
     LOCAL_PATH: str = Field(
-        default="/app/data/sql_files", 
+        default="/app/data/sql_files",
         description="本地存储路径"
     )
     
     # 文件生命周期配置
     FILE_RETENTION_DAYS: int = Field(
-        default=30, 
-        ge=1, 
+        default=30,
+        ge=1,
         description="文件保留天数"
     )
     
@@ -73,7 +73,7 @@ class StorageConfig(BaseSettings):
     OSS_SECRET_KEY: Optional[str] = Field(default=None, description="OSS Secret Key")
 
 
-@lru_cache()
+@lru_cache
 def get_storage_settings() -> StorageConfig:
     """
     获取存储配置实例（缓存）
@@ -99,7 +99,7 @@ def get_storage_settings_from_db() -> dict:
         try:
             config_keys = [
                 "storage_type",
-                "sql_file_retention_days", 
+                "sql_file_retention_days",
                 "sql_file_size_threshold",
                 "local_storage_path",
                 "s3_bucket_name",

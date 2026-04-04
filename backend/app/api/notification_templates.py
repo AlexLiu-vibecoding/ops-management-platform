@@ -29,7 +29,7 @@ class NotificationTemplateCreate(BaseModel):
     sub_type: Optional[str] = Field(None, description="细分类型")
     title_template: str = Field(..., min_length=1, max_length=200, description="标题模板")
     content_template: str = Field(..., min_length=1, description="内容模板(Markdown)")
-    variables: Optional[List[Dict[str, Any]]] = Field(None, description="可用变量列表")
+    variables: Optional[list[dict[str, Any]]] = Field(None, description="可用变量列表")
     is_enabled: bool = Field(True, description="是否启用")
     is_default: bool = Field(False, description="是否默认模板")
 
@@ -42,7 +42,7 @@ class NotificationTemplateUpdate(BaseModel):
     sub_type: Optional[str] = Field(None, description="细分类型")
     title_template: Optional[str] = Field(None, min_length=1, max_length=200, description="标题模板")
     content_template: Optional[str] = Field(None, min_length=1, description="内容模板")
-    variables: Optional[List[Dict[str, Any]]] = Field(None, description="可用变量列表")
+    variables: Optional[list[dict[str, Any]]] = Field(None, description="可用变量列表")
     is_enabled: Optional[bool] = Field(None, description="是否启用")
     is_default: Optional[bool] = Field(None, description="是否默认模板")
 
@@ -56,7 +56,7 @@ class NotificationTemplateResponse(BaseModel):
     sub_type: Optional[str]
     title_template: str
     content_template: str
-    variables: Optional[List[Dict[str, Any]]]
+    variables: Optional[list[dict[str, Any]]]
     is_enabled: bool
     is_default: bool
     created_at: datetime
@@ -67,7 +67,7 @@ class NotificationTemplateResponse(BaseModel):
 
 class PaginationData(BaseModel):
     """分页数据"""
-    items: List[Any]
+    items: list[Any]
     total: int
     page: int
     page_size: int
@@ -159,7 +159,7 @@ async def create_notification_template(
     if data.is_default:
         db.query(NotificationTemplate).filter(
             NotificationTemplate.notification_type == data.notification_type,
-            NotificationTemplate.is_default == True
+            NotificationTemplate.is_default
         ).update({"is_default": False})
     
     # 如果没有提供变量，使用默认变量
@@ -209,7 +209,7 @@ async def update_notification_template(
         db.query(NotificationTemplate).filter(
             NotificationTemplate.notification_type == new_type,
             NotificationTemplate.id != template_id,
-            NotificationTemplate.is_default == True
+            NotificationTemplate.is_default
         ).update({"is_default": False})
     
     # 更新字段
@@ -255,8 +255,8 @@ async def get_default_template_endpoint(
     # 先查找数据库中的默认模板
     query = db.query(NotificationTemplate).filter(
         NotificationTemplate.notification_type == notification_type,
-        NotificationTemplate.is_enabled == True,
-        NotificationTemplate.is_default == True
+        NotificationTemplate.is_enabled,
+        NotificationTemplate.is_default
     )
     
     if sub_type:

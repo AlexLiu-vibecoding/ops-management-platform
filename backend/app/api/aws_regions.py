@@ -31,7 +31,7 @@ class AWSRegionResponse(BaseModel):
 class AWSRegionGrouped(BaseModel):
     """分组的 AWS 区域响应"""
     geo_group: str
-    regions: List[AWSRegionResponse]
+    regions: list[AWSRegionResponse]
 
 
 class AWSRegionUpdate(BaseModel):
@@ -51,7 +51,7 @@ class AWSRegionCreate(BaseModel):
     description: Optional[str] = None
 
 
-@router.get("", response_model=List[AWSRegionResponse])
+@router.get("", response_model=list[AWSRegionResponse])
 async def get_aws_regions(
     enabled_only: bool = False,
     current_user: User = Depends(get_current_user),
@@ -64,13 +64,13 @@ async def get_aws_regions(
     """
     query = db.query(AWSRegion)
     if enabled_only:
-        query = query.filter(AWSRegion.is_enabled == True)
+        query = query.filter(AWSRegion.is_enabled)
     
     regions = query.order_by(AWSRegion.geo_group, AWSRegion.display_order).all()
     return regions
 
 
-@router.get("/grouped", response_model=List[AWSRegionGrouped])
+@router.get("/grouped", response_model=list[AWSRegionGrouped])
 async def get_aws_regions_grouped(
     enabled_only: bool = True,
     current_user: User = Depends(get_current_user),
@@ -83,7 +83,7 @@ async def get_aws_regions_grouped(
     """
     query = db.query(AWSRegion)
     if enabled_only:
-        query = query.filter(AWSRegion.is_enabled == True)
+        query = query.filter(AWSRegion.is_enabled)
     
     regions = query.order_by(AWSRegion.geo_group, AWSRegion.display_order).all()
     
@@ -187,7 +187,7 @@ async def delete_aws_region(
     
     if env_count > 0 or rdb_count > 0:
         raise HTTPException(
-            status_code=400, 
+            status_code=400,
             detail=f"无法删除：有 {env_count} 个环境和 {rdb_count} 个实例正在使用该区域"
         )
     

@@ -94,7 +94,7 @@ class AlertAIAnalyzer:
             return None
     
     @classmethod
-    def _collect_alert_context(cls, db: Session, alert: AlertRecord) -> Dict[str, Any]:
+    def _collect_alert_context(cls, db: Session, alert: AlertRecord) -> dict[str, Any]:
         """
         收集告警相关的上下文数据
         
@@ -205,7 +205,7 @@ class AlertAIAnalyzer:
         return context
     
     @classmethod
-    def _build_analysis_prompt(cls, alert: AlertRecord, context: Dict[str, Any]) -> str:
+    def _build_analysis_prompt(cls, alert: AlertRecord, context: dict[str, Any]) -> str:
         """构建 AI 分析提示词"""
         
         # 告警基础信息
@@ -242,7 +242,7 @@ class AlertAIAnalyzer:
         # 锁信息
         if context.get("lock_info"):
             lock = context["lock_info"]
-            related_data += f"\n## 锁等待信息\n"
+            related_data += "\n## 锁等待信息\n"
             related_data += f"- 等待时间: {lock['wait_time']}秒\n"
             related_data += f"- 等待查询: {lock['waiting_query'][:200]}\n"
             related_data += f"- 阻塞查询: {lock['blocking_query'][:200]}\n"
@@ -250,7 +250,7 @@ class AlertAIAnalyzer:
         # 复制信息
         if context.get("replication_info"):
             repl = context["replication_info"]
-            related_data += f"\n## 复制状态\n"
+            related_data += "\n## 复制状态\n"
             related_data += f"- 延迟: {repl['seconds_behind']}秒\n"
             related_data += f"- IO线程: {'正常' if repl['io_running'] else '异常'}\n"
             related_data += f"- SQL线程: {'正常' if repl['sql_running'] else '异常'}\n"

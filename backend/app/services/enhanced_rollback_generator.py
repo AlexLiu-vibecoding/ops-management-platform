@@ -45,18 +45,18 @@ class RollbackResult:
     affected_rows: int = 0
     requires_data_backup: bool = False
     data_backup_sql: Optional[str] = None
-    backup_data: Optional[List[Dict]] = None  # 备份的原始数据
+    backup_data: Optional[list[dict]] = None  # 备份的原始数据
     error: Optional[str] = None
 
 
-@dataclass 
+@dataclass
 class RedisRollbackResult:
     """Redis回滚命令生成结果"""
     success: bool
-    rollback_commands: List[str] = field(default_factory=list)
+    rollback_commands: list[str] = field(default_factory=list)
     warning: Optional[str] = None
-    affected_keys: List[str] = field(default_factory=list)
-    backup_data: Optional[Dict[str, Any]] = None  # 键值备份
+    affected_keys: list[str] = field(default_factory=list)
+    backup_data: Optional[dict[str, Any]] = None  # 键值备份
     error: Optional[str] = None
 
 
@@ -90,7 +90,7 @@ class EnhancedRollbackGenerator:
         self.db_connection = db_connection
         self.db_type = db_type
     
-    def analyze_sql(self, sql: str) -> List[Tuple[SQLType, str, str]]:
+    def analyze_sql(self, sql: str) -> list[tuple[SQLType, str, str]]:
         """
         分析SQL语句
         
@@ -124,7 +124,7 @@ class EnhancedRollbackGenerator:
             return match.group(1).strip()
         return None
     
-    def extract_set_clause(self, sql: str) -> Dict[str, str]:
+    def extract_set_clause(self, sql: str) -> dict[str, str]:
         """从UPDATE语句中提取SET子句的列和值"""
         set_match = re.search(r'\bSET\s+(.+?)\s*(?:WHERE|$)', sql, re.IGNORECASE | re.DOTALL)
         if not set_match:
@@ -144,7 +144,7 @@ class EnhancedRollbackGenerator:
         
         return result
     
-    def extract_insert_values(self, sql: str) -> Tuple[List[str], List[List[str]]]:
+    def extract_insert_values(self, sql: str) -> tuple[list[str], list[list[str]]]:
         """从INSERT语句中提取列和值"""
         # 匹配 INSERT INTO table (cols) VALUES (vals)
         match = re.search(
@@ -164,7 +164,7 @@ class EnhancedRollbackGenerator:
         
         return [], []
     
-    def get_primary_key(self, table: str) -> List[str]:
+    def get_primary_key(self, table: str) -> list[str]:
         """获取表的主键列"""
         if not self.db_connection:
             return ['id']  # 默认假设主键是 id
@@ -182,8 +182,8 @@ class EnhancedRollbackGenerator:
                 cursor.execute("""
                     SELECT COLUMN_NAME
                     FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-                    WHERE TABLE_SCHEMA = DATABASE() 
-                    AND TABLE_NAME = %s 
+                    WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = %s
                     AND CONSTRAINT_NAME = 'PRIMARY'
                     ORDER BY ORDINAL_POSITION
                 """, (table,))
@@ -195,7 +195,7 @@ class EnhancedRollbackGenerator:
             logger.warning(f"获取主键失败: {e}")
             return ['id']
     
-    def get_table_columns(self, table: str) -> List[str]:
+    def get_table_columns(self, table: str) -> list[str]:
         """获取表的所有列名"""
         if not self.db_connection:
             return []
@@ -204,15 +204,15 @@ class EnhancedRollbackGenerator:
             cursor = self.db_connection.cursor()
             if self.db_type == "postgresql":
                 cursor.execute("""
-                    SELECT column_name 
-                    FROM information_schema.columns 
+                    SELECT column_name
+                    FROM information_schema.columns
                     WHERE table_schema = 'public' AND table_name = %s
                     ORDER BY ordinal_position
                 """, (table,))
             else:  # MySQL
                 cursor.execute("""
-                    SELECT COLUMN_NAME 
-                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    SELECT COLUMN_NAME
+                    FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s
                     ORDER BY ORDINAL_POSITION
                 """, (table,))
@@ -224,7 +224,7 @@ class EnhancedRollbackGenerator:
             logger.warning(f"获取列名失败: {e}")
             return []
     
-    def query_affected_data(self, table: str, where_clause: Optional[str], columns: List[str] = None) -> Tuple[List[Dict], int]:
+    def query_affected_data(self, table: str, where_clause: Optional[str], columns: list[str] = None) -> tuple[list[dict], int]:
         """
         查询受影响的数据
         
@@ -259,7 +259,7 @@ class EnhancedRollbackGenerator:
             # 转换为字典列表
             data = []
             for row in rows[:self.MAX_BACKUP_ROWS]:
-                data.append(dict(zip(col_names, row)))
+                data.append(dict(zip(col_names, row, strict=False)))
             
             cursor.close()
             return data, len(rows)
@@ -287,12 +287,12 @@ class EnhancedRollbackGenerator:
         return f"'{escaped}'"
     
     def generate_rollback_sql(
-        self, 
-        sql: str, 
-        db_connection=None, 
+        self,
+        sql: str,
+        db_connection=None,
         db_type: str = None,
         database: str = None
-    ) -> List[RollbackResult]:
+    ) -> list[RollbackResult]:
         """
         生成回滚SQL - 连接数据库查询真实数据
         
@@ -320,9 +320,9 @@ class EnhancedRollbackGenerator:
         return results
     
     def _generate_single_rollback_with_data(
-        self, 
-        sql_type: SQLType, 
-        table: Optional[str], 
+        self,
+        sql_type: SQLType,
+        table: Optional[str],
         original_sql: str
     ) -> RollbackResult:
         """生成单条SQL的回滚语句 - 包含数据查询"""
@@ -387,7 +387,7 @@ class EnhancedRollbackGenerator:
                     if self.db_type == "mysql":
                         cursor.execute(f"SHOW INDEX FROM {self._quote_identifier(table)}")
                         # 返回的是索引信息，需要整合
-                        index_info = cursor.fetchall()
+                        cursor.fetchall()
                         cursor.close()
                         # 简化处理：返回提示
                         return RollbackResult(
@@ -610,7 +610,7 @@ class EnhancedRollbackGenerator:
                 try:
                     cursor = self.db_connection.cursor()
                     if self.db_type == "mysql":
-                        cursor.execute(f"""
+                        cursor.execute("""
                             SELECT COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, EXTRA
                             FROM INFORMATION_SCHEMA.COLUMNS
                             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s
@@ -692,8 +692,8 @@ class EnhancedRollbackGenerator:
             )
     
     def generate_redis_rollback(
-        self, 
-        commands: str, 
+        self,
+        commands: str,
         redis_connection=None
     ) -> RedisRollbackResult:
         """

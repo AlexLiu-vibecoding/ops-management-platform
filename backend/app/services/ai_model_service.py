@@ -29,7 +29,7 @@ def decrypt_api_key(encrypted: str) -> str:
 
 def _call_doubao_model(
     config: AIModelConfig,
-    messages: List[Dict[str, str]],
+    messages: list[dict[str, str]],
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None
 ) -> str:
@@ -71,7 +71,7 @@ def get_scene_model(db: Session, scene: str) -> Optional[AIModelConfig]:
     """
     scene_config = db.query(AISceneConfig).filter(
         AISceneConfig.scene == scene,
-        AISceneConfig.is_enabled == True
+        AISceneConfig.is_enabled
     ).first()
     
     if not scene_config:
@@ -79,11 +79,11 @@ def get_scene_model(db: Session, scene: str) -> Optional[AIModelConfig]:
     
     return db.query(AIModelConfig).filter(
         AIModelConfig.id == scene_config.model_config_id,
-        AIModelConfig.is_enabled == True
+        AIModelConfig.is_enabled
     ).first()
 
 
-def get_all_scene_models(db: Session, scene: str) -> List[AIModelConfig]:
+def get_all_scene_models(db: Session, scene: str) -> list[AIModelConfig]:
     """
     获取场景可用的所有模型（用于备用切换）
     
@@ -102,7 +102,7 @@ def get_all_scene_models(db: Session, scene: str) -> List[AIModelConfig]:
 
 def call_model(
     config: AIModelConfig,
-    messages: List[Dict[str, str]],
+    messages: list[dict[str, str]],
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None,
     timeout: Optional[int] = None
@@ -187,7 +187,7 @@ def call_model(
 def call_with_scene(
     db: Session,
     scene: str,
-    messages: List[Dict[str, str]],
+    messages: list[dict[str, str]],
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None
 ) -> tuple[str, Optional[AIModelConfig]]:
@@ -267,7 +267,7 @@ def call_with_scene(
 async def call_with_scene_async(
     db: Session,
     scene: str,
-    messages: List[Dict[str, str]],
+    messages: list[dict[str, str]],
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None
 ) -> tuple[str, Optional[AIModelConfig]]:
@@ -288,7 +288,7 @@ def get_available_model(db: Session, use_case: str) -> Optional[AIModelConfig]:
     return get_scene_model(db, use_case)
 
 
-def get_all_available_models(db: Session, use_case: str) -> List[AIModelConfig]:
+def get_all_available_models(db: Session, use_case: str) -> list[AIModelConfig]:
     """兼容旧 API：获取所有可用的模型配置"""
     return get_all_scene_models(db, use_case)
 
@@ -296,7 +296,7 @@ def get_all_available_models(db: Session, use_case: str) -> List[AIModelConfig]:
 def call_with_fallback(
     db: Session,
     use_case: str,
-    messages: List[Dict[str, str]],
+    messages: list[dict[str, str]],
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None
 ) -> tuple[str, Optional[AIModelConfig]]:
@@ -307,7 +307,7 @@ def call_with_fallback(
 async def call_with_fallback_async(
     db: Session,
     use_case: str,
-    messages: List[Dict[str, str]],
+    messages: list[dict[str, str]],
     temperature: Optional[float] = None,
     max_tokens: Optional[int] = None
 ) -> tuple[str, Optional[AIModelConfig]]:

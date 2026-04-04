@@ -18,13 +18,13 @@ from app.database import Base
 import enum
 
 
-class RDBType(str, enum.Enum):
+class RDBType(enum.StrEnum):
     """关系型数据库类型枚举"""
     MYSQL = "mysql"
     POSTGRESQL = "postgresql"
 
 
-class RedisMode(str, enum.Enum):
+class RedisMode(enum.StrEnum):
     """Redis 运行模式枚举"""
     STANDALONE = "standalone"
     CLUSTER = "cluster"

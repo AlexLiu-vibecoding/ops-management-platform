@@ -61,7 +61,7 @@ class AsyncRDBInstanceService(AsyncBaseService[RDBInstance]):
         group_id: Optional[int] = None,
         db_type: Optional[str] = None,
         status: Optional[bool] = None
-    ) -> tuple[List[RDBInstance], int]:
+    ) -> tuple[list[RDBInstance], int]:
         """
         获取实例列表（预加载环境信息）
         
@@ -135,7 +135,7 @@ class AsyncRDBInstanceService(AsyncBaseService[RDBInstance]):
         )
         return result.scalar_one_or_none()
     
-    async def get_by_environment(self, environment_id: int) -> List[RDBInstance]:
+    async def get_by_environment(self, environment_id: int) -> list[RDBInstance]:
         """
         获取指定环境的所有实例
         
@@ -169,7 +169,7 @@ class AsyncRDBInstanceService(AsyncBaseService[RDBInstance]):
         )
         return result.scalar()
     
-    async def get_active_instances(self) -> List[RDBInstance]:
+    async def get_active_instances(self) -> list[RDBInstance]:
         """
         获取所有启用的实例
         
@@ -178,7 +178,7 @@ class AsyncRDBInstanceService(AsyncBaseService[RDBInstance]):
         """
         result = await self.db.execute(
             select(RDBInstance)
-            .where(RDBInstance.status == True)
+            .where(RDBInstance.status)
             .order_by(RDBInstance.name)
         )
         return list(result.scalars().all())
@@ -217,7 +217,7 @@ class AsyncRedisInstanceService(AsyncBaseService[RedisInstance]):
         limit: int = 20,
         environment_id: Optional[int] = None,
         status: Optional[bool] = None
-    ) -> tuple[List[RedisInstance], int]:
+    ) -> tuple[list[RedisInstance], int]:
         """
         获取实例列表（预加载环境信息）
         
@@ -273,7 +273,7 @@ class AsyncRedisInstanceService(AsyncBaseService[RedisInstance]):
         )
         return result.scalar_one_or_none()
     
-    async def get_active_instances(self) -> List[RedisInstance]:
+    async def get_active_instances(self) -> list[RedisInstance]:
         """
         获取所有启用的实例
         
@@ -282,7 +282,7 @@ class AsyncRedisInstanceService(AsyncBaseService[RedisInstance]):
         """
         result = await self.db.execute(
             select(RedisInstance)
-            .where(RedisInstance.status == True)
+            .where(RedisInstance.status)
             .order_by(RedisInstance.name)
         )
         return list(result.scalars().all())

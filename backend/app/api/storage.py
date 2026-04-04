@@ -68,7 +68,7 @@ async def test_storage(
     try:
         # 尝试写入和读取测试文件
         test_content = f"Storage test at {__import__('datetime').datetime.now().isoformat()}"
-        test_path = f"test/test_connection.txt"
+        test_path = "test/test_connection.txt"
         
         # 保存测试文件
         success = await storage_manager.backend.save(test_path, test_content, {"test": True})

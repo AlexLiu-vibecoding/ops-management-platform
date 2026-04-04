@@ -35,7 +35,7 @@ class RouterConfig:
         name: str,
         router: APIRouter,
         prefix: str = "",
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         priority: int = 100
     ):
         """
@@ -63,7 +63,7 @@ class APIRouterRegistry:
     """
     
     def __init__(self):
-        self._routers: Dict[str, RouterConfig] = {}
+        self._routers: dict[str, RouterConfig] = {}
         self._main_router: Optional[APIRouter] = None
     
     def register(
@@ -71,7 +71,7 @@ class APIRouterRegistry:
         name: str,
         router: APIRouter,
         prefix: str = "",
-        tags: Optional[List[str]] = None,
+        tags: Optional[list[str]] = None,
         priority: int = 100
     ) -> None:
         """
@@ -129,7 +129,7 @@ class APIRouterRegistry:
     def auto_register(
         self,
         package_path: str = "app.api",
-        exclude: Optional[List[str]] = None
+        exclude: Optional[list[str]] = None
     ) -> int:
         """
         自动发现并注册路由
@@ -217,7 +217,7 @@ class APIRouterRegistry:
         config = self._routers.get(name)
         return config.router if config else None
     
-    def list_routers(self) -> List[Dict[str, Any]]:
+    def list_routers(self) -> list[dict[str, Any]]:
         """列出所有注册的路由"""
         return [
             {
@@ -236,8 +236,8 @@ registry = APIRouterRegistry()
 
 def create_api_router(
     prefix: str = "",
-    tags: Optional[List[str]] = None,
-    responses: Optional[Dict] = None
+    tags: Optional[list[str]] = None,
+    responses: Optional[dict] = None
 ) -> APIRouter:
     """
     创建 API 路由器的便捷函数

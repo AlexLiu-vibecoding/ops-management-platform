@@ -116,7 +116,7 @@ class SQLOptimizationService:
         enabled: Optional[bool] = None,
         page: int = 1,
         page_size: int = 20
-    ) -> tuple[List[SlowQueryCollectionTask], int]:
+    ) -> tuple[list[SlowQueryCollectionTask], int]:
         """获取采集任务列表"""
         query = select(SlowQueryCollectionTask)
 
@@ -151,7 +151,7 @@ class SQLOptimizationService:
     def run_collection(
         self,
         task_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """执行采集任务"""
         task = self._get_task(task_id)
         if not task:
@@ -333,7 +333,7 @@ class SQLOptimizationService:
         risk_level: Optional[str] = None,
         page: int = 1,
         page_size: int = 20
-    ) -> tuple[List[OptimizationSuggestion], int]:
+    ) -> tuple[list[OptimizationSuggestion], int]:
         """获取优化建议列表"""
         query = select(OptimizationSuggestion)
 
@@ -376,7 +376,7 @@ class SQLOptimizationService:
         self,
         suggestion_id: int,
         current_user: User
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """采用建议，创建变更申请"""
         suggestion = self.get_suggestion(suggestion_id)
         if not suggestion:
@@ -461,7 +461,7 @@ class SQLOptimizationService:
     def verify_suggestion(
         self,
         suggestion_id: int
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """验证优化效果"""
         suggestion = self.get_suggestion(suggestion_id)
         if not suggestion:
@@ -533,7 +533,7 @@ class SQLOptimizationService:
         instance_id: int,
         sql_text: str,
         database_name: Optional[str] = None
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """手动分析 SQL"""
         instance = self._get_instance(instance_id)
         if not instance:
@@ -752,7 +752,7 @@ class SQLOptimizationService:
         instance_id: int,
         database_name: Optional[str],
         sql_text: str
-    ) -> List[Dict]:
+    ) -> list[dict]:
         """获取 SQL 中涉及的表结构"""
         # 简化实现：从 table_schemas 表获取
         # 实际应该解析 SQL 提取表名
@@ -779,9 +779,9 @@ class SQLOptimizationService:
     def _llm_analyze_sql(
         self,
         sql_text: str,
-        explain_result: Dict[str, Any],
-        table_schemas: List[Dict]
-    ) -> Dict[str, Any]:
+        explain_result: dict[str, Any],
+        table_schemas: list[dict]
+    ) -> dict[str, Any]:
         """使用 LLM 分析 SQL"""
         # 这里使用 coze-coding-dev-sdk 调用豆包大模型
         # 由于当前环境限制，这里返回模拟结果
@@ -848,7 +848,7 @@ class SQLOptimizationService:
         total_time = sum(sq.query_time or 0 for sq in slow_queries)
         return total_time / len(slow_queries) if slow_queries else None
 
-    def _detect_rule_issues(self, explain_result: Dict[str, Any]) -> List[Any]:
+    def _detect_rule_issues(self, explain_result: dict[str, Any]) -> list[Any]:
         """规则检测"""
         from app.schemas import RuleIssue
 
@@ -961,7 +961,7 @@ class SQLOptimizationService:
         name = result.scalar_one_or_none()
         return name or "未知实例"
     
-    def get_analysis_detail(self, history_id: int) -> Optional[Dict[str, Any]]:
+    def get_analysis_detail(self, history_id: int) -> Optional[dict[str, Any]]:
         """获取分析历史详情"""
         suggestion = self.get_suggestion(history_id)
         if not suggestion:
@@ -993,7 +993,7 @@ class SQLOptimizationService:
         file,
         auto_analyze: bool,
         current_user: User
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         上传慢日志文件
         
@@ -1085,7 +1085,7 @@ class SQLOptimizationService:
         
         return self._format_file_info(slow_log_file)
     
-    def parse_slow_log_file(self, file_id: int) -> Dict[str, Any]:
+    def parse_slow_log_file(self, file_id: int) -> dict[str, Any]:
         """
         解析慢日志文件
         
@@ -1108,7 +1108,7 @@ class SQLOptimizationService:
             self.db.commit()
             
             # 读取文件内容
-            with open(slow_log_file.file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(slow_log_file.file_path, encoding='utf-8', errors='ignore') as f:
                 content = f.read()
             
             # 解析慢日志（MySQL 格式）
@@ -1168,7 +1168,7 @@ class SQLOptimizationService:
         self,
         file_id: int,
         current_user: User
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         分析慢日志文件
         
@@ -1181,7 +1181,6 @@ class SQLOptimizationService:
         """
         from app.models import SlowLogFile, SQLAnalysisHistory
         from datetime import datetime, timedelta
-        import json
         
         slow_log_file = self.db.query(SlowLogFile).filter(SlowLogFile.id == file_id).first()
         if not slow_log_file:
@@ -1290,7 +1289,7 @@ class SQLOptimizationService:
         # 生成哈希
         return hashlib.md5(normalized.encode()).hexdigest()
     
-    def _analyze_sql_rules(self, sql: str, query_data: Dict) -> List[Dict]:
+    def _analyze_sql_rules(self, sql: str, query_data: dict) -> list[dict]:
         """
         基于规则分析SQL
         
@@ -1360,7 +1359,7 @@ class SQLOptimizationService:
         
         return issues
     
-    def _generate_suggestions(self, issues: List[Dict]) -> List[Dict]:
+    def _generate_suggestions(self, issues: list[dict]) -> list[dict]:
         """根据问题生成建议"""
         suggestions = []
         
@@ -1404,7 +1403,7 @@ class SQLOptimizationService:
         
         return [self._format_file_info(f) for f in files], total
     
-    def get_slow_log_file(self, file_id: int) -> Optional[Dict[str, Any]]:
+    def get_slow_log_file(self, file_id: int) -> Optional[dict[str, Any]]:
         """获取慢日志文件详情"""
         from app.models import SlowLogFile
         
@@ -1434,7 +1433,7 @@ class SQLOptimizationService:
         logger.info(f"删除慢日志文件: file_id={file_id}")
         return True
     
-    def _format_file_info(self, file) -> Dict[str, Any]:
+    def _format_file_info(self, file) -> dict[str, Any]:
         """格式化文件信息"""
         return {
             "id": file.id,

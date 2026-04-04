@@ -8,12 +8,12 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from app.database import get_db
 from app.models import (
-    MonitorSwitch, MonitorType, GlobalConfig, 
+    MonitorSwitch, MonitorType, GlobalConfig,
     RDBInstance, RedisInstance, User, SlowQuery, PerformanceMetric
 )
 from sqlalchemy import func
 from app.schemas import (
-    MonitorSwitchUpdate, MonitorSwitchResponse, 
+    MonitorSwitchUpdate, MonitorSwitchResponse,
     GlobalMonitorSwitchUpdate, MessageResponse
 )
 from app.deps import get_super_admin, get_current_user
@@ -57,7 +57,7 @@ class AlertRuleConfig(BaseModel):
     threshold: float = Field(..., description="阈值")
     severity: str = Field("warning", description="严重级别: info/warning/critical")
     enabled: bool = Field(True, description="是否启用")
-    notify_channels: Optional[List[int]] = Field(None, description="通知通道ID列表")
+    notify_channels: Optional[list[int]] = Field(None, description="通知通道ID列表")
     cooldown: int = Field(300, description="冷却时间(秒)")
 
 
@@ -131,7 +131,7 @@ async def update_global_monitor_switch(
     )
 
 
-@router.get("/switches/instance/{instance_id}", response_model=List[MonitorSwitchResponse])
+@router.get("/switches/instance/{instance_id}", response_model=list[MonitorSwitchResponse])
 async def get_instance_monitor_switches(
     instance_id: int,
     current_user: User = Depends(get_current_user),
@@ -240,7 +240,7 @@ async def get_monitor_config(
     for config in configs:
         try:
             # 尝试转换为数字
-            if config.config_key in ["monitor_collect_interval", "slow_query_collect_interval", 
+            if config.config_key in ["monitor_collect_interval", "slow_query_collect_interval",
                                       "performance_data_retention_days", "snapshot_retention_days"]:
                 result[config.config_key] = int(config.config_value)
             else:
@@ -279,7 +279,7 @@ async def update_monitor_config(
 
 # ============ 告警规则 ============
 
-@router.get("/alert-rules", response_model=List[dict])
+@router.get("/alert-rules", response_model=list[dict])
 async def get_alert_rules(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -302,7 +302,7 @@ async def get_alert_rules(
 
 @router.put("/alert-rules", response_model=MessageResponse)
 async def update_alert_rules(
-    rules: List[dict],
+    rules: list[dict],
     current_user: User = Depends(get_super_admin),
     db: Session = Depends(get_db)
 ):
@@ -529,7 +529,7 @@ async def get_high_cpu_statistics(
     ).join(RDBInstance, PerformanceMetric.instance_id == RDBInstance.id).filter(
         PerformanceMetric.collect_time >= start_time
     ).group_by(
-        PerformanceMetric.instance_id, 
+        PerformanceMetric.instance_id,
         RDBInstance.name
     ).all()
     
@@ -540,8 +540,8 @@ async def get_high_cpu_statistics(
         "avg_memory": float(cpu_stats.avg_memory) if cpu_stats.avg_memory else 0,
         "by_instance": [
             {
-                "instance_id": s.instance_id, 
-                "instance_name": s.instance_name, 
+                "instance_id": s.instance_id,
+                "instance_name": s.instance_name,
                 "max_cpu": float(s.max_cpu) if s.max_cpu else 0,
                 "avg_cpu": float(s.avg_cpu) if s.avg_cpu else 0,
                 "max_memory": float(s.max_memory) if s.max_memory else 0,
@@ -553,7 +553,7 @@ async def get_high_cpu_statistics(
 
 # ============ 告警规则高级配置 ============
 
-@router.get("/alert-rules/detail", response_model=List[dict])
+@router.get("/alert-rules/detail", response_model=list[dict])
 async def get_alert_rules_detail(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -664,7 +664,7 @@ async def get_alert_rules_detail(
 
 @router.put("/alert-rules/detail", response_model=MessageResponse)
 async def update_alert_rules_detail(
-    rules: List[AlertRuleConfig],
+    rules: list[AlertRuleConfig],
     current_user: User = Depends(get_super_admin),
     db: Session = Depends(get_db)
 ):
@@ -689,8 +689,8 @@ async def update_alert_rules_detail(
             existing.config_value = value
         else:
             db.add(GlobalConfig(
-                config_key=key, 
-                config_value=value, 
+                config_key=key,
+                config_value=value,
                 description=f"告警规则: {rule.name}"
             ))
     
@@ -725,8 +725,8 @@ async def get_monitor_overview(
     # 实例统计 (RDB + Redis)
     total_rdb = db.query(func.count(RDBInstance.id)).scalar() or 0
     total_redis = db.query(func.count(RedisInstance.id)).scalar() or 0
-    online_rdb = db.query(func.count(RDBInstance.id)).filter(RDBInstance.status == True).scalar() or 0
-    online_redis = db.query(func.count(RedisInstance.id)).filter(RedisInstance.status == True).scalar() or 0
+    online_rdb = db.query(func.count(RDBInstance.id)).filter(RDBInstance.status).scalar() or 0
+    online_redis = db.query(func.count(RedisInstance.id)).filter(RedisInstance.status).scalar() or 0
     total_instances = total_rdb + total_redis
     online_instances = online_rdb + online_redis
     

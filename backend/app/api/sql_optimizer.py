@@ -78,7 +78,7 @@ def get_db_connection(instance: RDBInstance, database: str = None):
         return conn, "mysql"
 
 
-def test_connection(instance: RDBInstance) -> Dict[str, Any]:
+def test_connection(instance: RDBInstance) -> dict[str, Any]:
     """测试数据库连接"""
     try:
         conn, db_type = get_db_connection(instance)
@@ -101,7 +101,7 @@ def test_connection(instance: RDBInstance) -> Dict[str, Any]:
 
 # ============ 表结构抓取功能 ============
 
-async def fetch_table_structure(instance: RDBInstance, database: str, table_name: str) -> Optional[Dict]:
+async def fetch_table_structure(instance: RDBInstance, database: str, table_name: str) -> Optional[dict]:
     """抓取单个表的结构信息（支持 MySQL 和 PostgreSQL）"""
     conn = None
     try:
@@ -112,7 +112,7 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
             
             # PostgreSQL: 获取表基本信息
             cursor.execute("""
-                SELECT 
+                SELECT
                     c.relname as table_name,
                     'BASE TABLE' as table_type,
                     '' as engine,
@@ -134,7 +134,7 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
             
             # PostgreSQL: 获取列信息
             cursor.execute("""
-                SELECT 
+                SELECT
                     a.attname as name,
                     pg_catalog.format_type(a.atttypid, a.atttypmod) as data_type,
                     NOT a.attnotnull as nullable,
@@ -153,7 +153,7 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
             
             # PostgreSQL: 获取索引信息
             cursor.execute("""
-                SELECT 
+                SELECT
                     i.relname as index_name,
                     array_agg(a.attname ORDER BY array_position(ix.indkey, a.attnum)) as columns,
                     NOT ix.indisunique as non_unique,
@@ -212,11 +212,11 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
             
             # MySQL: 获取表基本信息
             cursor.execute("""
-                SELECT 
+                SELECT
                     TABLE_NAME, TABLE_TYPE, ENGINE, ROW_FORMAT,
                     TABLE_ROWS, DATA_LENGTH, INDEX_LENGTH, TABLE_COMMENT,
                     CREATE_TIME, UPDATE_TIME
-                FROM information_schema.TABLES 
+                FROM information_schema.TABLES
                 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
             """, (database, table_name))
             table_info = cursor.fetchone()
@@ -226,7 +226,7 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
             
             # MySQL: 获取列信息
             cursor.execute("""
-                SELECT 
+                SELECT
                     COLUMN_NAME as name,
                     COLUMN_TYPE as data_type,
                     IS_NULLABLE as nullable,
@@ -234,7 +234,7 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
                     COLUMN_COMMENT as comment,
                     COLUMN_KEY as key_type,
                     EXTRA as extra
-                FROM information_schema.COLUMNS 
+                FROM information_schema.COLUMNS
                 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
                 ORDER BY ORDINAL_POSITION
             """, (database, table_name))
@@ -242,12 +242,12 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
             
             # MySQL: 获取索引信息
             cursor.execute("""
-                SELECT 
+                SELECT
                     INDEX_NAME as index_name,
                     GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) as columns,
                     NON_UNIQUE as non_unique,
                     INDEX_TYPE as index_type
-                FROM information_schema.STATISTICS 
+                FROM information_schema.STATISTICS
                 WHERE TABLE_SCHEMA = %s AND TABLE_NAME = %s
                 GROUP BY INDEX_NAME, NON_UNIQUE, INDEX_TYPE
             """, (database, table_name))
@@ -303,7 +303,7 @@ async def fetch_table_structure(instance: RDBInstance, database: str, table_name
             conn.close()
 
 
-async def fetch_database_tables(instance: RDBInstance, database: str) -> List[str]:
+async def fetch_database_tables(instance: RDBInstance, database: str) -> list[str]:
     """获取数据库中所有表名（支持 MySQL 和 PostgreSQL）"""
     conn = None
     try:
@@ -312,9 +312,9 @@ async def fetch_database_tables(instance: RDBInstance, database: str) -> List[st
         
         if db_type == "postgresql":
             cursor.execute("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
                 ORDER BY table_name
             """)
         else:
@@ -326,7 +326,7 @@ async def fetch_database_tables(instance: RDBInstance, database: str) -> List[st
             conn.close()
 
 
-@router.post("/sync-schema", response_model=Dict[str, Any])
+@router.post("/sync-schema", response_model=dict[str, Any])
 async def sync_table_schema(
     request: TableSchemaSyncRequest,
     current_user: User = Depends(get_current_user),
@@ -363,18 +363,17 @@ async def sync_table_schema(
             
             if db_type == "postgresql":
                 cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false")
-                databases = [row[0] for row in cursor.fetchall() 
+                databases = [row[0] for row in cursor.fetchall()
                             if row[0] not in ('template0', 'template1', 'postgres')]
             else:
                 cursor.execute("SHOW DATABASES")
-                databases = [row[0] for row in cursor.fetchall() 
+                databases = [row[0] for row in cursor.fetchall()
                             if row[0] not in ('information_schema', 'mysql', 'performance_schema', 'sys')]
         finally:
             if conn:
                 conn.close()
     
     synced_count = 0
-    errors = []
     
     for database in databases:
         # 获取表列表
@@ -446,7 +445,7 @@ async def sync_table_schema(
     }
 
 
-@router.get("/schemas/{instance_id}", response_model=List[Dict])
+@router.get("/schemas/{instance_id}", response_model=list[dict])
 async def get_table_schemas(
     instance_id: int,
     database: Optional[str] = None,
@@ -488,9 +487,9 @@ class SQLRuleEngine:
         return sql.strip()
     
     @staticmethod
-    def extract_tables(sql: str) -> List[str]:
+    def extract_tables(sql: str) -> list[str]:
         """从SQL中提取表名"""
-        sql_upper = sql.upper()
+        sql.upper()
         tables = []
         
         # 匹配 FROM table_name
@@ -512,7 +511,7 @@ class SQLRuleEngine:
         return list(set(tables))
     
     @staticmethod
-    def check_full_table_scan(explain_rows: List[Dict]) -> List[RuleIssue]:
+    def check_full_table_scan(explain_rows: list[dict]) -> list[RuleIssue]:
         """检查全表扫描"""
         issues = []
         for row in explain_rows:
@@ -528,7 +527,7 @@ class SQLRuleEngine:
         return issues
     
     @staticmethod
-    def check_unused_index(explain_rows: List[Dict]) -> List[RuleIssue]:
+    def check_unused_index(explain_rows: list[dict]) -> list[RuleIssue]:
         """检查未使用索引"""
         issues = []
         for row in explain_rows:
@@ -548,7 +547,7 @@ class SQLRuleEngine:
         return issues
     
     @staticmethod
-    def check_temporary_table(explain_rows: List[Dict]) -> List[RuleIssue]:
+    def check_temporary_table(explain_rows: list[dict]) -> list[RuleIssue]:
         """检查临时表使用"""
         issues = []
         for row in explain_rows:
@@ -565,7 +564,7 @@ class SQLRuleEngine:
         return issues
     
     @staticmethod
-    def check_filesort(explain_rows: List[Dict]) -> List[RuleIssue]:
+    def check_filesort(explain_rows: list[dict]) -> list[RuleIssue]:
         """检查文件排序"""
         issues = []
         for row in explain_rows:
@@ -582,7 +581,7 @@ class SQLRuleEngine:
         return issues
     
     @staticmethod
-    def check_large_scan(explain_rows: List[Dict]) -> List[RuleIssue]:
+    def check_large_scan(explain_rows: list[dict]) -> list[RuleIssue]:
         """检查大范围扫描"""
         issues = []
         for row in explain_rows:
@@ -600,10 +599,10 @@ class SQLRuleEngine:
         return issues
     
     @staticmethod
-    def check_select_star(sql: str) -> List[RuleIssue]:
+    def check_select_star(sql: str) -> list[RuleIssue]:
         """检查SELECT *"""
         issues = []
-        sql_upper = sql.upper()
+        sql.upper()
         # 简单检查 SELECT *
         if re.search(r'SELECT\s+\*\s+FROM', sql, re.IGNORECASE):
             issues.append(RuleIssue(
@@ -616,7 +615,7 @@ class SQLRuleEngine:
         return issues
     
     @staticmethod
-    def check_like_pattern(sql: str) -> List[RuleIssue]:
+    def check_like_pattern(sql: str) -> list[RuleIssue]:
         """检查LIKE模式"""
         issues = []
         # 检查 LIKE '%xxx' 模式
@@ -631,7 +630,7 @@ class SQLRuleEngine:
         return issues
     
     @staticmethod
-    def check_or_condition(sql: str, explain_rows: List[Dict]) -> List[RuleIssue]:
+    def check_or_condition(sql: str, explain_rows: list[dict]) -> list[RuleIssue]:
         """检查OR条件"""
         issues = []
         sql_upper = sql.upper()
@@ -651,7 +650,7 @@ class SQLRuleEngine:
         return issues
     
     @staticmethod
-    def check_function_on_index(sql: str) -> List[RuleIssue]:
+    def check_function_on_index(sql: str) -> list[RuleIssue]:
         """检查索引列上使用函数"""
         issues = []
         # 检查常见的函数使用模式
@@ -674,7 +673,7 @@ class SQLRuleEngine:
                 ))
         return issues
     
-    def analyze(self, sql: str, explain_rows: List[Dict]) -> List[RuleIssue]:
+    def analyze(self, sql: str, explain_rows: list[dict]) -> list[RuleIssue]:
         """执行所有规则检查"""
         all_issues = []
         
@@ -698,8 +697,8 @@ class SQLRuleEngine:
 
 async def get_llm_analysis(
     sql: str,
-    explain_result: List[Dict],
-    table_schemas: List[Dict],
+    explain_result: list[dict],
+    table_schemas: list[dict],
     db_type: str = "mysql",
     db_version: str = "8.0",
     db_session: Session = None
@@ -1143,7 +1142,7 @@ async def analyze_sql(
             conn.close()
 
 
-@router.get("/history/{instance_id}", response_model=List[Dict])
+@router.get("/history/{instance_id}", response_model=list[dict])
 async def get_analysis_history(
     instance_id: int,
     limit: int = 20,
@@ -1166,7 +1165,7 @@ async def get_analysis_history(
     } for h in history]
 
 
-@router.get("/history/detail/{history_id}", response_model=Dict)
+@router.get("/history/detail/{history_id}", response_model=dict)
 async def get_analysis_detail(
     history_id: int,
     current_user: User = Depends(get_current_user),

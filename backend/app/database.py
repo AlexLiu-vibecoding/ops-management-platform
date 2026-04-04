@@ -166,7 +166,7 @@ if is_mysql:
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20
 
-# PostgreSQL 特定配置  
+# PostgreSQL 特定配置
 if is_postgres:
     engine_kwargs["pool_size"] = 10
     engine_kwargs["max_overflow"] = 20

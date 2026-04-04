@@ -42,7 +42,7 @@ class ScriptCreate(BaseModel):
     script_type: str = Field("python", description="python/bash/sql")
     content: str
     description: Optional[str] = None
-    params_schema: Optional[Dict[str, Any]] = None
+    params_schema: Optional[dict[str, Any]] = None
     timeout: int = Field(300, ge=1, le=3600)
     max_retries: int = Field(0, ge=0, le=10)
     is_public: bool = False
@@ -59,7 +59,7 @@ class ScriptUpdate(BaseModel):
     name: Optional[str] = Field(None, max_length=100)
     content: Optional[str] = None
     description: Optional[str] = None
-    params_schema: Optional[Dict[str, Any]] = None
+    params_schema: Optional[dict[str, Any]] = None
     timeout: Optional[int] = Field(None, ge=1, le=3600)
     max_retries: Optional[int] = Field(None, ge=0, le=10)
     is_enabled: Optional[bool] = None
@@ -74,7 +74,7 @@ class ScriptUpdate(BaseModel):
 
 class ScriptExecute(BaseModel):
     """执行脚本请求"""
-    params: Optional[Dict[str, Any]] = Field(default={}, description="执行参数")
+    params: Optional[dict[str, Any]] = Field(default={}, description="执行参数")
     async_exec: bool = Field(True, description="是否异步执行")
     timeout: Optional[int] = Field(None, description="超时时间（秒）")
 
@@ -146,7 +146,7 @@ async def send_script_notification(
     # 使用新的通知通道系统
     channels = db.query(NotificationChannel).filter(
         NotificationChannel.id.in_(channel_ids),
-        NotificationChannel.is_enabled == True
+        NotificationChannel.is_enabled
     ).all()
     
     if not channels:
@@ -313,7 +313,7 @@ async def send_script_notification(
 async def execute_script_async(
     execution_id: int,
     script_id: int,
-    params: Dict[str, Any],
+    params: dict[str, Any],
     timeout: int
 ):
     """
@@ -404,7 +404,7 @@ async def execute_script_async(
                 execution.error_output = stderr.decode('utf-8', errors='replace')
                 execution.exit_code = process.returncode
                 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 # 超时，杀死进程
                 process.kill()
                 execution.status = ExecutionStatus.TIMEOUT
@@ -460,7 +460,7 @@ async def list_scripts(
     if current_user.role != UserRole.SUPER_ADMIN:
         query = query.filter(
             (Script.created_by == current_user.id) |
-            (Script.is_public == True) |
+            (Script.is_public) |
             (Script.allowed_roles.contains(current_user.role.value))
         )
     
@@ -475,7 +475,7 @@ async def list_scripts(
     # 搜索
     if search:
         query = query.filter(
-            Script.name.contains(search) | 
+            Script.name.contains(search) |
             Script.description.contains(search)
         )
     

@@ -47,7 +47,7 @@ class ChannelConfigDingTalk(BaseModel):
     webhook: str
     auth_type: str = "none"  # none/keyword/signature
     secret: Optional[str] = None
-    keywords: Optional[List[str]] = None
+    keywords: Optional[list[str]] = None
 
 
 class ChannelConfigWechat(BaseModel):
@@ -376,7 +376,7 @@ async def test_channel(
         if not webhook:
             # 更新日志为失败状态
             NotificationService.update_notification_log(
-                db, log, status="failed", 
+                db, log, status="failed",
                 error_message="Webhook 地址未配置"
             )
             raise HTTPException(status_code=400, detail="Webhook 地址未配置")
@@ -407,7 +407,7 @@ async def test_channel(
                     error_message=result.get('error_message', '未知错误')
                 )
                 raise HTTPException(
-                    status_code=400, 
+                    status_code=400,
                     detail=f"发送失败: {result.get('error_message', '未知错误')}"
                 )
         except Exception as e:
@@ -468,9 +468,9 @@ async def test_channel(
 
 
 async def _send_dingtalk_test(
-    webhook: str, 
-    message: dict, 
-    auth_type: str = "none", 
+    webhook: str,
+    message: dict,
+    auth_type: str = "none",
     secret: str = None,
     keywords: list = None
 ) -> dict:

@@ -101,8 +101,8 @@ def _get_redis_connection(instance: RedisInstance):
 
 
 async def _generate_sql_rollback_with_data(
-    instance: RDBInstance, 
-    sql_content: str, 
+    instance: RDBInstance,
+    sql_content: str,
     database: str = None
 ) -> tuple[str, int]:
     """
@@ -133,13 +133,13 @@ async def _generate_sql_rollback_with_data(
         
         for result in results:
             if result.success and result.rollback_sql:
-                rollback_parts.append(f"-- ================================")
+                rollback_parts.append("-- ================================")
                 rollback_parts.append(f"-- SQL类型: {result.sql_type.value}")
                 rollback_parts.append(f"-- 受影响表: {result.affected_table or '未知'}")
                 if result.affected_rows:
                     rollback_parts.append(f"-- 受影响行数: {result.affected_rows}")
                     total_affected += result.affected_rows
-                rollback_parts.append(f"-- ================================")
+                rollback_parts.append("-- ================================")
                 rollback_parts.append("")
                 rollback_parts.append(result.rollback_sql)
                 if result.warning:
@@ -172,7 +172,7 @@ async def _generate_sql_rollback_with_data(
 
 
 async def _generate_redis_rollback_with_data(
-    instance: RedisInstance, 
+    instance: RedisInstance,
     commands: str
 ) -> tuple[str, list]:
     """
@@ -583,7 +583,7 @@ def format_approval_response(approval: ApprovalRecord, include_full_sql: bool = 
         "execute_result": approval.execute_result,
         "created_at": approval.created_at,
         "approved_at": approval.approve_time,
-        "instance_name": (approval.rdb_instance.name if approval.rdb_instance else None) or 
+        "instance_name": (approval.rdb_instance.name if approval.rdb_instance else None) or
                          (approval.redis_instance.name if approval.redis_instance else None)
     }
     
@@ -663,7 +663,7 @@ async def get_approval(
         )
     
     # 权限检查：只能查看自己的申请或作为审批人查看
-    if (approval.requester_id != current_user.id and 
+    if (approval.requester_id != current_user.id and
         current_user.role.value not in ["super_admin", "approval_admin"]):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -723,8 +723,8 @@ async def create_approval(
     if environment_id:
         from app.models import ChangeWindow
         windows = db.query(ChangeWindow).filter(
-            ChangeWindow.is_enabled == True,
-            ChangeWindow.allow_emergency == True
+            ChangeWindow.is_enabled,
+            ChangeWindow.allow_emergency
         ).all()
         # 找到适用于该环境的窗口
         for w in windows:
@@ -751,8 +751,8 @@ async def create_approval(
         # SQL 变更 - 连接数据库生成回滚SQL
         try:
             rollback_sql, affected_rows = await _generate_sql_rollback_with_data(
-                instance, 
-                approval_data.sql_content, 
+                instance,
+                approval_data.sql_content,
                 approval_data.database_name
             )
             if rollback_sql:
@@ -783,7 +783,7 @@ async def create_approval(
         # Redis 命令回滚生成
         try:
             rollback_sql, affected_keys = await _generate_redis_rollback_with_data(
-                instance, 
+                instance,
                 approval_data.sql_content
             )
             if rollback_sql:
@@ -926,7 +926,7 @@ async def create_approval(
         operation_detail=f"Submit approval: {approval_data.title}\nDatabase: {db_target_desc}\nSQL lines: {sql_line_count}lines",
         request_ip="",
         request_method="POST",
-        request_path=f"/api/approvals",
+        request_path="/api/approvals",
         response_code=200
     )
     db.add(audit_log)
@@ -1013,7 +1013,7 @@ async def approve_or_reject(
     # 获取系统中所有有审批权限的用户数量（用于兜底判断）
     approver_count = db.query(User).filter(
         User.role.in_(["super_admin", "approval_admin"]),
-        User.status == True
+        User.status
     ).count()
     
     # 判断是否达到审批条件
@@ -1045,7 +1045,7 @@ async def approve_or_reject(
         if approval.scheduled_time:
             try:
                 approval_scheduler.schedule_approval_execution(
-                    approval.id, 
+                    approval.id,
                     approval.scheduled_time
                 )
                 logger.info(f"已添加定时执行任务: 审批ID={approval.id}, 执行时间={approval.scheduled_time}")
@@ -1071,7 +1071,7 @@ def _add_audit_log(db, current_user, approval, action):
         user_id=current_user.id,
         username=current_user.username,
         instance_id=approval.rdb_instance_id or approval.redis_instance_id,
-        instance_name=(approval.rdb_instance.name if approval.rdb_instance else None) or 
+        instance_name=(approval.rdb_instance.name if approval.rdb_instance else None) or
                       (approval.redis_instance.name if approval.redis_instance else None),
         environment_id=approval.environment_id,
         operation_type=action,
@@ -1240,7 +1240,7 @@ async def dingtalk_approval_action(
         # 如果有定时执行时间，添加到调度器
         if approval.scheduled_time:
             approval_scheduler.schedule_approval_execution(
-                approval.id, 
+                approval.id,
                 approval.scheduled_time
             )
         

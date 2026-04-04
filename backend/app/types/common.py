@@ -4,12 +4,12 @@
 提供项目中常用的类型定义，确保类型安全
 """
 from typing import (
-    TypeVar, Generic, Optional, List, Dict, Any, 
+    TypeVar, Generic, Optional, List, Dict, Any,
     Callable, Awaitable, Union, Tuple, Type
 )
 from typing_extensions import TypedDict, NotRequired
 from datetime import datetime
-from enum import Enum
+from enum import Enum, StrEnum
 
 
 # ==================== 通用类型变量 ====================
@@ -36,7 +36,7 @@ DBCursor = Union[pymysql.cursors.Cursor, pg_extensions.cursor]
 
 class PaginatedResult(TypedDict, Generic[T]):
     """分页结果"""
-    items: List[T]
+    items: list[T]
     total: int
     page: int
     page_size: int
@@ -63,7 +63,7 @@ class APIResponse(TypedDict, Generic[T]):
 
 class ListResponse(TypedDict, Generic[T]):
     """列表响应"""
-    items: List[T]
+    items: list[T]
     total: int
 
 
@@ -84,9 +84,9 @@ class ErrorResponse(TypedDict):
 class QueryResult(TypedDict, Generic[T]):
     """查询结果"""
     success: bool
-    data: List[T]
+    data: list[T]
     affected_rows: int
-    columns: NotRequired[List[str]]
+    columns: NotRequired[list[str]]
     message: NotRequired[str]
 
 
@@ -101,7 +101,7 @@ class ExecutionResult(TypedDict):
 class ScriptResult(TypedDict):
     """脚本执行结果"""
     success: bool
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
     total_affected: int
     summary: str
 
@@ -132,7 +132,7 @@ class Permission(TypedDict):
 class RoleInfo(TypedDict):
     """角色信息"""
     name: str
-    permissions: List[str]
+    permissions: list[str]
 
 
 # ==================== 实例类型 ====================
@@ -177,7 +177,7 @@ class MetricSeries(TypedDict):
     """监控指标序列"""
     name: str
     unit: str
-    points: List[MetricPoint]
+    points: list[MetricPoint]
 
 
 class PerformanceMetrics(TypedDict):
@@ -255,14 +255,14 @@ SessionFactory = Callable[[], Any]
 
 # ==================== 枚举类型 ====================
 
-class DBType(str, Enum):
+class DBType(StrEnum):
     """数据库类型"""
     MYSQL = "mysql"
     POSTGRESQL = "postgresql"
     REDIS = "redis"
 
 
-class Environment(str, Enum):
+class Environment(StrEnum):
     """环境类型"""
     DEVELOPMENT = "development"
     TESTING = "testing"
@@ -270,7 +270,7 @@ class Environment(str, Enum):
     PRODUCTION = "production"
 
 
-class ApprovalStatus(str, Enum):
+class ApprovalStatus(StrEnum):
     """审批状态"""
     PENDING = "pending"
     APPROVED = "approved"
@@ -279,7 +279,7 @@ class ApprovalStatus(str, Enum):
     FAILED = "failed"
 
 
-class AlertSeverity(str, Enum):
+class AlertSeverity(StrEnum):
     """告警严重级别"""
     INFO = "info"
     WARNING = "warning"
@@ -288,7 +288,7 @@ class AlertSeverity(str, Enum):
 
 # ==================== 工具函数 ====================
 
-def ensure_datetime(value: Union[str, datetime]) -> datetime:
+def ensure_datetime(value: str | datetime) -> datetime:
     """确保值为 datetime 类型"""
     if isinstance(value, datetime):
         return value
@@ -297,7 +297,7 @@ def ensure_datetime(value: Union[str, datetime]) -> datetime:
     raise ValueError(f"Cannot convert {type(value)} to datetime")
 
 
-def ensure_int(value: Union[str, int]) -> int:
+def ensure_int(value: str | int) -> int:
     """确保值为 int 类型"""
     if isinstance(value, int):
         return value

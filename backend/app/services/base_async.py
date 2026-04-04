@@ -52,7 +52,7 @@ class AsyncBaseService(Generic[ModelType]):
     ```
     """
     
-    def __init__(self, model: Type[ModelType], db: AsyncSession):
+    def __init__(self, model: type[ModelType], db: AsyncSession):
         """
         初始化异步 Service
         
@@ -79,11 +79,11 @@ class AsyncBaseService(Generic[ModelType]):
         return result.scalar_one_or_none()
     
     async def get_multi(
-        self, 
-        skip: int = 0, 
+        self,
+        skip: int = 0,
         limit: int = 100,
         order_by: Any = None
-    ) -> List[ModelType]:
+    ) -> list[ModelType]:
         """
         获取多条记录（分页）
         
@@ -103,7 +103,7 @@ class AsyncBaseService(Generic[ModelType]):
         result = await self.db.execute(query)
         return list(result.scalars().all())
     
-    async def create(self, obj_in: Dict[str, Any]) -> ModelType:
+    async def create(self, obj_in: dict[str, Any]) -> ModelType:
         """
         创建记录
         
@@ -119,7 +119,7 @@ class AsyncBaseService(Generic[ModelType]):
         await self.db.refresh(db_obj)
         return db_obj
     
-    async def update(self, id: int, obj_in: Dict[str, Any]) -> Optional[ModelType]:
+    async def update(self, id: int, obj_in: dict[str, Any]) -> Optional[ModelType]:
         """
         更新记录
         
@@ -205,12 +205,12 @@ class AsyncBaseService(Generic[ModelType]):
         return result.scalar_one_or_none()
     
     async def get_multi_by_field(
-        self, 
-        field_name: str, 
+        self,
+        field_name: str,
         value: Any,
         skip: int = 0,
         limit: int = 100
-    ) -> List[ModelType]:
+    ) -> list[ModelType]:
         """
         根据字段值获取多条记录
         

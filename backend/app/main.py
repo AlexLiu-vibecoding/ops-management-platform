@@ -100,7 +100,6 @@ async def lifespan(app: FastAPI):
 
 async def init_dev_instance(db):
     """开发环境：自动创建测试用的 PostgreSQL 实例"""
-    import os
     from urllib.parse import urlparse
     from app.models import RDBInstance, Environment, RDBType
     from app.utils.auth import encrypt_instance_password

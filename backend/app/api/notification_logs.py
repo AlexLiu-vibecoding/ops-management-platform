@@ -44,7 +44,7 @@ class NotificationLogResponse(BaseModel):
 
 class PaginationData(BaseModel):
     """分页数据"""
-    items: List[Any]
+    items: list[Any]
     total: int
     page: int
     page_size: int

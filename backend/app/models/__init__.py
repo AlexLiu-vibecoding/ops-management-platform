@@ -35,7 +35,7 @@ def get_local_timezone():
 
 # ==================== 枚举定义 ====================
 
-class UserRole(str, enum.Enum):
+class UserRole(enum.StrEnum):
     """用户角色枚举"""
     SUPER_ADMIN = "super_admin"
     APPROVAL_ADMIN = "approval_admin"
@@ -44,7 +44,7 @@ class UserRole(str, enum.Enum):
     READONLY = "readonly"
 
 
-class EnvironmentType(str, enum.Enum):
+class EnvironmentType(enum.StrEnum):
     """环境类型枚举"""
     DEVELOPMENT = "development"
     TESTING = "testing"
@@ -52,7 +52,7 @@ class EnvironmentType(str, enum.Enum):
     PRODUCTION = "production"
 
 
-class ApprovalStatus(str, enum.Enum):
+class ApprovalStatus(enum.StrEnum):
     """审批状态枚举"""
     PENDING = "pending"
     APPROVED = "approved"
@@ -61,7 +61,7 @@ class ApprovalStatus(str, enum.Enum):
     FAILED = "failed"
 
 
-class MonitorType(str, enum.Enum):
+class MonitorType(enum.StrEnum):
     """监控类型枚举"""
     SLOW_QUERY = "slow_query"
     CPU_SQL = "cpu_sql"
@@ -70,14 +70,14 @@ class MonitorType(str, enum.Enum):
     AI_ANALYSIS = "ai_analysis"
 
 
-class ScriptType(str, enum.Enum):
+class ScriptType(enum.StrEnum):
     """脚本类型枚举"""
     PYTHON = "python"
     BASH = "bash"
     SQL = "sql"
 
 
-class ExecutionStatus(str, enum.Enum):
+class ExecutionStatus(enum.StrEnum):
     """执行状态枚举"""
     PENDING = "pending"
     RUNNING = "running"
@@ -87,14 +87,14 @@ class ExecutionStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class TriggerType(str, enum.Enum):
+class TriggerType(enum.StrEnum):
     """触发类型枚举"""
     MANUAL = "manual"
     SCHEDULED = "scheduled"
     API = "api"
 
 
-class RegistrationStatus(str, enum.Enum):
+class RegistrationStatus(enum.StrEnum):
     """注册申请状态枚举"""
     PENDING = "pending"
     APPROVED = "approved"

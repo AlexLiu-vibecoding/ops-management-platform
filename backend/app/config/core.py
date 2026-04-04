@@ -46,7 +46,7 @@ class AppSettings(BaseSettings):
     
     # 项目域名
     PROJECT_DOMAIN: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="项目域名，用于生成回调URL等"
     )
     
@@ -74,7 +74,7 @@ class DatabaseSettings(BaseSettings):
     
     # PostgreSQL 连接 URL（优先）
     DATABASE_URL: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="PostgreSQL 连接 URL，格式: postgresql://user:pass@host:port/db"
     )
     
@@ -194,26 +194,26 @@ class SecuritySettings(BaseSettings):
     
     # JWT 配置
     JWT_SECRET_KEY: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="JWT 签名密钥（生产环境必须设置）"
     )
     JWT_ALGORITHM: str = Field(default="HS256", description="JWT 签名算法")
     JWT_ACCESS_TOKEN_EXPIRE_HOURS: int = Field(
-        default=24, 
-        ge=1, 
+        default=24,
+        ge=1,
         le=168,  # 最长7天
         description="访问令牌过期时间(小时)"
     )
     
     # 数据加密配置
     AES_KEY: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="AES 加密密钥（必须32字符）"
     )
     
     # 密码哈希配置
     PASSWORD_SALT: Optional[str] = Field(
-        default=None, 
+        default=None,
         description="密码哈希盐值"
     )
     
@@ -305,20 +305,20 @@ class StorageSettings(BaseSettings):
     
     # 存储类型
     TYPE: str = Field(
-        default="local", 
+        default="local",
         description="存储类型: local, s3, oss"
     )
     
     # 本地存储配置
     LOCAL_PATH: str = Field(
-        default="/app/data/sql_files", 
+        default="/app/data/sql_files",
         description="本地存储路径"
     )
     
     # 文件生命周期
     FILE_RETENTION_DAYS: int = Field(
-        default=30, 
-        ge=1, 
+        default=30,
+        ge=1,
         description="文件保留天数"
     )
     
@@ -513,7 +513,7 @@ class Settings(BaseSettings):
         """兼容旧代码"""
         return self.app.DEBUG
     
-    def check_production_config(self) -> List[str]:
+    def check_production_config(self) -> list[str]:
         """
         检查生产环境配置是否完整
         

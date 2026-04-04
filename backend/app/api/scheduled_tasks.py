@@ -41,7 +41,7 @@ class ScheduledTaskCreate(BaseModel):
     name: str = Field(..., max_length=100)
     script_id: int
     cron_expression: str = Field(..., description="Cron表达式，如: 0 0 * * * (每天0点)")
-    params: Optional[Dict[str, Any]] = Field(default={}, description="执行参数")
+    params: Optional[dict[str, Any]] = Field(default={}, description="执行参数")
     timezone: str = Field(default_factory=get_local_timezone, description="时区，默认使用服务器本地时区")
     max_history: int = Field(100, ge=1, le=1000, description="保留历史记录数")
     notify_on_success: bool = Field(False, description="成功时通知")
@@ -53,7 +53,7 @@ class ScheduledTaskUpdate(BaseModel):
     """更新定时任务"""
     name: Optional[str] = Field(None, max_length=100)
     cron_expression: Optional[str] = None
-    params: Optional[Dict[str, Any]] = None
+    params: Optional[dict[str, Any]] = None
     timezone: Optional[str] = None
     max_history: Optional[int] = Field(None, ge=1, le=1000)
     notify_on_success: Optional[bool] = None

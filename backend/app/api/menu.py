@@ -20,7 +20,7 @@ from app.services.permission_service import PermissionService
 router = APIRouter(prefix="/menu", tags=["Menu Config"])
 
 
-def menu_to_dict(menu: MenuConfig) -> Dict[str, Any]:
+def menu_to_dict(menu: MenuConfig) -> dict[str, Any]:
     """将菜单模型转换为字典"""
     return {
         "id": menu.id,
@@ -39,7 +39,7 @@ def menu_to_dict(menu: MenuConfig) -> Dict[str, Any]:
     }
 
 
-def build_menu_tree(menus: List[MenuConfig], parent_id: Optional[int] = None) -> List[Dict[str, Any]]:
+def build_menu_tree(menus: list[MenuConfig], parent_id: Optional[int] = None) -> list[dict[str, Any]]:
     """构建菜单树"""
     result = []
     for menu in menus:
@@ -52,7 +52,7 @@ def build_menu_tree(menus: List[MenuConfig], parent_id: Optional[int] = None) ->
     return result
 
 
-def filter_menu_by_role(menus: List[Dict[str, Any]], user_role: UserRole, user_permissions: Set[str]) -> List[Dict[str, Any]]:
+def filter_menu_by_role(menus: list[dict[str, Any]], user_role: UserRole, user_permissions: set[str]) -> list[dict[str, Any]]:
     """
     根据权限过滤菜单
     
@@ -89,7 +89,7 @@ def filter_menu_by_role(menus: List[Dict[str, Any]], user_role: UserRole, user_p
     return result
 
 
-@router.get("/list", response_model=List[MenuConfigResponse])
+@router.get("/list", response_model=list[MenuConfigResponse])
 async def get_menu_list(
     current_user: User = Depends(get_super_admin),
     db: Session = Depends(get_db)
@@ -99,15 +99,15 @@ async def get_menu_list(
     return build_menu_tree(menus)
 
 
-@router.get("/user-menu", response_model=List[MenuItemResponse])
+@router.get("/user-menu", response_model=list[MenuItemResponse])
 async def get_user_menu(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """获取当前用户的菜单（前端导航用）"""
     menus = db.query(MenuConfig).filter(
-        MenuConfig.is_visible == True,
-        MenuConfig.is_enabled == True
+        MenuConfig.is_visible,
+        MenuConfig.is_enabled
     ).order_by(MenuConfig.sort_order).all()
     
     # 构建树形结构
@@ -121,7 +121,7 @@ async def get_user_menu(
     filtered_menus = filter_menu_by_role(menu_tree, current_user.role, user_permissions)
     
     # 转换为前端需要的格式
-    def to_menu_item(menus: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def to_menu_item(menus: list[dict[str, Any]]) -> list[dict[str, Any]]:
         result = []
         for menu in menus:
             item = {

@@ -61,7 +61,7 @@ class BaseService(Generic[ModelType]):
     ```
     """
     
-    def __init__(self, model: Type[ModelType], db: Session):
+    def __init__(self, model: type[ModelType], db: Session):
         """
         初始化 Service
         
@@ -85,11 +85,11 @@ class BaseService(Generic[ModelType]):
         return self.db.query(self.model).filter(self.model.id == id).first()
     
     def get_multi(
-        self, 
-        skip: int = 0, 
+        self,
+        skip: int = 0,
         limit: int = 100,
         order_by: Any = None
-    ) -> List[ModelType]:
+    ) -> list[ModelType]:
         """
         获取多条记录（分页）
         
@@ -106,7 +106,7 @@ class BaseService(Generic[ModelType]):
             query = query.order_by(order_by)
         return query.offset(skip).limit(limit).all()
     
-    def create(self, obj_in: Dict[str, Any]) -> ModelType:
+    def create(self, obj_in: dict[str, Any]) -> ModelType:
         """
         创建记录
         
@@ -122,7 +122,7 @@ class BaseService(Generic[ModelType]):
         self.db.refresh(db_obj)
         return db_obj
     
-    def update(self, id: int, obj_in: Dict[str, Any]) -> Optional[ModelType]:
+    def update(self, id: int, obj_in: dict[str, Any]) -> Optional[ModelType]:
         """
         更新记录
         
@@ -184,7 +184,7 @@ class BaseService(Generic[ModelType]):
         """
         return self.db.query(self.model).filter(self.model.id == id).count() > 0
     
-    def get_all(self) -> List[ModelType]:
+    def get_all(self) -> list[ModelType]:
         """
         获取所有记录
         

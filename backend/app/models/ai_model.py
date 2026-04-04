@@ -16,7 +16,7 @@ from app.database import Base
 import enum
 
 
-class AIProvider(str, enum.Enum):
+class AIProvider(enum.StrEnum):
     """AI 模型提供商"""
     OPENAI = "openai"
     DOUBAO = "doubao"
@@ -24,14 +24,14 @@ class AIProvider(str, enum.Enum):
     CUSTOM = "custom"
 
 
-class AIModelType(str, enum.Enum):
+class AIModelType(enum.StrEnum):
     """模型类型"""
     CHAT = "chat"
     COMPLETION = "completion"
     EMBEDDING = "embedding"
 
 
-class AIScene(str, enum.Enum):
+class AIScene(enum.StrEnum):
     """AI 使用场景"""
     SQL_OPTIMIZE = "sql_optimize"       # SQL 优化
     ALERT_ANALYSIS = "alert_analysis"   # 告警分析
@@ -190,7 +190,7 @@ def get_ai_config_for_scene(db, scene: str):
     """
     scene_config = db.query(AISceneConfig).filter(
         AISceneConfig.scene == scene,
-        AISceneConfig.is_enabled == True
+        AISceneConfig.is_enabled
     ).first()
     
     if not scene_config:
@@ -199,7 +199,7 @@ def get_ai_config_for_scene(db, scene: str):
     # 获取关联的模型配置
     model_config = db.query(AIModelConfig).filter(
         AIModelConfig.id == scene_config.model_config_id,
-        AIModelConfig.is_enabled == True
+        AIModelConfig.is_enabled
     ).first()
     
     return model_config, scene_config
@@ -228,7 +228,7 @@ def init_default_scene_configs(db):
     """
     # 获取第一个可用的模型配置
     first_model = db.query(AIModelConfig).filter(
-        AIModelConfig.is_enabled == True
+        AIModelConfig.is_enabled
     ).order_by(AIModelConfig.priority.desc()).first()
     
     if not first_model:

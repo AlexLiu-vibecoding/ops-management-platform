@@ -31,10 +31,10 @@ class LLMClient:
         
     def _convert_messages(
         self,
-        messages: Optional[List[Dict[str, str]]] = None,
+        messages: Optional[list[dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None
-    ) -> List:
+    ) -> list:
         """转换消息格式为 LangChain 格式"""
         from langchain_core.messages import SystemMessage, HumanMessage
         
@@ -66,15 +66,15 @@ class LLMClient:
                 return " ".join(content)
             else:
                 return " ".join(
-                    item.get("text", "") 
-                    for item in content 
+                    item.get("text", "")
+                    for item in content
                     if isinstance(item, dict) and item.get("type") == "text"
                 )
         return str(content)
     
     def invoke(
         self,
-        messages: Optional[List[Dict[str, str]]] = None,
+        messages: Optional[list[dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
         model: str = None,
@@ -134,7 +134,7 @@ class LLMClient:
     
     async def ainvoke(
         self,
-        messages: Optional[List[Dict[str, str]]] = None,
+        messages: Optional[list[dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
         model: str = None,
@@ -197,7 +197,7 @@ class LLMClient:
     
     async def astream(
         self,
-        messages: Optional[List[Dict[str, str]]] = None,
+        messages: Optional[list[dict[str, str]]] = None,
         system_prompt: Optional[str] = None,
         user_message: Optional[str] = None,
         model: str = None,

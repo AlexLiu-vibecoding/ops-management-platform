@@ -49,7 +49,7 @@ class RDBInstanceService(BaseService[RDBInstance]):
         group_id: Optional[int] = None,
         db_type: Optional[str] = None,
         status: Optional[bool] = None
-    ) -> tuple[List[RDBInstance], int]:
+    ) -> tuple[list[RDBInstance], int]:
         """
         获取实例列表（预加载环境信息）
         
@@ -260,7 +260,7 @@ class RDBInstanceService(BaseService[RDBInstance]):
         """
         return decrypt_instance_password(instance.password_encrypted)
     
-    def to_dict(self, instance: RDBInstance) -> Dict[str, Any]:
+    def to_dict(self, instance: RDBInstance) -> dict[str, Any]:
         """
         将实例转换为字典（用于 API 响应）
         
@@ -311,7 +311,7 @@ class InstanceGroupService:
     def __init__(self, db: Session):
         self.db = db
     
-    def get_all(self) -> List[Any]:
+    def get_all(self) -> list[Any]:
         """
         获取所有分组
         
@@ -443,7 +443,7 @@ class InstanceGroupService:
         
         return True
     
-    def to_dict(self, group: Any) -> Dict[str, Any]:
+    def to_dict(self, group: Any) -> dict[str, Any]:
         """
         将分组转换为字典（用于 API 响应）
         
@@ -465,7 +465,7 @@ class InstanceGroupService:
         group_id: Optional[int] = None,
         redis_mode: Optional[str] = None,
         status: Optional[bool] = None
-    ) -> List[RedisInstance]:
+    ) -> list[RedisInstance]:
         """
         获取所有实例（预加载环境信息，不分页）
         
@@ -583,7 +583,7 @@ class InstanceGroupService:
         group_id: Optional[int] = None,
         db_type: Optional[str] = None,
         status: Optional[bool] = None
-    ) -> List[RDBInstance]:
+    ) -> list[RDBInstance]:
         """
         获取所有实例（预加载环境信息，不分页）
         
@@ -672,7 +672,7 @@ class RedisInstanceService(BaseService[RedisInstance]):
         group_id: Optional[int] = None,
         redis_mode: Optional[str] = None,
         status: Optional[bool] = None
-    ) -> tuple[List[RedisInstance], int]:
+    ) -> tuple[list[RedisInstance], int]:
         """
         获取实例列表（预加载环境信息）
         
@@ -796,7 +796,7 @@ class RedisInstanceService(BaseService[RedisInstance]):
             return None
         return decrypt_instance_password(instance.password_encrypted)
     
-    def to_dict(self, instance: RedisInstance) -> Dict[str, Any]:
+    def to_dict(self, instance: RedisInstance) -> dict[str, Any]:
         """
         将实例转换为字典（用于 API 响应）
         

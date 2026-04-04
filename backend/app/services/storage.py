@@ -24,14 +24,14 @@ class FileInfo:
     size: int
     created_at: datetime
     content_type: str = "text/plain"
-    metadata: Dict[str, Any] = None
+    metadata: dict[str, Any] = None
 
 
 class StorageBackend(ABC):
     """存储后端抽象基类"""
     
     @abstractmethod
-    async def save(self, path: str, content: str, metadata: Dict = None) -> bool:
+    async def save(self, path: str, content: str, metadata: dict = None) -> bool:
         """保存文件"""
         pass
     
@@ -56,7 +56,7 @@ class StorageBackend(ABC):
         pass
     
     @abstractmethod
-    async def list_files(self, prefix: str = "") -> List[str]:
+    async def list_files(self, prefix: str = "") -> list[str]:
         """列出文件"""
         pass
     
@@ -81,7 +81,7 @@ class LocalStorage(StorageBackend):
         """获取完整路径"""
         return self.base_path / path
     
-    async def save(self, path: str, content: str, metadata: Dict = None) -> bool:
+    async def save(self, path: str, content: str, metadata: dict = None) -> bool:
         """保存文件到本地"""
         try:
             full_path = self._get_full_path(path)
@@ -112,7 +112,7 @@ class LocalStorage(StorageBackend):
             full_path = self._get_full_path(path)
             if not full_path.exists():
                 return None
-            with open(full_path, 'r', encoding='utf-8') as f:
+            with open(full_path, encoding='utf-8') as f:
                 return f.read()
         except Exception as e:
             logger.error(f"读取文件失败: {path}, 错误: {e}")
@@ -154,7 +154,7 @@ class LocalStorage(StorageBackend):
             metadata = None
             meta_path = full_path.with_suffix(full_path.suffix + '.meta')
             if meta_path.exists():
-                with open(meta_path, 'r', encoding='utf-8') as f:
+                with open(meta_path, encoding='utf-8') as f:
                     metadata = json.load(f)
             
             return FileInfo(
@@ -167,7 +167,7 @@ class LocalStorage(StorageBackend):
             logger.error(f"获取文件信息失败: {path}, 错误: {e}")
             return None
     
-    async def list_files(self, prefix: str = "") -> List[str]:
+    async def list_files(self, prefix: str = "") -> list[str]:
         """列出文件"""
         try:
             full_prefix = self._get_full_path(prefix)
@@ -249,7 +249,7 @@ class S3Storage(StorageBackend):
                 raise ImportError("请安装 boto3: pip install boto3")
         return self._client
     
-    async def save(self, path: str, content: str, metadata: Dict = None) -> bool:
+    async def save(self, path: str, content: str, metadata: dict = None) -> bool:
         """保存到 S3"""
         try:
             client = self._get_client()
@@ -328,7 +328,7 @@ class S3Storage(StorageBackend):
             logger.error(f"获取S3文件信息失败: {path}, 错误: {e}")
             return None
     
-    async def list_files(self, prefix: str = "") -> List[str]:
+    async def list_files(self, prefix: str = "") -> list[str]:
         """列出 S3 文件"""
         try:
             client = self._get_client()
@@ -386,7 +386,7 @@ class OSSStorage(StorageBackend):
                 raise ImportError("请安装 oss2: pip install oss2")
         return self._bucket
     
-    async def save(self, path: str, content: str, metadata: Dict = None) -> bool:
+    async def save(self, path: str, content: str, metadata: dict = None) -> bool:
         """保存到 OSS"""
         try:
             bucket = self._get_bucket()
@@ -448,7 +448,7 @@ class OSSStorage(StorageBackend):
             logger.error(f"获取OSS文件信息失败: {path}, 错误: {e}")
             return None
     
-    async def list_files(self, prefix: str = "") -> List[str]:
+    async def list_files(self, prefix: str = "") -> list[str]:
         """列出 OSS 文件"""
         try:
             bucket = self._get_bucket()
@@ -536,7 +536,7 @@ class StorageManager:
         approval_id: int,
         sql_type: str,  # 'sql' or 'rollback'
         content: str,
-        metadata: Dict = None
+        metadata: dict = None
     ) -> str:
         """
         保存SQL文件

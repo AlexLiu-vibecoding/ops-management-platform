@@ -26,14 +26,14 @@ return ApiResponse.success(data=user)
 return ApiResponse.error(ErrorCodes.VALIDATION_ERROR, message="参数错误")
 ```
 """
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Any, Dict, List, Optional, Union
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     """
     错误码枚举
     
@@ -295,7 +295,7 @@ class ApiResponse(BaseModel):
     success: bool
     data: Optional[Any] = None
     message: Optional[str] = None
-    error: Optional[Dict[str, Any]] = None
+    error: Optional[dict[str, Any]] = None
     request_id: Optional[str] = None
     
     @classmethod

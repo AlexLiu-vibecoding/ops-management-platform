@@ -83,7 +83,7 @@ class AlertRuleCreate(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
     rule_type: str = Field(..., min_length=1)
     instance_scope: str = Field("all")
-    instance_ids: Optional[List[int]] = None
+    instance_ids: Optional[list[int]] = None
     metric_name: Optional[str] = None
     operator: str = Field(">")
     threshold: float = Field(0)
@@ -100,7 +100,7 @@ class AlertRuleUpdate(BaseModel):
     description: Optional[str] = Field(None, max_length=500)
     rule_type: Optional[str] = None
     instance_scope: Optional[str] = None
-    instance_ids: Optional[List[int]] = None
+    instance_ids: Optional[list[int]] = None
     metric_name: Optional[str] = None
     operator: Optional[str] = None
     threshold: Optional[float] = None

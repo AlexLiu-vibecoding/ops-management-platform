@@ -35,7 +35,7 @@ class SchedulerStatus(BaseModel):
     name: str
     is_running: bool
     job_count: int
-    jobs: List[JobInfo]
+    jobs: list[JobInfo]
 
 
 class SchedulerOverview(BaseModel):
@@ -180,7 +180,7 @@ async def get_scheduler_overview(
     )
 
 
-@router.get("/jobs", response_model=List[JobInfo])
+@router.get("/jobs", response_model=list[JobInfo])
 async def get_all_jobs(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -270,19 +270,16 @@ async def job_action(
     
     # 确定任务属于哪个调度器
     scheduler = None
-    task_type = None
     
     if approval_scheduler.scheduler:
         job = approval_scheduler.scheduler.get_job(job_id)
         if job:
             scheduler = approval_scheduler.scheduler
-            task_type = "approval"
     
     if not scheduler and task_scheduler.scheduler:
         job = task_scheduler.scheduler.get_job(job_id)
         if job:
             scheduler = task_scheduler.scheduler
-            task_type = "scheduled"
     
     if not scheduler:
         raise HTTPException(status_code=404, detail="任务不存在")

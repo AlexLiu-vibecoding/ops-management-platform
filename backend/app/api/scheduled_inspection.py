@@ -11,7 +11,7 @@ from croniter import croniter
 
 from app.database import get_db
 from app.models import (
-    ScheduledInspection, InspectionExecution, RDBInstance, 
+    ScheduledInspection, InspectionExecution, RDBInstance,
     Environment, User
 )
 from app.schemas import MessageResponse
@@ -28,8 +28,8 @@ class ScheduledInspectionCreate(BaseModel):
     name: str = Field(..., description="任务名称")
     description: Optional[str] = Field(None, description="描述")
     instance_scope: str = Field("all", description="实例范围: all/selected")
-    instance_ids: Optional[List[int]] = Field(None, description="选中的实例ID列表")
-    modules: Optional[List[str]] = Field(None, description="检查模块列表")
+    instance_ids: Optional[list[int]] = Field(None, description="选中的实例ID列表")
+    modules: Optional[list[str]] = Field(None, description="检查模块列表")
     cron_expression: str = Field(..., description="Cron表达式")
     timezone: str = Field("Asia/Shanghai", description="时区")
     notify_on_complete: bool = Field(True, description="完成时通知")
@@ -43,8 +43,8 @@ class ScheduledInspectionUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     instance_scope: Optional[str] = None
-    instance_ids: Optional[List[int]] = None
-    modules: Optional[List[str]] = None
+    instance_ids: Optional[list[int]] = None
+    modules: Optional[list[str]] = None
     cron_expression: Optional[str] = None
     timezone: Optional[str] = None
     status: Optional[str] = None
@@ -58,7 +58,7 @@ class ValidateCronResponse(BaseModel):
     """验证Cron表达式响应"""
     valid: bool
     error: Optional[str] = None
-    next_times: Optional[List[str]] = None
+    next_times: Optional[list[str]] = None
 
 
 # ==================== APIs ====================

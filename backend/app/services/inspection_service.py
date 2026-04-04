@@ -129,25 +129,25 @@ class InspectionService:
             self.db.commit()
             raise
     
-    def _get_instances(self, task: ScheduledInspection) -> List[RDBInstance]:
+    def _get_instances(self, task: ScheduledInspection) -> list[RDBInstance]:
         """获取要检查的实例列表"""
-        query = self.db.query(RDBInstance).filter(RDBInstance.status == True)
+        query = self.db.query(RDBInstance).filter(RDBInstance.status)
         
         if task.instance_scope == "selected" and task.instance_ids:
             query = query.filter(RDBInstance.id.in_(task.instance_ids))
         
         return query.all()
     
-    def _get_metrics(self, modules: Optional[List[str]] = None) -> List[InspectMetric]:
+    def _get_metrics(self, modules: Optional[list[str]] = None) -> list[InspectMetric]:
         """获取启用的巡检指标"""
-        query = self.db.query(InspectMetric).filter(InspectMetric.is_enabled == True)
+        query = self.db.query(InspectMetric).filter(InspectMetric.is_enabled)
         
         if modules:
             query = query.filter(InspectMetric.module.in_(modules))
         
         return query.all()
     
-    def _run_single_check(self, instance: RDBInstance, metric: InspectMetric) -> Dict[str, Any]:
+    def _run_single_check(self, instance: RDBInstance, metric: InspectMetric) -> dict[str, Any]:
         """执行单个检查"""
         status = "normal"
         actual_value = None
@@ -329,7 +329,7 @@ class InspectionService:
             "check_time": check_time.isoformat()
         }
     
-    def _create_alert(self, instance: RDBInstance, metric: InspectMetric, 
+    def _create_alert(self, instance: RDBInstance, metric: InspectMetric,
                       status: str, suggestion: str, check_time: datetime):
         """创建告警记录"""
         alert = AlertRecord(
@@ -355,8 +355,8 @@ class InspectionService:
             logger = logging.getLogger(__name__)
             logger.warning(f"告警聚合处理失败: {e}")
     
-    def _send_notification(self, task: ScheduledInspection, execution: InspectionExecution, 
-                          summary: Dict[str, Any]):
+    def _send_notification(self, task: ScheduledInspection, execution: InspectionExecution,
+                          summary: dict[str, Any]):
         """发送巡检通知"""
         # 判断是否需要发送通知
         should_notify = False
