@@ -19,14 +19,15 @@
 
 ### Issue-001: API 文件过大，违反单一职责原则
 
-**优先级**: 🔴 高  
+**优先级**: 🔴 高
 **影响范围**: `app/api/`
+**状态**: ✅ 已修复 (2026-04-05)
 
 **问题描述**:
 多个 API 文件代码行数超过 1000 行，违反单一职责原则，难以维护和测试：
-- `approval.py`: 1291 行
-- `sql_optimizer.py`: 1242 行
-- `scripts.py`: 935 行
+- `approval.py`: 1291 行 → 已拆分为模块化结构
+- `sql_optimizer.py`: 1242 行 (待处理)
+- `scripts.py`: 935 行 (待处理)
 
 **影响**:
 - 代码可读性差
@@ -34,22 +35,37 @@
 - 修改风险高
 - 团队协作困难
 
-**建议方案**:
+**解决方案** (已实施):
 ```
-将大型 API 文件拆分为多个模块：
+将 approval.py 拆分为模块化结构：
 app/api/approval/
-  ├── __init__.py
-  ├── crud.py          # CRUD 操作
-  ├── workflow.py      # 审批流程
-  ├── execution.py     # 执行逻辑
-  └── rollback.py      # 回滚逻辑
-
-使用 RouterGroup 模式组合路由
+  ├── __init__.py       # 导出所有路由
+  ├── helpers.py        # 辅助函数（数据库连接、风险分析、格式化响应）
+  ├── rollback.py       # 回滚SQL生成逻辑
+  └── endpoints.py      # 所有API端点
 ```
 
-**参考实现**:
-- 参考 FastAPI 官方文档的 APIRouter 分组建议
-- 参考 NestJS 的模块化设计
+**修复内容**:
+- ✅ 创建 `helpers.py`: 提取 10 个辅助函数，320 行代码
+- ✅ 创建 `rollback.py`: 提取回滚生成逻辑，250 行代码
+- ✅ 创建 `endpoints.py`: 提取所有 API 端点，450 行代码
+- ✅ 更新 `__init__.py`: 导出所有路由，保持向后兼容
+- ✅ 修复测试: 所有 6 个测试通过
+
+**测试验证**:
+```
+✅ tests/api/test_approval_api.py - 6/6 通过
+   - test_list_approvals
+   - test_create_approval
+   - test_get_approval_detail
+   - test_approve_request
+   - test_execute_change
+   - test_create_approval_with_auto_execute
+```
+
+**后续优化**:
+- 拆分 `sql_optimizer.py` (1242 行)
+- 拆分 `scripts.py` (935 行)
 
 ---
 
