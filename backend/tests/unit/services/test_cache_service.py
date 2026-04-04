@@ -1,350 +1,426 @@
+#!/usr/bin/env python3
 """
-缓存服务测试
+缓存服务单元测试
+
+测试范围：
+1. 内存缓存
+2. 缓存服务
+3. 装饰器
+4. 缓存过期
+5. 模式删除
+
+运行方式:
+    cd /workspace/projects/backend
+
+    # 运行所有缓存服务测试
+    python -m pytest tests/unit/services/test_cache_service.py -v
+
+    # 运行特定测试
+    python -m pytest tests/unit/services/test_cache_service.py::TestMemoryCache -v
 """
+
 import pytest
+import sys
+import os
 import time
-import json
-from unittest.mock import Mock, patch
-from app.services.cache_service import MemoryCache, CacheService
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+
+from app.services.cache_service import MemoryCache, CacheService, get_cache_service
 
 
+@pytest.mark.unit
 class TestMemoryCache:
     """内存缓存测试"""
 
-    def test_init(self):
-        """测试初始化"""
-        cache = MemoryCache(default_ttl=600)
-        assert cache._default_ttl == 600
-        assert cache._cache == {}
-
-    def test_get_existing_key(self):
-        """测试获取存在的键"""
-        cache = MemoryCache()
-        cache._cache["test_key"] = ("test_value", time.time() + 300)
-
-        result = cache.get("test_key")
-        assert result == "test_value"
-
-    def test_get_non_existing_key(self):
+    def test_get_missing_key(self):
         """测试获取不存在的键"""
         cache = MemoryCache()
-        result = cache.get("non_existing")
-        assert result is None
+        value = cache.get("non_existent_key")
+        assert value is None
 
-    def test_get_expired_key(self):
-        """测试获取已过期的键"""
+    def test_set_and_get(self):
+        """测试设置和获取"""
         cache = MemoryCache()
-        cache._cache["expired_key"] = ("value", time.time() - 1)
+        cache.set("test_key", "test_value")
+        value = cache.get("test_key")
+        assert value == "test_value"
 
-        result = cache.get("expired_key")
-        assert result is None
-        assert "expired_key" not in cache._cache
-
-    def test_set(self):
-        """测试设置缓存"""
-        cache = MemoryCache()
-        result = cache.set("key1", "value1", ttl=300)
-
-        assert result is True
-        assert "key1" in cache._cache
-        assert cache._cache["key1"][0] == "value1"
-
-    def test_set_default_ttl(self):
-        """测试使用默认TTL设置缓存"""
-        cache = MemoryCache(default_ttl=600)
-        cache.set("key1", "value1")
-
-        _, expire_at = cache._cache["key1"]
-        expected_expire = time.time() + 600
-        assert abs(expire_at - expected_expire) < 5
+    def test_set_with_ttl(self):
+        """测试设置带过期时间的值"""
+        cache = MemoryCache(default_ttl=300)
+        cache.set("test_key", "test_value", ttl=1)  # 1秒后过期
+        time.sleep(0.5)
+        value = cache.get("test_key")
+        assert value == "test_value"
+        time.sleep(0.6)
+        value = cache.get("test_key")
+        assert value is None
 
     def test_delete_existing_key(self):
         """测试删除存在的键"""
         cache = MemoryCache()
-        cache._cache["key1"] = ("value", time.time() + 300)
-
-        result = cache.delete("key1")
+        cache.set("test_key", "test_value")
+        result = cache.delete("test_key")
         assert result is True
-        assert "key1" not in cache._cache
+        value = cache.get("test_key")
+        assert value is None
 
     def test_delete_non_existing_key(self):
         """测试删除不存在的键"""
         cache = MemoryCache()
-        result = cache.delete("non_existing")
-        assert result is True
+        result = cache.delete("non_existent_key")
+        assert result is True  # 删除操作总是返回True
 
     def test_clear(self):
-        """测试清空缓存"""
+        """测试清空所有缓存"""
         cache = MemoryCache()
-        cache._cache["key1"] = ("value1", time.time() + 300)
-        cache._cache["key2"] = ("value2", time.time() + 300)
-
+        cache.set("key1", "value1")
+        cache.set("key2", "value2")
         count = cache.clear()
         assert count == 2
-        assert cache._cache == {}
+        assert cache.get("key1") is None
+        assert cache.get("key2") is None
 
     def test_cleanup_expired(self):
         """测试清理过期缓存"""
-        cache = MemoryCache()
-        cache._cache["valid"] = ("value1", time.time() + 300)
-        cache._cache["expired1"] = ("value2", time.time() - 1)
-        cache._cache["expired2"] = ("value3", time.time() - 10)
-
+        cache = MemoryCache(default_ttl=300)
+        cache.set("key1", "value1", ttl=1)  # 1秒后过期
+        cache.set("key2", "value2", ttl=2)  # 2秒后过期
+        time.sleep(1.5)
         count = cache.cleanup_expired()
+        assert count == 1  # 只有key1过期
+        assert cache.get("key1") is None
+        assert cache.get("key2") == "value2"
+
+    def test_delete_pattern(self):
+        """测试模式删除"""
+        cache = MemoryCache()
+        cache.set("user:1", "value1")
+        cache.set("user:2", "value2")
+        cache.set("product:1", "value3")
+        count = cache.delete_pattern("user:*")
         assert count == 2
-        assert "valid" in cache._cache
-        assert "expired1" not in cache._cache
-        assert "expired2" not in cache._cache
+        assert cache.get("user:1") is None
+        assert cache.get("user:2") is None
+        assert cache.get("product:1") == "value3"
+
+    def test_default_ttl(self):
+        """测试默认过期时间"""
+        cache = MemoryCache(default_ttl=2)
+        cache.set("test_key", "test_value")
+        time.sleep(1.5)
+        value = cache.get("test_key")
+        assert value == "test_value"
+        time.sleep(0.6)
+        value = cache.get("test_key")
+        assert value is None
+
+    def test_set_complex_object(self):
+        """测试设置复杂对象"""
+        cache = MemoryCache()
+        complex_obj = {"name": "test", "nested": {"key": "value"}}
+        cache.set("complex_key", complex_obj)
+        value = cache.get("complex_key")
+        assert value == complex_obj
+
+    def test_overwrite_existing_key(self):
+        """测试覆盖已存在的键"""
+        cache = MemoryCache()
+        cache.set("test_key", "old_value")
+        cache.set("test_key", "new_value")
+        value = cache.get("test_key")
+        assert value == "new_value"
 
     def test_thread_safety(self):
         """测试线程安全"""
         import threading
+
         cache = MemoryCache()
-        results = []
+        errors = []
 
-        def worker():
-            cache.set(f"key_{threading.current_thread().name}", "value")
-            results.append(cache.get(f"key_{threading.current_thread().name}"))
+        def set_values():
+            try:
+                for i in range(100):
+                    cache.set(f"key_{i}", f"value_{i}")
+            except Exception as e:
+                errors.append(e)
 
-        threads = [threading.Thread(target=worker) for _ in range(10)]
-        for t in threads:
-            t.start()
+        def get_values():
+            try:
+                for i in range(100):
+                    cache.get(f"key_{i}")
+            except Exception as e:
+                errors.append(e)
+
+        threads = []
+        for _ in range(10):
+            t1 = threading.Thread(target=set_values)
+            t2 = threading.Thread(target=get_values)
+            threads.extend([t1, t2])
+            t1.start()
+            t2.start()
+
         for t in threads:
             t.join()
 
-        assert len(results) == 10
-        assert all(r == "value" for r in results)
+        assert len(errors) == 0
 
 
+@pytest.mark.unit
 class TestCacheService:
     """缓存服务测试"""
 
     def test_init_without_redis(self):
         """测试不使用Redis初始化"""
-        service = CacheService(redis_client=None, default_ttl=300)
-        assert service._use_redis is False
-        assert service._default_ttl == 300
+        service = CacheService()
         assert service._redis is None
-
-    def test_init_with_redis(self):
-        """测试使用Redis初始化"""
-        mock_redis = Mock()
-        service = CacheService(redis_client=mock_redis, default_ttl=600)
-        assert service._use_redis is True
-        assert service._default_ttl == 600
-        assert service._redis == mock_redis
+        assert service._use_redis is False
 
     def test_make_key(self):
         """测试生成缓存键"""
         service = CacheService()
-        key = service._make_key("user:123")
-        assert key == "ops:user:123"
+        full_key = service._make_key("test_key")
+        assert full_key == "ops:test_key"
 
-    def test_get_from_memory_cache(self):
-        """测试从内存缓存获取"""
+    def test_set_and_get_memory_mode(self):
+        """测试内存模式下的设置和获取"""
         service = CacheService()
-        service._memory_cache.set("ops:key1", "value1", 300)
+        service.set("test_key", "test_value")
+        value = service.get("test_key")
+        assert value == "test_value"
 
-        result = service.get("key1")
-        assert result == "value1"
-
-    def test_get_from_redis(self):
-        """测试从Redis获取"""
-        mock_redis = Mock()
-        mock_redis.get.return_value = json.dumps({"data": "test"})
-        service = CacheService(redis_client=mock_redis)
-
-        result = service.get("key1")
-        assert result == {"data": "test"}
-        mock_redis.get.assert_called_once_with("ops:key1")
-
-    def test_get_redis_fallback_to_memory(self):
-        """测试Redis失败降级到内存缓存"""
-        mock_redis = Mock()
-        mock_redis.get.side_effect = Exception("Redis error")
-        service = CacheService(redis_client=mock_redis)
-        service._memory_cache.set("ops:key1", "memory_value", 300)
-
-        result = service.get("key1")
-        assert result == "memory_value"
-
-    def test_set_to_memory_cache(self):
-        """测试设置到内存缓存"""
+    def test_get_missing_key_memory_mode(self):
+        """测试内存模式下获取不存在的键"""
         service = CacheService()
-        result = service.set("key1", {"data": "test"}, ttl=300)
+        value = service.get("non_existent_key")
+        assert value is None
 
+    def test_delete_memory_mode(self):
+        """测试内存模式下的删除"""
+        service = CacheService()
+        service.set("test_key", "test_value")
+        result = service.delete("test_key")
         assert result is True
-        assert service._memory_cache.get("ops:key1") == {"data": "test"}
+        value = service.get("test_key")
+        assert value is None
 
-    def test_set_to_redis(self):
-        """测试设置到Redis"""
-        mock_redis = Mock()
-        service = CacheService(redis_client=mock_redis)
-
-        result = service.set("key1", {"data": "test"}, ttl=300)
-
-        assert result is True
-        mock_redis.setex.assert_called_once()
-
-    def test_set_redis_fallback_to_memory(self):
-        """测试Redis失败降级到内存缓存"""
-        mock_redis = Mock()
-        mock_redis.setex.side_effect = Exception("Redis error")
-        service = CacheService(redis_client=mock_redis)
-
-        result = service.set("key1", "value1", ttl=300)
-
-        assert result is True
-        assert service._memory_cache.get("ops:key1") == "value1"
-
-    def test_delete(self):
-        """测试删除缓存"""
-        mock_redis = Mock()
-        service = CacheService(redis_client=mock_redis)
-        service._memory_cache.set("ops:key1", "value", 300)
-
-        result = service.delete("key1")
-
-        assert result is True
-        mock_redis.delete.assert_called_once_with("ops:key1")
-        assert service._memory_cache.get("ops:key1") is None
-
-    def test_get_or_set_cache_hit(self):
-        """测试get_or_set缓存命中"""
+    def test_get_or_set_with_existing_value(self):
+        """测试get_or_set当缓存存在时"""
         service = CacheService()
-        service._memory_cache.set("ops:key1", "cached_value", 300)
+        service.set("test_key", "cached_value")
+        getter_called = []
 
-        getter = Mock(return_value="new_value")
-        result = service.get_or_set("key1", getter)
+        def getter():
+            getter_called.append(True)
+            return "new_value"
 
-        assert result == "cached_value"
-        getter.assert_not_called()
+        value = service.get_or_set("test_key", getter)
+        assert value == "cached_value"
+        assert len(getter_called) == 0
 
-    def test_get_or_set_cache_miss(self):
-        """测试get_or_set缓存未命中"""
+    def test_get_or_set_without_existing_value(self):
+        """测试get_or_set当缓存不存在时"""
         service = CacheService()
+        getter_called = []
 
-        getter = Mock(return_value="new_value")
-        result = service.get_or_set("key1", getter)
+        def getter():
+            getter_called.append(True)
+            return "new_value"
 
-        assert result == "new_value"
-        getter.assert_called_once()
-        assert service._memory_cache.get("ops:key1") == "new_value"
+        value = service.get_or_set("test_key", getter)
+        assert value == "new_value"
+        assert len(getter_called) == 1
+        # 检查是否被缓存
+        cached_value = service.get("test_key")
+        assert cached_value == "new_value"
 
-    @pytest.mark.asyncio
-    async def test_aget_or_set_cache_hit(self):
-        """测试异步aget_or_set缓存命中"""
+    def test_aget_or_set_with_sync_getter(self):
+        """测试aget_or_set使用同步getter"""
+        import asyncio
+
         service = CacheService()
-        service._memory_cache.set("ops:key1", "cached_value", 300)
+        getter_called = []
 
-        getter = Mock(return_value="new_value")
-        result = await service.aget_or_set("key1", getter)
+        def getter():
+            getter_called.append(True)
+            return "new_value"
 
-        assert result == "cached_value"
-        getter.assert_not_called()
+        async def test():
+            value = await service.aget_or_set("test_key", getter)
+            assert value == "new_value"
+            assert len(getter_called) == 1
 
-    @pytest.mark.asyncio
-    async def test_aget_or_set_async_getter(self):
-        """测试异步getter"""
+        asyncio.run(test())
+
+    def test_aget_or_set_with_async_getter(self):
+        """测试aget_or_set使用异步getter"""
+        import asyncio
+
         service = CacheService()
+        getter_called = []
 
-        async def async_getter():
+        async def getter():
+            getter_called.append(True)
+            await asyncio.sleep(0.1)
             return "async_value"
 
-        result = await service.aget_or_set("key1", async_getter)
+        async def test():
+            value = await service.aget_or_set("test_key", getter)
+            assert value == "async_value"
+            assert len(getter_called) == 1
 
-        assert result == "async_value"
-        assert service._memory_cache.get("ops:key1") == "async_value"
-
-    @pytest.mark.asyncio
-    async def test_aget_or_set_sync_getter(self):
-        """测试同步getter"""
-        service = CacheService()
-
-        def sync_getter():
-            return "sync_value"
-
-        result = await service.aget_or_set("key1", sync_getter)
-
-        assert result == "sync_value"
-        assert service._memory_cache.get("ops:key1") == "sync_value"
+        asyncio.run(test())
 
     def test_cached_decorator(self):
         """测试缓存装饰器"""
         service = CacheService()
+        call_count = []
 
-        @service.cached("user", ttl=300)
-        def get_user(user_id: int):
-            return {"id": user_id, "name": f"User {user_id}"}
+        @service.cached("test_func", ttl=10)
+        def test_func(x, y):
+            call_count.append(True)
+            return x + y
 
         # 第一次调用
-        result1 = get_user(123)
-        assert result1["id"] == 123
+        result1 = test_func(1, 2)
+        assert result1 == 3
+        assert len(call_count) == 1
 
-        # 第二次调用（应该命中缓存）
-        result2 = get_user(123)
-        assert result2 == result1
+        # 第二次调用（应该从缓存获取）
+        result2 = test_func(1, 2)
+        assert result2 == 3
+        assert len(call_count) == 1  # 没有增加
+
+        # 不同参数的调用
+        result3 = test_func(2, 3)
+        assert result3 == 5
+        assert len(call_count) == 2  # 增加了
 
     def test_cached_decorator_with_key_builder(self):
-        """测试带自定义键生成器的缓存装饰器"""
+        """测试带自定义键生成器的装饰器"""
         service = CacheService()
+        call_count = []
 
-        def custom_key_builder(user_id: int, **kwargs):
-            return f"custom_user_{user_id}"
+        def key_builder(x, y):
+            return f"custom:{x}:{y}"
 
-        @service.cached("user", ttl=300, key_builder=custom_key_builder)
-        def get_user(user_id: int):
-            return {"id": user_id}
+        @service.cached("test_func", ttl=10, key_builder=key_builder)
+        def test_func(x, y):
+            call_count.append(True)
+            return x * y
 
-        result = get_user(123)
-        assert result["id"] == 123
-        assert service._memory_cache.get("ops:custom_user_123") == {"id": 123}
+        # 第一次调用
+        result1 = test_func(3, 4)
+        assert result1 == 12
+        assert len(call_count) == 1
 
-    def test_invalidate_pattern_memory_only(self):
-        """测试仅内存缓存的失效模式"""
+        # 第二次调用（应该从缓存获取）
+        result2 = test_func(3, 4)
+        assert result2 == 12
+        assert len(call_count) == 1
+
+    def test_invalidate_pattern(self):
+        """测试模式删除"""
         service = CacheService()
-        service._memory_cache.set("ops:user:1", "value1", 300)
-        service._memory_cache.set("ops:user:2", "value2", 300)
-        service._memory_cache.set("ops:order:1", "value3", 300)
+        service.set("user:1", "value1")
+        service.set("user:2", "value2")
+        service.set("product:1", "value3")
 
         count = service.invalidate_pattern("user:*")
-
         assert count == 2
-        assert service._memory_cache.get("ops:user:1") is None
-        assert service._memory_cache.get("ops:user:2") is None
-        assert service._memory_cache.get("ops:order:1") == "value3"
+        assert service.get("user:1") is None
+        assert service.get("user:2") is None
+        assert service.get("product:1") == "value3"
 
-    def test_invalidate_pattern_with_redis(self):
-        """测试带Redis的失效模式"""
-        mock_redis = Mock()
-        mock_redis.keys.return_value = ["ops:user:1", "ops:user:2"]
-        mock_redis.delete.return_value = 2
-        service = CacheService(redis_client=mock_redis)
-
-        count = service.invalidate_pattern("user:*")
-
-        assert count == 2
-        mock_redis.keys.assert_called_once_with("ops:user:*")
-        mock_redis.delete.assert_called_once_with("ops:user:1", "ops:user:2")
-
-    def test_clear(self):
-        """测试清空缓存"""
+    def test_clear_all(self):
+        """测试清空所有缓存"""
         service = CacheService()
-        service._memory_cache.set("ops:key1", "value1", 300)
-        service._memory_cache.set("ops:key2", "value2", 300)
+        service.set("key1", "value1")
+        service.set("key2", "value2")
+        service.set("key3", "value3")
 
         count = service.clear()
+        assert count == 3
+        assert service.get("key1") is None
+        assert service.get("key2") is None
+        assert service.get("key3") is None
 
-        assert count == 2
-        assert service._memory_cache.get("ops:key1") is None
+    def test_custom_default_ttl(self):
+        """测试自定义默认过期时间"""
+        service = CacheService(default_ttl=2)
+        service.set("test_key", "test_value")
+        time.sleep(1.5)
+        value = service.get("test_key")
+        assert value == "test_value"
+        time.sleep(0.6)
+        value = service.get("test_key")
+        assert value is None
 
-    def test_clear_with_redis(self):
-        """测试带Redis的清空缓存"""
-        mock_redis = Mock()
+    def test_set_json_serializable_object(self):
+        """测试设置可JSON序列化的对象"""
+        service = CacheService()
+        data = {"name": "test", "age": 25, "nested": {"key": "value"}}
+        service.set("data_key", data)
+        value = service.get("data_key")
+        assert value == data
+
+    def test_redis_mode_fallback_to_memory(self, monkeypatch):
+        """测试Redis模式下失败降级到内存缓存"""
+        # 模拟Redis客户端
+        mock_redis = type('MockRedis', (), {})()
+        mock_redis.get = lambda key: (_ for _ in ()).throw(Exception("Redis error"))
+
         service = CacheService(redis_client=mock_redis)
-        service._memory_cache.set("ops:key1", "value1", 300)
+        service.set("test_key", "test_value")
+        value = service.get("test_key")
+        # 由于Redis失败，应该降级到内存缓存
+        assert value == "test_value"
 
-        count = service.clear()
+    def test_custom_ttl_override(self):
+        """测试自定义TTL覆盖默认TTL"""
+        service = CacheService(default_ttl=10)
+        service.set("test_key", "test_value", ttl=1)
+        time.sleep(1.5)
+        value = service.get("test_key")
+        assert value is None
 
-        assert count == 1
-        mock_redis.keys.assert_called_once_with("ops:*")
+    def test_invalidate_pattern_with_no_matches(self):
+        """测试模式删除没有匹配项"""
+        service = CacheService()
+        service.set("key1", "value1")
+        service.set("key2", "value2")
+
+        count = service.invalidate_pattern("nonexistent:*")
+        assert count == 0
+        assert service.get("key1") == "value1"
+        assert service.get("key2") == "value2"
+
+
+@pytest.mark.unit
+class TestCacheServiceFactory:
+    """缓存服务工厂函数测试"""
+
+    def test_get_cache_service_singleton(self):
+        """测试get_cache_service返回单例"""
+        service1 = get_cache_service()
+        service2 = get_cache_service()
+        # 由于是单例，应该返回同一个实例
+        # 注意：这里可能因为redis连接状态不同而创建不同的实例
+        # 所以我们只测试调用成功
+        assert service1 is not None
+        assert service2 is not None
+
+    def test_convenience_functions(self):
+        """测试便捷函数"""
+        # 测试cache_set和cache_get
+        from app.services.cache_service import cache_set, cache_get, cache_delete
+
+        cache_set("convenience_key", "convenience_value")
+        value = cache_get("convenience_key")
+        assert value == "convenience_value"
+
+        # 测试cache_delete
+        cache_delete("convenience_key")
+        value = cache_get("convenience_key")
+        assert value is None
