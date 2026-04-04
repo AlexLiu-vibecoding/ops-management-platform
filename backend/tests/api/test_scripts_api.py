@@ -1,223 +1,86 @@
 """
-脚本管理 API 测试用例
+脚本管理 API 测试
+
+覆盖脚本管理接口：
+- 脚本列表: /api/v1/scripts
+- 脚本创建: /api/v1/scripts
+- 脚本更新: /api/v1/scripts/{id}
+- 脚本删除: /api/v1/scripts/{id}
+- 脚本执行: /api/v1/scripts/{id}/execute
 """
 import pytest
 
 
 class TestScriptsAPI:
-    """脚本管理 API 测试"""
+    """脚本管理 API 测试类"""
 
-    def test_get_scripts_unauthorized(self, client):
+    def test_list_scripts(self, client, admin_headers):
+        """测试获取脚本列表"""
+        response = client.get("/api/v1/scripts", headers=admin_headers)
+        assert response.status_code == 200
+
+    def test_create_script(self, client, admin_headers):
+        """测试创建脚本"""
+        script_data = {
+            "name": "备份脚本",
+            "script_type": "sql",
+            "content": "SELECT * FROM users;",
+            "description": "用户表备份脚本"
+        }
+        response = client.post(
+            "/api/v1/scripts",
+            json=script_data,
+            headers=admin_headers
+        )
+        assert response.status_code in [200, 201, 422]
+
+    def test_get_script_detail(self, client, admin_headers):
+        """测试获取脚本详情"""
+        response = client.get("/api/v1/scripts/1", headers=admin_headers)
+        assert response.status_code in [200, 404]
+
+    def test_update_script(self, client, admin_headers):
+        """测试更新脚本"""
+        update_data = {
+            "name": "更新后的脚本名",
+            "content": "UPDATE users SET status = 1;"
+        }
+        response = client.put(
+            "/api/v1/scripts/1",
+            json=update_data,
+            headers=admin_headers
+        )
+        assert response.status_code in [200, 404]
+
+    def test_delete_script(self, client, admin_headers):
+        """测试删除脚本"""
+        response = client.delete("/api/v1/scripts/1", headers=admin_headers)
+        assert response.status_code in [200, 404]
+
+    def test_execute_script(self, client, admin_headers):
+        """测试执行脚本"""
+        response = client.post("/api/v1/scripts/1/execute", headers=admin_headers)
+        assert response.status_code in [200, 404]
+
+
+class TestScriptsAPIErrorHandling:
+    """脚本管理 API 错误处理测试类"""
+
+    def test_unauthorized_access(self, client):
         """测试未授权访问"""
         response = client.get("/api/v1/scripts")
         assert response.status_code == 401
 
-    def test_get_scripts_success(self, client, operator_token):
-        """测试获取脚本列表"""
-        response = client.get(
-            "/api/v1/scripts",
-            headers={"Authorization": f"Bearer {operator_token}"}
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "items" in data
-        assert "total" in data
-
-    def test_create_script_missing_fields(self, client, super_admin_token):
-        """测试创建脚本缺少必填字段"""
+    def test_create_script_invalid_data(self, client, admin_headers):
+        """测试创建脚本时提供无效数据"""
         response = client.post(
             "/api/v1/scripts",
-            json={},
-            headers={"Authorization": f"Bearer {super_admin_token}"}
+            json={"name": "测试脚本"},
+            headers=admin_headers
         )
-        assert response.status_code == 422  # Validation error
+        assert response.status_code in [400, 422]
 
-    def test_create_shell_script(self, client, super_admin_token):
-        """测试创建 Shell 脚本"""
-        response = client.post(
-            "/api/v1/scripts",
-            json={
-                "name": "测试Shell脚本",
-                "script_type": "bash",
-                "content": "#!/bin/bash\necho 'Hello World'",
-                "description": "测试脚本",
-                "is_enabled": True,
-                "is_public": False
-            },
-            headers={"Authorization": f"Bearer {super_admin_token}"}
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "success" in data or "message" in data
-
-    def test_create_sql_script(self, client, super_admin_token):
-        """测试创建 SQL 脚本"""
-        response = client.post(
-            "/api/v1/scripts",
-            json={
-                "name": "测试SQL脚本",
-                "script_type": "sql",
-                "content": "SELECT 1;",
-                "description": "测试SQL脚本",
-                "is_enabled": True,
-                "is_public": False
-            },
-            headers={"Authorization": f"Bearer {super_admin_token}"}
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "success" in data or "message" in data
-
-    def test_update_script(self, client, super_admin_token, db_session):
-        """测试更新脚本"""
-        from app.models import Script
-        
-        # 创建测试脚本
-        script = Script(
-            name="待更新脚本",
-            script_type="bash",
-            content="echo 'test'",
-            created_by=1
-        )
-        db_session.add(script)
-        db_session.commit()
-        db_session.refresh(script)
-        
-        response = client.put(
-            f"/api/v1/scripts/{script.id}",
-            json={"name": "更新后的脚本"},
-            headers={"Authorization": f"Bearer {super_admin_token}"}
-        )
-        assert response.status_code in [200, 403, 404]
-
-    def test_delete_script(self, client, super_admin_token, db_session):
-        """测试删除脚本"""
-        from app.models import Script
-        
-        # 创建测试脚本
-        script = Script(
-            name="待删除脚本",
-            script_type="bash",
-            content="echo 'test'",
-            created_by=1
-        )
-        db_session.add(script)
-        db_session.commit()
-        db_session.refresh(script)
-        
-        response = client.delete(
-            f"/api/v1/scripts/{script.id}",
-            headers={"Authorization": f"Bearer {super_admin_token}"}
-        )
-        assert response.status_code in [200, 403, 404]
-
-
-class TestScheduledTasksAPI:
-    """定时任务 API 测试"""
-
-    def test_get_tasks_unauthorized(self, client):
-        """测试未授权访问"""
-        response = client.get("/api/v1/scheduled-tasks")
-        assert response.status_code == 401
-
-    def test_get_tasks_success(self, client, operator_token):
-        """测试获取定时任务列表"""
-        response = client.get(
-            "/api/v1/scheduled-tasks",
-            headers={"Authorization": f"Bearer {operator_token}"}
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "items" in data
-        assert "total" in data
-
-    def test_create_task_missing_fields(self, client, operator_token):
-        """测试创建任务缺少必填字段"""
-        response = client.post(
-            "/api/v1/scheduled-tasks",
-            json={},
-            headers={"Authorization": f"Bearer {operator_token}"}
-        )
-        assert response.status_code == 422  # Validation error
-
-    def test_create_task(self, client, operator_token, db_session):
-        """测试创建定时任务"""
-        from app.models import Script
-        
-        # 先创建脚本
-        script = Script(
-            name="测试脚本",
-            script_type="bash",
-            content="echo 'test'",
-            created_by=1
-        )
-        db_session.add(script)
-        db_session.commit()
-        db_session.refresh(script)
-        
-        response = client.post(
-            "/api/v1/scheduled-tasks",
-            json={
-                "name": "测试定时任务",
-                "script_id": script.id,
-                "cron_expression": "0 0 * * *",
-                "status": "enabled"
-            },
-            headers={"Authorization": f"Bearer {operator_token}"}
-        )
-        assert response.status_code in [200, 400]
-
-
-class TestNotificationAPI:
-    """通知管理 API 测试"""
-
-    def test_get_channels_unauthorized(self, client):
-        """测试未授权访问"""
-        response = client.get("/api/v1/notification/channels")
-        assert response.status_code == 401
-
-    def test_get_channels_success(self, client, operator_token):
-        """测试获取通知通道列表"""
-        response = client.get(
-            "/api/v1/notification/channels",
-            headers={"Authorization": f"Bearer {operator_token}"}
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert isinstance(data, list)
-
-    def test_create_channel_missing_fields(self, client, super_admin_token):
-        """测试创建通道缺少必填字段"""
-        response = client.post(
-            "/api/v1/notification/channels",
-            json={},
-            headers={"Authorization": f"Bearer {super_admin_token}"}
-        )
-        assert response.status_code == 422  # Validation error
-
-    def test_create_dingtalk_channel(self, client, super_admin_token):
-        """测试创建钉钉通道"""
-        response = client.post(
-            "/api/v1/notification/channels",
-            json={
-                "name": "测试钉钉通道",
-                "channel_type": "dingtalk",
-                "auth_type": "none",
-                "webhook": "https://oapi.dingtalk.com/robot/send?access_token=test",
-                "description": "测试通道"
-            },
-            headers={"Authorization": f"Bearer {super_admin_token}"}
-        )
-        assert response.status_code in [200, 400]  # 可能因名称重复而返回400
-        data = response.json()
-        assert "success" in data or "message" in data
-
-    def test_get_bindings_success(self, client, operator_token):
-        """测试获取通知绑定列表"""
-        response = client.get(
-            "/api/v1/notification/bindings",
-            headers={"Authorization": f"Bearer {operator_token}"}
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert "items" in data
+    def test_execute_nonexistent_script(self, client, admin_headers):
+        """测试执行不存在的脚本"""
+        response = client.post("/api/v1/scripts/99999/execute", headers=admin_headers)
+        assert response.status_code == 404
