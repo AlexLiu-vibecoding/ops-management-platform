@@ -84,10 +84,11 @@ async def get_global_monitor_switches(
     
     result = {}
     for config in configs:
-        # 提取监控类型
-        key_parts = config.config_key.split("_")
-        if len(key_parts) >= 2:
-            monitor_type = key_parts[1]
+        # 提取监控类型 (从 monitor_X_enabled 中提取 X)
+        # 支持 monitor_slow_query_enabled -> slow_query
+        key = config.config_key
+        if key.startswith("monitor_") and key.endswith("_enabled"):
+            monitor_type = key[8:-8]  # 去掉前缀 "monitor_" 和后缀 "_enabled"
             result[monitor_type] = config.config_value == "true"
     
     # 确保所有类型都有默认值
