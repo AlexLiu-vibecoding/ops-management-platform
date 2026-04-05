@@ -755,7 +755,381 @@ const res = await request.get('/notification/channels')
 
 ---
 
-## 十、快速定位
+## 十一、架构设计与优化
+
+> **⚠️ 重要**: 本章节分析系统当前架构设计，识别不符合设计原则的地方，并提供优化方案。
+
+### 11.1 开闭原则（Open-Closed Principle）分析
+
+**开闭原则定义**：软件实体（类、模块、函数等）应该对扩展开放，对修改关闭。即在不修改现有代码的情况下，通过扩展来增加新功能。
+
+#### 11.1.1 当前系统开闭原则评估
+
+| 模块 | 符合程度 | 说明 |
+|------|----------|------|
+| **数据库连接管理** | ❌ 部分符合 | 有 `DatabaseConnectionManager`，但 MySQL/PostgreSQL/Redis 没有统一接口 |
+| **通知渠道** | ⚠️ 基本符合 | 有统一模型，但发送逻辑没有适配器抽象 |
+| **权限管理** | ✅ 符合 | 基于 RBAC 模型，权限配置在数据库，扩展性好 |
+| **菜单系统** | ✅ 符合 | 数据库驱动菜单，新增菜单无需修改代码 |
+| **实例管理** | ❌ 不符合 | RDB 和 Redis 实例分开管理，没有统一接口 |
+
+#### 11.1.2 不符合开闭原则的具体问题
+
+##### 问题1: 数据源连接缺乏统一抽象
+
+**现状**：
+- MySQL/PostgreSQL 由 `DatabaseConnectionManager` 管理
+- Redis 由 `RedisClient` 管理
+- 新增数据源（如 MongoDB、Elasticsearch）需要修改核心代码
+
+**影响**：
+```python
+# 当前实现：新增数据源需修改 DatabaseConnectionManager
+class DatabaseConnectionManager:
+    def _create_mysql_pool(self, instance):
+        # MySQL 逻辑
+        pass
+    
+    def _create_postgresql_pool(self, instance):
+        # PostgreSQL 逻辑
+        pass
+    
+    # ❌ 新增 MongoDB 需要在这里添加方法
+    def _create_mongodb_pool(self, instance):
+        pass
+```
+
+**违反原则**：对修改开放（需修改此类），对扩展关闭（不能外部注册）
+
+##### 问题2: 通知渠道发送逻辑分散
+
+**现状**：
+- 支持 5 种通道：钉钉、企业微信、飞书、邮件、Webhook
+- 发送逻辑分散在 `notification.py` 的不同方法中
+- 新增通道需要修改多处代码
+
+**影响**：
+```python
+# 当前实现：每种通道的发送逻辑是独立的
+async def send_dingtalk_message(webhook, message, auth_type, secret, keywords):
+    # 钉钉特定逻辑
+    pass
+
+async def send_wechat_message(webhook, message):
+    # 企业微信特定逻辑
+    pass
+
+# ❌ 新增 Slack 需要添加新方法并修改调用方
+async def send_slack_message(webhook, message):
+    pass
+```
+
+**违反原则**：对修改开放（需添加新方法），对扩展关闭（不能外部注册）
+
+##### 问题3: 实例管理类型耦合
+
+**现状**：
+- `RDBInstance` 和 `RedisInstance` 分开管理
+- 前端路由、API、服务都分别处理
+- 新增实例类型（如 MongoDB 实例）需要大量修改
+
+**影响**：
+- 代码重复（测试连接、监控、操作等功能）
+- 维护成本高
+- 难以统一管理
+
+#### 11.1.3 优化方案
+
+##### 优化1: 引入数据源适配器模式
+
+**目标**：统一 MySQL/PostgreSQL/Redis/MongoDB 等数据源的连接和操作接口
+
+**实现步骤**：
+
+1. 定义统一接口：
+```python
+# backend/app/adapters/datasource/base.py
+from abc import ABC, abstractmethod
+
+class DataSourceAdapter(ABC):
+    @abstractmethod
+    def connect(self) -> bool:
+        """建立连接"""
+        pass
+    
+    @abstractmethod
+    def test_connection(self) -> Dict[str, Any]:
+        """测试连接"""
+        pass
+    
+    @abstractmethod
+    def execute_query(self, query: str, params: Optional[Dict] = None) -> List[Dict]:
+        """执行查询"""
+        pass
+    
+    @abstractmethod
+    def get_metrics(self) -> Dict[str, Any]:
+        """获取监控指标"""
+        pass
+    
+    @abstractmethod
+    def get_adapter_type(self) -> str:
+        """获取适配器类型"""
+        pass
+```
+
+2. 实现各类型适配器：
+```python
+# backend/app/adapters/datasource/mysql_adapter.py
+class MySQLAdapter(DataSourceAdapter):
+    def get_adapter_type(self) -> str:
+        return "mysql"
+
+# backend/app/adapters/datasource/redis_adapter.py
+class RedisAdapter(DataSourceAdapter):
+    def get_adapter_type(self) -> str:
+        return "redis"
+```
+
+3. 适配器工厂（开闭原则核心）：
+```python
+# backend/app/adapters/datasource/factory.py
+class DataSourceAdapterFactory:
+    _adapters = {
+        "mysql": MySQLAdapter,
+        "postgresql": PostgreSQLAdapter,
+        "redis": RedisAdapter,
+    }
+    
+    @classmethod
+    def create(cls, adapter_type: str, config: Dict[str, Any]) -> DataSourceAdapter:
+        adapter_class = cls._adapters.get(adapter_type)
+        if not adapter_class:
+            raise ValueError(f"Unsupported adapter type: {adapter_type}")
+        return adapter_class(config)
+    
+    @classmethod
+    def register(cls, adapter_type: str, adapter_class: type):
+        """✅ 对扩展开放：新增适配器只需注册，无需修改核心代码"""
+        cls._adapters[adapter_type] = adapter_class
+```
+
+4. 使用示例：
+```python
+# 新增 MongoDB 适配器，无需修改核心代码
+from backend.app.adapters.datasource.factory import DataSourceAdapterFactory
+
+DataSourceAdapterFactory.register("mongodb", MongoDBAdapter)
+
+# 使用
+adapter = DataSourceAdapterFactory.create("mongodb", config={"host": "..."})
+adapter.connect()
+result = adapter.execute_query("db.collection.find()")
+```
+
+**收益**：
+- 新增数据源无需修改核心代码（对修改关闭）
+- 只需实现适配器并注册（对扩展开放）
+- 统一的接口，易于测试和维护
+
+##### 优化2: 引入通知渠道适配器模式
+
+**目标**：统一各通知渠道的发送逻辑
+
+**实现步骤**：
+
+1. 定义统一接口：
+```python
+# backend/app/adapters/notification/base.py
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+
+@dataclass
+class NotificationMessage:
+    title: str
+    content: str
+    markdown: bool = True
+    extra: Dict[str, Any] = None
+
+@dataclass
+class NotificationResult:
+    success: bool
+    channel_id: int
+    channel_type: str
+    error_message: str = None
+
+class NotificationAdapter(ABC):
+    @abstractmethod
+    async def send(self, message: NotificationMessage) -> NotificationResult:
+        """发送消息"""
+        pass
+    
+    @abstractmethod
+    def validate_config(self, config: Dict[str, Any]) -> bool:
+        """验证配置"""
+        pass
+    
+    @abstractmethod
+    def get_adapter_type(self) -> str:
+        """获取适配器类型"""
+        pass
+```
+
+2. 实现各渠道适配器：
+```python
+# backend/app/adapters/notification/dingtalk_adapter.py
+class DingTalkAdapter(NotificationAdapter):
+    def get_adapter_type(self) -> str:
+        return "dingtalk"
+    
+    async def send(self, message: NotificationMessage) -> NotificationResult:
+        # 转换为钉钉格式并发送
+        pass
+```
+
+3. 适配器工厂：
+```python
+# backend/app/adapters/notification/factory.py
+class NotificationAdapterFactory:
+    _adapters = {
+        "dingtalk": DingTalkAdapter,
+        "wechat": WeChatAdapter,
+        "feishu": FeishuAdapter,
+        "email": EmailAdapter,
+        "webhook": WebhookAdapter,
+    }
+    
+    @classmethod
+    def register(cls, channel_type: str, adapter_class: type):
+        """✅ 对扩展开放：新增渠道只需注册"""
+        cls._adapters[channel_type] = adapter_class
+```
+
+4. 统一分发器：
+```python
+# backend/app/services/notification_dispatcher.py
+class NotificationDispatcher:
+    async def send_to_channel(self, channel_id: int, message: NotificationMessage):
+        channel = self.db.query(NotificationChannel).filter(
+            NotificationChannel.id == channel_id
+        ).first()
+        
+        # 创建适配器
+        adapter = NotificationAdapterFactory.create(
+            channel.channel_type,
+            channel.config
+        )
+        
+        return await adapter.send(message)
+```
+
+**收益**：
+- 新增渠道无需修改核心代码（对修改关闭）
+- 只需实现适配器并注册（对扩展开放）
+- 统一的消息格式和结果处理
+
+##### 优化3: 统一实例管理接口
+
+**目标**：消除 RDB 和 Redis 实例管理的代码重复
+
+**实现步骤**：
+
+1. 定义实例基类：
+```python
+# backend/app/models/instance_base.py
+class InstanceBase(ABC):
+    @abstractmethod
+    def get_adapter_type(self) -> str:
+        """获取实例类型"""
+        pass
+    
+    @abstractmethod
+    def test_connection(self) -> bool:
+        """测试连接"""
+        pass
+```
+
+2. 统一实例服务：
+```python
+# backend/app/services/instance_service_unified.py
+class InstanceServiceUnified:
+    def test_instance(self, instance: InstanceBase) -> Dict[str, Any]:
+        """统一的实例测试接口"""
+        adapter = DataSourceAdapterFactory.create(
+            instance.get_adapter_type(),
+            instance.to_config()
+        )
+        return adapter.test_connection()
+```
+
+**收益**：
+- 消除代码重复
+- 统一操作接口
+- 易于扩展新实例类型
+
+### 11.2 其他设计优化建议
+
+#### 优化4: 监控指标收集抽象
+
+**问题**：不同数据源的监控指标收集逻辑分散
+
+**方案**：引入 `MetricsCollector` 接口
+```python
+class MetricsCollector(ABC):
+    @abstractmethod
+    def collect_metrics(self, instance: InstanceBase) -> Dict[str, Any]:
+        """收集监控指标"""
+        pass
+```
+
+#### 优化5: 脚本执行器抽象
+
+**问题**：SQL 脚本和 Shell 脚本执行逻辑混合
+
+**方案**：引入 `ScriptExecutor` 接口
+```python
+class ScriptExecutor(ABC):
+    @abstractmethod
+    async def execute(self, script: str, params: Dict) -> ScriptResult:
+        """执行脚本"""
+        pass
+```
+
+### 11.3 优化优先级
+
+| 优先级 | 优化项 | 预期收益 | 实施难度 |
+|--------|--------|----------|----------|
+| **P0** | 数据源适配器模式 | 高 | 中 |
+| **P1** | 通知渠道适配器模式 | 中 | 低 |
+| **P1** | 统一实例管理接口 | 中 | 中 |
+| **P2** | 监控指标收集抽象 | 中 | 中 |
+| **P3** | 脚本执行器抽象 | 低 | 高 |
+
+### 11.4 优化实施检查清单
+
+```
+□ 定义适配器基类接口
+□ 实现现有类型的适配器
+□ 创建适配器工厂
+□ 重构现有代码使用适配器
+□ 添加单元测试
+□ 更新文档和示例
+□ 性能测试（无回归）
+```
+
+### 11.5 设计原则总结
+
+| 原则 | 评估 | 说明 |
+|------|------|------|
+| **开闭原则** | ⚠️ 部分符合 | 需引入适配器模式改进 |
+| **单一职责原则** | ✅ 符合 | 各模块职责清晰 |
+| **里氏替换原则** | ⚠️ 部分符合 | 需统一实例基类 |
+| **接口隔离原则** | ✅ 符合 | 接口设计合理 |
+| **依赖倒置原则** | ⚠️ 部分符合 | 需引入抽象接口 |
+
+---
+
+## 十二、快速定位
 
 | 需求 | 文件位置 |
 |------|----------|
@@ -806,13 +1180,14 @@ helm install opscenter ./helm/opscenter --namespace opscenter --create-namespace
 
 ---
 
-*文档版本：v5.0*
-*最后更新：2026-04-02*
+*文档版本：v7.0*
+*最后更新：2026-04-05*
 
 ### 版本历史
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
+| v7.0 | 2026-04-05 | 新增架构设计与优化章节，分析开闭原则并提供适配器模式优化方案 |
 | v6.0 | 2026-04-02 | 新增云原生部署章节，移除内置数据库，使用 AWS 托管服务 |
 | v5.0 | 2026-04-02 | 新增 AI 助手工作指南，总结常见错误模式 |
 | v4.0 | 2026-04 | 新增代码整洁规范，案例：MenuConfig.roles 残留 |
