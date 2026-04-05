@@ -13,7 +13,7 @@ from sqlalchemy import text
 import logging
 
 from app.models.sql_performance import SQLPerformanceRecord
-from app.models.instance import Instance
+from app.models import RDBInstance as Instance
 from app.services.db_connection import DatabaseConnectionManager
 
 

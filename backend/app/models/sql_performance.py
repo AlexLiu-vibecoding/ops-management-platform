@@ -17,7 +17,7 @@ class SQLPerformanceRecord(Base):
     id = Column(Integer, primary_key=True, index=True)
     
     # 基本信息
-    instance_id = Column(Integer, ForeignKey("instances.id"), nullable=False, index=True)
+    instance_id = Column(Integer, ForeignKey("rdb_instances.id"), nullable=False, index=True)
     sql_text = Column(Text, nullable=False, comment="SQL 语句")
     sql_hash = Column(String(64), nullable=False, index=True, comment="SQL Hash（用于去重）")
     
@@ -46,7 +46,7 @@ class SQLPerformanceRecord(Base):
     created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
     
     # 关联
-    instance = relationship("Instance", back_populates="performance_records")
+    instance = relationship("RDBInstance", back_populates="performance_records")
     user = relationship("User", backref="performance_records")
     comparison_source = relationship("SQLPerformanceComparison", foreign_keys="SQLPerformanceComparison.source_id", back_populates="source_record")
     comparison_target = relationship("SQLPerformanceComparison", foreign_keys="SQLPerformanceComparison.target_id", back_populates="target_record")
