@@ -276,7 +276,8 @@ onMounted(async () => {
 
 async function loadInstances() {
   try {
-    instances.value = await request.get('/instances?instance_type=rdb&status=true')
+    const result = await request.get('/rdb-instances?status=true&limit=100')
+    instances.value = result.items || []
   } catch (error) {
     ElMessage.error('加载实例失败')
   }
