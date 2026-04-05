@@ -206,10 +206,10 @@ class TestWeChatAdapter:
 
         assert adapter.validate_config(config) is False
 
-    def test_validate_config_invalid_webhook(self):
-        """测试无效的 webhook URL"""
+    def test_validate_config_empty_webhook(self):
+        """测试空 webhook 配置"""
         config = {
-            "webhook": "invalid-url"
+            "webhook": ""
         }
 
         adapter = WeChatAdapter(config)

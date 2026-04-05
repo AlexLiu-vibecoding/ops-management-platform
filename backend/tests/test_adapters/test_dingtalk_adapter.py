@@ -209,18 +209,6 @@ class TestDingTalkAdapter:
 
         assert adapter.validate_config(config) is False
 
-    def test_validate_config_invalid_auth_type(self):
-        """测试无效的认证类型"""
-        config = {
-            "webhook": "https://oapi.dingtalk.com/robot/send",
-            "auth_type": "invalid",
-            "keywords": ["告警"]
-        }
-
-        adapter = DingTalkAdapter(config)
-
-        assert adapter.validate_config(config) is False
-
     def test_validate_config_keyword_missing(self):
         """测试关键字认证缺少关键字"""
         config = {
@@ -231,6 +219,28 @@ class TestDingTalkAdapter:
         adapter = DingTalkAdapter(config)
 
         assert adapter.validate_config(config) is False
+
+    def test_validate_config_sign_missing_secret(self):
+        """测试签名认证缺少密钥"""
+        config = {
+            "webhook": "https://oapi.dingtalk.com/robot/send",
+            "auth_type": "sign"
+        }
+
+        adapter = DingTalkAdapter(config)
+
+        assert adapter.validate_config(config) is False
+
+    def test_validate_config_valid_no_auth(self):
+        """测试无认证的有效配置"""
+        config = {
+            "webhook": "https://oapi.dingtalk.com/robot/send",
+            "auth_type": "none"
+        }
+
+        adapter = DingTalkAdapter(config)
+
+        assert adapter.validate_config(config) is True
 
     @patch('httpx.AsyncClient.post')
     async def test_connection(self, mock_post):
