@@ -15,6 +15,7 @@ from app.models.permissions import PermissionCode
 from app.deps import get_current_user, require_permissions
 from app.utils.auth import aes_cipher
 from app.services.notification import NotificationService
+from app.models import GlobalConfig
 
 
 # ==================== Helper Functions ====================
@@ -677,6 +678,93 @@ async def delete_channel_binding(
         raise HTTPException(status_code=404, detail="绑定不存在")
 
     db.delete(binding)
+    db.commit()
+
+    return {"message": "绑定删除成功"}
+
+
+# ==================== 默认通道管理 ====================
+
+@router.get("/default")
+async def get_default_channel(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """获取默认通知通道"""
+    config = db.query(GlobalConfig).filter_by(config_key="default_notification_channel_id").first()
+    
+    if not config:
+        return {
+            "success": True,
+            "data": None,
+            "message": "未设置默认通道"
+        }
+    
+    channel_id = int(config.config_value)
+    channel = db.query(NotificationChannel).filter_by(id=channel_id).first()
+    
+    if not channel:
+        return {
+            "success": False,
+            "message": "默认通道不存在，请重新设置",
+            "data": None
+        }
+    
+    return {
+        "success": True,
+        "data": {
+            "id": channel.id,
+            "name": channel.name,
+            "channel_type": channel.channel_type,
+            "channel_type_label": CHANNEL_TYPE_LABELS.get(channel.channel_type, channel.channel_type),
+            "is_enabled": channel.is_enabled
+        }
+    }
+
+
+@router.post("/default/{channel_id}")
+async def set_default_channel(
+    channel_id: int,
+    current_user: User = Depends(require_permissions([PermissionCode.NOTIFICATION_CHANNEL_MANAGE])),
+    db: Session = Depends(get_db)
+):
+    """设置默认通知通道"""
+    # 检查通道是否存在
+    channel = db.query(NotificationChannel).filter_by(id=channel_id).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="通道不存在")
+    
+    # 检查通道是否启用
+    if not channel.is_enabled:
+        raise HTTPException(status_code=400, detail="通道未启用，不能设置为默认通道")
+    
+    # 获取或创建默认通道配置
+    config = db.query(GlobalConfig).filter_by(config_key="default_notification_channel_id").first()
+    
+    if config:
+        # 更新现有配置
+        config.config_value = str(channel_id)
+        config.updated_by = current_user.id
+    else:
+        # 创建新配置
+        config = GlobalConfig(
+            config_key="default_notification_channel_id",
+            config_value=str(channel_id),
+            description="默认通知通道ID",
+            updated_by=current_user.id
+        )
+        db.add(config)
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": f"已将 {channel.name} 设置为默认通知通道",
+        "data": {
+            "channel_id": channel_id,
+            "channel_name": channel.name
+        }
+    }
     db.commit()
 
     return {"message": "绑定删除成功"}

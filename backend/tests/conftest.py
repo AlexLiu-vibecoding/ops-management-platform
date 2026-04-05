@@ -49,11 +49,13 @@ def db_session():
     """创建测试数据库会话"""
     # 创建所有表
     Base.metadata.create_all(bind=engine)
-    
+
     db = TestingSessionLocal()
     try:
         # 初始化默认配置
         _init_default_configs(db)
+        # 初始化插件系统
+        _init_plugin_system()
         yield db
     finally:
         db.close()
@@ -72,6 +74,15 @@ def _init_default_configs(db):
     for config in configs:
         db.add(config)
     db.commit()
+
+
+def _init_plugin_system():
+    """初始化插件系统"""
+    try:
+        from app.plugins.notification import notification_plugin_manager
+        notification_plugin_manager.discover_plugins()
+    except Exception as e:
+        print(f"Warning: Plugin system initialization failed: {e}")
 
 
 @pytest.fixture(scope="function")
