@@ -43,12 +43,26 @@ docker-compose ps             # 查看状态
 ### 本地开发
 
 ```bash
-# 一键启动（需要 Python 和数据库）
-chmod +x start.sh
-./start.sh all     # 完整安装并启动
-./start.sh         # 启动服务
-./start.sh stop    # 停止服务
-./start.sh logs    # 查看日志
+# 开发模式启动
+./ops.sh dev
+
+# 生产模式启动
+./ops.sh start
+
+# 重启服务
+./ops.sh restart
+
+# 停止服务
+./ops.sh stop
+
+# 查看日志
+./ops.sh logs
+
+# 构建前端
+./ops.sh build
+
+# 安装依赖
+./ops.sh install
 ```
 
 ---
@@ -285,7 +299,7 @@ SQL_FILE_SIZE_THRESHOLD=10000
 │   ├── deploy-k8s.sh          # K8s 部署脚本
 │   └── README.md              # 部署说明
 │
-├── start.sh                   # 本地启动脚本
+├── ops.sh                     # 统一管理脚本
 ├── AGENTS.md                  # AI 开发指南
 └── README.md
 ```
