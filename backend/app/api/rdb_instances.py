@@ -132,7 +132,7 @@ async def list_rdb_instances(
     status: Optional[bool] = None,
     skip: int = 0,
     limit: int = 20,
-    current_user: User = Depends(require_permission("instance:list")),
+    current_user: User = Depends(require_permission("instance:view")),
     db: Session = Depends(get_db)
 ):
     """获取 RDB 实例列表"""
