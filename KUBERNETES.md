@@ -6,26 +6,27 @@
 opscenter/
 ├── k8s/                           # Kubernetes 部署清单
 │   ├── 00-namespace.yaml          # 命名空间配置
-│   ├── 01-configmap.yaml          # 应用配置（非敏感）
-│   ├── 02-secret.yaml             # 敏感配置（密码、密钥）
+│   ├── 01-configmap.yaml          # 应用配置（包含 AWS 数据库配置）
+│   ├── 02-secret.yaml             # 敏感配置（包含 AWS 数据库密码）
 │   ├── 03-backend-deployment.yaml  # 后端部署配置
 │   ├── 04-backend-service.yaml    # 后端服务 + HPA + PDB
 │   ├── 05-frontend-deployment.yaml # 前端部署配置
 │   ├── 06-frontend-service.yaml   # 前端服务 + Ingress
-│   ├── 07-postgresql.yaml         # PostgreSQL 数据库
-│   ├── 08-redis.yaml              # Redis 缓存
 │   └── 09-rbac.yaml               # RBAC 权限配置
 ├── helm/opscenter/                # Helm Chart
 │   ├── Chart.yaml                 # Chart 元数据
-│   ├── values.yaml                # 默认配置
+│   ├── values.yaml                # 默认配置（禁用内置数据库）
 │   └── templates/                 # 模板文件
 │       └── _helpers.tpl           # 模板助手
 ├── deploy-k8s.sh                  # 一键部署脚本
 ├── docker-compose.yml             # Docker Compose 配置
 ├── Dockerfile                     # Docker 镜像构建
 ├── KUBERNETES_DEPLOYMENT.md       # 详细部署文档
-└── README.md                      # 本文件
+├── KUBERNETES.md                  # 本文件
+└── MIGRATION_GUIDE.md             # 迁移指南
 ```
+
+**注意**: PostgreSQL 和 Redis 使用 AWS 托管服务（Amazon RDS + Amazon ElastiCache），无需部署内置数据库。
 
 ---
 
@@ -36,18 +37,28 @@ opscenter/
 - Kubernetes 1.24+
 - kubectl 1.24+
 - Helm 3.0+（可选）
-- NFS 或云存储（用于 PVC）
+- **AWS 账号**（用于 Amazon RDS 和 Amazon ElastiCache）
+- 集群可访问 AWS 托管服务
 
 ### 方式一：使用部署脚本（推荐）
 
 ```bash
-# 1. 修改 k8s/02-secret.yaml 中的敏感配置
-vim k8s/02-secret.yaml
+# 1. 创建 AWS RDS PostgreSQL 和 ElastiCache Redis（见详细文档）
+#    - 记录 RDS endpoint: opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com
+#    - 记录 ElastiCache endpoint: opscenter-redis.xxxxxx.cache.amazonaws.com
 
-# 2. 运行部署脚本
+# 2. 修改 k8s/01-configmap.yaml，配置 AWS 数据库 endpoint
+vim k8s/01-configmap.yaml
+# 更新 POSTGRES_HOST 和 REDIS_HOST
+
+# 3. 修改 k8s/02-secret.yaml，配置 AWS 数据库密码
+vim k8s/02-secret.yaml
+# 更新 POSTGRES_PASSWORD 和 REDIS_PASSWORD
+
+# 4. 运行部署脚本
 ./deploy-k8s.sh
 
-# 3. 等待 Pod 就绪
+# 5. 等待 Pod 就绪
 kubectl get pods -n opscenter
 
 # 4. 访问应用

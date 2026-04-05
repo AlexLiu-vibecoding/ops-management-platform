@@ -119,11 +119,30 @@ ruff check --select F401
 |------|------|
 | **名称** | OpsCenter - 一站式运维管理平台 |
 | **技术栈** | Vue 3 + Vite + Element Plus / Python 3.11 + FastAPI + SQLAlchemy |
-| **数据库** | PostgreSQL (元数据) + MySQL/PostgreSQL/Redis (监控实例) |
+| **数据库** | **生产环境: Amazon RDS + Amazon ElastiCache** / 开发环境: 内置 PostgreSQL + Redis |
+| **部署方式** | Kubernetes (生产) / Docker Compose (开发) |
 | **端口** | 后端 5000 / 前端开发 3000 |
 | **环境变量** | `DEPLOY_RUN_PORT=5000`, `COZE_PROJECT_DOMAIN_DEFAULT` |
 
-### 1.2 核心能力
+### 1.2 部署架构
+
+```
+⚠️ 生产环境架构（云原生） - 重要！
+
+Kubernetes 集群
+├── opscenter-backend (Deployment + HPA + PDB)
+├── opscenter-frontend (Deployment + HPA)
+└── 外部依赖（AWS 托管服务）
+    ├── Amazon RDS PostgreSQL（元数据库）
+    └── Amazon ElastiCache Redis（缓存）
+
+特点：
+- 使用 Kubernetes 原生资源（Deployment、HPA、PDB）
+- 支持弹性伸缩、滚动更新、自我修复
+- 使用 AWS 托管服务（RDS + ElastiCache）提供高可用数据库
+- 不再部署内置数据库（PostgreSQL/Redis StatefulSet）
+
+### 1.3 核心能力
 
 - **数据库管理**: MySQL/PostgreSQL/Redis 多实例管理
 - **SQL 工具**: SQL 编辑器、SQL 优化器、慢查询分析
@@ -132,7 +151,7 @@ ruff check --select F401
 - **自动化**: 脚本管理、定时任务、定时巡检
 - **权限管理**: RBAC 权限模型、环境权限隔离
 
-### 1.3 架构特点
+### 1.4 架构特点
 
 ```
 ⚠️ 数据库驱动设计 - 重要！
@@ -143,6 +162,92 @@ ruff check --select F401
 
 特点：前端不硬编码配置，全部从数据库动态加载
 ```
+
+---
+
+## 云原生部署（生产环境）
+
+### 部署架构
+
+OpsCenter 支持云原生部署，使用 Kubernetes 和 AWS 托管服务。
+
+**架构图**:
+```
+Kubernetes Cluster
+├── Namespace: opscenter
+│   ├── Deployment: opscenter-backend (3 replicas)
+│   ├── Deployment: opscenter-frontend (2 replicas)
+│   ├── Service: opscenter-backend-service
+│   ├── Service: opscenter-frontend-service
+│   ├── HPA: opscenter-backend-hpa
+│   ├── HPA: opscenter-frontend-hpa
+│   ├── PDB: opscenter-backend-pdb
+│   └── Ingress: opscenter-ingress
+│
+└── External (AWS)
+    ├── Amazon RDS PostgreSQL (Multi-AZ)
+    └── Amazon ElastiCache Redis (Replication)
+```
+
+### 部署清单
+
+| 文件 | 说明 |
+|------|------|
+| `k8s/00-namespace.yaml` | 命名空间配置 |
+| `k8s/01-configmap.yaml` | 应用配置（包含 AWS RDS/ElastiCache endpoint） |
+| `k8s/02-secret.yaml` | 敏感配置（包含数据库密码） |
+| `k8s/03-backend-deployment.yaml` | 后端部署配置 |
+| `k8s/04-backend-service.yaml` | 后端服务 + HPA + PDB |
+| `k8s/05-frontend-deployment.yaml` | 前端部署配置 |
+| `k8s/06-frontend-service.yaml` | 前端服务 + Ingress |
+| `k8s/09-rbac.yaml` | RBAC 权限配置 |
+
+**注意**: 已移除内置数据库部署清单（`07-postgresql.yaml`, `08-redis.yaml`），生产环境强制使用 AWS 托管服务。
+
+### 部署步骤
+
+```bash
+# 1. 创建 AWS RDS PostgreSQL 和 ElastiCache Redis
+#    （详见 MIGRATION_GUIDE.md）
+
+# 2. 更新配置
+vim k8s/01-configmap.yaml  # 配置 AWS endpoint
+vim k8s/02-secret.yaml     # 配置密码
+
+# 3. 部署应用
+./deploy-k8s.sh
+
+# 4. 验证部署
+kubectl get pods -n opscenter
+kubectl get services -n opscenter
+```
+
+### 云原生特性
+
+| 特性 | 实现方式 | 说明 |
+|------|---------|------|
+| **弹性伸缩** | HPA | 基于 CPU/内存使用率自动扩缩容 |
+| **滚动更新** | Deployment | 零停机更新应用 |
+| **自我修复** | Liveness Probe + Readiness Probe | 自动重启不健康的 Pod |
+| **高可用** | PDB + Multi-AZ RDS | 确保最小可用副本 |
+| **负载均衡** | Service + Ingress | 自动分配流量 |
+| **服务发现** | Kubernetes DNS | 内部服务自动发现 |
+
+### Helm Chart
+
+提供 Helm Chart 简化部署管理:
+
+```bash
+helm install opscenter ./helm/opscenter \
+  --namespace opscenter \
+  --create-namespace \
+  --set postgresql.enabled=false \
+  --set redis.enabled=false \
+  --set config.aws.rds.endpoint="your-rds-endpoint" \
+  --set config.aws.redis.endpoint="your-redis-endpoint"
+```
+
+**详细文档**: 见 `KUBERNETES_DEPLOYMENT.md`
 
 ---
 
@@ -177,6 +282,20 @@ ruff check --select F401
 │   ├── specs/                 # 功能规格 (16个)
 │   └── template.md            # 规格模板
 │
+├── k8s/                       # Kubernetes 部署清单（生产环境）
+│   ├── 00-namespace.yaml      # 命名空间配置
+│   ├── 01-configmap.yaml      # 应用配置
+│   ├── 02-secret.yaml         # 敏感配置
+│   ├── 03-backend-deployment.yaml
+│   ├── 04-backend-service.yaml
+│   ├── 05-frontend-deployment.yaml
+│   ├── 06-frontend-service.yaml
+│   └── 09-rbac.yaml
+├── helm/opscenter/            # Helm Chart
+├── docker-compose.yml         # Docker Compose 配置（开发环境）
+├── KUBERNETES_DEPLOYMENT.md   # 详细部署文档
+├── KUBERNETES.md              # 快速部署指南
+├── MIGRATION_GUIDE.md         # AWS 托管服务迁移指南
 ├── .coze                      # 项目配置
 └── AGENTS.md                  # 本文件
 ```
@@ -593,10 +712,16 @@ const res = await request.get('/notification/channels')
 | 后端入口 | `backend/app/main.py` |
 | 数据库模型 | `backend/app/models/` |
 | 日志文件 | `/app/work/logs/bypass/app.log` |
+| K8s 配置 | `k8s/01-configmap.yaml`, `k8s/02-secret.yaml` |
+| K8s 部署清单 | `k8s/` 目录 |
+| Helm Chart | `helm/opscenter/` |
+| 部署文档 | `KUBERNETES_DEPLOYMENT.md` |
+| 迁移指南 | `MIGRATION_GUIDE.md` |
 
 ### 常用命令
 
 ```bash
+# 本地开发
 # 查看服务状态
 curl -I http://localhost:5000
 
@@ -605,6 +730,23 @@ tail -n 50 /app/work/logs/bypass/app.log
 
 # 前端构建
 cd frontend && pnpm build
+
+# 云原生部署（生产环境）
+# 部署到 Kubernetes
+./deploy-k8s.sh
+
+# 查看部署状态
+kubectl get pods -n opscenter
+kubectl get services -n opscenter
+
+# 查看日志
+kubectl logs -f deployment/opscenter-backend -n opscenter
+
+# 重启部署
+kubectl rollout restart deployment opscenter-backend -n opscenter
+
+# Helm 部署
+helm install opscenter ./helm/opscenter --namespace opscenter --create-namespace
 ```
 
 ---
@@ -616,6 +758,7 @@ cd frontend && pnpm build
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
+| v6.0 | 2026-04-02 | 新增云原生部署章节，移除内置数据库，使用 AWS 托管服务 |
 | v5.0 | 2026-04-02 | 新增 AI 助手工作指南，总结常见错误模式 |
 | v4.0 | 2026-04 | 新增代码整洁规范，案例：MenuConfig.roles 残留 |
 | v3.0 | 2026-04 | 新增通知系统重构案例 |

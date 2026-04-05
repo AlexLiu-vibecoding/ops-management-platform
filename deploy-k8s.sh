@@ -114,8 +114,6 @@ deploy_with_yaml() {
         "01-configmap.yaml"
         "02-secret.yaml"
         "09-rbac.yaml"
-        "07-postgresql.yaml"
-        "08-redis.yaml"
         "03-backend-deployment.yaml"
         "04-backend-service.yaml"
         "05-frontend-deployment.yaml"

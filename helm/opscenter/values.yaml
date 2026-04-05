@@ -132,9 +132,9 @@ frontend:
                     - frontend
             topologyKey: kubernetes.io/hostname
 
-# PostgreSQL 配置
+# PostgreSQL 配置（使用 AWS RDS，禁用内置部署）
 postgresql:
-  enabled: true
+  enabled: false
   replicas: 1
   storage:
     size: 20Gi
@@ -165,9 +165,9 @@ postgresql:
     min_wal_size = 1GB
     max_wal_size = 4GB
 
-# Redis 配置
+# Redis 配置（使用 AWS ElastiCache，禁用内置部署）
 redis:
-  enabled: true
+  enabled: false
   replicas: 1
   storage:
     size: 5Gi
@@ -226,16 +226,16 @@ config:
 
   database:
     postgres:
-      host: "postgresql-service"
+      host: "opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com"  # AWS RDS endpoint
       port: "5432"
       database: "opscenter"
     mysql:
-      host: "mysql-service"
+      host: "opscenter-mysql.xxxxxx.us-east-1.rds.amazonaws.com"  # AWS RDS endpoint
       port: "3306"
       database: "opscenter"
 
   redis:
-    host: "redis-service"
+    host: "opscenter-redis.xxxxxx.cache.amazonaws.com"  # AWS ElastiCache endpoint
     port: "6379"
     db: "0"
 

@@ -13,17 +13,19 @@ data:
   LOG_LEVEL: "info"
   DEPLOY_RUN_PORT: "5000"
 
-  # 数据库配置
-  POSTGRES_HOST: "postgresql-service"
+  # 数据库配置 - AWS RDS
+  # PostgreSQL (Amazon RDS)
+  POSTGRES_HOST: "opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com"
   POSTGRES_PORT: "5432"
   POSTGRES_DATABASE: "opscenter"
 
-  MYSQL_HOST: "mysql-service"
+  # MySQL (Amazon RDS)
+  MYSQL_HOST: "opscenter-mysql.xxxxxx.us-east-1.rds.amazonaws.com"
   MYSQL_PORT: "3306"
   MYSQL_DATABASE: "opscenter"
 
-  # Redis 配置
-  REDIS_HOST: "redis-service"
+  # Redis 配置 - Amazon ElastiCache
+  REDIS_HOST: "opscenter-redis.xxxxxx.cache.amazonaws.com"
   REDIS_PORT: "6379"
   REDIS_DB: "0"
 

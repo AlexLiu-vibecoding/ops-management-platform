@@ -37,11 +37,10 @@ OpsCenter 现已支持完整的云原生部署方案，提供以下特性：
 |------|------|------|
 | `opscenter-backend` | Deployment | 后端 FastAPI 应用 |
 | `opscenter-frontend` | Deployment | 前端 Nginx 静态服务 |
-| `postgresql` | StatefulSet | PostgreSQL 数据库 |
-| `redis` | StatefulSet | Redis 缓存 |
 | `opscenter-backend-service` | Service | 后端服务暴露 |
 | `opscenter-frontend-service` | Service | 前端服务暴露 |
 | `opscenter-ingress` | Ingress | HTTP 入口路由 |
+| **外部依赖** | - | **Amazon RDS PostgreSQL + Amazon ElastiCache Redis** |
 
 ---
 
@@ -52,15 +51,29 @@ OpsCenter 现已支持完整的云原生部署方案，提供以下特性：
 - Kubernetes 1.24+
 - kubectl 1.24+
 - Helm 3.0+（可选，用于 Helm Chart 部署）
-- NFS 或云存储提供商（用于 PVC）
+- **AWS 账号**（用于 Amazon RDS 和 Amazon ElastiCache）
+- AWS CLI（可选）
 
 ### 网络要求
 
 - 集群内部 DNS 正常工作
 - 有可用的 LoadBalancer 或 Ingress Controller
-- 端口 5000（后端）、80（前端）、6379（Redis）、5432（PostgreSQL）
+- 集群可以访问 AWS RDS 和 ElastiCache
+- 端口 5000（后端）、80（前端）
 
-### 存储要求
+### AWS 要求
+
+- **Amazon RDS PostgreSQL**（推荐）
+  - 实例类型：db.t3.medium 或更高
+  - 版本：PostgreSQL 15.x
+  - 存储：至少 20Gi
+  - VPC 安全组：允许 Kubernetes Worker 节点访问
+  
+- **Amazon ElastiCache Redis**（推荐）
+  - 节点类型：cache.t3.medium 或更高
+  - 版本：Redis 7.x
+  - 集群模式：禁用（单节点）或启用（多节点）
+  - VPC 安全组：允许 Kubernetes Worker 节点访问
 
 - PostgreSQL: 至少 20Gi
 - Redis: 至少 5Gi
@@ -110,7 +123,41 @@ kubectl create secret tls opscenter-tls-secret \
   -n opscenter
 ```
 
-#### 4. 部署到 Kubernetes
+#### 4. 配置 AWS 数据库（AWS RDS + ElastiCache）
+
+编辑 `k8s/01-configmap.yaml`，修改数据库配置为 AWS 托管服务：
+
+```yaml
+data:
+  # PostgreSQL - Amazon RDS
+  POSTGRES_HOST: "opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DATABASE: "opscenter"
+
+  # MySQL - Amazon RDS（如需要）
+  MYSQL_HOST: "opscenter-mysql.xxxxxx.us-east-1.rds.amazonaws.com"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "opscenter"
+
+  # Redis - Amazon ElastiCache
+  REDIS_HOST: "opscenter-redis.xxxxxx.cache.amazonaws.com"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+```
+
+编辑 `k8s/02-secret.yaml`，添加数据库密码：
+
+```yaml
+stringData:
+  # AWS RDS 密码
+  POSTGRES_PASSWORD: "your-rds-password"
+  MYSQL_PASSWORD: "your-rds-mysql-password"
+
+  # AWS ElastiCache 密码（如果启用了 AUTH）
+  REDIS_PASSWORD: "your-elasticache-password"
+```
+
+#### 5. 部署到 Kubernetes
 
 ```bash
 # 按顺序部署
@@ -118,8 +165,6 @@ kubectl apply -f k8s/00-namespace.yaml
 kubectl apply -f k8s/01-configmap.yaml
 kubectl apply -f k8s/02-secret.yaml
 kubectl apply -f k8s/09-rbac.yaml
-kubectl apply -f k8s/07-postgresql.yaml
-kubectl apply -f k8s/08-redis.yaml
 kubectl apply -f k8s/03-backend-deployment.yaml
 kubectl apply -f k8s/04-backend-service.yaml
 kubectl apply -f k8s/05-frontend-deployment.yaml
@@ -168,11 +213,15 @@ curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 #### 3. 部署
 
 ```bash
-# 部署到生产环境
+# 部署到生产环境（使用 AWS RDS + ElastiCache）
 helm install opscenter ./helm/opscenter \
   --namespace opscenter \
   --create-namespace \
-  --values helm/opscenter/values.yaml
+  --values helm/opscenter/values.yaml \
+  --set postgresql.enabled=false \
+  --set redis.enabled=false \
+  --set config.aws.rds.endpoint="opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com" \
+  --set config.aws.redis.endpoint="opscenter-redis.xxxxxx.cache.amazonaws.com"
 
 # 或使用自定义 values 文件
 helm install opscenter ./helm/opscenter \
@@ -208,23 +257,82 @@ helm rollback opscenter 2 -n opscenter
 
 ### 生产环境部署
 
-#### 1. 使用外部数据库
+#### 1. 使用 AWS 托管数据库
+
+OpsCenter 已配置为使用 AWS 托管服务（Amazon RDS + Amazon ElastiCache），无需部署内置数据库。
+
+##### 1.1 创建 AWS RDS PostgreSQL
+
+通过 AWS 控制台或 CLI 创建 PostgreSQL 数据库：
+
+```bash
+# AWS CLI 示例
+aws rds create-db-instance \
+  --db-instance-identifier opscenter-postgres \
+  --db-instance-class db.t3.medium \
+  --engine postgres \
+  --engine-version 15.7 \
+  --master-username opscenter \
+  --master-user-password YourSecurePassword123! \
+  --allocated-storage 20 \
+  --storage-type gp2 \
+  --publicly-accessible false \
+  --vpc-security-group-ids sg-xxxxx \
+  --db-subnet-group-name default
+```
+
+##### 1.2 创建 AWS ElastiCache Redis
+
+```bash
+# AWS CLI 示例
+aws elasticache create-cache-cluster \
+  --cache-cluster-id opscenter-redis \
+  --cache-node-type cache.t3.medium \
+  --engine redis \
+  --engine-version 7.0 \
+  --num-cache-nodes 1 \
+  --cache-parameter-group default.redis7 \
+  --security-group-ids sg-xxxxx \
+  --cache-subnet-group-name default
+```
+
+##### 1.3 配置 Kubernetes 连接 AWS 数据库
 
 修改 `k8s/01-configmap.yaml`：
 
 ```yaml
 data:
-  POSTGRES_HOST: "your-postgres-host"
+  # PostgreSQL - Amazon RDS
+  POSTGRES_HOST: "opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com"
   POSTGRES_PORT: "5432"
-  MYSQL_HOST: "your-mysql-host"
+  POSTGRES_DATABASE: "opscenter"
+
+  # MySQL - Amazon RDS（如需要）
+  MYSQL_HOST: "opscenter-mysql.xxxxxx.us-east-1.rds.amazonaws.com"
   MYSQL_PORT: "3306"
-  REDIS_HOST: "your-redis-host"
+  MYSQL_DATABASE: "opscenter"
+
+  # Redis - Amazon ElastiCache
+  REDIS_HOST: "opscenter-redis.xxxxxx.cache.amazonaws.com"
   REDIS_PORT: "6379"
+  REDIS_DB: "0"
+```
+
+修改 `k8s/02-secret.yaml`：
+
+```yaml
+stringData:
+  # AWS RDS 密码
+  POSTGRES_PASSWORD: "your-rds-password"
+  MYSQL_PASSWORD: "your-rds-mysql-password"
+
+  # AWS ElastiCache 密码（如果启用了 AUTH）
+  REDIS_PASSWORD: "your-elasticache-password"
 ```
 
 #### 2. 禁用内置数据库
 
-修改 `helm/opscenter/values.yaml`：
+修改 `helm/opscenter/values.yaml`（已默认禁用）：
 
 ```yaml
 postgresql:
@@ -234,7 +342,27 @@ redis:
   enabled: false
 ```
 
-#### 3. 配置 Ingress
+#### 3. 配置网络访问
+
+确保 Kubernetes 集群可以访问 AWS RDS 和 ElastiCache：
+
+```bash
+# 添加 RDS 安全组入站规则
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-rds-security-group-id \
+  --protocol tcp \
+  --port 5432 \
+  --source-group sg-kubernetes-worker-security-group
+
+# 添加 ElastiCache 安全组入站规则
+aws ec2 authorize-security-group-ingress \
+  --group-id sg-elasticache-security-group-id \
+  --protocol tcp \
+  --port 6379 \
+  --source-group sg-kubernetes-worker-security-group
+```
+
+#### 4. 配置 Ingress
 
 修改 `k8s/06-frontend-service.yaml` 或 `values.yaml`：
 
@@ -444,12 +572,21 @@ kubectl get apiservice v1beta1.metrics.k8s.io
 ### 数据库连接失败
 
 ```bash
-# 检查数据库 Pod
-kubectl get pods -l app=postgresql -n opscenter
-kubectl logs -l app=postgresql -n opscenter
+# 检查后端 Pod 日志
+kubectl logs -f deployment/opscenter-backend -n opscenter
 
-# 测试数据库连接
-kubectl exec -it postgresql-0 -n opscenter -- psql -U postgres -d opscenter -c "SELECT 1"
+# 测试 AWS RDS 连接
+kubectl run -it --rm db-test --image=postgres:15-alpine --restart=Never -n opscenter -- \
+  psql -h opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com \
+  -U postgres \
+  -d opscenter \
+  -c "SELECT 1"
+
+# 测试 AWS ElastiCache 连接
+kubectl run -it --rm redis-test --image=redis:7-alpine --restart=Never -n opscenter -- \
+  redis-cli -h opscenter-redis.xxxxxx.cache.amazonaws.com \
+  -p 6379 \
+  ping
 ```
 
 ---
@@ -552,15 +689,15 @@ kubectl exec -i postgresql-0 -n opscenter -- psql -U postgres opscenter < backup
 | 文件 | 说明 |
 |------|------|
 | `00-namespace.yaml` | 命名空间配置 |
-| `01-configmap.yaml` | 应用配置 |
-| `02-secret.yaml` | 敏感配置 |
+| `01-configmap.yaml` | 应用配置（包含 AWS 数据库配置） |
+| `02-secret.yaml` | 敏感配置（包含 AWS 数据库密码） |
 | `03-backend-deployment.yaml` | 后端部署 |
-| `04-backend-service.yaml` | 后端服务 |
+| `04-backend-service.yaml` | 后端服务 + HPA + PDB |
 | `05-frontend-deployment.yaml` | 前端部署 |
 | `06-frontend-service.yaml` | 前端服务和 Ingress |
-| `07-postgresql.yaml` | PostgreSQL 数据库 |
-| `08-redis.yaml` | Redis 缓存 |
 | `09-rbac.yaml` | RBAC 权限配置 |
+
+**注意**: PostgreSQL 和 Redis 使用 AWS 托管服务（Amazon RDS + Amazon ElastiCache），无需部署内置数据库。
 
 ### 环境变量完整列表
 
