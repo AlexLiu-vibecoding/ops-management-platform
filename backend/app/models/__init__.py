@@ -24,6 +24,9 @@ from app.models.instances import (
     RedisSlowLog, RedisMemoryStats, RedisKeyAnalysis
 )
 
+# 导入 SQL 性能对比模型
+from app.models.sql_performance import SQLPerformanceRecord, SQLPerformanceComparison
+
 
 def get_local_timezone():
     """获取服务器本地时区"""
@@ -1141,6 +1144,9 @@ __all__ = [
     
     # AI 模型配置
     'AIModelConfig', 'AICallLog', 'AIProvider', 'AIModelType',
+    
+    # SQL 性能对比
+    'SQLPerformanceRecord', 'SQLPerformanceComparison',
 ]
 
 # 导入权限模型

@@ -143,6 +143,12 @@ const routes = [
             meta: { title: '巡检报告', icon: 'DocumentChecked' }
           },
           {
+            path: 'sql-performance',
+            name: 'SQLPerformance',
+            component: () => import('@/views/sql-performance-comparison/index.vue'),
+            meta: { title: 'SQL性能对比', icon: 'DataLine' }
+          },
+          {
             path: 'scheduled-inspection',
             name: 'ScheduledInspection',
             component: () => import('@/views/inspection/scheduled/index.vue'),
