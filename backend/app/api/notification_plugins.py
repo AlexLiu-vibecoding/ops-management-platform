@@ -45,6 +45,27 @@ async def list_plugins():
     }
 
 
+@router.get("/discover")
+async def discover_plugins():
+    """重新发现并加载插件
+    
+    扫描插件目录，发现并加载新的插件。
+    
+    Returns:
+        发现结果
+    """
+    loaded_count = notification_plugin_manager.discover_plugins()
+    
+    return {
+        "success": True,
+        "message": f"成功加载 {loaded_count} 个插件",
+        "data": {
+            "loaded_count": loaded_count,
+            "total_plugins": len(notification_plugin_manager.list_plugins())
+        }
+    }
+
+
 @router.get("/{channel_type}")
 async def get_plugin_info(channel_type: str):
     """获取指定插件的详细信息
@@ -193,7 +214,7 @@ async def send_notification(request: NotificationRequest):
     }
 
 
-@router.post("/reload")
+@router.post("/reload/{channel_type}")
 async def reload_plugin(channel_type: str):
     """重新加载插件
     
@@ -213,25 +234,4 @@ async def reload_plugin(channel_type: str):
     return {
         "success": is_reloaded,
         "message": "插件已重新加载" if is_reloaded else "插件重新加载失败"
-    }
-
-
-@router.get("/discover")
-async def discover_plugins():
-    """重新发现并加载插件
-    
-    扫描插件目录，发现并加载新的插件。
-    
-    Returns:
-        发现结果
-    """
-    loaded_count = notification_plugin_manager.discover_plugins()
-    
-    return {
-        "success": True,
-        "message": f"成功加载 {loaded_count} 个插件",
-        "data": {
-            "loaded_count": loaded_count,
-            "total_plugins": len(notification_plugin_manager.list_plugins())
-        }
     }

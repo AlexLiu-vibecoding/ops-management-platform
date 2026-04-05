@@ -389,6 +389,16 @@
           </el-descriptions>
         </el-card>
       </el-tab-pane>
+
+      <!-- 插件管理 -->
+      <el-tab-pane label="插件管理" name="plugins">
+        <template #label>
+          <span class="tab-label"><el-icon><Box /></el-icon>插件管理</span>
+        </template>
+        <el-card shadow="never" style="min-height: 500px;">
+          <PluginsView />
+        </el-card>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -400,10 +410,11 @@ import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataAnalysis, Timer, Setting, Coin, Folder, Cloudy, Files, Lock, 
-  Refresh 
+  Refresh, Box 
 } from '@element-plus/icons-vue'
 import { getAwsRegionsGrouped } from '@/api/awsRegions'
 import dayjs from 'dayjs'
+import PluginsView from './plugins.vue'
 
 // Tab 状态
 const activeTab = ref('overview')
