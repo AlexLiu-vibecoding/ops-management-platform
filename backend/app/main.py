@@ -31,6 +31,7 @@ from app.api import auth, users, environments, monitor, approval, sql, performan
 from app.api import rdb_instances, redis_instances, batch_operations, permissions
 from app.api import scheduled_inspection, alert_rules, change_windows, scheduler, sql_optimization, notification_logs, notification_templates, notification_config
 from app.api import notification_channels, notification_rules, ai_models, sql_performance
+from app.api import notification_plugins
 
 # 配置安全日志（统一配置，敏感信息脱敏）
 from app.utils.log_filter import SensitiveDataFilter
@@ -85,6 +86,14 @@ async def lifespan(app: FastAPI):
     
     # 初始化默认数据
     await init_default_data()
+    
+    # 初始化插件系统
+    try:
+        from app.plugins.notification import notification_plugin_manager
+        loaded_count = notification_plugin_manager.discover_plugins()
+        logger.info(f"Notification plugin system initialized, loaded {loaded_count} plugins")
+    except Exception as e:
+        logger.warning(f"Notification plugin system initialization failed: {e}")
     
     logger.info("Ops Management Platform started successfully")
     
@@ -330,6 +339,7 @@ app.include_router(notification_templates.router, prefix="/api/v1")  # 通知模
 app.include_router(notification_config.router, prefix="/api/v1")  # 通知配置管理
 app.include_router(notification_channels.router, prefix="/api/v1")  # 通知通道管理
 app.include_router(notification_rules.router, prefix="/api/v1")  # 通知规则管理
+app.include_router(notification_plugins.router, prefix="/api/v1")  # 通知插件管理
 app.include_router(ai_models.router, prefix="/api/v1")  # AI 模型配置管理
 app.include_router(sql_performance.router, prefix="/api/v1")  # SQL 性能对比
 
