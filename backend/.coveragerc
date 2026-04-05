@@ -1,0 +1,42 @@
+[run]
+# 覆盖率配置
+source = app
+# 排除不需要覆盖的文件和目录
+omit =
+    */__pycache__/*
+    */tests/*
+    */venv/*
+    */env/*
+    */node_modules/*
+    */static/*
+    */media/*
+    */dist/*
+    */build/*
+    */types/*
+    */utils/llm_client.py
+    */utils/api_response.py
+    */utils/audit_decorator.py
+    */utils/aws_rds_collector.py
+    setup.py
+    conftest.py
+
+[report]
+# 报告配置
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    def __str__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @property
+    # 临时调试代码
+    logger.debug
+
+ignore_errors = true
+precision = 2
+
+[html]
+directory = htmlcov
