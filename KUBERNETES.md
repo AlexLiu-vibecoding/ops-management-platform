@@ -37,23 +37,26 @@ opscenter/
 - Kubernetes 1.24+
 - kubectl 1.24+
 - Helm 3.0+（可选）
-- **AWS 账号**（用于 Amazon RDS 和 Amazon ElastiCache）
+- **AWS 账号**（用于 Amazon RDS，可选用于 Amazon ElastiCache Redis）
 - 集群可访问 AWS 托管服务
 
 ### 方式一：使用部署脚本（推荐）
 
 ```bash
-# 1. 创建 AWS RDS PostgreSQL 和 ElastiCache Redis（见详细文档）
+# 1. 创建 AWS RDS PostgreSQL（必需）和 ElastiCache Redis（可选，见详细文档）
 #    - 记录 RDS endpoint: opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com
-#    - 记录 ElastiCache endpoint: opscenter-redis.xxxxxx.cache.amazonaws.com
+#    - 如需缓存，创建 ElastiCache Redis 并记录 endpoint
 
 # 2. 修改 k8s/01-configmap.yaml，配置 AWS 数据库 endpoint
 vim k8s/01-configmap.yaml
-# 更新 POSTGRES_HOST 和 REDIS_HOST
+# 更新 POSTGRES_HOST
+# 如需 Redis，更新 REDIS_HOST 并设置 REDIS_ENABLED="true"
+# 如不需 Redis，设置 REDIS_ENABLED="false"
 
 # 3. 修改 k8s/02-secret.yaml，配置 AWS 数据库密码
 vim k8s/02-secret.yaml
-# 更新 POSTGRES_PASSWORD 和 REDIS_PASSWORD
+# 更新 POSTGRES_PASSWORD
+# 如需 Redis，更新 REDIS_PASSWORD
 
 # 4. 运行部署脚本
 ./deploy-k8s.sh
@@ -61,7 +64,7 @@ vim k8s/02-secret.yaml
 # 5. 等待 Pod 就绪
 kubectl get pods -n opscenter
 
-# 4. 访问应用
+# 6. 访问应用
 kubectl port-forward svc/opscenter-frontend-service 8080:80 -n opscenter
 # 浏览器访问: http://localhost:8080
 ```

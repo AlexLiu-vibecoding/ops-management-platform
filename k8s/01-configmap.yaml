@@ -24,7 +24,8 @@ data:
   MYSQL_PORT: "3306"
   MYSQL_DATABASE: "opscenter"
 
-  # Redis 配置 - Amazon ElastiCache
+  # Redis 配置 - Amazon ElastiCache（可选，不配置则禁用缓存）
+  REDIS_ENABLED: "true"  # 设为 "false" 可禁用 Redis
   REDIS_HOST: "opscenter-redis.xxxxxx.cache.amazonaws.com"
   REDIS_PORT: "6379"
   REDIS_DB: "0"

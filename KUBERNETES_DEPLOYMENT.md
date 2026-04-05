@@ -40,7 +40,7 @@ OpsCenter 现已支持完整的云原生部署方案，提供以下特性：
 | `opscenter-backend-service` | Service | 后端服务暴露 |
 | `opscenter-frontend-service` | Service | 前端服务暴露 |
 | `opscenter-ingress` | Ingress | HTTP 入口路由 |
-| **外部依赖** | - | **Amazon RDS PostgreSQL + Amazon ElastiCache Redis** |
+| **外部依赖** | - | **Amazon RDS PostgreSQL（必需） + Amazon ElastiCache Redis（可选）** |
 
 ---
 
@@ -51,7 +51,7 @@ OpsCenter 现已支持完整的云原生部署方案，提供以下特性：
 - Kubernetes 1.24+
 - kubectl 1.24+
 - Helm 3.0+（可选，用于 Helm Chart 部署）
-- **AWS 账号**（用于 Amazon RDS 和 Amazon ElastiCache）
+- **AWS 账号**（用于 Amazon RDS，可选用于 Amazon ElastiCache Redis）
 - AWS CLI（可选）
 
 ### 网络要求
@@ -69,11 +69,12 @@ OpsCenter 现已支持完整的云原生部署方案，提供以下特性：
   - 存储：至少 20Gi
   - VPC 安全组：允许 Kubernetes Worker 节点访问
   
-- **Amazon ElastiCache Redis**（推荐）
+- **Amazon ElastiCache Redis**（可选，推荐用于缓存优化）
   - 节点类型：cache.t3.medium 或更高
   - 版本：Redis 7.x
   - 集群模式：禁用（单节点）或启用（多节点）
   - VPC 安全组：允许 Kubernetes Worker 节点访问
+  - **注意**: 不配置 Redis 时，系统将禁用缓存功能，但仍可正常运行
 
 - PostgreSQL: 至少 20Gi
 - Redis: 至少 5Gi
@@ -100,7 +101,7 @@ cd opscenter
 stringData:
   POSTGRES_PASSWORD: "your-secure-password"
   MYSQL_PASSWORD: "your-secure-password"
-  REDIS_PASSWORD: "your-secure-password"
+  REDIS_PASSWORD: "your-secure-password"  # 可选，仅在配置 Redis 时需要
   JWT_SECRET_KEY: "your-jwt-secret-key-min-32-chars-long"
   AES_KEY: "your-32-char-aes-key!!"
   PASSWORD_SALT: "your-random-salt"
@@ -123,13 +124,13 @@ kubectl create secret tls opscenter-tls-secret \
   -n opscenter
 ```
 
-#### 4. 配置 AWS 数据库（AWS RDS + ElastiCache）
+#### 4. 配置 AWS 数据库（AWS RDS + 可选的 ElastiCache Redis）
 
 编辑 `k8s/01-configmap.yaml`，修改数据库配置为 AWS 托管服务：
 
 ```yaml
 data:
-  # PostgreSQL - Amazon RDS
+  # PostgreSQL - Amazon RDS（必需）
   POSTGRES_HOST: "opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com"
   POSTGRES_PORT: "5432"
   POSTGRES_DATABASE: "opscenter"
@@ -139,8 +140,12 @@ data:
   MYSQL_PORT: "3306"
   MYSQL_DATABASE: "opscenter"
 
-  # Redis - Amazon ElastiCache
+  # Redis - Amazon ElastiCache（可选）
+  REDIS_ENABLED: "true"  # 设为 "false" 可禁用 Redis
   REDIS_HOST: "opscenter-redis.xxxxxx.cache.amazonaws.com"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+```
   REDIS_PORT: "6379"
   REDIS_DB: "0"
 ```

@@ -133,14 +133,15 @@ Kubernetes 集群
 ├── opscenter-backend (Deployment + HPA + PDB)
 ├── opscenter-frontend (Deployment + HPA)
 └── 外部依赖（AWS 托管服务）
-    ├── Amazon RDS PostgreSQL（元数据库）
-    └── Amazon ElastiCache Redis（缓存）
+    ├── Amazon RDS PostgreSQL（元数据库，必需）
+    └── Amazon ElastiCache Redis（缓存，可选）
 
 特点：
 - 使用 Kubernetes 原生资源（Deployment、HPA、PDB）
 - 支持弹性伸缩、滚动更新、自我修复
-- 使用 AWS 托管服务（RDS + ElastiCache）提供高可用数据库
+- 使用 AWS 托管服务（RDS + 可选的 ElastiCache）提供高可用数据库
 - 不再部署内置数据库（PostgreSQL/Redis StatefulSet）
+- Redis 可选配置，不配置时禁用缓存功能
 
 ### 1.3 核心能力
 
@@ -185,8 +186,8 @@ Kubernetes Cluster
 │   └── Ingress: opscenter-ingress
 │
 └── External (AWS)
-    ├── Amazon RDS PostgreSQL (Multi-AZ)
-    └── Amazon ElastiCache Redis (Replication)
+    ├── Amazon RDS PostgreSQL (Multi-AZ) - 必需
+    └── Amazon ElastiCache Redis (Replication) - 可选
 ```
 
 ### 部署清单
@@ -202,17 +203,20 @@ Kubernetes Cluster
 | `k8s/06-frontend-service.yaml` | 前端服务 + Ingress |
 | `k8s/09-rbac.yaml` | RBAC 权限配置 |
 
-**注意**: 已移除内置数据库部署清单（`07-postgresql.yaml`, `08-redis.yaml`），生产环境强制使用 AWS 托管服务。
+**注意**:
+- 已移除内置数据库部署清单（`07-postgresql.yaml`, `08-redis.yaml`）
+- 生产环境强制使用 AWS RDS PostgreSQL
+- Amazon ElastiCache Redis 为可选组件，不配置时禁用缓存功能
 
 ### 部署步骤
 
 ```bash
-# 1. 创建 AWS RDS PostgreSQL 和 ElastiCache Redis
+# 1. 创建 AWS RDS PostgreSQL（必需）和 ElastiCache Redis（可选）
 #    （详见 MIGRATION_GUIDE.md）
 
 # 2. 更新配置
-vim k8s/01-configmap.yaml  # 配置 AWS endpoint
-vim k8s/02-secret.yaml     # 配置密码
+vim k8s/01-configmap.yaml  # 配置 AWS endpoint（必需 RDS，可选 Redis）
+vim k8s/02-secret.yaml     # 配置密码（RDS 必需，Redis 可选）
 
 # 3. 部署应用
 ./deploy-k8s.sh

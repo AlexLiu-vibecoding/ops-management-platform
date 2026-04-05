@@ -4,6 +4,10 @@
 
 本指南帮助您从内置数据库（PostgreSQL + Redis）迁移到 AWS 托管服务（Amazon RDS + Amazon ElastiCache）。
 
+**重要说明**:
+- **PostgreSQL**: 必需配置，用于元数据存储
+- **Redis**: **可选配置**，用于缓存和会话管理。不配置 Redis 时，系统将禁用缓存功能，但仍可正常运行
+
 ## 迁移优势
 
 ### 使用 AWS 托管服务的优势
@@ -77,7 +81,9 @@ aws rds create-db-instance \
   --publicly-accessible false
 ```
 
-#### 1.2 创建 Amazon ElastiCache Redis
+#### 1.2 创建 Amazon ElastiCache Redis（可选）
+
+**注意**: Redis 是可选的，不配置时系统将禁用缓存功能。如果需要缓存优化性能，请创建 ElastiCache Redis。
 
 **AWS Console**:
 1. 导航到 Amazon ElastiCache
@@ -189,7 +195,9 @@ psql -h opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com \
      -c "\dt"
 ```
 
-### 步骤 2: 导入数据到 AWS ElastiCache
+### 步骤 2: 导入数据到 AWS ElastiCache（可选）
+
+**注意**: 如果不需要 Redis 缓存功能，可以跳过此步骤，直接在配置中禁用 Redis（设置 REDIS_ENABLED=false）。
 
 #### 2.1 获取 ElastiCache endpoint
 
@@ -248,6 +256,8 @@ data:
   POSTGRES_DB: "opscenter"
   POSTGRES_USER: "postgres"
   
+  # Redis 配置（可选）
+  REDIS_ENABLED: "true"  # 设为 "false" 可禁用 Redis
   REDIS_HOST: "opscenter-redis.xxxxxx.cache.amazonaws.com"
   REDIS_PORT: "6379"
   REDIS_DB: "0"
@@ -271,7 +281,7 @@ metadata:
 type: Opaque
 stringData:
   POSTGRES_PASSWORD: "your-rds-password"
-  REDIS_PASSWORD: "your-elasticache-password"
+  REDIS_PASSWORD: "your-elasticache-password"  # 可选，仅在 REDIS_ENABLED=true 时需要
 ```
 
 应用配置:

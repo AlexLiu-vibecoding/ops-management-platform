@@ -235,9 +235,10 @@ config:
       database: "opscenter"
 
   redis:
-    host: "opscenter-redis.xxxxxx.cache.amazonaws.com"  # AWS ElastiCache endpoint
+    host: "opscenter-redis.xxxxxx.cache.amazonaws.com"  # AWS ElastiCache endpoint（可选）
     port: "6379"
     db: "0"
+    enabled: "true"  # 设为 "false" 可禁用 Redis
 
   storage:
     type: "s3"
