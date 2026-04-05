@@ -4,6 +4,7 @@
 import os
 import hashlib
 import base64
+import logging
 from datetime import datetime, timedelta, timezone, UTC
 from typing import Optional, Dict, Any
 from jose import jwt, JWTError
@@ -13,8 +14,16 @@ from cryptography.hazmat.backends import default_backend
 from app.config import settings
 
 
+logger = logging.getLogger(__name__)
+
+
 # 密码哈希上下文
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+class PasswordDecryptionError(Exception):
+    """密码解密失败异常"""
+    pass
 
 
 def hash_password(password: str) -> str:
@@ -185,18 +194,54 @@ def encrypt_instance_password(password: str) -> str:
 
 def decrypt_instance_password(encrypted_password: str) -> str:
     """
-    解密MySQL实例密码
-    
+    解密实例密码
+
     Args:
         encrypted_password: 加密后的密码
-    
+
     Returns:
-        明文密码，如果加密密码为空则返回空字符串
+        明文密码
+
+    Raises:
+        ValueError: 密码为空时
+        PasswordDecryptionError: 解密失败时
     """
-    # 空密码直接返回（Redis 等实例可能不需要密码）
+    # 空密码直接抛出异常（不允许使用未加密的密码）
     if not encrypted_password:
-        return ""
-    return aes_cipher.decrypt(encrypted_password)
+        raise ValueError("实例密码未配置")
+
+    try:
+        return aes_cipher.decrypt(encrypted_password)
+    except Exception as e:
+        logger.error(f"密码解密失败: {e}", exc_info=True)
+        raise PasswordDecryptionError("实例密码解密失败，请联系管理员") from e
+
+
+def get_instance_password(encrypted_password: Optional[str], allow_empty: bool = True) -> Optional[str]:
+    """
+    获取实例密码（统一的密码处理接口）
+
+    Args:
+        encrypted_password: 加密后的密码
+        allow_empty: 是否允许空密码（Redis 等实例可能不需要密码）
+
+    Returns:
+        解密后的密码，如果允许空且密码为空则返回 None
+
+    Raises:
+        PasswordDecryptionError: 密码解密失败时
+        ValueError: 密码未配置且不允许为空时
+    """
+    if not encrypted_password:
+        if allow_empty:
+            return None
+        raise ValueError("实例密码未配置")
+
+    try:
+        return aes_cipher.decrypt(encrypted_password)
+    except Exception as e:
+        logger.error(f"密码解密失败: {e}", exc_info=True)
+        raise PasswordDecryptionError("实例密码解密失败，请联系管理员") from e
 
 
 def encrypt_dingtalk_webhook(webhook: str) -> str:

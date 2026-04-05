@@ -15,7 +15,7 @@ from app.models import (
 )
 from app.services.enhanced_rollback_generator import EnhancedRollbackGenerator
 from app.services.storage import storage_manager
-from app.utils.auth import decrypt_instance_password
+from app.utils.auth import decrypt_instance_password, PasswordDecryptionError
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +69,9 @@ def get_redis_connection(instance: RedisInstance):
     """获取Redis连接"""
     try:
         password = decrypt_instance_password(instance.password_encrypted) if instance.password_encrypted else None
-    except ValueError:
-        password = instance.password_encrypted
+    except (ValueError, PasswordDecryptionError) as e:
+        logger.error(f"Redis实例 {instance.id} 密码解密失败: {e}")
+        raise ValueError(f"Redis实例密码解密失败: {str(e)}") from e
 
     r = redis_client.Redis(
         host=instance.host,

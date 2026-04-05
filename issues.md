@@ -527,8 +527,9 @@ tests/integration/
 
 ### Issue-014: 密码解密失败处理不当
 
-**优先级**: 🔴 高  
+**优先级**: 🔴 高
 **影响范围**: `app/utils/auth.py`, 多个 API
+**状态**: ✅ 已修复 (2026-04-06)
 
 **问题描述**:
 密码解密失败时，有的地方抛出异常，有的地方返回空字符串：
@@ -545,26 +546,54 @@ except ValueError:
 - 错误处理不一致
 - 难以定位问题
 
-**建议方案**:
+**解决方案 (已实施)**:
 ```python
-def get_instance_password(instance: RDBInstance) -> str:
-    """获取实例密码（统一处理解密）"""
-    if not instance.password_encrypted:
+# 1. 添加自定义异常
+class PasswordDecryptionError(Exception):
+    """密码解密失败异常"""
+    pass
+
+# 2. 修改解密函数，统一抛出异常
+def decrypt_instance_password(encrypted_password: str) -> str:
+    """解密实例密码"""
+    if not encrypted_password:
         raise ValueError("实例密码未配置")
 
     try:
-        return decrypt_instance_password(instance.password_encrypted)
+        return aes_cipher.decrypt(encrypted_password)
+    except Exception as e:
+        logger.error(f"密码解密失败: {e}", exc_info=True)
+        raise PasswordDecryptionError("实例密码解密失败，请联系管理员") from e
+
+# 3. 添加安全的密码获取接口
+def get_instance_password(encrypted_password: Optional[str], allow_empty: bool = True) -> Optional[str]:
+    """获取实例密码（统一的密码处理接口）"""
+    if not encrypted_password:
+        if allow_empty:
+            return None
+        raise ValueError("实例密码未配置")
+
+    try:
+        return aes_cipher.decrypt(encrypted_password)
     except Exception as e:
         logger.error(f"密码解密失败: {e}", exc_info=True)
         raise PasswordDecryptionError("实例密码解密失败，请联系管理员") from e
 ```
 
+**修复内容**:
+- ✅ 在 `app/utils/auth.py` 中添加 `PasswordDecryptionError` 异常类
+- ✅ 修改 `decrypt_instance_password` 函数，解密失败时抛出异常
+- ✅ 新增 `get_instance_password` 统一密码处理接口
+- ✅ 修复 `app/api/approval/helpers.py` 中的 `get_redis_connection` 函数，移除不安全的 fallback 逻辑
+- ✅ 统一错误处理，避免混淆加密和明文密码
+
 ---
 
 ### Issue-015: SQL 注入防护不完整
 
-**优先级**: 🔴 高  
+**优先级**: 🔴 高
 **影响范围**: `app/services/secure_sql_executor.py`
+**状态**: ✅ 已修复 (2026-04-06)
 
 **问题描述**:
 SQL 注入检测模式不够完善，可能绕过检测：
@@ -581,40 +610,71 @@ INJECTION_PATTERNS = [
 - 潜在的 SQL 注入风险
 - 安全合规性问题
 
-**建议方案**:
+**解决方案 (已实施)**:
 ```python
 # 使用 sqlparse 进行 SQL 解析
 import sqlparse
 
-def detect_injection(sql: str) -> bool:
+def detect_injection(self, sql: str) -> Tuple[bool, List[str]]:
     """使用 sqlparse 检测 SQL 注入"""
+    risks = []
+
     try:
         parsed = sqlparse.parse(sql)[0]
 
         # 检测注释
         for token in parsed.flatten():
-            if token.ttype is sqlparse.tokens.Comment.Multiline:
-                return True
+            if token.ttype in (sqlparse.tokens.Comment.Single, sqlparse.tokens.Comment.Multiline):
+                risks.append(f"检测到注释: {token.value.strip()[:50]}")
+                # 块注释可能隐藏注入代码
+                if token.ttype is sqlparse.tokens.Comment.Multiline:
+                    risks.append("检测到块注释，可能隐藏注入代码")
 
-        # 检测危险语句
-        dangerous_keywords = ['DROP', 'DELETE', 'TRUNCATE', 'EXEC']
+        # 检测危险关键字（非注释中）
         for token in parsed.flatten():
-            if token.ttype is sqlparse.tokens.Keyword and token.value in dangerous_keywords:
+            if token.ttype is sqlparse.tokens.Keyword and token.value.upper() in self.DANGEROUS_KEYWORDS:
                 # 检查是否在注释中
-                if not is_in_comment(token, parsed):
-                    return True
+                if not self._is_in_comment(token, parsed):
+                    risks.append(f"检测到危险关键字: {token.value}")
 
-        return False
-    except Exception:
-        return False  # 解析失败视为危险
+        # 检测可疑的 WHERE 条件（注入常见模式）
+        if self._has_suspicious_where(parsed):
+            risks.append("检测到可疑的 WHERE 条件，可能存在注入")
+
+        # 检测多个语句（语句分割符）
+        statements = sqlparse.parse(sql)
+        if len(statements) > 1:
+            risks.append(f"检测到多条语句: {len(statements)} 条")
+
+        # 检测字符串拼接模式
+        if self._has_string_concatenation(parsed):
+            risks.append("检测到字符串拼接，可能存在注入风险")
+
+        return len(risks) > 0, risks
+
+    except Exception as e:
+        logger.error(f"SQL 解析失败: {e}", exc_info=True)
+        # 解析失败视为有风险
+        return True, [f"SQL 解析失败，可能存在注入: {str(e)}"]
 ```
+
+**修复内容**:
+- ✅ 引入 `sqlparse` 库进行 SQL 解析
+- ✅ 添加 `detect_injection` 方法，使用解析方式检测注入
+- ✅ 检测块注释 `/* */`
+- ✅ 检测可疑 WHERE 条件（如 `' OR '1'='1'`）
+- ✅ 检测多条语句拼接
+- ✅ 检测字符串拼接模式
+- ✅ 检测危险关键字（非注释中）
+- ✅ 更新 `validate_sql` 和 `assess_risk_level` 方法使用新的检测逻辑
 
 ---
 
 ### Issue-016: 权限检查不够严格
 
-**优先级**: 🔴 高  
+**优先级**: 🔴 高
 **影响范围**: 多个 API 端点
+**状态**: ✅ 已修复 (2026-04-06)
 
 **问题描述**:
 部分 API 端点只检查用户登录，未检查具体权限：
@@ -630,18 +690,38 @@ async def list_instances(current_user: User = Depends(get_current_user)):
 - 数据泄露风险
 - 安全合规性问题
 
-**建议方案**:
+**解决方案 (已实施)**:
 ```python
-@router.get("/instances")
-async def list_instances(
-    current_user: User = Depends(get_current_user),
-    permissions: List[str] = Depends(require_permission("instance:list"))
+@router.get("")
+async def list_rdb_instances(
+    ...
+    current_user: User = Depends(require_permission("instance:list")),  # 添加权限检查
+    db: Session = Depends(get_db)
 ):
-    # 检查了登录和权限
-    return db.query(RDBInstance).all()
+    """获取 RDB 实例列表"""
+    ...
+
+@router.get("/{instance_id}")
+async def get_rdb_instance(
+    instance_id: int,
+    current_user: User = Depends(require_permission("instance:view")),  # 添加权限检查
+    db: Session = Depends(get_db)
+):
+    """获取 RDB 实例详情"""
+    ...
 ```
 
-**参考**: `app/deps.py` 中的 `require_permission` 函数
+**修复内容**:
+- ✅ 修复 `app/api/rdb_instances.py` 中的权限检查：
+  - `list_rdb_instances` 端点添加 `require_permission("instance:list")`
+  - `get_rdb_instance` 端点添加 `require_permission("instance:view")`
+- ✅ 修复 `app/api/redis_instances.py` 中的权限检查：
+  - `list_redis_instances` 端点添加 `require_permission("instance:list")`
+  - `get_redis_instance` 端点添加 `require_permission("instance:view")`
+- ✅ 所有实例列表和详情查看端点都使用 `require_permission` 检查具体权限
+- ✅ 确保只有拥有相应权限的用户才能访问对应资源
+
+**注意**: `require_permission` 函数已在 `app/deps.py` 中实现，使用 `PermissionService` 检查用户是否拥有指定功能权限。
 
 ---
 
@@ -686,6 +766,7 @@ async def list_instances(
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-04-06 | v1.1 | 修复安全问题：Issue-014/015/016 已修复 |
 | 2026-04-02 | v1.0 | 初始版本，记录 16 个设计缺陷 |
 
 ---

@@ -12,6 +12,9 @@ import logging
 from typing import Tuple, Optional, List, Dict, Any, Union
 from enum import Enum, StrEnum
 
+import sqlparse
+from sqlparse.sql import Identifier, IdentifierList, Comparison, Where, Comment
+
 from app.models import RDBInstance
 from app.services.db_connection import db_manager, DatabaseConnectionError, DatabaseExecutionError
 from app.core.exceptions import (
@@ -73,19 +76,167 @@ class SecureSQLExecutor:
         r'\bGRANT\s+ALL\b',
         r'\bDROP\s+USER\b',
     ]
-    
-    # SQL 注入检测模式
-    INJECTION_PATTERNS = [
-        r"--\s*$",  # SQL 注释
-        r";\s*(DROP|DELETE|TRUNCATE)",  # 语句拼接
-        r"UNION\s+(ALL\s+)?SELECT",  # UNION 注入
-        r"'\s*OR\s+'",  # OR 注入
-        r"'\s*AND\s+'",  # AND 注入
-        r"EXEC(\s+|\()",  # 存储过程执行
-        r"xp_cmdshell",
-    ]
-    
+
+    # 危险关键字（用于解析检测）
+    DANGEROUS_KEYWORDS = {
+        'DROP', 'TRUNCATE', 'EXEC', 'EXECUTE', 'XP_CMDSHELL',
+        'SP_OACREATE', 'SP_ADDUSER', 'SP_PASSWORD'
+    }
+
+    # 注入模式关键字
+    INJECTION_KEYWORDS = {
+        'UNION', 'OR', 'AND', 'SLEEP', 'BENCHMARK', 'WAITFOR',
+        'PG_SLEEP', 'DBMS_PIPE', 'UTL_HTTP', 'HTTPURITYPE'
+    }
+
     def detect_statement_type(self, sql: str) -> SQLStatementType:
+        """
+        检测 SQL 语句类型
+
+        Args:
+            sql: SQL 语句
+
+        Returns:
+            SQLStatementType: 语句类型
+        """
+        sql_upper = sql.upper().strip()
+
+        # 移除注释
+        sql_upper = re.sub(r'--.*$', '', sql_upper, flags=re.MULTILINE)
+        sql_upper = re.sub(r'/\*.*?\*/', '', sql_upper, flags=re.DOTALL)
+        sql_upper = sql_upper.strip()
+
+        if any(sql_upper.startswith(kw) for kw in self.QUERY_KEYWORDS):
+            return SQLStatementType.SELECT
+
+        for kw in self.DDL_KEYWORDS:
+            if sql_upper.startswith(kw):
+                return SQLStatementType.DDL
+
+        for kw in self.DML_KEYWORDS:
+            if sql_upper.startswith(kw):
+                return SQLStatementType.INSERT if kw == 'INSERT' else \
+                       SQLStatementType.UPDATE if kw == 'UPDATE' else SQLStatementType.DELETE
+
+        for kw in self.DCL_KEYWORDS:
+            if sql_upper.startswith(kw):
+                return SQLStatementType.DCL
+
+        return SQLStatementType.OTHER
+
+    def detect_injection(self, sql: str) -> Tuple[bool, List[str]]:
+        """
+        使用 sqlparse 检测 SQL 注入
+
+        Args:
+            sql: SQL 语句
+
+        Returns:
+            Tuple[bool, List[str]]: (是否检测到注入, 风险点列表)
+        """
+        risks = []
+
+        try:
+            parsed = sqlparse.parse(sql)[0]
+
+            # 检测注释
+            for token in parsed.flatten():
+                if token.ttype in (sqlparse.tokens.Comment.Single, sqlparse.tokens.Comment.Multiline):
+                    risks.append(f"检测到注释: {token.value.strip()[:50]}")
+                    # 块注释可能隐藏注入代码
+                    if token.ttype is sqlparse.tokens.Comment.Multiline:
+                        risks.append("检测到块注释，可能隐藏注入代码")
+
+            # 检测多个语句（语句分割符）
+            statements = sqlparse.parse(sql)
+            if len(statements) > 1:
+                risks.append(f"检测到多条语句: {len(statements)} 条")
+
+            # 检测危险关键字（非注释中）
+            for token in parsed.flatten():
+                if token.ttype is sqlparse.tokens.Keyword and token.value.upper() in self.DANGEROUS_KEYWORDS:
+                    # 检查是否在注释中
+                    if not self._is_in_comment(token, parsed):
+                        risks.append(f"检测到危险关键字: {token.value}")
+
+            # 检测可疑的 WHERE 条件（注入常见模式）
+            if self._has_suspicious_where(parsed):
+                risks.append("检测到可疑的 WHERE 条件，可能存在注入")
+
+            # 检测字符串拼接模式
+            if self._has_string_concatenation(parsed):
+                risks.append("检测到字符串拼接，可能存在注入风险")
+
+            # 检测 UNION 模式（可疑的 UNION）
+            if self._has_suspicious_union(parsed):
+                risks.append("检测到可疑的 UNION 操作，可能存在注入风险")
+
+            # 检测时间延迟注入
+            if self._has_timing_injection(parsed):
+                risks.append("检测到时间延迟注入特征")
+
+            return len(risks) > 0, risks
+
+        except Exception as e:
+            logger.error(f"SQL 解析失败: {e}", exc_info=True)
+            # 解析失败视为有风险
+            return True, [f"SQL 解析失败，可能存在注入: {str(e)}"]
+
+    def _is_in_comment(self, token, parsed) -> bool:
+        """检查 token 是否在注释中"""
+        # 简化检查：如果有注释，且在注释前找到该 token
+        for ptoken in parsed.flatten():
+            if ptoken.ttype in (sqlparse.tokens.Comment.Single, sqlparse.tokens.Comment.Multiline):
+                if token.position and ptoken.position:
+                    return token.position > ptoken.position
+        return False
+
+    def _has_suspicious_where(self, parsed) -> bool:
+        """检测可疑的 WHERE 条件"""
+        suspicious_patterns = [
+            r"=\s*'",  # LIKE '1'='1' 模式
+            r"'\s*=\s*'",  # '='='=' 模式
+            r"1\s*=\s*1",  # 1=1 模式
+            r"TRUE\s*=\s*TRUE",  # TRUE=TRUE 模式
+        ]
+
+        sql_text = str(parsed).upper()
+        for pattern in suspicious_patterns:
+            if re.search(pattern, sql_text, re.IGNORECASE):
+                return True
+        return False
+
+    def _has_string_concatenation(self, parsed) -> bool:
+        """检测字符串拼接模式"""
+        for token in parsed.flatten():
+            if token.ttype is sqlparse.tokens.Operator and token.value in ('+', '||'):
+                return True
+        return False
+
+    def _has_suspicious_union(self, parsed) -> bool:
+        """检测可疑的 UNION 操作"""
+        # 如果 UNION 后面跟着 SELECT，且不在同一个 SELECT 语句中
+        # 这里简化检测：如果 UNION 出现在 WHERE 子句之后，视为可疑
+        sql_text = str(parsed).upper()
+        if 'UNION' in sql_text:
+            # 检查是否在 WHERE 子句中
+            if 'WHERE' in sql_text:
+                # 简单检测：WHERE ... UNION
+                where_pos = sql_text.find('WHERE')
+                union_pos = sql_text.find('UNION')
+                if union_pos > where_pos:
+                    return True
+        return False
+
+    def _has_timing_injection(self, parsed) -> bool:
+        """检测时间延迟注入特征"""
+        timing_keywords = ['SLEEP', 'BENCHMARK', 'WAITFOR', 'PG_SLEEP', 'DBMS_PIPE', 'UTL_HTTP', 'HTTPURITYPE']
+        for token in parsed.flatten():
+            if token.ttype in (sqlparse.tokens.Keyword, sqlparse.tokens.Name) and token.value.upper() in timing_keywords:
+                # 检查是否在注释中
+                if not self._is_in_comment(token, parsed):
+                    return True
+        return False
         """
         检测 SQL 语句类型
         
@@ -123,31 +274,31 @@ class SecureSQLExecutor:
     def assess_risk_level(self, sql: str) -> tuple[SQLRiskLevel, list[str]]:
         """
         评估 SQL 风险等级
-        
+
         Args:
             sql: SQL 语句
-        
+
         Returns:
             Tuple[SQLRiskLevel, List[str]]: (风险等级, 风险点列表)
         """
         sql_upper = sql.upper().strip()
         risks = []
-        
+
+        # 使用 sqlparse 检测 SQL 注入
+        has_injection, injection_risks = self.detect_injection(sql)
+        if has_injection:
+            risks.extend(injection_risks)
+
         # 检查危险操作（排除UPDATE/DELETE无WHERE的情况，单独处理）
         for pattern in self.DANGEROUS_PATTERNS:
             if re.search(pattern, sql_upper, re.IGNORECASE):
                 risks.append(f"检测到危险操作: {pattern}")
 
-        # 检查 SQL 注入模式
-        for pattern in self.INJECTION_PATTERNS:
-            if re.search(pattern, sql_upper, re.IGNORECASE):
-                risks.append(f"疑似 SQL 注入: {pattern}")
-
         # 根据语句类型和风险点确定风险等级
         statement_type = self.detect_statement_type(sql)
 
         if risks:
-            if any('DROP' in r or 'TRUNCATE' in r for r in risks):
+            if any('DROP' in r or 'TRUNCATE' in r or 'SQL 注入' in r for r in risks):
                 return SQLRiskLevel.CRITICAL, risks
             return SQLRiskLevel.HIGH, risks
 
@@ -170,28 +321,28 @@ class SecureSQLExecutor:
     def validate_sql(self, sql: str, allow_dangerous: bool = False) -> tuple[bool, str]:
         """
         验证 SQL 语句
-        
+
         Args:
             sql: SQL 语句
             allow_dangerous: 是否允许危险操作
-        
+
         Returns:
             Tuple[bool, str]: (是否有效, 错误消息)
         """
         if not sql or not sql.strip():
             return False, "SQL 语句为空"
-        
-        # 检查 SQL 注入模式
-        for pattern in self.INJECTION_PATTERNS:
-            if re.search(pattern, sql, re.IGNORECASE):
-                return False, f"检测到疑似 SQL 注入模式: {pattern}"
-        
+
+        # 使用 sqlparse 检测 SQL 注入
+        has_injection, injection_risks = self.detect_injection(sql)
+        if has_injection:
+            return False, f"检测到 SQL 注入风险: {'; '.join(injection_risks)}"
+
         # 评估风险等级
         risk_level, risks = self.assess_risk_level(sql)
-        
+
         if risk_level == SQLRiskLevel.CRITICAL and not allow_dangerous:
             return False, f"检测到危险操作，禁止执行: {'; '.join(risks)}"
-        
+
         return True, ""
     
     async def execute_query(
