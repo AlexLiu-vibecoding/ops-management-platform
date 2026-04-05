@@ -39,27 +39,27 @@ from contextvars import ContextVar
 from functools import wraps
 
 
-# 上下文变量，用于请求链路追踪
-_request_context: ContextVar[dict[str, Any]] = ContextVar("request_context")
+# 上下文变量，用于请求链路追踪（带默认值）
+_request_context: ContextVar[dict[str, Any]] = ContextVar("request_context", default={})
 
 
 class LogContext:
     """
     日志上下文管理器
-    
+
     用于在请求链路中传递上下文信息
     """
-    
+
     def __init__(self, **kwargs):
         self.new_context = kwargs
         self.old_context = None
-    
+
     def __enter__(self):
         self.old_context = _request_context.get()
         merged = {**self.old_context, **self.new_context}
         _request_context.set(merged)
         return self
-    
+
     def __exit__(self, *args):
         _request_context.set(self.old_context or {})
 
@@ -178,15 +178,14 @@ class StructuredFormatter(logging.Formatter):
 class StructuredLogger:
     """
     结构化日志器
-    
+
     提供便捷的日志方法，支持结构化数据
     """
-    
+
     def __init__(self, name: str, json_format: bool = True):
         self._logger = logging.getLogger(name)
-        self._logger.setLevel(logging.DEBUG)
-        
-        # 避免重复添加 handler
+
+        # 只在没有 handler 时添加（避免重复）
         if not self._logger.handlers:
             handler = logging.StreamHandler(sys.stdout)
             handler.setFormatter(StructuredFormatter(json_format=json_format))
@@ -317,22 +316,77 @@ class StructuredLogger:
 
 # 日志器缓存
 _loggers: dict[str, StructuredLogger] = {}
+_initialized: bool = False
 
 
-def get_logger(name: str, json_format: bool = True) -> StructuredLogger:
+def get_logger(name: str, json_format: bool = None) -> StructuredLogger:
     """
     获取结构化日志器
-    
+
     Args:
         name: 日志器名称（通常使用 __name__）
-        json_format: 是否使用 JSON 格式
-    
+        json_format: 是否使用 JSON 格式（None 表示从配置读取）
+
     Returns:
         StructuredLogger 实例
     """
+    global _initialized
+
+    # 首次初始化
+    if not _initialized:
+        _setup_root_logger()
+        _initialized = True
+
+    # 如果 json_format 未指定，从配置读取
+    if json_format is None:
+        try:
+            from app.config import settings
+            json_format = settings.app.LOG_FORMAT.lower() == "json"
+        except Exception:
+            json_format = True  # 默认使用 JSON 格式
+
     if name not in _loggers:
         _loggers[name] = StructuredLogger(name, json_format=json_format)
+
     return _loggers[name]
+
+
+def _setup_root_logger():
+    """设置根日志器"""
+    try:
+        from app.config import settings
+
+        # 获取日志级别
+        log_level_str = settings.app.get_log_level()
+
+        # 映射日志级别
+        log_level_map = {
+            "DEBUG": logging.DEBUG,
+            "INFO": logging.INFO,
+            "WARNING": logging.WARNING,
+            "ERROR": logging.ERROR,
+            "CRITICAL": logging.CRITICAL,
+        }
+        log_level = log_level_map.get(log_level_str.upper(), logging.INFO)
+
+        # 设置根日志器级别
+        root_logger = logging.getLogger()
+        root_logger.setLevel(log_level)
+
+        # 移除现有的 handlers
+        for handler in root_logger.handlers[:]:
+            root_logger.removeHandler(handler)
+
+        # 添加新的 handler
+        json_format = settings.app.LOG_FORMAT.lower() == "json"
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setFormatter(StructuredFormatter(json_format=json_format))
+        root_logger.addHandler(handler)
+
+    except Exception as e:
+        # 配置加载失败，使用默认配置
+        logging.basicConfig(level=logging.INFO)
+        print(f"[INIT] 日志配置加载失败，使用默认配置: {e}", file=sys.stderr)
 
 
 # ==================== 装饰器 ====================

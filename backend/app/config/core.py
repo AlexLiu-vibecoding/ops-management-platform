@@ -28,21 +28,42 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class AppSettings(BaseSettings):
     """应用基础配置"""
-    
+
     model_config = SettingsConfigDict(
         env_prefix="APP_",
         env_file=".env",
         extra="ignore"
     )
-    
+
     # 应用信息
     NAME: str = Field(default="OpsCenter", description="应用名称")
     VERSION: str = Field(default="1.0.0", description="应用版本")
     DESCRIPTION: str = Field(default="运维管理平台", description="应用描述")
-    
+
     # 运行配置
     DEBUG: bool = Field(default=False, description="调试模式")
     ENV: str = Field(default="production", description="运行环境: development/staging/production")
+
+    # 日志配置
+    LOG_LEVEL: str = Field(
+        default="INFO",
+        description="日志级别: DEBUG/INFO/WARNING/ERROR/CRITICAL"
+    )
+    LOG_FORMAT: str = Field(
+        default="json",
+        description="日志格式: json/text"
+    )
+
+    def get_log_level(self) -> str:
+        """获取日志级别，根据环境自动调整"""
+        # 如果是开发环境，默认使用 DEBUG
+        if self.ENV == "development":
+            return "DEBUG"
+        # 如果是调试模式，默认使用 DEBUG
+        if self.DEBUG:
+            return "DEBUG"
+        # 否则使用配置的日志级别
+        return self.LOG_LEVEL.upper()
     
     # 项目域名
     PROJECT_DOMAIN: Optional[str] = Field(

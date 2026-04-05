@@ -349,8 +349,9 @@ async def get_instance(instance_id: int = Depends(InstanceID)):
 
 ### Issue-009: 缺少日志级别控制
 
-**优先级**: 🟢 低  
+**优先级**: 🟢 低
 **影响范围**: 全局
+**状态**: ✅ 已修复 (2026-04-06)
 
 **问题描述**:
 日志级别硬编码，难以根据环境调整：
@@ -365,15 +366,49 @@ async def get_instance(instance_id: int = Depends(InstanceID)):
 - 关键信息被淹没
 - 性能影响
 
-**建议方案**:
+**解决方案 (已实施)**:
 ```python
-# 使用结构化日志
-from app.utils.structured_logger import get_logger
+# 1. 添加日志配置到 AppSettings
+class AppSettings(BaseSettings):
+    LOG_LEVEL: str = Field(
+        default="INFO",
+        description="日志级别: DEBUG/INFO/WARNING/ERROR/CRITICAL"
+    )
+    LOG_FORMAT: str = Field(
+        default="json",
+        description="日志格式: json/text"
+    )
 
-logger = get_logger(__name__)
+    def get_log_level(self) -> str:
+        """获取日志级别，根据环境自动调整"""
+        if self.ENV == "development":
+            return "DEBUG"
+        if self.DEBUG:
+            return "DEBUG"
+        return self.LOG_LEVEL.upper()
 
-# 根据 log_level 配置自动过滤
-logger.info({"event": "query_execution", "user_id": user.id, "sql": sql[:100]})
+# 2. 修改 structured_logger 支持配置
+def _setup_root_logger():
+    """设置根日志器"""
+    from app.config import settings
+    log_level_str = settings.app.get_log_level()
+    # 设置日志级别...
+```
+
+**修复内容**:
+- ✅ 在 `app/config/core.py` 的 `AppSettings` 中添加 `LOG_LEVEL` 和 `LOG_FORMAT` 配置
+- ✅ 添加 `get_log_level` 方法，根据环境自动调整日志级别
+- ✅ 修改 `app/utils/structured_logger.py` 的 `get_logger` 函数支持从配置读取
+- ✅ 添加 `_setup_root_logger` 函数统一设置根日志器
+- ✅ 支持 JSON 和文本两种日志格式
+- ✅ 开发环境默认使用 DEBUG 级别
+
+**使用示例**:
+```bash
+# 环境变量配置
+export APP_LOG_LEVEL=DEBUG    # 设置日志级别
+export APP_LOG_FORMAT=text     # 设置日志格式
+export APP_ENV=development     # 开发环境自动 DEBUG
 ```
 
 ---
@@ -422,8 +457,9 @@ def monitor_performance(func):
 
 ### Issue-011: 代码重复率高
 
-**优先级**: 🟡 中  
+**优先级**: 🟡 中
 **影响范围**: 多个文件
+**状态**: ✅ 已修复 (2026-04-06)
 
 **问题描述**:
 多处重复代码，如数据库连接创建、密码解密等：
@@ -442,17 +478,47 @@ password = decrypt_instance_password(instance.password_encrypted)
 - 修改需要同步多处
 - 增加出错概率
 
-**建议方案**:
-```
-1. 提取公共方法到 utils 模块
-2. 创建服务层统一管理
-3. 使用 Mixin 模式复用逻辑
+**解决方案 (已实施)**:
+```python
+# 1. 创建统一的数据库连接辅助模块
+# app/utils/db_helpers.py
 
-class InstanceMixin:
-    """实例操作 Mixin"""
-    def get_decrypted_password(self, instance: RDBInstance) -> str:
-        return decrypt_instance_password(instance.password_encrypted)
+def test_mysql_connection(...) -> dict:
+    """测试 MySQL 连接"""
+
+def test_postgresql_connection(...) -> dict:
+    """测试 PostgreSQL 连接"""
+
+def test_instance_connection(instance: RDBInstance, ...) -> dict:
+    """测试数据库实例连接（自动解密密码）"""
+
+def create_instance_connection(instance: RDBInstance, ...) -> Tuple:
+    """创建数据库实例连接（自动解密密码）"""
+
+# 2. 在 API 中使用统一辅助函数
+from app.utils.db_helpers import test_mysql_connection, test_postgresql_connection
+
+result = test_mysql_connection(host, port, username, password)
 ```
+
+**修复内容**:
+- ✅ 创建 `app/utils/db_helpers.py` 统一数据库连接辅助模块
+- ✅ 实现 `test_mysql_connection` 和 `test_postgresql_connection` 连接测试函数
+- ✅ 实现 `test_instance_connection` 统一测试函数（自动解密密码）
+- ✅ 实现 `create_mysql_connection` 和 `create_postgresql_connection` 连接创建函数
+- ✅ 实现 `create_instance_connection` 统一创建函数（自动解密密码）
+- ✅ 修改 `app/api/rdb_instances.py` 使用统一辅助函数，消除重复代码
+- ✅ 添加 `DatabaseConnectionTestError` 统一异常处理
+
+**消除的重复代码**:
+- ✅ MySQL 连接测试逻辑（从 rdb_instances.py 移至 db_helpers.py）
+- ✅ PostgreSQL 连接测试逻辑（从 rdb_instances.py 移至 db_helpers.py）
+- ✅ 密码解密和连接创建的重复逻辑
+
+**后续优化建议**:
+- 将其他 API 文件中的连接测试和创建逻辑迁移到 db_helpers.py
+- 将 SQL 执行相关的重复代码提取到服务层
+- 考虑使用 Mixin 模式处理实例操作相关的重复逻辑
 
 ---
 
@@ -766,6 +832,7 @@ async def get_rdb_instance(
 
 | 日期 | 版本 | 更新内容 |
 |------|------|----------|
+| 2026-04-06 | v1.2 | 修复代码质量和日志问题：Issue-009/011 已修复 |
 | 2026-04-06 | v1.1 | 修复安全问题：Issue-014/015/016 已修复 |
 | 2026-04-02 | v1.0 | 初始版本，记录 16 个设计缺陷 |
 
