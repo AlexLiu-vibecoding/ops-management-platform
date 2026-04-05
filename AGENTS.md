@@ -188,8 +188,13 @@ release/
 │   ├── KUBERNETES_DEPLOYMENT.md
 │   ├── KUBERNETES.md
 │   └── MIGRATION_GUIDE.md
+├── docker/           # Docker 配置
+│   ├── entrypoint.sh
+│   └── nginx.conf
+├── Dockerfile        # Docker 镜像构建文件
+├── docker-compose.yml # Docker Compose 配置（开发环境）
 ├── deploy-k8s.sh     # Kubernetes 部署脚本
-└── docker-compose.yml # Docker Compose 配置（开发环境）
+└── README.md         # 部署说明
 ```
 
 ### 快速开始
@@ -338,8 +343,13 @@ helm install opscenter ./helm/opscenter \
 │   │   ├── KUBERNETES_DEPLOYMENT.md  # 详细部署文档
 │   │   ├── KUBERNETES.md             # 快速部署指南
 │   │   └── MIGRATION_GUIDE.md        # AWS 托管服务迁移指南
+│   ├── docker/                # Docker 配置
+│   │   ├── entrypoint.sh      # 容器启动脚本
+│   │   └── nginx.conf         # Nginx 配置
+│   ├── Dockerfile             # Docker 镜像构建文件
+│   ├── docker-compose.yml     # Docker Compose 配置（开发环境）
 │   ├── deploy-k8s.sh          # Kubernetes 部署脚本
-│   └── docker-compose.yml     # Docker Compose 配置（开发环境）
+│   └── README.md              # 部署说明
 │
 ├── .coze                      # 项目配置
 └── AGENTS.md                  # 本文件

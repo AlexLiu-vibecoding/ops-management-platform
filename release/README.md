@@ -9,8 +9,12 @@ release/
 ├── k8s/              # Kubernetes 部署清单（生产环境）
 ├── helm/opscenter/   # Helm Chart
 ├── docs/             # 部署文档
-├── deploy-k8s.sh     # Kubernetes 部署脚本
-└── docker-compose.yml # Docker Compose 配置（开发环境）
+├── docker/           # Docker 配置文件
+│   ├── entrypoint.sh # 容器启动脚本
+│   └── nginx.conf    # Nginx 配置
+├── Dockerfile        # Docker 镜像构建文件
+├── docker-compose.yml # Docker Compose 配置（开发环境）
+└── deploy-k8s.sh     # Kubernetes 部署脚本
 ```
 
 ## 快速开始

@@ -21,6 +21,7 @@ cp .env.example .env
 # 编辑 .env 文件，配置数据库和安全密钥
 
 # 3. 构建并启动
+cd release
 docker-compose up -d --build
 
 # 4. 访问系统
@@ -31,6 +32,7 @@ docker-compose up -d --build
 ### 管理命令
 
 ```bash
+cd release
 docker-compose up -d          # 启动服务
 docker-compose down           # 停止服务
 docker-compose logs -f        # 查看日志
@@ -271,9 +273,18 @@ SQL_FILE_SIZE_THRESHOLD=10000
 │   ├── specs/                 # 功能规格 (16个)
 │   └── VIBECODING.md          # 协作经验
 │
-├── docker/                    # Docker 配置
-├── Dockerfile                 # 统一 Docker 镜像
-├── docker-compose.yml         # Docker Compose 配置
+├── release/                   # 部署相关文件
+│   ├── docker/                # Docker 配置
+│   │   ├── entrypoint.sh      # 容器启动脚本
+│   │   └── nginx.conf         # Nginx 配置
+│   ├── Dockerfile             # 统一 Docker 镜像
+│   ├── docker-compose.yml     # Docker Compose 配置
+│   ├── k8s/                   # Kubernetes 部署清单
+│   ├── helm/opscenter/        # Helm Chart
+│   ├── docs/                  # 部署文档
+│   ├── deploy-k8s.sh          # K8s 部署脚本
+│   └── README.md              # 部署说明
+│
 ├── start.sh                   # 本地启动脚本
 ├── AGENTS.md                  # AI 开发指南
 └── README.md
