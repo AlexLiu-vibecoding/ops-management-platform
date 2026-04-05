@@ -1,0 +1,11 @@
+# ============================================================
+# Namespace 配置
+# ============================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opscenter
+  labels:
+    name: opscenter
+    app: opscenter
+    environment: production

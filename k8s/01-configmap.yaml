@@ -1,0 +1,54 @@
+# ============================================================
+# ConfigMap - 应用配置
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opscenter-config
+  namespace: opscenter
+data:
+  # 应用配置
+  APP_NAME: "OpsCenter"
+  APP_ENV: "production"
+  LOG_LEVEL: "info"
+  DEPLOY_RUN_PORT: "5000"
+
+  # 数据库配置
+  POSTGRES_HOST: "postgresql-service"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DATABASE: "opscenter"
+
+  MYSQL_HOST: "mysql-service"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "opscenter"
+
+  # Redis 配置
+  REDIS_HOST: "redis-service"
+  REDIS_PORT: "6379"
+  REDIS_DB: "0"
+
+  # 存储配置（对象存储）
+  STORAGE_TYPE: "s3"
+  STORAGE_REGION: "us-east-1"
+
+  # 监控配置
+  ENABLE_METRICS: "true"
+  METRICS_PORT: "9090"
+
+  # 其他配置
+  MAX_WORKERS: "4"
+  ACCESS_LOG: "true"
+  CORS_ORIGINS: "*"
+  CORS_ALLOW_CREDENTIALS: "true"
+
+  # 通知配置
+  ENABLE_NOTIFICATION: "true"
+  NOTIFICATION_TIMEOUT: "30"
+
+  # 定时任务配置
+  ENABLE_SCHEDULER: "true"
+  SCHEDULER_MAX_WORKERS: "10"
+
+  # 监控数据采集间隔
+  MONITOR_INTERVAL: "60"
+  SLOW_QUERY_THRESHOLD: "1000"

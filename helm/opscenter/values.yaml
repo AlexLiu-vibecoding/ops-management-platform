@@ -1,0 +1,313 @@
+# ============================================================
+# Values - OpsCenter Helm Chart
+# ============================================================
+
+# 全局配置
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: standard
+
+# 命名空间配置
+namespace:
+  name: opscenter
+  create: true
+
+# 应用镜像配置
+images:
+  backend:
+    repository: opscenter/backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: opscenter/frontend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  postgresql:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+  redis:
+    repository: redis
+    tag: "7-alpine"
+    pullPolicy: IfNotPresent
+
+# 后端配置
+backend:
+  enabled: true
+  replicas: 3
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  hpa:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  autoscaling:
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Percent
+            value: 50
+            periodSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 0
+        policies:
+          - type: Percent
+            value: 100
+            periodSeconds: 30
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+  nodeSelector: {}
+  tolerations: []
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                    - opscenter
+                - key: component
+                  operator: In
+                  values:
+                    - backend
+            topologyKey: kubernetes.io/hostname
+
+# 前端配置
+frontend:
+  enabled: true
+  replicas: 2
+  apiBaseUrl: "http://opscenter-backend-service:5000"
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+
+  nodeSelector: {}
+  tolerations: []
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                    - opscenter
+                - key: component
+                  operator: In
+                  values:
+                    - frontend
+            topologyKey: kubernetes.io/hostname
+
+# PostgreSQL 配置
+postgresql:
+  enabled: true
+  replicas: 1
+  storage:
+    size: 20Gi
+    storageClass: standard
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+  persistence:
+    enabled: true
+
+  configuration: |
+    max_connections = 200
+    shared_buffers = 256MB
+    effective_cache_size = 1GB
+    maintenance_work_mem = 64MB
+    checkpoint_completion_target = 0.9
+    wal_buffers = 16MB
+    default_statistics_target = 100
+    random_page_cost = 1.1
+    effective_io_concurrency = 200
+    work_mem = 1310kB
+    min_wal_size = 1GB
+    max_wal_size = 4GB
+
+# Redis 配置
+redis:
+  enabled: true
+  replicas: 1
+  storage:
+    size: 5Gi
+    storageClass: standard
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  persistence:
+    enabled: true
+
+  configuration: |
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
+    save 900 1
+    save 300 10
+    save 60 10000
+
+# Ingress 配置
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/websocket-services: "opscenter-backend-service"
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+
+  hosts:
+    - host: opscenter.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+
+  tls:
+    - secretName: opscenter-tls-secret
+      hosts:
+        - opscenter.example.com
+
+# ConfigMap 配置
+config:
+  app:
+    name: "OpsCenter"
+    env: "production"
+    logLevel: "info"
+    deployRunPort: "5000"
+
+  database:
+    postgres:
+      host: "postgresql-service"
+      port: "5432"
+      database: "opscenter"
+    mysql:
+      host: "mysql-service"
+      port: "3306"
+      database: "opscenter"
+
+  redis:
+    host: "redis-service"
+    port: "6379"
+    db: "0"
+
+  storage:
+    type: "s3"
+    region: "us-east-1"
+
+  monitoring:
+    enabled: "true"
+    metricsPort: "9090"
+
+  other:
+    maxWorkers: "4"
+    accessLog: "true"
+    corsOrigins: "*"
+    corsAllowCredentials: "true"
+    enableNotification: "true"
+    notificationTimeout: "30"
+    enableScheduler: "true"
+    schedulerMaxWorkers: "10"
+    monitorInterval: "60"
+    slowQueryThreshold: "1000"
+
+# Secret 配置（用于生成Secret）
+secrets:
+  postgres:
+    password: "change-me-postgres-password"
+  mysql:
+    password: "change-me-mysql-password"
+  redis:
+    password: "change-me-redis-password"
+  jwt:
+    secretKey: "change-me-jwt-secret-key-min-32-chars-long"
+  aes:
+    key: "change-me-to-32-char-aes-key!!"
+  password:
+    salt: "change-me-password-salt-random"
+  storage:
+    accessKey: "change-me-storage-access-key"
+    secretKey: "change-me-storage-secret-key"
+    bucket: "opscenter-bucket"
+  api:
+    aiKey: "change-me-ai-api-key"
+    slackWebhook: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+    emailSmtpPassword: "change-me-smtp-password"
+  db:
+    encryptionKey: "change-me-db-encryption-key"
+  internal:
+    apiSecret: "change-me-internal-api-secret"
+
+# 监控配置
+monitoring:
+  enabled: false
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false
+
+# 日志配置
+logging:
+  enabled: false
+  elasticsearch:
+    enabled: false
+
+# RBAC 配置
+rbac:
+  create: true
+  serviceAccount:
+    create: true
+    name: "opscenter-sa"
+
+# 资源清理
+cleanup:
+  enabled: false
+  keepPvOnDelete: false

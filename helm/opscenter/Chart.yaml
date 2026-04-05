@@ -1,0 +1,19 @@
+# ============================================================
+# Helm Chart - OpsCenter
+# ============================================================
+apiVersion: v2
+name: opscenter
+description: 运维管理平台 - 云原生部署方案
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ops
+  - database
+  - mysql
+  - postgresql
+  - redis
+  - monitoring
+maintainers:
+  - name: OpsCenter Team
+    email: ops@example.com

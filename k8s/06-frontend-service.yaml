@@ -1,0 +1,122 @@
+# ============================================================
+# Service - 前端服务
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: opscenter-frontend-service
+  namespace: opscenter
+  labels:
+    app: opscenter
+    component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: opscenter
+    component: frontend
+
+
+---
+# ============================================================
+# Ingress - HTTP路由
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: opscenter-ingress
+  namespace: opscenter
+  labels:
+    app: opscenter
+  annotations:
+    # Nginx Ingress Controller 注解
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/websocket-services: "opscenter-backend-service"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+
+    # 限流注解
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+
+    # CORS 注解（如需要）
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - opscenter.example.com
+      secretName: opscenter-tls-secret
+  rules:
+    - host: opscenter.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: opscenter-frontend-service
+                port:
+                  number: 80
+
+
+---
+# ============================================================
+# HorizontalPodAutoscaler - 前端自动扩缩容
+# ============================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: opscenter-frontend-hpa
+  namespace: opscenter
+  labels:
+    app: opscenter
+    component: frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: opscenter-frontend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+
+
+---
+# ============================================================
+# PodDisruptionBudget - 前端Pod中断预算
+# ============================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opscenter-frontend-pdb
+  namespace: opscenter
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: opscenter
+      component: frontend

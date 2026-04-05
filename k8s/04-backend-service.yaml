@@ -1,0 +1,123 @@
+# ============================================================
+# Service - 后端服务
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: opscenter-backend-service
+  namespace: opscenter
+  labels:
+    app: opscenter
+    component: backend
+  annotations:
+    prometheus.io/scrape: "true"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 5000
+      targetPort: http
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: opscenter
+    component: backend
+
+
+---
+# ============================================================
+# Service - API服务（对内部暴露）
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: opscenter-api-service
+  namespace: opscenter
+  labels:
+    app: opscenter
+    component: backend
+spec:
+  type: ClusterIP
+  ports:
+    - name: api
+      port: 80
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: opscenter
+    component: backend
+
+
+---
+# ============================================================
+# HorizontalPodAutoscaler - 自动扩缩容
+# ============================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: opscenter-backend-hpa
+  namespace: opscenter
+  labels:
+    app: opscenter
+    component: backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: opscenter-backend
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 2
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 4
+          periodSeconds: 30
+      selectPolicy: Max
+
+
+---
+# ============================================================
+# PodDisruptionBudget - Pod中断预算
+# ============================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: opscenter-backend-pdb
+  namespace: opscenter
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: opscenter
+      component: backend

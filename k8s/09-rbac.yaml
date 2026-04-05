@@ -1,0 +1,83 @@
+# ============================================================
+# ServiceAccount - 应用服务账号
+# ============================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: opscenter-sa
+  namespace: opscenter
+  labels:
+    app: opscenter
+
+
+---
+# ============================================================
+# Role - 命名空间内权限
+# ============================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: opscenter-role
+  namespace: opscenter
+  labels:
+    app: opscenter
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - secrets
+      - pods
+      - services
+      - endpoints
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - pods/log
+      - pods/exec
+    verbs:
+      - get
+      - create
+
+
+---
+# ============================================================
+# RoleBinding - 角色绑定
+# ============================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: opscenter-rolebinding
+  namespace: opscenter
+  labels:
+    app: opscenter
+subjects:
+  - kind: ServiceAccount
+    name: opscenter-sa
+    namespace: opscenter
+roleRef:
+  kind: Role
+  name: opscenter-role
+  apiGroup: rbac.authorization.k8s.io
+
+
+---
+# ============================================================
+# Secret - TLS证书（示例）
+# 生产环境应使用 cert-manager 自动管理
+# ============================================================
+apiVersion: v1
+kind: Secret
+metadata:
+  name: opscenter-tls-secret
+  namespace: opscenter
+type: kubernetes.io/tls
+data:
+  # 使用 base64 编码的证书
+  # 示例：cat tls.crt | base64 -w 0
+  tls.crt: LS0tLS1CRUdJTi...
+  tls.key: LS0tLS1CRUdJTi...
