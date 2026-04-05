@@ -123,8 +123,8 @@ class TestAsyncPermissionService:
         await async_db.commit()
         await async_db.refresh(perm)
 
-        # 创建角色权限关联
-        role_perm = RolePermission(role="developer", permission_id=perm.id)
+        # 创建角色权限关联 (注意：用户是 operator，所以关联到 operator 角色)
+        role_perm = RolePermission(role="operator", permission_id=perm.id)
         async_db.add(role_perm)
         await async_db.commit()
 
@@ -133,7 +133,7 @@ class TestAsyncPermissionService:
         assert result is True
 
         # 验证缓存
-        assert "role_permissions:developer" in service._permission_cache
+        assert "role_permissions:operator" in service._permission_cache
 
     async def test_has_permission_from_default(self, async_db, developer_user):
         """测试从默认配置获取权限"""

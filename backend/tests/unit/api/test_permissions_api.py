@@ -200,13 +200,12 @@ class TestPermissionAPI:
             json={"code": "test:duplicate", "name": "测试重复"},
             headers=admin_headers
         )
-        # API 可能返回 200 (如果允许重复) 或者 400 (如果不允许)
-        # 根据实际 API 行为调整断言
-        if response.status_code == 400:
-            assert "detail" in response.json()
-        else:
-            # 如果 API 允许重复创建，跳过此测试
-            pytest.skip("API 允许创建重复权限编码")
+        # API 返回格式: {"error": "HTTP_400", "message": "权限编码已存在"}
+        assert response.status_code == 400
+        data = response.json()
+        assert "error" in data
+        assert "message" in data
+        assert "权限编码已存在" in data["message"]
 
         # 清理
         db_session.delete(perm)
