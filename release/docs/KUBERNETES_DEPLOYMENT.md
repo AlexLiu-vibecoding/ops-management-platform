@@ -95,7 +95,7 @@ cd opscenter
 
 #### 2. 配置环境变量
 
-编辑 `k8s/02-secret.yaml`，修改敏感配置：
+编辑 `release/k8s/02-secret.yaml`，修改敏感配置：
 
 ```yaml
 stringData:
@@ -126,7 +126,7 @@ kubectl create secret tls opscenter-tls-secret \
 
 #### 4. 配置 AWS 数据库（AWS RDS + 可选的 ElastiCache Redis）
 
-编辑 `k8s/01-configmap.yaml`，修改数据库配置为 AWS 托管服务：
+编辑 `release/k8s/01-configmap.yaml`，修改数据库配置为 AWS 托管服务：
 
 ```yaml
 data:
@@ -150,7 +150,7 @@ data:
   REDIS_DB: "0"
 ```
 
-编辑 `k8s/02-secret.yaml`，添加数据库密码：
+编辑 `release/k8s/02-secret.yaml`，添加数据库密码：
 
 ```yaml
 stringData:
@@ -166,14 +166,14 @@ stringData:
 
 ```bash
 # 按顺序部署
-kubectl apply -f k8s/00-namespace.yaml
-kubectl apply -f k8s/01-configmap.yaml
-kubectl apply -f k8s/02-secret.yaml
-kubectl apply -f k8s/09-rbac.yaml
-kubectl apply -f k8s/03-backend-deployment.yaml
-kubectl apply -f k8s/04-backend-service.yaml
-kubectl apply -f k8s/05-frontend-deployment.yaml
-kubectl apply -f k8s/06-frontend-service.yaml
+kubectl apply -f release/k8s/00-namespace.yaml
+kubectl apply -f release/k8s/01-configmap.yaml
+kubectl apply -f release/k8s/02-secret.yaml
+kubectl apply -f release/k8s/09-rbac.yaml
+kubectl apply -f release/k8s/03-backend-deployment.yaml
+kubectl apply -f release/k8s/04-backend-service.yaml
+kubectl apply -f release/k8s/05-frontend-deployment.yaml
+kubectl apply -f release/k8s/06-frontend-service.yaml
 ```
 
 #### 5. 验证部署
@@ -303,7 +303,7 @@ aws elasticache create-cache-cluster \
 
 ##### 1.3 配置 Kubernetes 连接 AWS 数据库
 
-修改 `k8s/01-configmap.yaml`：
+修改 `release/k8s/01-configmap.yaml`：
 
 ```yaml
 data:
@@ -323,7 +323,7 @@ data:
   REDIS_DB: "0"
 ```
 
-修改 `k8s/02-secret.yaml`：
+修改 `release/k8s/02-secret.yaml`：
 
 ```yaml
 stringData:
@@ -369,7 +369,7 @@ aws ec2 authorize-security-group-ingress \
 
 #### 4. 配置 Ingress
 
-修改 `k8s/06-frontend-service.yaml` 或 `values.yaml`：
+修改 `release/k8s/06-frontend-service.yaml` 或 `values.yaml`：
 
 ```yaml
 ingress:
@@ -388,7 +388,7 @@ ingress:
 
 #### 4. 配置 HPA
 
-修改 `k8s/04-backend-service.yaml`：
+修改 `release/k8s/04-backend-service.yaml`：
 
 ```yaml
 spec:
@@ -410,7 +410,7 @@ spec:
 ```bash
 # 使用 Minikube
 minikube start
-kubectl apply -f k8s/
+kubectl apply -f release/k8s/
 
 # 使用 Port Forward 访问
 kubectl port-forward svc/opscenter-frontend-service 8080:80 -n opscenter
@@ -422,7 +422,7 @@ kubectl port-forward svc/opscenter-frontend-service 8080:80 -n opscenter
 
 ### ConfigMap 配置
 
-修改 `k8s/01-configmap.yaml` 更新非敏感配置：
+修改 `release/k8s/01-configmap.yaml` 更新非敏感配置：
 
 ```yaml
 data:
@@ -457,10 +457,10 @@ kubectl create secret generic opscenter-secret \
 kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.24.0/controller.yaml
 
 # 加密 Secret
-kubeseal -f k8s/02-secret.yaml -w k8s/02-secret-sealed.yaml
+kubeseal -f release/k8s/02-secret.yaml -w release/k8s/02-secret-sealed.yaml
 
 # 部署加密的 Secret
-kubectl apply -f k8s/02-secret-sealed.yaml
+kubectl apply -f release/k8s/02-secret-sealed.yaml
 ```
 
 #### 使用 External Secrets Operator
@@ -706,7 +706,7 @@ kubectl exec -i postgresql-0 -n opscenter -- psql -U postgres opscenter < backup
 
 ### 环境变量完整列表
 
-详见 `k8s/01-configmap.yaml` 和 `k8s/02-secret.yaml`。
+详见 `release/k8s/01-configmap.yaml` 和 `release/k8s/02-secret.yaml`。
 
 ---
 

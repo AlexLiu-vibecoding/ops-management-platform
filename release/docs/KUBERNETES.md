@@ -4,26 +4,28 @@
 
 ```
 opscenter/
-├── k8s/                           # Kubernetes 部署清单
-│   ├── 00-namespace.yaml          # 命名空间配置
-│   ├── 01-configmap.yaml          # 应用配置（包含 AWS 数据库配置）
-│   ├── 02-secret.yaml             # 敏感配置（包含 AWS 数据库密码）
-│   ├── 03-backend-deployment.yaml  # 后端部署配置
-│   ├── 04-backend-service.yaml    # 后端服务 + HPA + PDB
-│   ├── 05-frontend-deployment.yaml # 前端部署配置
-│   ├── 06-frontend-service.yaml   # 前端服务 + Ingress
-│   └── 09-rbac.yaml               # RBAC 权限配置
-├── helm/opscenter/                # Helm Chart
-│   ├── Chart.yaml                 # Chart 元数据
-│   ├── values.yaml                # 默认配置（禁用内置数据库）
-│   └── templates/                 # 模板文件
-│       └── _helpers.tpl           # 模板助手
-├── deploy-k8s.sh                  # 一键部署脚本
-├── docker-compose.yml             # Docker Compose 配置
-├── Dockerfile                     # Docker 镜像构建
-├── KUBERNETES_DEPLOYMENT.md       # 详细部署文档
-├── KUBERNETES.md                  # 本文件
-└── MIGRATION_GUIDE.md             # 迁移指南
+├── release/                          # 部署相关文件
+│   ├── k8s/                          # Kubernetes 部署清单
+│   │   ├── 00-namespace.yaml         # 命名空间配置
+│   │   ├── 01-configmap.yaml         # 应用配置（包含 AWS 数据库配置）
+│   │   ├── 02-secret.yaml            # 敏感配置（包含 AWS 数据库密码）
+│   │   ├── 03-backend-deployment.yaml # 后端部署配置
+│   │   ├── 04-backend-service.yaml   # 后端服务 + HPA + PDB
+│   │   ├── 05-frontend-deployment.yaml # 前端部署配置
+│   │   ├── 06-frontend-service.yaml  # 前端服务 + Ingress
+│   │   └── 09-rbac.yaml              # RBAC 权限配置
+│   ├── helm/opscenter/               # Helm Chart
+│   │   ├── Chart.yaml                # Chart 元数据
+│   │   ├── values.yaml               # 默认配置（禁用内置数据库）
+│   │   └── templates/                # 模板文件
+│   │       └── _helpers.tpl          # 模板助手
+│   ├── docs/                         # 部署文档
+│   │   ├── KUBERNETES_DEPLOYMENT.md  # 详细部署文档
+│   │   ├── KUBERNETES.md             # 本文件
+│   │   └── MIGRATION_GUIDE.md        # 迁移指南
+│   ├── deploy-k8s.sh                 # 一键部署脚本
+│   └── docker-compose.yml            # Docker Compose 配置（开发环境）
+└── ...                               # 其他项目文件（backend/, frontend/ 等）
 ```
 
 **注意**: PostgreSQL 和 Redis 使用 AWS 托管服务（Amazon RDS + Amazon ElastiCache），无需部署内置数据库。
@@ -47,14 +49,14 @@ opscenter/
 #    - 记录 RDS endpoint: opscenter-postgres.xxxxxx.us-east-1.rds.amazonaws.com
 #    - 如需缓存，创建 ElastiCache Redis 并记录 endpoint
 
-# 2. 修改 k8s/01-configmap.yaml，配置 AWS 数据库 endpoint
-vim k8s/01-configmap.yaml
+# 2. 修改 release/k8s/01-configmap.yaml，配置 AWS 数据库 endpoint
+vim release/k8s/01-configmap.yaml
 # 更新 POSTGRES_HOST
 # 如需 Redis，更新 REDIS_HOST 并设置 REDIS_ENABLED="true"
 # 如不需 Redis，设置 REDIS_ENABLED="false"
 
-# 3. 修改 k8s/02-secret.yaml，配置 AWS 数据库密码
-vim k8s/02-secret.yaml
+# 3. 修改 release/k8s/02-secret.yaml，配置 AWS 数据库密码
+vim release/k8s/02-secret.yaml
 # 更新 POSTGRES_PASSWORD
 # 如需 Redis，更新 REDIS_PASSWORD
 
@@ -73,21 +75,21 @@ kubectl port-forward svc/opscenter-frontend-service 8080:80 -n opscenter
 
 ```bash
 # 1. 创建命名空间
-kubectl apply -f k8s/00-namespace.yaml
+kubectl apply -f release/k8s/00-namespace.yaml
 
 # 2. 应用配置
-kubectl apply -f k8s/01-configmap.yaml
-kubectl apply -f k8s/02-secret.yaml
+kubectl apply -f release/k8s/01-configmap.yaml
+kubectl apply -f release/k8s/02-secret.yaml
 
 # 3. 部署数据库
-kubectl apply -f k8s/07-postgresql.yaml
-kubectl apply -f k8s/08-redis.yaml
+kubectl apply -f release/k8s/07-postgresql.yaml
+kubectl apply -f release/k8s/08-redis.yaml
 
 # 4. 部署应用
-kubectl apply -f k8s/03-backend-deployment.yaml
-kubectl apply -f k8s/04-backend-service.yaml
-kubectl apply -f k8s/05-frontend-deployment.yaml
-kubectl apply -f k8s/06-frontend-service.yaml
+kubectl apply -f release/k8s/03-backend-deployment.yaml
+kubectl apply -f release/k8s/04-backend-service.yaml
+kubectl apply -f release/k8s/05-frontend-deployment.yaml
+kubectl apply -f release/k8s/06-frontend-service.yaml
 
 # 5. 验证部署
 kubectl get pods,svc,ingress -n opscenter
@@ -234,7 +236,7 @@ kubectl logs -f statefulset/postgresql -n opscenter
 
 ### 修改应用配置
 
-编辑 `k8s/01-configmap.yaml`：
+编辑 `release/k8s/01-configmap.yaml`：
 
 ```yaml
 data:
@@ -246,7 +248,7 @@ data:
 应用更新：
 
 ```bash
-kubectl apply -f k8s/01-configmap.yaml
+kubectl apply -f release/k8s/01-configmap.yaml
 kubectl rollout restart deployment/opscenter-backend -n opscenter
 ```
 
@@ -269,10 +271,10 @@ kubectl create secret generic opscenter-secret \
 kubectl apply -f https://github.com/bitnami-labs/sealed-secrets/releases/download/v0.24.0/controller.yaml
 
 # 加密 Secret
-kubeseal -f k8s/02-secret.yaml -w k8s/02-secret-sealed.yaml
+kubeseal -f release/k8s/02-secret.yaml -w release/k8s/02-secret-sealed.yaml
 
 # 部署加密的 Secret
-kubectl apply -f k8s/02-secret-sealed.yaml
+kubectl apply -f release/k8s/02-secret-sealed.yaml
 ```
 
 ---

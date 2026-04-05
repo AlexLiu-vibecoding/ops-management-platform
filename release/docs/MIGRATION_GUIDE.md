@@ -242,7 +242,7 @@ INFO keyspace
 
 #### 3.1 更新 ConfigMap
 
-编辑 `k8s/01-configmap.yaml`:
+编辑 `release/k8s/01-configmap.yaml`:
 
 ```yaml
 apiVersion: v1
@@ -265,12 +265,12 @@ data:
 
 应用配置:
 ```bash
-kubectl apply -f k8s/01-configmap.yaml
+kubectl apply -f release/k8s/01-configmap.yaml
 ```
 
 #### 3.2 更新 Secret
 
-编辑 `k8s/02-secret.yaml`:
+编辑 `release/k8s/02-secret.yaml`:
 
 ```yaml
 apiVersion: v1
@@ -286,7 +286,7 @@ stringData:
 
 应用配置:
 ```bash
-kubectl apply -f k8s/02-secret.yaml
+kubectl apply -f release/k8s/02-secret.yaml
 ```
 
 ### 步骤 4: 重启应用
@@ -394,8 +394,8 @@ kubectl delete service redis-master -n opscenter
 
 ```bash
 # 删除内置数据库部署清单
-rm k8s/07-postgresql.yaml
-rm k8s/08-redis.yaml
+rm release/k8s/07-postgresql.yaml
+rm release/k8s/08-redis.yaml
 
 # 提交变更
 git add -A
@@ -412,20 +412,20 @@ git commit -m "feat: migrate to AWS managed services (RDS + ElastiCache)"
 
 ```bash
 # 恢复 ConfigMap（使用备份）
-kubectl apply -f k8s/01-configmap.yaml.backup
+kubectl apply -f release/k8s/01-configmap.yaml.backup
 
 # 恢复 Secret（使用备份）
-kubectl apply -f k8s/02-secret.yaml.backup
+kubectl apply -f release/k8s/02-secret.yaml.backup
 ```
 
 ### 2. 重新部署内置数据库
 
 ```bash
 # 恢复 PostgreSQL
-kubectl apply -f k8s/07-postgresql.yaml
+kubectl apply -f release/k8s/07-postgresql.yaml
 
 # 恢复 Redis
-kubectl apply -f k8s/08-redis.yaml
+kubectl apply -f release/k8s/08-redis.yaml
 
 # 等待数据库就绪
 kubectl wait --for=condition=ready pod -l app=postgresql -n opscenter --timeout=300s

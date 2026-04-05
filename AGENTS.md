@@ -168,6 +168,43 @@ Kubernetes 集群
 
 ## 云原生部署（生产环境）
 
+**⚠️ 重要**: 所有部署相关文件已统一移至 `release/` 目录，项目根目录更清晰。
+
+### release/ 目录结构
+
+```
+release/
+├── k8s/              # Kubernetes 部署清单（生产环境）
+│   ├── 00-namespace.yaml
+│   ├── 01-configmap.yaml
+│   ├── 02-secret.yaml
+│   ├── 03-backend-deployment.yaml
+│   ├── 04-backend-service.yaml
+│   ├── 05-frontend-deployment.yaml
+│   ├── 06-frontend-service.yaml
+│   └── 09-rbac.yaml
+├── helm/opscenter/   # Helm Chart
+├── docs/             # 部署文档
+│   ├── KUBERNETES_DEPLOYMENT.md
+│   ├── KUBERNETES.md
+│   └── MIGRATION_GUIDE.md
+├── deploy-k8s.sh     # Kubernetes 部署脚本
+└── docker-compose.yml # Docker Compose 配置（开发环境）
+```
+
+### 快速开始
+
+```bash
+# 进入 release 目录
+cd release
+
+# 使用部署脚本
+./deploy-k8s.sh
+
+# 或查看部署文档
+cat docs/KUBERNETES.md
+```
+
 ### 部署架构
 
 OpsCenter 支持云原生部署，使用 Kubernetes 和 AWS 托管服务。
@@ -286,20 +323,24 @@ helm install opscenter ./helm/opscenter \
 │   ├── specs/                 # 功能规格 (16个)
 │   └── template.md            # 规格模板
 │
-├── k8s/                       # Kubernetes 部署清单（生产环境）
-│   ├── 00-namespace.yaml      # 命名空间配置
-│   ├── 01-configmap.yaml      # 应用配置
-│   ├── 02-secret.yaml         # 敏感配置
-│   ├── 03-backend-deployment.yaml
-│   ├── 04-backend-service.yaml
-│   ├── 05-frontend-deployment.yaml
-│   ├── 06-frontend-service.yaml
-│   └── 09-rbac.yaml
-├── helm/opscenter/            # Helm Chart
-├── docker-compose.yml         # Docker Compose 配置（开发环境）
-├── KUBERNETES_DEPLOYMENT.md   # 详细部署文档
-├── KUBERNETES.md              # 快速部署指南
-├── MIGRATION_GUIDE.md         # AWS 托管服务迁移指南
+├── release/                   # 部署相关文件
+│   ├── k8s/                   # Kubernetes 部署清单（生产环境）
+│   │   ├── 00-namespace.yaml  # 命名空间配置
+│   │   ├── 01-configmap.yaml  # 应用配置
+│   │   ├── 02-secret.yaml     # 敏感配置
+│   │   ├── 03-backend-deployment.yaml
+│   │   ├── 04-backend-service.yaml
+│   │   ├── 05-frontend-deployment.yaml
+│   │   ├── 06-frontend-service.yaml
+│   │   └── 09-rbac.yaml
+│   ├── helm/opscenter/        # Helm Chart
+│   ├── docs/                  # 部署文档
+│   │   ├── KUBERNETES_DEPLOYMENT.md  # 详细部署文档
+│   │   ├── KUBERNETES.md             # 快速部署指南
+│   │   └── MIGRATION_GUIDE.md        # AWS 托管服务迁移指南
+│   ├── deploy-k8s.sh          # Kubernetes 部署脚本
+│   └── docker-compose.yml     # Docker Compose 配置（开发环境）
+│
 ├── .coze                      # 项目配置
 └── AGENTS.md                  # 本文件
 ```
@@ -716,11 +757,11 @@ const res = await request.get('/notification/channels')
 | 后端入口 | `backend/app/main.py` |
 | 数据库模型 | `backend/app/models/` |
 | 日志文件 | `/app/work/logs/bypass/app.log` |
-| K8s 配置 | `k8s/01-configmap.yaml`, `k8s/02-secret.yaml` |
-| K8s 部署清单 | `k8s/` 目录 |
-| Helm Chart | `helm/opscenter/` |
-| 部署文档 | `KUBERNETES_DEPLOYMENT.md` |
-| 迁移指南 | `MIGRATION_GUIDE.md` |
+| K8s 配置 | `release/k8s/01-configmap.yaml`, `release/k8s/02-secret.yaml` |
+| K8s 部署清单 | `release/k8s/` 目录 |
+| Helm Chart | `release/helm/opscenter/` |
+| 部署文档 | `release/docs/KUBERNETES_DEPLOYMENT.md` |
+| 迁移指南 | `release/docs/MIGRATION_GUIDE.md` |
 
 ### 常用命令
 
@@ -737,7 +778,7 @@ cd frontend && pnpm build
 
 # 云原生部署（生产环境）
 # 部署到 Kubernetes
-./deploy-k8s.sh
+cd release && ./deploy-k8s.sh
 
 # 查看部署状态
 kubectl get pods -n opscenter
