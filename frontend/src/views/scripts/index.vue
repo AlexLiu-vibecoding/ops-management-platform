@@ -337,7 +337,7 @@ const notificationChannels = ref([])
 const fetchNotificationChannels = async () => {
   try {
     const data = await request.get('/notification/channels')
-    notificationChannels.value = data
+    notificationChannels.value = data.items || data
   } catch (error) {
     console.error('获取通知通道列表失败:', error)
   }
