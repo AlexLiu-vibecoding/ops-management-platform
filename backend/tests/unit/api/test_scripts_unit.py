@@ -162,14 +162,58 @@ class TestScriptPermission:
         result = check_script_permission(mock_script, mock_user)
         assert result is True
     
+    def test_allowed_roles_permission(self):
+        """测试角色白名单权限"""
+        from app.api.scripts import check_script_permission
+        from app.models import UserRole
+        from enum import Enum
+        
+        mock_script = MagicMock()
+        mock_script.created_by = 1
+        mock_script.is_public = False
+        mock_script.allowed_roles = "developer,operator"
+        
+        # 创建一个Mock的role，带有value属性
+        mock_role = MagicMock()
+        mock_role.value = "developer"
+        
+        mock_user = MagicMock()
+        mock_user.role = mock_role
+        mock_user.id = 2
+        
+        result = check_script_permission(mock_script, mock_user)
+        assert result is True
+    
     def test_no_permission(self):
         """测试无权限"""
+        from app.api.scripts import check_script_permission
+        from app.models import UserRole
+        
+        mock_script = MagicMock()
+        mock_script.created_by = 1
+        mock_script.is_public = False
+        mock_script.allowed_roles = "operator"
+        
+        # 创建一个Mock的role，带有value属性
+        mock_role = MagicMock()
+        mock_role.value = "developer"
+        
+        mock_user = MagicMock()
+        mock_user.role = mock_role
+        mock_user.id = 2
+        
+        result = check_script_permission(mock_script, mock_user)
+        assert result is False
+    
+    def test_no_permission_no_allowed_roles(self):
+        """测试无权限且无角色白名单"""
         from app.api.scripts import check_script_permission
         from app.models import User, UserRole
         
         mock_script = MagicMock()
         mock_script.created_by = 1
         mock_script.is_public = False
+        mock_script.allowed_roles = None
         
         mock_user = MagicMock()
         mock_user.role = UserRole.DEVELOPER
@@ -320,6 +364,142 @@ class TestExecutionQuery:
         
         assert query.start_date == start
         assert query.end_date == end
+
+
+class TestScriptUpdate:
+    """测试更新脚本Schema"""
+    
+    def test_update_partial_fields(self):
+        """测试部分更新字段"""
+        from app.api.scripts import ScriptUpdate
+        
+        update = ScriptUpdate(name="新名称")
+        
+        assert update.name == "新名称"
+        assert update.content is None
+        assert update.description is None
+    
+    def test_update_with_all_fields(self):
+        """测试完整更新字段"""
+        from app.api.scripts import ScriptUpdate
+        
+        update = ScriptUpdate(
+            name="新名称",
+            content="new content",
+            description="new desc",
+            is_enabled=False,
+            is_public=True
+        )
+        
+        assert update.name == "新名称"
+        assert update.content == "new content"
+        assert update.is_enabled is False
+        assert update.is_public is True
+    
+    def test_update_notification_config(self):
+        """测试更新通知配置"""
+        from app.api.scripts import ScriptUpdate
+        
+        update = ScriptUpdate(
+            notify_on_success=True,
+            notify_on_failure=False,
+            notify_channels="1,2,3"
+        )
+        
+        assert update.notify_on_success is True
+        assert update.notify_on_failure is False
+        assert update.notify_channels == "1,2,3"
+
+
+class TestScriptCreateWithNotification:
+    """测试带通知配置的脚本创建"""
+    
+    def test_create_with_notification(self):
+        """测试创建带通知的脚本"""
+        from app.api.scripts import ScriptCreate
+        
+        script = ScriptCreate(
+            name="通知测试脚本",
+            content="echo hello",
+            notify_on_success=True,
+            notify_on_failure=True,
+            notify_channels="1,2"
+        )
+        
+        assert script.notify_on_success is True
+        assert script.notify_on_failure is True
+        assert script.notify_channels == "1,2"
+    
+    def test_create_with_tags(self):
+        """测试创建带标签的脚本"""
+        from app.api.scripts import ScriptCreate
+        
+        script = ScriptCreate(
+            name="标签测试脚本",
+            content="echo hello",
+            tags="dev,test"
+        )
+        
+        assert script.tags == "dev,test"
+
+
+class TestScriptEnums:
+    """测试脚本枚举值"""
+    
+    def test_execution_status_all_values(self):
+        """测试执行状态所有值"""
+        from app.models import ExecutionStatus
+        
+        values = [e.value for e in ExecutionStatus]
+        assert "pending" in values
+        assert "running" in values
+        assert "success" in values
+        assert "failed" in values
+        assert "timeout" in values
+        assert "cancelled" in values
+    
+    def test_trigger_type_all_values(self):
+        """测试触发类型所有值"""
+        from app.models import TriggerType
+        
+        values = [e.value for e in TriggerType]
+        assert "manual" in values
+        assert "scheduled" in values
+        assert "api" in values
+
+
+class TestExecutionQueryEdgeCases:
+    """测试执行查询边界情况"""
+    
+    def test_query_with_all_filters(self):
+        """测试带所有过滤条件的查询"""
+        from app.api.scripts import ExecutionQuery
+        
+        query = ExecutionQuery(
+            script_id=1,
+            status="success",
+            trigger_type="manual",
+            start_date=datetime(2024, 1, 1),
+            end_date=datetime(2024, 12, 31),
+            skip=10,
+            limit=50
+        )
+        
+        assert query.script_id == 1
+        assert query.status == "success"
+        assert query.trigger_type == "manual"
+        assert query.skip == 10
+        assert query.limit == 50
+    
+    def test_query_pagination_limits(self):
+        """测试分页限制"""
+        from app.api.scripts import ExecutionQuery
+        
+        query = ExecutionQuery(limit=100)
+        assert query.limit == 100
+        
+        query2 = ExecutionQuery(limit=1)
+        assert query2.limit == 1
 
 
 if __name__ == "__main__":

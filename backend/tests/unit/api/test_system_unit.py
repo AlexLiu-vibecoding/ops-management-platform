@@ -206,5 +206,97 @@ class TestSystemModels:
         assert GlobalConfig is not None
 
 
+class TestDefaultDbConfigsComplete:
+    """测试完整默认数据库配置"""
+    
+    def test_all_db_types_have_required_fields(self):
+        """测试所有数据库类型都有必填字段"""
+        from app.api.system import DEFAULT_DB_CONFIGS
+        
+        required_fields = ['db_type', 'display_name', 'default_port']
+        
+        for config in DEFAULT_DB_CONFIGS:
+            for field in required_fields:
+                assert field in config, f"Missing {field} in {config.get('db_type', 'unknown')}"
+    
+    def test_all_db_types_have_optional_fields(self):
+        """测试所有数据库类型都有可选字段"""
+        from app.api.system import DEFAULT_DB_CONFIGS
+        
+        optional_fields = ['enabled', 'icon', 'description']
+        
+        for config in DEFAULT_DB_CONFIGS:
+            for field in optional_fields:
+                assert field in config, f"Missing {field} in {config.get('db_type', 'unknown')}"
+    
+    def test_all_db_types_enabled_by_default(self):
+        """测试所有数据库类型默认启用"""
+        from app.api.system import DEFAULT_DB_CONFIGS
+        
+        for config in DEFAULT_DB_CONFIGS:
+            assert config.get('enabled') is True, f"{config.get('db_type')} should be enabled by default"
+
+
+class TestDatabaseTypeConfigEdgeCases:
+    """测试数据库类型配置边界情况"""
+    
+    def test_minimal_config(self):
+        """测试最小配置"""
+        from app.api.system import DatabaseTypeConfig
+        
+        config = DatabaseTypeConfig(
+            db_type="mongodb",
+            display_name="MongoDB",
+            default_port=27017
+        )
+        
+        assert config.db_type == "mongodb"
+        assert config.enabled is True
+        assert config.icon == ""
+        assert config.description == ""
+    
+    def test_full_config(self):
+        """测试完整配置"""
+        from app.api.system import DatabaseTypeConfig
+        
+        config = DatabaseTypeConfig(
+            db_type="oracle",
+            display_name="Oracle",
+            default_port=1521,
+            enabled=False,
+            icon="oracle",
+            description="Oracle Database"
+        )
+        
+        assert config.enabled is False
+        assert config.icon == "oracle"
+        assert config.description == "Oracle Database"
+
+
+class TestDatabaseConfigUpdateEdgeCases:
+    """测试数据库配置更新边界情况"""
+    
+    def test_partial_update_enabled(self):
+        """测试部分更新-启用"""
+        from app.api.system import DatabaseConfigUpdate
+        
+        update = DatabaseConfigUpdate(enabled=True)
+        assert update.enabled is True
+    
+    def test_partial_update_disabled(self):
+        """测试部分更新-禁用"""
+        from app.api.system import DatabaseConfigUpdate
+        
+        update = DatabaseConfigUpdate(enabled=False)
+        assert update.enabled is False
+    
+    def test_empty_update(self):
+        """测试空更新"""
+        from app.api.system import DatabaseConfigUpdate
+        
+        update = DatabaseConfigUpdate()
+        assert update.enabled is None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

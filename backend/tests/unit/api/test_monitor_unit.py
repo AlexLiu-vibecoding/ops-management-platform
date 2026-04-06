@@ -232,5 +232,120 @@ class TestMonitorModels:
         assert hasattr(MonitorType, 'CPU') or hasattr(MonitorType, 'SLOW_QUERY') or hasattr(MonitorType, 'MEMORY')
 
 
+class TestMonitorConfigValidation:
+    """测试监控配置验证"""
+    
+    def test_slow_query_threshold_range(self):
+        """测试慢查询阈值范围"""
+        from app.api.monitor import SlowQueryConfig
+        
+        field = SlowQueryConfig.model_fields['threshold']
+        metadata = field.metadata
+        ge = next((m.ge for m in metadata if hasattr(m, 'ge')), None)
+        le = next((m.le for m in metadata if hasattr(m, 'le')), None)
+        assert ge == 0.1
+        assert le == 3600
+    
+    def test_slow_query_retention_days_range(self):
+        """测试数据保留天数范围"""
+        from app.api.monitor import SlowQueryConfig
+        
+        field = SlowQueryConfig.model_fields['retention_days']
+        metadata = field.metadata
+        ge = next((m.ge for m in metadata if hasattr(m, 'ge')), None)
+        le = next((m.le for m in metadata if hasattr(m, 'le')), None)
+        assert ge == 1
+        assert le == 365
+    
+    def test_high_cpu_threshold_range(self):
+        """测试CPU阈值范围"""
+        from app.api.monitor import HighCPUSQLConfig
+        
+        field = HighCPUSQLConfig.model_fields['cpu_threshold']
+        metadata = field.metadata
+        ge = next((m.ge for m in metadata if hasattr(m, 'ge')), None)
+        le = next((m.le for m in metadata if hasattr(m, 'le')), None)
+        assert ge == 0
+        assert le == 100
+    
+    def test_high_cpu_collect_interval_range(self):
+        """测试采集间隔范围"""
+        from app.api.monitor import HighCPUSQLConfig
+        
+        field = HighCPUSQLConfig.model_fields['collect_interval']
+        metadata = field.metadata
+        ge = next((m.ge for m in metadata if hasattr(m, 'ge')), None)
+        le = next((m.le for m in metadata if hasattr(m, 'le')), None)
+        assert ge == 1
+        assert le == 60
+
+
+class TestAlertRuleEdgeCases:
+    """测试告警规则边界情况"""
+    
+    def test_alert_rule_all_operators(self):
+        """测试所有操作符"""
+        from app.api.monitor import AlertRuleConfig
+        
+        for op in [">", "<", ">=", "<=", "=="]:
+            rule = AlertRuleConfig(
+                rule_id="test",
+                name="Test",
+                metric_type="cpu",
+                operator=op,
+                threshold=80
+            )
+            assert rule.operator == op
+    
+    def test_alert_rule_all_severities(self):
+        """测试所有严重级别"""
+        from app.api.monitor import AlertRuleConfig
+        
+        for severity in ["info", "warning", "critical"]:
+            rule = AlertRuleConfig(
+                rule_id="test",
+                name="Test",
+                metric_type="cpu",
+                threshold=80,
+                severity=severity
+            )
+            assert rule.severity == severity
+    
+    def test_alert_rule_all_metric_types(self):
+        """测试所有指标类型"""
+        from app.api.monitor import AlertRuleConfig
+        
+        for metric in ["cpu", "memory", "disk", "connections", "qps", "slow_query"]:
+            rule = AlertRuleConfig(
+                rule_id="test",
+                name="Test",
+                metric_type=metric,
+                threshold=80
+            )
+            assert rule.metric_type == metric
+
+
+class TestMonitorSwitchesModel:
+    """测试监控开关模型"""
+    
+    def test_monitor_switch_model_exists(self):
+        """测试MonitorSwitch模型存在"""
+        from app.models import MonitorSwitch
+        
+        assert MonitorSwitch is not None
+    
+    def test_slow_query_model_exists(self):
+        """测试SlowQuery模型存在"""
+        from app.models import SlowQuery
+        
+        assert SlowQuery is not None
+    
+    def test_performance_metric_model_exists(self):
+        """测试PerformanceMetric模型存在"""
+        from app.models import PerformanceMetric
+        
+        assert PerformanceMetric is not None
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
