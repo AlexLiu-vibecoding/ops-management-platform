@@ -131,3 +131,26 @@ async def full_jwt_rotation(
         new_version=result["new_version"],
         key_preview=result["key_preview"]
     )
+
+
+@router.delete("/keys/{key_id}", response_model=MessageResponse)
+async def delete_jwt_key(
+    key_id: str,
+    current_user: User = Depends(get_super_admin),
+    db: Session = Depends(get_db)
+):
+    """删除指定的 JWT 密钥版本"""
+    service = JWTRotationService(db, operator_id=current_user.id)
+    
+    try:
+        success = service.delete_key(key_id)
+        if not success:
+            raise HTTPException(status_code=404, detail=f"密钥版本 {key_id} 不存在")
+        
+        return MessageResponse(
+            success=True,
+            message=f"密钥版本 {key_id} 已删除",
+            note="删除后无法恢复"
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))

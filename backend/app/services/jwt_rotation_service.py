@@ -6,7 +6,7 @@ import secrets
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
-from app.models.key_rotation import JWTRotationKey, JWTRotationConfig
+from app.models.key_rotation import JWTRotationKey, JWTRotationConfig, KeyRotationLog
 from app.config import settings
 
 
@@ -95,6 +95,19 @@ class JWTRotationService:
             created_by=self.operator_id
         )
         self.db.add(key)
+        
+        # 记录日志
+        log = KeyRotationLog(
+            key_type='JWT',
+            action='generate',
+            to_version=key_id,
+            status='success',
+            total_records=1,
+            migrated_records=1,
+            operator_id=self.operator_id
+        )
+        self.db.add(log)
+        
         self.db.commit()
         self.db.refresh(key)
         
@@ -111,6 +124,19 @@ class JWTRotationService:
         old_version = config.current_key_id
         config.current_key_id = target_version
         config.last_rotation_at = datetime.now()
+        
+        # 记录日志
+        log = KeyRotationLog(
+            key_type='JWT',
+            action='switch',
+            from_version=old_version,
+            to_version=target_version,
+            status='success',
+            total_records=1,
+            migrated_records=1,
+            operator_id=self.operator_id
+        )
+        self.db.add(log)
         
         self.db.commit()
         
@@ -131,12 +157,18 @@ class JWTRotationService:
         
         current_version = config.current_key_id or "v1"
         
+        # 获取 JWT 操作历史
+        history = self.db.query(KeyRotationLog).filter(
+            KeyRotationLog.key_type == 'JWT'
+        ).order_by(KeyRotationLog.created_at.desc()).limit(20).all()
+        
         return {
             "enabled": config.enabled,
             "current_version": current_version,
             "total_keys": len(all_keys),
             "keys": [k.to_dict() for k in all_keys],
-            "last_rotation_at": config.last_rotation_at.isoformat() if config.last_rotation_at else None
+            "last_rotation_at": config.last_rotation_at.isoformat() if config.last_rotation_at else None,
+            "history": [h.to_dict() for h in history]
         }
     
     def full_rotation(self) -> dict:
@@ -152,3 +184,32 @@ class JWTRotationService:
             "new_version": new_key.key_id,
             "key_preview": new_key.key_value[:4] + "***" + new_key.key_value[-4:]
         }
+    
+    def delete_key(self, key_id: str) -> bool:
+        """删除指定的 JWT 密钥"""
+        # 不能删除当前活跃密钥
+        current_version = self.get_current_version()
+        if key_id == current_version:
+            raise ValueError("不能删除当前活跃的密钥版本")
+        
+        key = self.get_key_by_id(key_id)
+        if not key:
+            return False
+        
+        # 记录日志
+        log = KeyRotationLog(
+            key_type='JWT',
+            action='delete',
+            from_version=key_id,
+            status='success',
+            total_records=1,
+            migrated_records=1,
+            operator_id=self.operator_id
+        )
+        self.db.add(log)
+        
+        # 删除密钥
+        self.db.delete(key)
+        self.db.commit()
+        
+        return True

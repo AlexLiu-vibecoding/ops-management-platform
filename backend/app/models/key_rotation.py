@@ -33,6 +33,7 @@ class KeyRotationLog(Base):
     __tablename__ = "key_rotation_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
+    key_type = Column(String(20), default='AES', nullable=False, comment="密钥类型: AES/JWT")
     action = Column(String(50), nullable=False, comment="操作类型: preview/migrate/switch")
     from_version = Column(String(10), nullable=True, comment="源版本")
     to_version = Column(String(10), nullable=True, comment="目标版本")

@@ -459,57 +459,6 @@
                 </el-table-column>
               </el-table>
             </el-card>
-
-            <!-- 统计信息 -->
-            <el-row :gutter="20" class="rotation-stats">
-              <el-col :span="12">
-                <div class="rotation-stat-card">
-                  <div class="stat-icon current"><el-icon><Key /></el-icon></div>
-                  <div class="stat-info">
-                    <div class="stat-label">当前版本</div>
-                    <div class="stat-value">{{ overviewData.current_version?.toUpperCase() || '-' }}</div>
-                  </div>
-                </div>
-              </el-col>
-              <el-col :span="12">
-                <div class="rotation-stat-card">
-                  <div class="stat-icon total"><el-icon><Document /></el-icon></div>
-                  <div class="stat-info">
-                    <div class="stat-label">版本总数</div>
-                    <div class="stat-value">{{ overviewData.total_keys || 0 }}</div>
-                  </div>
-                </div>
-              </el-col>
-            </el-row>
-
-            <!-- 历史记录 -->
-            <el-divider content-position="left">操作历史</el-divider>
-            <el-table :data="rotationHistory" size="small" border v-loading="historyLoading">
-              <el-table-column prop="action" label="操作" width="80">
-                <template #default="{ row }">
-                  <el-tag size="small" :type="getActionType(row.action)">{{ getActionLabel(row.action) }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="status" label="状态" width="80">
-                <template #default="{ row }">
-                  <el-tag size="small" :type="row.status === 'success' ? 'success' : row.status === 'partial' ? 'warning' : 'danger'">
-                    {{ row.status === 'success' ? '成功' : row.status === 'partial' ? '部分' : '失败' }}
-                  </el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="migrated_records" label="迁移数" width="80" align="center" />
-              <el-table-column prop="error_message" label="错误原因" min-width="200" show-overflow-tooltip>
-                <template #default="{ row }">
-                  <span v-if="row.error_message" class="text-danger">{{ row.error_message }}</span>
-                  <span v-else class="text-muted">-</span>
-                </template>
-              </el-table-column>
-              <el-table-column prop="created_at" label="时间" width="160">
-                <template #default="{ row }">
-                  {{ formatTime(row.created_at) }}
-                </template>
-              </el-table-column>
-            </el-table>
           </div>
 
           <!-- JWT 密钥轮换区块 -->
@@ -584,6 +533,47 @@
               </template>
             </el-alert>
           </div>
+
+          <!-- 密钥轮换操作历史 -->
+          <el-divider content-position="left">
+            <el-icon><Clock /></el-icon> 操作历史
+          </el-divider>
+          
+          <el-card shadow="never" v-loading="historyLoading">
+            <el-table :data="allHistory" size="small" border>
+              <el-table-column prop="key_type" label="类型" width="80" align="center">
+                <template #default="{ row }">
+                  <el-tag :type="row.key_type === 'AES' ? 'primary' : 'success'" size="small">
+                    {{ row.key_type }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="action" label="操作" width="80">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="getActionType(row.action)">{{ getActionLabel(row.action) }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="status" label="状态" width="80">
+                <template #default="{ row }">
+                  <el-tag size="small" :type="row.status === 'success' ? 'success' : row.status === 'partial' ? 'warning' : 'danger'">
+                    {{ row.status === 'success' ? '成功' : row.status === 'partial' ? '部分' : '失败' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="migrated_records" label="迁移数" width="80" align="center" />
+              <el-table-column prop="error_message" label="错误原因" min-width="200" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span v-if="row.error_message" class="text-danger">{{ row.error_message }}</span>
+                  <span v-else class="text-muted">-</span>
+                </template>
+              </el-table-column>
+              <el-table-column prop="created_at" label="时间" width="160">
+                <template #default="{ row }">
+                  {{ formatTime(row.created_at) }}
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
         </el-card>
       </el-tab-pane>
 
@@ -834,7 +824,14 @@ const jwtRotationData = ref({
   current_version: '',
   total_keys: 0,
   last_rotation_at: null,
-  keys: []
+  keys: [],
+  history: []
+})
+const jwtHistoryRecords = computed(() => jwtRotationData.value.history || [])
+const allHistory = computed(() => {
+  const aesHistory = (rotationHistory.value || []).map(h => ({ ...h, key_type: 'AES' }))
+  const jwtHistory = (jwtHistoryRecords.value || []).map(h => ({ ...h, key_type: 'JWT' }))
+  return [...aesHistory, ...jwtHistory].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 })
 const jwtRotationLoading = ref(false)
 const jwtSwitching = ref(false)
