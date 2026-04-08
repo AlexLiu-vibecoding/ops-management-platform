@@ -482,7 +482,7 @@
                   </el-space>
                 </div>
               </template>
-              <el-table :data="jwtRotationData.keys || []" size="small" border>
+              <el-table :data="jwtKeysReversed" size="small" border>
                 <el-table-column prop="key_id" label="版本" width="150" align="center">
                   <template #default="{ row }">
                     <div class="version-cell">
@@ -827,6 +827,7 @@ const jwtRotationData = ref({
   keys: [],
   history: []
 })
+const jwtKeysReversed = computed(() => [...(jwtRotationData.value.keys || [])].reverse())
 const jwtHistoryRecords = computed(() => jwtRotationData.value.history || [])
 const allHistory = computed(() => {
   const aesHistory = (rotationHistory.value || []).map(h => ({ ...h, key_type: 'AES' }))
