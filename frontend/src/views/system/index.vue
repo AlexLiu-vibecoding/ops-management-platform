@@ -821,11 +821,17 @@ const loadRotationHistory = async () => {
 }
 
 const loadRotationData = async () => {
-  await Promise.all([
-    loadRotationStatus(),
-    loadMigrationPreview(),
-    loadRotationHistory()
-  ])
+  console.log('开始加载密钥轮换数据...')
+  try {
+    const results = await Promise.all([
+      loadRotationStatus(),
+      loadMigrationPreview(),
+      loadRotationHistory()
+    ])
+    console.log('密钥轮换数据加载完成', results)
+  } catch (error) {
+    console.error('加载密钥轮换数据失败:', error)
+  }
 }
 
 const handleConfigChange = async () => {
@@ -844,24 +850,27 @@ const handleConfigChange = async () => {
 }
 
 const handleSwitchVersion = async (targetVersion) => {
+  console.log('1. 点击了切换按钮, 目标版本:', targetVersion)
   try {
-    await ElMessageBox.confirm(
+    const confirmed = await ElMessageBox.confirm(
       `确定要切换到 ${targetVersion.toUpperCase()} 版本吗？\n\n切换后，新加密的数据将使用新密钥。旧密钥加密的数据仍可自动解密。`,
       '确认切换',
       { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
     )
+    console.log('2. 用户确认了, confirmed:', confirmed)
     switching.value = true
-    console.log('开始切换到版本:', targetVersion)
+    console.log('3. 开始调用 API')
     const result = await rotationApi.switchKeyVersion(targetVersion)
-    console.log('切换结果:', result)
+    console.log('4. API 返回:', result)
     ElMessage.success(`已切换到 ${targetVersion.toUpperCase()} 版本`)
     await loadRotationData()
   } catch (error) {
-    console.error('切换失败:', error)
-    console.error('错误详情:', error.response?.data)
-    if (error !== 'cancel') {
-      const detail = error.response?.data?.detail || error.response?.data?.message || '切换失败'
-      ElMessage.error(detail)
+    console.error('5. 捕获到错误:', error)
+    console.error('   error 类型:', typeof error)
+    console.error('   error === cancel:', error === 'cancel')
+    console.error('   error.response:', error?.response)
+    if (error !== 'cancel' && error !== 'close') {
+      ElMessage.error('切换失败: ' + (error?.message || error?.detail || String(error)))
     }
   } finally {
     switching.value = false
