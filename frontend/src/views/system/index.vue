@@ -380,7 +380,7 @@
             </el-descriptions-item>
             <el-descriptions-item label="AES 密钥">
               <div class="secret-value">
-                <code>{{ securityConfig.aes_key }}</code>
+                <code>{{ getAesCurrentKeyPreview() }}</code>
                 <el-tag v-if="overviewData.current_version" type="success" size="small" style="margin-left: 10px;">
                   {{ overviewData.current_version.toUpperCase() }}
                 </el-tag>
@@ -1125,6 +1125,13 @@ const isJwtKeyCustomized = computed(() => {
   const keys = jwtRotationData.value.keys || []
   return keys.length > 1 || jwtRotationData.value.current_version !== 'v1'
 })
+
+// AES 密钥辅助函数
+const getAesCurrentKeyPreview = () => {
+  const keys = keyVersions.value || []
+  const currentKey = keys.find(k => k.is_active)
+  return currentKey?.key_value_preview || '***'
+}
 
 onMounted(() => {
   loadOverview()
