@@ -743,6 +743,12 @@ const securityConfig = reactive({
 })
 
 // 密钥轮换统计
+const overviewData = ref({
+  current_version: '',
+  total_keys: 0,
+  total_records: 0,
+  latest_key_created_at: null
+})
 const rotationConfig = ref({
   enabled: false,
   schedule_type: 'monthly',
@@ -765,10 +771,17 @@ const historyLoading = ref(false)
 const loadRotationStatus = async () => {
   rotationLoading.value = true
   try {
-    const [versions, config] = await Promise.all([
+    const [overview, versions, config] = await Promise.all([
+      rotationApi.getKeyRotationStatus(),
       rotationApi.getKeyVersions(),
       rotationApi.getRotationConfig()
     ])
+    overviewData.value = {
+      current_version: overview.current_version || versions.current_version,
+      total_keys: versions.total_versions,
+      total_records: overview.unrotated_count || 0,
+      latest_key_created_at: null
+    }
     keyVersions.value = versions.versions || []
     rotationConfig.value = {
       enabled: config.enabled,
