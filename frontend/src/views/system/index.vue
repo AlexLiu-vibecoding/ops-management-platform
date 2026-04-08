@@ -529,22 +529,19 @@
                 </div>
               </template>
               <el-table :data="jwtRotationData.keys || []" size="small" border>
-                <el-table-column prop="key_id" label="版本" width="100" align="center">
+                <el-table-column prop="key_id" label="版本" width="120" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="row.key_id === jwtRotationData.current_version ? 'success' : 'info'" size="small">
-                      {{ row.key_id.toUpperCase() }}
-                    </el-tag>
+                    <div class="version-cell">
+                      <el-tag :type="row.key_id === jwtRotationData.current_version ? 'success' : 'info'" size="small">
+                        {{ row.key_id.toUpperCase() }}
+                      </el-tag>
+                      <el-tag v-if="row.key_id === jwtRotationData.current_version" type="success" size="small" style="margin-left: 4px; white-space: nowrap;">使用中</el-tag>
+                    </div>
                   </template>
                 </el-table-column>
-                <el-table-column prop="key_value_preview" label="密钥预览">
+                <el-table-column prop="key_value_preview" label="密钥预览" min-width="150">
                   <template #default="{ row }">
                     <code>{{ row.key_value_preview }}</code>
-                  </template>
-                </el-table-column>
-                <el-table-column prop="is_active" label="当前版本" width="100" align="center">
-                  <template #default="{ row }">
-                    <el-tag v-if="row.key_id === jwtRotationData.current_version" type="success">当前</el-tag>
-                    <el-tag v-else type="info">-</el-tag>
                   </template>
                 </el-table-column>
                 <el-table-column prop="created_at" label="创建时间" width="160">
@@ -552,13 +549,12 @@
                     {{ formatTime(row.created_at) }}
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="150" align="center">
+                <el-table-column label="操作" width="180" align="center">
                   <template #default="{ row }">
                     <el-button 
                       v-if="row.key_id !== jwtRotationData.current_version"
-                      type="primary" 
+                      type="success" 
                       size="small" 
-                      link
                       @click="handleJwtSwitchVersion(row.key_id)"
                       :loading="jwtSwitching">
                       切换
@@ -567,12 +563,11 @@
                       v-if="row.key_id !== jwtRotationData.current_version"
                       type="danger" 
                       size="small" 
-                      link
                       @click="handleJwtDeleteKey(row.key_id)"
                       :loading="jwtDeleting === row.key_id">
                       删除
                     </el-button>
-                    <span v-else class="text-muted">-</span>
+                    <span v-else class="text-muted">当前版本</span>
                   </template>
                 </el-table-column>
               </el-table>
