@@ -192,15 +192,15 @@ class AESCipher:
         elif encrypted_text.startswith("v2$"):
             version = "v2"
             data = encrypted_text[3:]
+        elif encrypted_text.startswith("v3$"):
+            version = "v3"
+            data = encrypted_text[3:]
         elif encrypted_text.startswith(cls.LEGACY_PREFIX):
             # 旧格式，无版本前缀
             data = encrypted_text[len(cls.LEGACY_PREFIX):]
         
-        # 获取对应版本的密钥
-        if version == "v2" and settings.security.AES_KEY_V2:
-            key = settings.security.AES_KEY_V2.encode('utf-8')
-        else:
-            key = settings.AES_KEY.encode('utf-8')
+        # 获取对应版本的密钥 - 优先从数据库读取
+        key = cls._get_key_for_version(version)
         
         if len(key) != 32:
             key = key.ljust(32, b'0')[:32]
@@ -231,6 +231,38 @@ class AESCipher:
             logger.error(f"解密失败 (version={version}): {e}")
             raise ValueError(f"解密失败: {e}")
     
+    @classmethod
+    def _get_key_for_version(cls, version: str) -> bytes:
+        """
+        获取指定版本的密钥
+        
+        优先从 key_rotation_keys 表读取，如果未找到则回退到环境变量
+        """
+        # 尝试从数据库读取密钥
+        try:
+            from app.database import SessionLocal
+            from app.models.key_rotation import KeyRotationKey
+            
+            db = SessionLocal()
+            try:
+                key_record = db.query(KeyRotationKey).filter(
+                    KeyRotationKey.key_id == version
+                ).first()
+                
+                if key_record and key_record.key_value:
+                    logger.debug(f"使用数据库中的 {version} 密钥进行解密")
+                    return key_record.key_value.encode('utf-8')
+            finally:
+                db.close()
+        except Exception as e:
+            logger.debug(f"从数据库读取密钥失败: {e}")
+        
+        # 回退到环境变量
+        if version == "v2" and settings.security.AES_KEY_V2:
+            return settings.security.AES_KEY_V2.encode('utf-8')
+        else:
+            return settings.AES_KEY.encode('utf-8')
+    
     @staticmethod
     def detect_version(encrypted_text: str) -> str:
         """
@@ -240,12 +272,14 @@ class AESCipher:
             encrypted_text: 加密后的字符串
         
         Returns:
-            版本标识：v1, v2, 或 legacy
+            版本标识：v1, v2, v3 或 legacy
         """
         if encrypted_text.startswith("v1$"):
             return "v1"
         elif encrypted_text.startswith("v2$"):
             return "v2"
+        elif encrypted_text.startswith("v3$"):
+            return "v3"
         elif encrypted_text.startswith(AESCipher.LEGACY_PREFIX):
             return "legacy"
         else:
