@@ -394,141 +394,100 @@
           </el-divider>
           
           <div class="key-rotation-section" v-loading="rotationLoading">
-            <!-- 提示信息 -->
-            <el-alert
-              v-if="!rotationStatus.can_rotate"
-              type="warning"
-              :closable="false"
-              show-icon
-              style="margin-bottom: 20px;">
-              <template #title>
-                <span>密钥轮换功能未启用 - 请配置 <code>AES_KEY_V2</code> 环境变量（32字符）</span>
+            <!-- 版本密钥列表 -->
+            <el-card shadow="never" style="margin-bottom: 20px;">
+              <template #header>
+                <div class="card-header">
+                  <span>密钥版本</span>
+                  <el-button type="primary" size="small" @click="handleGenerateKey" :loading="generatingKey">
+                    <el-icon><Plus /></el-icon> 生成新版本
+                  </el-button>
+                </div>
               </template>
-              <template #default>
-                当前只有 V1 密钥配置，V2 密钥未配置。要使用密钥轮换功能，请先配置 V2 密钥。
-                配置后需要重启服务使配置生效。
-              </template>
-            </el-alert>
+              <el-table :data="keyVersions" size="small" border>
+                <el-table-column prop="key_id" label="版本" width="80" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                      {{ row.key_id.toUpperCase() }}
+                      <el-tag v-if="row.is_active" type="success" size="small" style="margin-left: 4px;">使用中</el-tag>
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="key_value_preview" label="密钥预览">
+                  <template #default="{ row }">
+                    <code>{{ row.key_value_preview }}</code>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="created_at" label="创建时间" width="160">
+                  <template #default="{ row }">
+                    {{ formatTime(row.created_at) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="120" align="center">
+                  <template #default="{ row }">
+                    <el-button 
+                      v-if="!row.is_active" 
+                      type="success" 
+                      size="small" 
+                      @click="handleSwitchVersion(row.key_id)"
+                      :loading="switching">
+                      切换到此版本
+                    </el-button>
+                    <span v-else class="text-muted">当前版本</span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-card>
 
-            <!-- 统计卡片 -->
+            <!-- 统计信息 -->
             <el-row :gutter="20" class="rotation-stats">
-              <el-col :span="6">
+              <el-col :span="8">
                 <div class="rotation-stat-card">
                   <div class="stat-icon current"><el-icon><Key /></el-icon></div>
                   <div class="stat-info">
                     <div class="stat-label">当前版本</div>
-                    <div class="stat-value">{{ rotationStatus.current_version?.toUpperCase() || 'v1' }}</div>
+                    <div class="stat-value">{{ overviewData.current_version?.toUpperCase() || '-' }}</div>
                   </div>
                 </div>
               </el-col>
-              <el-col :span="6">
+              <el-col :span="8">
                 <div class="rotation-stat-card">
                   <div class="stat-icon total"><el-icon><Document /></el-icon></div>
                   <div class="stat-info">
                     <div class="stat-label">加密记录总数</div>
-                    <div class="stat-value">{{ rotationStatistics?.total || 0 }}</div>
+                    <div class="stat-value">{{ overviewData.total_records || 0 }}</div>
                   </div>
                 </div>
               </el-col>
-              <el-col :span="6">
+              <el-col :span="8">
                 <div class="rotation-stat-card">
                   <div class="stat-icon pending"><el-icon><Warning /></el-icon></div>
                   <div class="stat-info">
-                    <div class="stat-label">待迁移</div>
-                    <div class="stat-value">{{ rotationStatistics?.needs_migration || 0 }}</div>
-                  </div>
-                </div>
-              </el-col>
-              <el-col :span="6">
-                <div class="rotation-stat-card">
-                  <div class="stat-icon v2"><el-icon><CircleCheck /></el-icon></div>
-                  <div class="stat-info">
-                    <div class="stat-label">V2 版本</div>
-                    <div class="stat-value">{{ rotationStatistics?.v2_count || 0 }}</div>
+                    <div class="stat-label">待迁移记录</div>
+                    <div class="stat-value">{{ migrationPreview?.total_pending || 0 }}</div>
                   </div>
                 </div>
               </el-col>
             </el-row>
 
-            <!-- 配置表单 -->
-            <el-divider content-position="left">自动轮换配置</el-divider>
-            <el-form :model="rotationConfig" label-width="120px" class="rotation-form">
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <el-form-item label="启用自动轮换">
-                    <el-switch v-model="rotationConfig.enabled" @change="handleConfigChange" />
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item label="轮换周期">
-                    <el-select v-model="rotationConfig.schedule_type" @change="handleConfigChange" style="width: 100%">
-                      <el-option label="每周" value="weekly" />
-                      <el-option label="每月" value="monthly" />
-                      <el-option label="每季度" value="quarterly" />
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-row :gutter="20">
-                <el-col :span="12">
-                  <!-- 每周：选择星期 -->
-                  <el-form-item v-if="rotationConfig.schedule_type === 'weekly'" label="执行星期">
-                    <el-select v-model="rotationConfig.schedule_day" @change="handleConfigChange" style="width: 100%">
-                      <el-option label="周一" :value="1" />
-                      <el-option label="周二" :value="2" />
-                      <el-option label="周三" :value="3" />
-                      <el-option label="周四" :value="4" />
-                      <el-option label="周五" :value="5" />
-                      <el-option label="周六" :value="6" />
-                      <el-option label="周日" :value="7" />
-                    </el-select>
-                  </el-form-item>
-                  <!-- 每月：选择日期 -->
-                  <el-form-item v-else-if="rotationConfig.schedule_type === 'monthly'" label="执行日期">
-                    <el-select v-model="rotationConfig.schedule_day" @change="handleConfigChange" style="width: 100%">
-                      <el-option v-for="d in 28" :key="d" :label="`每月${d}日`" :value="d" />
-                    </el-select>
-                  </el-form-item>
-                  <!-- 每季度：选择月份和日期 -->
-                  <el-form-item v-else label="执行月份">
-                    <el-select v-model="rotationConfig.schedule_quarter_month" @change="handleConfigChange" style="width: 100%">
-                      <el-option label="1月" :value="1" />
-                      <el-option label="4月" :value="4" />
-                      <el-option label="7月" :value="7" />
-                      <el-option label="10月" :value="10" />
-                    </el-select>
-                  </el-form-item>
-                </el-col>
-                <el-col :span="12">
-                  <el-form-item :label="rotationConfig.schedule_type === 'quarterly' ? '执行日期' : '执行时间'">
-                    <!-- 每季度：选择日期 -->
-                    <el-select v-if="rotationConfig.schedule_type === 'quarterly'" v-model="rotationConfig.schedule_day" @change="handleConfigChange" style="width: 100%">
-                      <el-option v-for="d in 28" :key="d" :label="`${d}日`" :value="d" />
-                    </el-select>
-                    <!-- 其他：选择时间 -->
-                    <el-time-picker v-else v-model="rotationTime" format="HH:mm" value-format="HH:mm" @change="handleConfigChange" style="width: 100%" />
-                  </el-form-item>
-                </el-col>
-              </el-row>
-              <el-form-item label="迁移后自动切换">
-                <el-switch v-model="rotationConfig.auto_switch" @change="handleConfigChange" />
-                <span class="form-tip">执行迁移后自动切换到新密钥版本</span>
-              </el-form-item>
-            </el-form>
-
             <!-- 迁移预览 -->
-            <el-divider content-position="left">数据迁移</el-divider>
-            <el-table :data="migrationPreview" size="small" border class="migration-table">
+            <el-divider content-position="left">数据迁移预览</el-divider>
+            <el-table :data="migrationPreview?.preview || []" size="small" border class="migration-table">
               <el-table-column prop="description" label="数据项" />
               <el-table-column prop="total" label="总数" width="80" align="center" />
-              <el-table-column prop="v1_or_legacy" label="待迁移" width="80" align="center">
+              <el-table-column prop="pending" label="待迁移" width="80" align="center">
                 <template #default="{ row }">
-                  <el-tag type="warning" size="small">{{ row.v1_or_legacy }}</el-tag>
+                  <el-tag type="warning" size="small">{{ row.pending }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="v2" label="已完成" width="80" align="center">
+              <el-table-column prop="migrated" label="已迁移" width="80" align="center">
                 <template #default="{ row }">
-                  <el-tag type="success" size="small">{{ row.v2 }}</el-tag>
+                  <el-tag type="success" size="small">{{ row.migrated }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column prop="target_version" label="目标版本" width="100" align="center">
+                <template #default="{ row }">
+                  <el-tag size="small">{{ row.target_version?.toUpperCase() || '-' }}</el-tag>
                 </template>
               </el-table-column>
             </el-table>
@@ -538,20 +497,12 @@
               <el-button type="primary" @click="loadRotationData" :loading="rotationLoading">
                 <el-icon><Refresh /></el-icon> 刷新
               </el-button>
-              <el-button v-if="!rotationConfig.has_v2_key" type="danger" @click="handleGenerateKey" :loading="generatingKey">
-                <el-icon><Key /></el-icon> 生成新密钥
+              <el-button type="info" @click="handleFullRotation" :disabled="!migrationPreview?.total_pending" :loading="fullRotating">
+                <el-icon><RefreshLeft /></el-icon> 一键轮换
               </el-button>
-              <template v-else>
-                <el-button type="info" @click="handleFullRotation" :disabled="!migrationPreview.length" :loading="fullRotating">
-                  <el-icon><RefreshLeft /></el-icon> 一键轮换
-                </el-button>
-                <el-button type="warning" @click="handleMigrate" :disabled="!migrationPreview.length" :loading="migrating">
-                  <el-icon><Upload /></el-icon> 执行迁移
-                </el-button>
-                <el-button type="success" @click="handleSwitchVersion" :loading="switching">
-                  <el-icon><Switch /></el-icon> 切换到 V2
-                </el-button>
-              </template>
+              <el-button type="warning" @click="handleMigrate" :disabled="!migrationPreview?.total_pending" :loading="migrating">
+                <el-icon><Upload /></el-icon> 执行迁移
+              </el-button>
             </div>
 
             <!-- 历史记录 -->
@@ -789,9 +740,7 @@ const securityConfig = reactive({
   jwt_configured: false, jwt_secret_key: '', aes_configured: false, aes_key: '', token_expire_hours: 24
 })
 
-// 密钥轮换状态
-const rotationStatus = ref({})
-const rotationStatistics = ref({})
+// 密钥轮换统计
 const rotationConfig = ref({
   enabled: false,
   schedule_type: 'monthly',
@@ -801,7 +750,8 @@ const rotationConfig = ref({
   auto_switch: false
 })
 const rotationTime = ref('02:00')
-const migrationPreview = ref([])
+const keyVersions = ref([])  // 所有密钥版本
+const migrationPreview = ref({ preview: [], total_pending: 0 })  // 迁移预览
 const rotationHistory = ref([])
 const rotationLoading = ref(false)
 const migrating = ref(false)
@@ -813,21 +763,18 @@ const historyLoading = ref(false)
 const loadRotationStatus = async () => {
   rotationLoading.value = true
   try {
-    const [status, stats, config] = await Promise.all([
-      rotationApi.getKeyRotationStatus(),
-      rotationApi.getEncryptionStatistics(),
+    const [versions, config] = await Promise.all([
+      rotationApi.getKeyVersions(),
       rotationApi.getRotationConfig()
     ])
-    rotationStatus.value = status
-    rotationStatistics.value = stats
+    keyVersions.value = versions.versions || []
     rotationConfig.value = {
       enabled: config.enabled,
       schedule_type: config.schedule_type,
       schedule_day: config.schedule_day,
       schedule_time: config.schedule_time,
-      schedule_quarter_month: config.schedule_quarter_month || 1,
-      auto_switch: config.auto_switch,
-      has_v2_key: config.has_v2_key || !!config.v2_key
+      schedule_quarter_month: 1,
+      auto_switch: config.auto_switch
     }
     rotationTime.value = config.schedule_time
   } catch (error) {
@@ -840,7 +787,7 @@ const loadRotationStatus = async () => {
 const loadMigrationPreview = async () => {
   try {
     const result = await rotationApi.getMigrationPreview()
-    migrationPreview.value = result.preview_tables || []
+    migrationPreview.value = result
   } catch (error) {
     console.error('加载迁移预览失败:', error)
   }
@@ -881,45 +828,20 @@ const handleConfigChange = async () => {
   }
 }
 
-const handleMigrate = async () => {
+const handleSwitchVersion = async (targetVersion) => {
   try {
-    await ElMessageBox.confirm('确定要执行数据迁移吗？这将把所有加密数据迁移到 V2 密钥。', '确认迁移', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    migrating.value = true
-    const result = await rotationApi.executeMigration()
-    if (result.success) {
-      ElMessage.success(`迁移完成！成功迁移 ${result.total_migrated} 条记录`)
-    } else {
-      ElMessage.warning(`迁移完成，但有 ${result.total_failed} 条记录失败`)
-    }
-    await loadRotationData()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('迁移失败')
-    }
-  } finally {
-    migrating.value = false
-  }
-}
-
-const handleSwitchVersion = async () => {
-  const targetVersion = rotationStatus.value.current_version === 'v1' ? 'v2' : 'v1'
-  try {
-    await ElMessageBox.confirm(`确定要切换到 ${targetVersion.toUpperCase()} 版本吗？`, '确认切换', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'info'
-    })
+    await ElMessageBox.confirm(
+      `确定要切换到 ${targetVersion.toUpperCase()} 版本吗？\n\n切换后，新加密的数据将使用新密钥。旧密钥加密的数据仍可自动解密。`,
+      '确认切换',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
+    )
     switching.value = true
     await rotationApi.switchKeyVersion(targetVersion)
     ElMessage.success(`已切换到 ${targetVersion.toUpperCase()} 版本`)
-    await loadRotationStatus()
+    await loadRotationData()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('切换失败')
+      ElMessage.error(error.response?.data?.detail || '切换失败')
     }
   } finally {
     switching.value = false
@@ -929,16 +851,16 @@ const handleSwitchVersion = async () => {
 const handleFullRotation = async () => {
   try {
     await ElMessageBox.confirm(
-      '一键轮换将执行以下操作：\n\n1. 执行数据迁移（将所有加密数据迁移到新密钥）\n2. 自动切换到新密钥版本\n\n确定要执行吗？',
+      '一键轮换将执行以下操作：\n\n1. 生成新的密钥版本\n2. 执行数据迁移\n3. 自动切换到新密钥版本\n\n确定要执行吗？',
       '确认一键轮换',
       { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
     )
     fullRotating.value = true
-    const result = await rotationApi.triggerAutoRotation()
+    const result = await rotationApi.fullRotation()
     if (result.success) {
-      ElMessage.success(`一键轮换完成！成功迁移 ${result.migrated} 条记录`)
+      ElMessage.success(`一键轮换完成！新版本: ${result.new_key_version.toUpperCase()}`)
     } else {
-      ElMessage.warning(`一键轮换完成，但有 ${result.failed} 条记录失败`)
+      ElMessage.warning(`一键轮换完成，但迁移有失败`)
     }
     await loadRotationData()
   } catch (error) {
@@ -950,19 +872,40 @@ const handleFullRotation = async () => {
   }
 }
 
+const handleMigrate = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要执行数据迁移吗？\n\n这将把所有加密数据迁移到最新的密钥版本。',
+      '确认迁移',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    migrating.value = true
+    const result = await rotationApi.executeMigration()
+    if (result.success) {
+      ElMessage.success(`迁移完成！成功迁移 ${result.total_migrated} 条记录`)
+    } else {
+      ElMessage.warning(`迁移完成，但有 ${result.total_failed} 条记录失败`)
+    }
+    await loadRotationData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '迁移失败')
+    }
+  } finally {
+    migrating.value = false
+  }
+}
+
 const handleGenerateKey = async () => {
   try {
     await ElMessageBox.confirm(
-      '确定要生成新的 V2 密钥吗？\n\n生成后，您可以使用一键轮换功能完成数据迁移和版本切换。',
+      '确定要生成新的密钥版本吗？\n\n生成后，您可以执行迁移和切换版本。',
       '生成新密钥',
       { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
     )
     generatingKey.value = true
-    const result = await rotationApi.generateV2Key()
-    ElMessage.success(result.message)
-    if (result.warning) {
-      ElMessage.warning(result.warning)
-    }
+    const result = await rotationApi.generateNewKey()
+    ElMessage.success(`新密钥版本 ${result.new_version.toUpperCase()} 已生成`)
     await loadRotationData()
   } catch (error) {
     if (error !== 'cancel') {

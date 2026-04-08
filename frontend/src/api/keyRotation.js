@@ -1,5 +1,5 @@
 /**
- * 密钥轮换 API
+ * 密钥轮换 API - 支持动态多版本
  */
 import request from './index'
 
@@ -11,17 +11,10 @@ export function getKeyRotationStatus() {
 }
 
 /**
- * 获取密钥版本信息
+ * 获取所有密钥版本
  */
 export function getKeyVersions() {
   return request.get('/key-rotation/versions')
-}
-
-/**
- * 获取加密数据统计
- */
-export function getEncryptionStatistics() {
-  return request.get('/key-rotation/statistics')
 }
 
 /**
@@ -33,7 +26,6 @@ export function getRotationConfig() {
 
 /**
  * 更新轮换配置
- * @param {Object} config - 配置对象
  */
 export function updateRotationConfig(config) {
   return request.put('/key-rotation/config', config)
@@ -48,7 +40,6 @@ export function getMigrationPreview() {
 
 /**
  * 执行迁移
- * @param {number} batchSize - 批次大小
  */
 export function executeMigration(batchSize = 100) {
   return request.post(`/key-rotation/migrate?batch_size=${batchSize}`)
@@ -56,31 +47,35 @@ export function executeMigration(batchSize = 100) {
 
 /**
  * 切换密钥版本
- * @param {string} targetVersion - 目标版本 (v1 或 v2)
  */
 export function switchKeyVersion(targetVersion) {
-  return request.post('/key-rotation/switch-version', { target_version: targetVersion })
+  return request.post('/key-rotation/switch-version', { target_version })
+}
+
+/**
+ * 生成新的密钥版本
+ */
+export function generateNewKey() {
+  return request.post('/key-rotation/generate-key')
 }
 
 /**
  * 获取轮换历史
- * @param {number} page - 页码
- * @param {number} pageSize - 每页大小
  */
 export function getRotationHistory(page = 1, pageSize = 20) {
   return request.get('/key-rotation/history', { params: { page, page_size: pageSize } })
 }
 
 /**
- * 触发自动轮换（手动触发）
+ * 一键轮换
  */
-export function triggerAutoRotation() {
-  return request.post('/key-rotation/auto-rotate')
+export function fullRotation() {
+  return request.post('/key-rotation/full-rotation')
 }
 
 /**
- * 生成新的 V2 密钥
+ * 触发自动轮换
  */
-export function generateV2Key() {
-  return request.post('/key-rotation/generate-v2-key')
+export function triggerAutoRotation() {
+  return request.post('/key-rotation/auto-rotate')
 }

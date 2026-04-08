@@ -8,6 +8,26 @@ from sqlalchemy.orm import relationship
 from app.database import Base
 
 
+class KeyRotationKey(Base):
+    """密钥历史（存储所有版本的密钥）"""
+    __tablename__ = "key_rotation_keys"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key_id = Column(String(10), unique=True, nullable=False, comment="版本号: v1, v2, v3...")
+    key_value = Column(String(64), nullable=False, comment="密钥值")
+    is_active = Column(Boolean, default=False, comment="是否正在使用")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "key_id": self.key_id,
+            "key_value_preview": self.key_value[:4] + "***" + self.key_value[-4:] if self.key_value else "",
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
 class KeyRotationLog(Base):
     """密钥轮换日志"""
     __tablename__ = "key_rotation_logs"
@@ -53,7 +73,6 @@ class KeyRotationConfig(Base):
     schedule_day = Column(Integer, default=1, comment="执行日(周几/每月几号)")
     schedule_time = Column(String(10), default="02:00", comment="执行时间")
     current_key_id = Column(String(10), default="v1", comment="当前密钥版本")
-    v2_key = Column(String(64), nullable=True, comment="V2 密钥（自动生成的下一版本密钥）")
     auto_switch = Column(Boolean, default=False, comment="迁移后自动切换版本")
     last_rotation_at = Column(DateTime, nullable=True, comment="上次轮换时间")
     next_rotation_at = Column(DateTime, nullable=True, comment="下次轮换时间")
@@ -67,8 +86,6 @@ class KeyRotationConfig(Base):
             "schedule_day": self.schedule_day,
             "schedule_time": self.schedule_time,
             "current_key_id": self.current_key_id,
-            "v2_key": self.v2_key,
-            "has_v2_key": bool(self.v2_key),
             "auto_switch": self.auto_switch,
             "last_rotation_at": self.last_rotation_at.isoformat() if self.last_rotation_at else None,
             "next_rotation_at": self.next_rotation_at.isoformat() if self.next_rotation_at else None

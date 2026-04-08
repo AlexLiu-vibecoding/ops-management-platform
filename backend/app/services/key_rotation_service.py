@@ -1,37 +1,115 @@
 """
-密钥轮换服务
+密钥轮换服务 - 支持动态多版本
 """
 
+import secrets
+import re
 import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
 from sqlalchemy.orm import Session
-from app.models.key_rotation import KeyRotationLog, KeyRotationConfig
+from sqlalchemy import text
+from app.models.key_rotation import KeyRotationLog, KeyRotationConfig, KeyRotationKey
 from app.utils.auth import AESCipher
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class KeyRotationService:
-    """密钥轮换服务"""
+    """密钥轮换服务 - 支持动态多版本"""
 
     def __init__(self, db: Session, operator_id: Optional[int] = None):
-        """
-        初始化服务
-        
-        Args:
-            db: 数据库会话
-            operator_id: 操作人 ID
-        """
         self.db = db
         self.operator_id = operator_id
+
+    def get_or_create_initial_key(self) -> KeyRotationKey:
+        """获取或创建初始密钥（V1）"""
+        # 检查是否已有密钥
+        existing = self.db.query(KeyRotationKey).first()
+        if existing:
+            return existing
+        
+        # 获取初始密钥（优先环境变量，否则生成）
+        initial_key = settings.security.AES_KEY
+        if not initial_key:
+            initial_key = "dev-aes-key-32-characters-please!"
+        
+        # 创建 V1 密钥
+        key = KeyRotationKey(
+            key_id="v1",
+            key_value=initial_key,
+            is_active=True
+        )
+        self.db.add(key)
+        self.db.commit()
+        self.db.refresh(key)
+        return key
+
+    def get_next_key_version(self) -> str:
+        """获取下一个密钥版本号"""
+        # 获取所有密钥版本号
+        keys = self.db.query(KeyRotationKey).all()
+        if not keys:
+            return "v1"
+        
+        # 解析版本号
+        versions = []
+        for k in keys:
+            match = re.match(r'v(\d+)', k.key_id)
+            if match:
+                versions.append(int(match.group(1)))
+        
+        if not versions:
+            return "v1"
+        
+        return f"v{max(versions) + 1}"
+
+    def get_active_key(self) -> Optional[KeyRotationKey]:
+        """获取当前激活的密钥"""
+        return self.db.query(KeyRotationKey).filter(
+            KeyRotationKey.is_active == True
+        ).first()
+
+    def get_key_by_id(self, key_id: str) -> Optional[KeyRotationKey]:
+        """根据版本号获取密钥"""
+        return self.db.query(KeyRotationKey).filter(
+            KeyRotationKey.key_id == key_id
+        ).first()
+
+    def generate_new_key(self) -> KeyRotationKey:
+        """生成新的密钥版本"""
+        new_version = self.get_next_key_version()
+        new_key_value = secrets.token_hex(16)  # 32字符
+        
+        new_key = KeyRotationKey(
+            key_id=new_version,
+            key_value=new_key_value,
+            is_active=False
+        )
+        self.db.add(new_key)
+        self.db.commit()
+        self.db.refresh(new_key)
+        
+        logger.info(f"生成新密钥: {new_version}")
+        return new_key
+
+    def get_all_keys(self) -> List[KeyRotationKey]:
+        """获取所有密钥"""
+        return self.db.query(KeyRotationKey).order_by(
+            KeyRotationKey.created_at.asc()
+        ).all()
+
+    # ==================== 配置管理 ====================
 
     def get_config(self) -> KeyRotationConfig:
         """获取轮换配置"""
         config = self.db.query(KeyRotationConfig).first()
         if not config:
-            # 创建默认配置
+            # 确保有初始密钥
+            self.get_or_create_initial_key()
+            
             config = KeyRotationConfig(
                 enabled=False,
                 schedule_type="monthly",
@@ -70,6 +148,47 @@ class KeyRotationService:
         self.db.commit()
         self.db.refresh(config)
         return config
+
+    def get_overview(self) -> Dict[str, Any]:
+        """获取密钥轮换概览（用于仪表盘显示）"""
+        config = self.get_config()
+        keys = self.get_all_keys()
+        stats = self.get_statistics()
+        
+        # 获取最新创建的密钥
+        latest_key = keys[0] if keys else None
+        
+        return {
+            "current_version": config.current_key_id,
+            "total_keys": len(keys),
+            "total_records": stats["total"],
+            "latest_key_created_at": latest_key.created_at.isoformat() if latest_key else None
+        }
+
+    def get_status(self) -> Dict[str, Any]:
+        """获取密钥轮换状态"""
+        config = self.get_config()
+        keys = self.get_all_keys()
+        stats = self.get_statistics()
+        
+        # 获取当前密钥
+        current_key = self.get_key_by_id(config.current_key_id)
+        
+        # 检查是否有待迁移的数据
+        needs_migration = stats["needs_migration"] > 0
+        
+        return {
+            "current_version": config.current_key_id,
+            "can_rotate": len(keys) > 0,
+            "reason": None if len(keys) > 0 else "没有可用密钥",
+            "migration_needed": needs_migration,
+            "unrotated_count": stats["needs_migration"],
+            "total_versions": len(keys),
+            "current_key_preview": current_key.key_value[:4] + "***" if current_key else "",
+            "has_pending_key": any(not k.is_active for k in keys)
+        }
+
+    # ==================== 历史记录 ====================
 
     def get_history(self, limit: int = 20, offset: int = 0) -> List[KeyRotationLog]:
         """获取轮换历史"""
@@ -113,9 +232,15 @@ class KeyRotationService:
         self.db.refresh(log)
         return log
 
+    # ==================== 统计 ====================
+
     def get_statistics(self) -> Dict[str, Any]:
         """获取加密数据统计"""
-        from sqlalchemy import text, func
+        config = self.get_config()
+        keys = self.get_all_keys()
+        
+        # 获取所有密钥版本号，用于匹配加密数据前缀
+        key_versions = [k.key_id for k in keys]  # 如 ["v1", "v2", "v3"]
         
         tables_fields = [
             ("rdb_instances", "password_encrypted"),
@@ -125,7 +250,11 @@ class KeyRotationService:
         ]
         
         total = 0
-        by_version = {"v1": 0, "v2": 0, "legacy": 0, "empty": 0}
+        by_version = {}
+        legacy_count = 0
+        
+        for version in key_versions:
+            by_version[version] = 0
         
         for table, field in tables_fields:
             try:
@@ -149,7 +278,7 @@ class KeyRotationService:
                 total += count
                 
                 # 按版本统计
-                for version in ["v1", "v2"]:
+                for version in key_versions:
                     version_query = f"""
                         SELECT COUNT(*) FROM {table} 
                         WHERE {field} LIKE '{version}$%'
@@ -157,152 +286,70 @@ class KeyRotationService:
                     version_count = self.db.execute(text(version_query)).scalar() or 0
                     by_version[version] += version_count
                 
-                # legacy = 总数 - v1 - v2
-                by_version["legacy"] += count - by_version.get("v1", 0) - by_version.get("v2", 0)
-                
             except Exception as e:
                 logger.warning(f"统计表 {table} 失败: {e}")
         
-        # 修正 legacy 计算
-        by_version["legacy"] = max(0, total - by_version["v1"] - by_version["v2"])
+        # 计算待迁移数（legacy + 旧版本）
+        current_version = config.current_key_id
+        current_idx = key_versions.index(current_version) if current_version in key_versions else 0
+        
+        needs_migration = 0
+        for i, version in enumerate(key_versions):
+            if i < current_idx:
+                needs_migration += by_version.get(version, 0)
+        
+        # legacy = 总数 - 所有已知版本
+        known_version_count = sum(by_version.values())
+        legacy_count = max(0, total - known_version_count)
+        needs_migration += legacy_count
         
         return {
             "total": total,
-            "v1_count": by_version["v1"],
-            "v2_count": by_version["v2"],
-            "legacy_count": by_version["legacy"],
-            "needs_migration": by_version["v1"] + by_version["legacy"]
+            "by_version": by_version,
+            "legacy_count": legacy_count,
+            "needs_migration": needs_migration,
+            "versions": key_versions
         }
 
-    def execute_migration(self, batch_size: int = 100) -> Dict[str, Any]:
-        """执行数据迁移"""
-        from sqlalchemy import text
-        from app.config import settings
+    # ==================== 迁移 ====================
+
+    def get_next_key_for_migration(self) -> Optional[KeyRotationKey]:
+        """获取下一个待迁移的密钥（当前未激活且版本最高的）"""
+        keys = self.db.query(KeyRotationKey).filter(
+            KeyRotationKey.is_active == False
+        ).all()
         
-        results = []
-        total_migrated = 0
-        total_failed = 0
+        if not keys:
+            return None
         
-        # 获取 v2_key（优先使用数据库中的，如果没有则使用环境变量）
-        config = self.get_config()
-        v2_key = config.v2_key or settings.security.AES_KEY_V2
+        # 返回版本最高的未激活密钥
+        versions = []
+        for k in keys:
+            match = re.match(r'v(\d+)', k.key_id)
+            if match:
+                versions.append((int(match.group(1)), k))
         
-        if not v2_key:
-            return {
-                "success": False,
-                "results": [{"error": "V2 密钥未配置"}],
-                "total_migrated": 0,
-                "total_failed": 0
-            }
+        if not versions:
+            return None
         
-        tables_fields = [
-            ("rdb_instances", "password_encrypted"),
-            ("redis_instances", "password_encrypted"),
-            ("ai_models", "api_key_encrypted"),
-            ("aws_credentials", "aws_secret_access_key"),
-        ]
-        
-        for table, field in tables_fields:
-            try:
-                # 检查表是否存在
-                check_query = f"""
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE table_name = '{table}'
-                    )
-                """
-                exists = self.db.execute(text(check_query)).scalar()
-                if not exists:
-                    continue
-                
-                # 获取需要迁移的记录（v1 或 legacy 格式）
-                select_query = f"""
-                    SELECT id, {field} FROM {table} 
-                    WHERE {field} IS NOT NULL 
-                    AND {field} != ''
-                    AND NOT ({field} LIKE 'v2$%')
-                    LIMIT :batch_size
-                """
-                rows = self.db.execute(text(select_query), {"batch_size": batch_size}).fetchall()
-                
-                migrated = 0
-                failed = 0
-                errors = []
-                
-                for row in rows:
-                    record_id = row[0]
-                    old_value = row[1]
-                    
-                    try:
-                        # 解密并重新加密（使用 v2_key）
-                        plaintext = AESCipher.decrypt(old_value)
-                        new_value = AESCipher(v2_key).encrypt(plaintext)
-                        
-                        # 更新数据库
-                        update_query = f"""
-                            UPDATE {table} 
-                            SET {field} = :new_value 
-                            WHERE id = :id
-                        """
-                        self.db.execute(text(update_query), {"new_value": new_value, "id": record_id})
-                        migrated += 1
-                        
-                    except Exception as e:
-                        failed += 1
-                        error_msg = f"ID={record_id}: {str(e)}"
-                        errors.append(error_msg)
-                        logger.warning(f"迁移 {table}.{field} {error_msg}")
-                
-                self.db.commit()
-                
-                results.append({
-                    "table_name": table,
-                    "field_name": field,
-                    "total": len(rows),
-                    "migrated": migrated,
-                    "failed": failed,
-                    "errors": errors[:10]
-                })
-                
-                total_migrated += migrated
-                total_failed += failed
-                
-            except Exception as e:
-                logger.error(f"迁移表 {table}.{field} 失败: {e}")
-                self.db.rollback()
-                results.append({
-                    "table_name": table,
-                    "field_name": field,
-                    "total": 0,
-                    "migrated": 0,
-                    "failed": 0,
-                    "errors": [str(e)]
-                })
-        
-        # 记录日志
-        self.add_log(
-            action="migrate",
-            status="success" if total_failed == 0 else "partial",
-            from_version="v1/legacy",
-            to_version="v2",
-            total_records=total_migrated + total_failed,
-            migrated_records=total_migrated,
-            failed_records=total_failed,
-            error_message=f"迁移完成，成功 {total_migrated}，失败 {total_failed}" if total_failed > 0 else None
-        )
-        
-        return {
-            "success": total_failed == 0,
-            "results": results,
-            "total_migrated": total_migrated,
-            "total_failed": total_failed
-        }
+        versions.sort(key=lambda x: x[0])
+        return versions[-1][1]  # 返回版本号最大的
 
     def preview_migration(self) -> List[Dict[str, Any]]:
         """预览迁移"""
-        from sqlalchemy import text
+        config = self.get_config()
+        keys = self.get_all_keys()
+        next_key = self.get_next_key_for_migration()
         
-        results = []
+        if not next_key:
+            # 如果没有待迁移的密钥，返回当前版本统计
+            return [{
+                "description": "所有数据已迁移到最新版本",
+                "total": 0,
+                "migrated": 0,
+                "pending": 0,
+                "target_version": config.current_key_id
+            }]
         
         tables_fields = [
             ("rdb_instances", "password_encrypted", "RDB 实例密码"),
@@ -311,6 +358,7 @@ class KeyRotationService:
             ("aws_credentials", "aws_secret_access_key", "AWS 访问密钥"),
         ]
         
+        results = []
         for table, field, description in tables_fields:
             try:
                 # 检查表是否存在
@@ -331,61 +379,176 @@ class KeyRotationService:
                 """
                 total = self.db.execute(text(count_query)).scalar() or 0
                 
-                # 统计 v2 数量
-                v2_query = f"""
+                # 统计目标版本数量
+                target_query = f"""
                     SELECT COUNT(*) FROM {table} 
-                    WHERE {field} LIKE 'v2$%'
+                    WHERE {field} LIKE '{next_key.key_id}$%'
                 """
-                v2_count = self.db.execute(text(v2_query)).scalar() or 0
+                migrated = self.db.execute(text(target_query)).scalar() or 0
                 
                 results.append({
-                    "table_name": table,
-                    "field_name": field,
                     "description": description,
+                    "table": table,
+                    "field": field,
                     "total": total,
-                    "v1_or_legacy": total - v2_count,
-                    "v2": v2_count
+                    "migrated": migrated,
+                    "pending": total - migrated,
+                    "target_version": next_key.key_id
                 })
                 
             except Exception as e:
                 logger.warning(f"预览表 {table} 失败: {e}")
-                results.append({
-                    "table_name": table,
-                    "field_name": field,
-                    "description": description,
-                    "total": 0,
-                    "v1_or_legacy": 0,
-                    "v2": 0
-                })
-        
-        # 记录预览日志
-        total_needs = sum(r["v1_or_legacy"] for r in results)
-        self.add_log(
-            action="preview",
-            status="success",
-            from_version="v1/legacy",
-            to_version="v2",
-            total_records=total_needs,
-            migrated_records=0,
-            failed_records=0,
-            error_message=None
-        )
         
         return results
 
+    def execute_migration(self, batch_size: int = 100) -> Dict[str, Any]:
+        """执行数据迁移"""
+        next_key = self.get_next_key_for_migration()
+        
+        if not next_key:
+            return {
+                "success": False,
+                "message": "没有待迁移的密钥",
+                "results": [],
+                "total_migrated": 0,
+                "total_failed": 0,
+                "target_version": None
+            }
+        
+        tables_fields = [
+            ("rdb_instances", "password_encrypted"),
+            ("redis_instances", "password_encrypted"),
+            ("ai_models", "api_key_encrypted"),
+            ("aws_credentials", "aws_secret_access_key"),
+        ]
+        
+        results = []
+        total_migrated = 0
+        total_failed = 0
+        
+        for table, field in tables_fields:
+            try:
+                # 检查表是否存在
+                check_query = f"""
+                    SELECT EXISTS (
+                        SELECT FROM information_schema.tables 
+                        WHERE table_name = '{table}'
+                    )
+                """
+                exists = self.db.execute(text(check_query)).scalar()
+                if not exists:
+                    continue
+                
+                # 获取需要迁移的记录（不是目标版本）
+                select_query = f"""
+                    SELECT id, {field} FROM {table} 
+                    WHERE {field} IS NOT NULL 
+                    AND {field} != ''
+                    AND NOT ({field} LIKE :target_prefix)
+                    LIMIT :batch_size
+                """
+                rows = self.db.execute(text(select_query), {
+                    "target_prefix": f"{next_key.key_id}$%",
+                    "batch_size": batch_size
+                }).fetchall()
+                
+                migrated = 0
+                failed = 0
+                errors = []
+                
+                for row in rows:
+                    record_id = row[0]
+                    old_value = row[1]
+                    
+                    try:
+                        # 解密并重新加密
+                        plaintext = AESCipher.decrypt(old_value)
+                        new_value = AESCipher(next_key.key_value).encrypt(plaintext)
+                        
+                        # 更新数据库
+                        update_query = f"""
+                            UPDATE {table} 
+                            SET {field} = :new_value 
+                            WHERE id = :id
+                        """
+                        self.db.execute(text(update_query), {
+                            "new_value": new_value,
+                            "id": record_id
+                        })
+                        migrated += 1
+                        
+                    except Exception as e:
+                        failed += 1
+                        errors.append(f"ID={record_id}: {str(e)}")
+                
+                self.db.commit()
+                
+                results.append({
+                    "table": table,
+                    "field": field,
+                    "total": len(rows),
+                    "migrated": migrated,
+                    "failed": failed,
+                    "errors": errors[:5]
+                })
+                
+                total_migrated += migrated
+                total_failed += failed
+                
+            except Exception as e:
+                logger.error(f"迁移表 {table} 失败: {e}")
+                self.db.rollback()
+                results.append({
+                    "table": table,
+                    "field": field,
+                    "total": 0,
+                    "migrated": 0,
+                    "failed": 0,
+                    "errors": [str(e)]
+                })
+        
+        # 记录日志
+        self.add_log(
+            action="migrate",
+            status="success" if total_failed == 0 else "partial",
+            from_version=self.get_active_key().key_id if self.get_active_key() else None,
+            to_version=next_key.key_id,
+            total_records=total_migrated + total_failed,
+            migrated_records=total_migrated,
+            failed_records=total_failed
+        )
+        
+        return {
+            "success": total_failed == 0,
+            "message": f"迁移到 {next_key.key_id} 完成",
+            "results": results,
+            "total_migrated": total_migrated,
+            "total_failed": total_failed,
+            "target_version": next_key.key_id
+        }
+
     def switch_version(self, target_version: str) -> bool:
         """切换密钥版本"""
-        from app.config import settings
-        
-        if target_version not in ["v1", "v2"]:
+        # 获取目标密钥
+        target_key = self.get_key_by_id(target_version)
+        if not target_key:
+            logger.warning(f"密钥版本 {target_version} 不存在")
             return False
         
-        if target_version == "v2" and not settings.security.has_aes_key_v2():
-            return False
+        # 获取当前密钥
+        current_key = self.get_active_key()
+        old_version = current_key.key_id if current_key else None
         
+        # 标记所有密钥为非活跃
+        self.db.query(KeyRotationKey).update({KeyRotationKey.is_active: False})
+        
+        # 激活目标密钥
+        target_key.is_active = True
+        
+        # 更新配置中的当前版本
         config = self.get_config()
-        old_version = config.current_key_id
         config.current_key_id = target_version
+        config.last_rotation_at = datetime.now()
         
         self.db.commit()
         
@@ -397,37 +560,56 @@ class KeyRotationService:
             to_version=target_version,
             total_records=0,
             migrated_records=0,
-            failed_records=0,
-            error_message=None
+            failed_records=0
         )
         
+        logger.info(f"切换密钥版本: {old_version} -> {target_version}")
         return True
+
+    # ==================== 一键轮换 ====================
+
+    def full_rotation(self) -> Dict[str, Any]:
+        """一键完成轮换：生成密钥 -> 迁移数据 -> 切换版本"""
+        # 1. 生成新密钥（如果不存在）
+        keys = self.get_all_keys()
+        if not keys:
+            self.get_or_create_initial_key()
+        
+        new_key = self.generate_new_key()
+        
+        # 2. 执行迁移
+        migration_result = self.execute_migration()
+        
+        # 3. 如果迁移成功且配置了自动切换，则切换版本
+        config = self.get_config()
+        if config.auto_switch and migration_result["success"]:
+            self.switch_version(new_key.key_id)
+        
+        return {
+            "new_key_version": new_key.key_id,
+            "migration_result": migration_result,
+            "auto_switched": config.auto_switch and migration_result["success"]
+        }
 
     def calculate_next_rotation(self) -> datetime:
         """计算下次轮换时间"""
-        import calendar
-        from datetime import timedelta
-        
         config = self.get_config()
         now = datetime.now()
         
         if config.schedule_type == "weekly":
-            # 每周执行
             days_ahead = config.schedule_day - now.weekday()
             if days_ahead <= 0:
                 days_ahead += 7
-            next_rotation = now + timedelta(days=days_ahead)
+            return now + __import__('datetime').timedelta(days=days_ahead)
             
         elif config.schedule_type == "monthly":
-            # 每月执行
             if now.day < config.schedule_day:
-                next_rotation = now.replace(day=config.schedule_day, hour=2, minute=0, second=0)
+                return now.replace(day=config.schedule_day, hour=2, minute=0, second=0)
             else:
-                # 下个月
                 if now.month == 12:
-                    next_rotation = now.replace(year=now.year + 1, month=1, day=config.schedule_day, hour=2, minute=0, second=0)
+                    return now.replace(year=now.year + 1, month=1, day=config.schedule_day, hour=2, minute=0, second=0)
                 else:
-                    next_rotation = now.replace(month=now.month + 1, day=config.schedule_day, hour=2, minute=0, second=0)
+                    return now.replace(month=now.month + 1, day=config.schedule_day, hour=2, minute=0, second=0)
         else:
             # 每季度
             quarter_months = [1, 4, 7, 10]
@@ -439,11 +621,9 @@ class KeyRotationService:
             else:
                 next_year = now.year
             
-            next_rotation = datetime(
+            return datetime(
                 year=next_year,
                 month=next_quarter_month,
                 day=config.schedule_day,
                 hour=2, minute=0, second=0
             )
-        
-        return next_rotation

@@ -1201,11 +1201,16 @@ helm install opscenter ./helm/opscenter --namespace opscenter --create-namespace
 
 ## 十三、密钥轮换机制
 
-> **⚠️ 重要**: 为防止密钥变更导致数据无法解密，实现了一套完整的密钥轮换机制。
+> **⚠️ 重要**: 为防止密钥变更导致数据无法解密，实现了一套完整的密钥轮换机制，支持**动态多版本**（无限次轮换）。
 
 ### 13.1 概述
 
 系统使用 AES-256-CBC 加密敏感数据，为防止密钥变更导致数据丢失，实现了密钥轮换机制。
+
+**核心特点**：
+- 支持**动态多版本**（v1, v2, v3... 无限次轮换）
+- 密钥存储在数据库 `key_rotation_keys` 表中，支持自动生成和动态管理
+- 支持一键轮换（生成密钥 → 数据迁移 → 版本切换）
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -1228,63 +1233,111 @@ v{version}$base64(iv + ciphertext)
 示例：
 - v1$xxxxxx  → 使用 V1 密钥加密
 - v2$xxxxxx  → 使用 V2 密钥加密
-- xxxxxx     → 无前缀（旧格式，自动使用 V1 密钥解密）
+- v3$xxxxxx  → 使用 V3 密钥加密
+- xxxxxx     → 无前缀（旧格式，自动使用默认密钥解密）
 ```
 
-### 13.3 配置项
+### 13.3 密钥存储
 
-| 环境变量 | 说明 | 必填 |
-|----------|------|------|
-| `AES_KEY` | V1 密钥（32字符） | 是 |
-| `AES_KEY_V2` | V2 密钥（密钥轮换用，32字符） | 否 |
-| `AES_CURRENT_VERSION` | 当前使用版本（v1 或 v2） | 否，默认 v1 |
+| 存储位置 | 说明 |
+|----------|------|
+| `key_rotation_keys` 表 | 存储所有版本的密钥（v1, v2, v3...） |
+| `key_rotation_config` 表 | 存储当前使用版本配置 |
+
+**密钥生成**：
+- 系统自动生成 32 字符安全随机密钥
+- 支持前端手动生成或一键轮换
 
 ### 13.4 密钥轮换流程
 
 ```
-1. 配置新密钥
-   export AES_KEY_V2="新的32位密钥"
-   export AES_CURRENT_VERSION="v2"
+方式1: 一键轮换（推荐）
+1. 点击「一键轮换」
+   → 自动生成新密钥版本
+   → 执行数据迁移
+   → 自动切换到新密钥版本
+
+方式2: 分步轮换
+1. 生成新密钥
+   POST /api/v1/key-rotation/generate-key
 
 2. 预览迁移
    GET /api/v1/key-rotation/migration-preview
-   或
-   python -m app.migrations.migrate_aes_key --dry-run
 
 3. 执行迁移
    POST /api/v1/key-rotation/migrate
-   或
-   python -m app.migrations.migrate_aes_key
 
 4. 切换版本（可选）
-   POST /api/v1/key-rotation/switch-version?target_version=v2
-   然后重启服务
+   POST /api/v1/key-rotation/switch-version
+   （新数据已使用最新密钥加密，可选是否切换默认版本）
 ```
 
 ### 13.5 API 端点
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
+| GET | `/api/v1/key-rotation/overview` | 获取密钥轮换概览 |
 | GET | `/api/v1/key-rotation/status` | 获取轮换状态 |
-| GET | `/api/v1/key-rotation/versions` | 获取密钥版本信息 |
+| GET | `/api/v1/key-rotation/versions` | 获取密钥版本列表 |
+| GET | `/api/v1/key-rotation/config` | 获取轮换配置 |
+| PUT | `/api/v1/key-rotation/config` | 更新轮换配置 |
 | GET | `/api/v1/key-rotation/migration-preview` | 预览迁移 |
+| POST | `/api/v1/key-rotation/generate-key` | 生成新密钥 |
 | POST | `/api/v1/key-rotation/migrate` | 执行迁移 |
 | POST | `/api/v1/key-rotation/switch-version` | 切换版本 |
+| POST | `/api/v1/key-rotation/full-rotation` | 一键轮换 |
+| POST | `/api/v1/key-rotation/auto-rotate` | 触发自动轮换 |
+| GET | `/api/v1/key-rotation/history` | 获取轮换历史 |
 
-### 13.6 向后兼容
+### 13.6 前端集成
+
+密钥轮换功能集成在「系统设置 → 安全配置」页面中：
+
+```javascript
+// 前端 API 封装
+import rotationApi from '@/api/keyRotation'
+
+// 获取概览（用于仪表盘）
+rotationApi.getKeyRotationStatus()
+
+// 获取版本列表
+rotationApi.getKeyVersions()
+
+// 生成新密钥
+rotationApi.generateNewKey()
+
+// 一键轮换
+rotationApi.fullRotation()
+
+// 执行迁移
+rotationApi.executeMigration()
+
+// 切换版本
+rotationApi.switchKeyVersion('v3')
+```
+
+### 13.7 向后兼容
 
 - ✅ 旧格式（无前缀）可自动解密
-- ✅ V1 密钥数据可解密
+- ✅ 所有历史版本密钥数据可解密
 - ✅ 迁移过程不中断服务
 - ✅ 新密钥加密的数据自动使用新版本前缀
 
-### 13.7 注意事项
+### 13.8 注意事项
 
 ```
 ⚠️ 重要提醒：
 
-1. 密钥变更前必须执行迁移
+1. 密钥变更前建议执行迁移
 2. 迁移前建议备份数据库
 3. 切换版本后旧版本密钥仍可用于解密
 4. 生产环境建议使用 KMS 管理密钥
+5. 一键轮换会自动完成：生成 → 迁移 → 切换
 ```
+
+### 13.9 版本历史
+
+| 版本 | 日期 | 更新内容 |
+|------|------|----------|
+| v2.0 | 2026-04-08 | 重构为动态多版本架构，支持无限次轮换 |
+| v1.0 | 2026-04 | 初始版本，仅支持 V1/V2 |

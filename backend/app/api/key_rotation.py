@@ -1,5 +1,5 @@
 """
-密钥轮换 API
+密钥轮换 API - 支持动态多版本
 
 提供 AES 密钥轮换、数据迁移和自动轮换配置功能
 """
@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from app.deps import get_current_user, get_super_admin
 from app.models import User
-from app.models.key_rotation import KeyRotationConfig
+from app.models.key_rotation import KeyRotationConfig, KeyRotationKey
 from app.database import SessionLocal
 from app.config import settings
 from app.services.key_rotation_service import KeyRotationService
@@ -28,18 +28,8 @@ router = APIRouter(prefix="/key-rotation", tags=["密钥轮换"])
 class KeyVersionInfo(BaseModel):
     """密钥版本信息"""
     current_version: str
-    v1_configured: bool
-    v2_configured: bool
-    v2_key_preview: str
-
-
-class EncryptionStatistics(BaseModel):
-    """加密数据统计"""
-    total: int
-    v1_count: int
-    v2_count: int
-    legacy_count: int
-    needs_migration: int
+    total_versions: int
+    versions: List[dict]
 
 
 class KeyRotationStatus(BaseModel):
@@ -48,9 +38,10 @@ class KeyRotationStatus(BaseModel):
     reason: Optional[str] = None
     migration_needed: bool
     unrotated_count: int
-    v1_configured: bool
-    v2_configured: bool
     current_version: str
+    total_versions: int
+    current_key_preview: str
+    has_pending_key: bool
 
 
 class RotationConfig(BaseModel):
@@ -61,8 +52,6 @@ class RotationConfig(BaseModel):
     schedule_day: int
     schedule_time: str
     current_key_id: str
-    v2_key: Optional[str] = None
-    has_v2_key: bool = False
     auto_switch: bool
     last_rotation_at: Optional[str] = None
     next_rotation_at: Optional[str] = None
@@ -77,28 +66,30 @@ class RotationConfigUpdate(BaseModel):
     auto_switch: Optional[bool] = None
 
 
-class MigrationPreview(BaseModel):
-    """迁移预览"""
-    table_name: str
-    field_name: str
+class MigrationPreviewItem(BaseModel):
+    """迁移预览项"""
     description: str
+    table: Optional[str] = None
+    field: Optional[str] = None
     total: int
-    v1_or_legacy: int
-    v2: int
+    migrated: int
+    pending: int
+    target_version: str
 
 
 class MigrationPreviewResponse(BaseModel):
     """迁移预览响应"""
     can_migrate: bool
-    preview_tables: List[MigrationPreview]
+    preview: List[MigrationPreviewItem]
     total_records: int
-    total_needs_migration: int
+    total_pending: int
+    target_version: Optional[str] = None
 
 
 class MigrationResult(BaseModel):
     """迁移结果"""
-    table_name: str
-    field_name: str
+    table: str
+    field: str
     total: int
     migrated: int
     failed: int
@@ -112,6 +103,7 @@ class MigrationResponse(BaseModel):
     results: List[MigrationResult]
     total_migrated: int
     total_failed: int
+    target_version: Optional[str] = None
 
 
 class RotationLog(BaseModel):
@@ -125,7 +117,6 @@ class RotationLog(BaseModel):
     migrated_records: int
     failed_records: int
     error_message: Optional[str] = None
-    operator_id: Optional[int] = None
     created_at: str
 
 
@@ -139,36 +130,49 @@ class RotationHistoryResponse(BaseModel):
 
 class SwitchVersionRequest(BaseModel):
     """切换版本请求"""
-    target_version: str = Field(..., pattern="^(v1|v2)$")
+    target_version: str
+
+
+class GenerateKeyResponse(BaseModel):
+    """生成密钥响应"""
+    success: bool
+    new_version: str
+    key_preview: str
+
+
+class FullRotationResponse(BaseModel):
+    """一键轮换响应"""
+    success: bool
+    new_key_version: str
+    migration_result: dict
+    auto_switched: bool
 
 
 # ==================== 端点 ====================
+
+@router.get("/overview")
+async def get_key_rotation_overview(
+    current_user: User = Depends(get_super_admin)
+):
+    """获取密钥轮换概览"""
+    db = SessionLocal()
+    try:
+        service = KeyRotationService(db, operator_id=current_user.id)
+        return service.get_overview()
+    finally:
+        db.close()
+
 
 @router.get("/status", response_model=KeyRotationStatus)
 async def get_key_rotation_status(
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    获取密钥轮换状态
-    """
+    """获取密钥轮换状态"""
     db = SessionLocal()
     try:
-        # 检查数据库中的 v2_key
-        config = db.query(KeyRotationConfig).first()
-        has_v2_key = bool(config and config.v2_key)
-        
-        service = KeyRotationService(db)
-        stats = service.get_statistics()
-        
-        return KeyRotationStatus(
-            can_rotate=has_v2_key,
-            reason=None if has_v2_key else "V2 密钥未生成，请点击「生成新密钥」按钮",
-            migration_needed=stats["needs_migration"] > 0,
-            unrotated_count=stats["needs_migration"],
-            v1_configured=bool(settings.security.AES_KEY),
-            v2_configured=has_v2_key,
-            current_version=settings.security.AES_CURRENT_VERSION
-        )
+        service = KeyRotationService(db, operator_id=current_user.id)
+        status = service.get_status()
+        return KeyRotationStatus(**status)
     finally:
         db.close()
 
@@ -177,36 +181,18 @@ async def get_key_rotation_status(
 async def get_key_versions(
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    获取密钥版本信息
-    """
+    """获取所有密钥版本"""
     db = SessionLocal()
     try:
-        config = db.query(KeyRotationConfig).first()
-        v2_key = config.v2_key if config else None
+        service = KeyRotationService(db, operator_id=current_user.id)
+        config = service.get_config()
+        keys = service.get_all_keys()
         
         return KeyVersionInfo(
-            current_version=settings.security.AES_CURRENT_VERSION,
-            v1_configured=bool(settings.security.AES_KEY),
-            v2_configured=bool(v2_key),
-            v2_key_preview=v2_key[:4] + "***" if v2_key else ""
+            current_version=config.current_key_id,
+            total_versions=len(keys),
+            versions=[k.to_dict() for k in keys]
         )
-    finally:
-        db.close()
-
-
-@router.get("/statistics", response_model=EncryptionStatistics)
-async def get_encryption_statistics(
-    current_user: User = Depends(get_super_admin)
-):
-    """
-    获取加密数据统计
-    """
-    db = SessionLocal()
-    try:
-        service = KeyRotationService(db)
-        stats = service.get_statistics()
-        return EncryptionStatistics(**stats)
     finally:
         db.close()
 
@@ -215,12 +201,10 @@ async def get_encryption_statistics(
 async def get_rotation_config(
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    获取轮换配置
-    """
+    """获取轮换配置"""
     db = SessionLocal()
     try:
-        service = KeyRotationService(db)
+        service = KeyRotationService(db, operator_id=current_user.id)
         config = service.get_config()
         
         # 计算下次轮换时间
@@ -237,20 +221,7 @@ async def update_rotation_config(
     config_update: RotationConfigUpdate,
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    更新轮换配置
-    """
-    # 验证 schedule_type
-    if config_update.schedule_type and config_update.schedule_type not in ["weekly", "monthly", "quarterly"]:
-        raise HTTPException(status_code=400, detail="schedule_type 必须是 weekly/monthly/quarterly")
-    
-    # 验证 schedule_day
-    if config_update.schedule_day is not None:
-        if config_update.schedule_type == "weekly" and (config_update.schedule_day < 0 or config_update.schedule_day > 6):
-            raise HTTPException(status_code=400, detail="weekly 模式下 schedule_day 必须是 0-6 (周日到周六)")
-        if config_update.schedule_type in ["monthly", "quarterly"] and (config_update.schedule_day < 1 or config_update.schedule_day > 31):
-            raise HTTPException(status_code=400, detail="monthly/quarterly 模式下 schedule_day 必须是 1-31")
-    
+    """更新轮换配置"""
     db = SessionLocal()
     try:
         service = KeyRotationService(db, operator_id=current_user.id)
@@ -282,32 +253,22 @@ async def update_rotation_config(
 async def get_migration_preview(
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    预览数据迁移
-    """
+    """预览数据迁移"""
     db = SessionLocal()
     try:
-        config = db.query(KeyRotationConfig).first()
-        if not config or not config.v2_key:
-            # V2 密钥不存在时返回空数据（而不是报错）
-            return MigrationPreviewResponse(
-                can_migrate=False,
-                preview_tables=[],
-                total_records=0,
-                total_needs_migration=0
-            )
-        
         service = KeyRotationService(db, operator_id=current_user.id)
-        preview_tables = service.preview_migration()
+        preview = service.preview_migration()
         
-        total_records = sum(p["total"] for p in preview_tables)
-        total_needs_migration = sum(p["v1_or_legacy"] for p in preview_tables)
+        total_records = sum(p.get("total", 0) for p in preview)
+        total_pending = sum(p.get("pending", 0) for p in preview)
+        target_version = preview[0].get("target_version") if preview else None
         
         return MigrationPreviewResponse(
-            can_migrate=total_needs_migration > 0,
-            preview_tables=[MigrationPreview(**p) for p in preview_tables],
+            can_migrate=total_pending > 0,
+            preview=[MigrationPreviewItem(**p) for p in preview],
             total_records=total_records,
-            total_needs_migration=total_needs_migration
+            total_pending=total_pending,
+            target_version=target_version
         )
     finally:
         db.close()
@@ -318,55 +279,64 @@ async def execute_migration(
     batch_size: int = Query(default=100, ge=1, le=1000),
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    执行数据迁移
-    """
+    """执行数据迁移"""
     db = SessionLocal()
     try:
-        config = db.query(KeyRotationConfig).first()
-        if not config or not config.v2_key:
-            raise HTTPException(status_code=400, detail="V2 密钥未生成，请先点击「生成新密钥」按钮")
-        
         service = KeyRotationService(db, operator_id=current_user.id)
         result = service.execute_migration(batch_size=batch_size)
         
         return MigrationResponse(
             success=result["success"],
-            message="迁移完成" if result["success"] else f"迁移完成，但有 {result['total_failed']} 条记录失败",
-            results=[MigrationResult(**r) for r in result["results"]],
+            message=result.get("message", ""),
+            results=[MigrationResult(**r) for r in result.get("results", [])],
             total_migrated=result["total_migrated"],
-            total_failed=result["total_failed"]
+            total_failed=result["total_failed"],
+            target_version=result.get("target_version")
         )
     finally:
         db.close()
 
 
-@router.post("/switch-version", response_model=dict)
+@router.post("/switch-version")
 async def switch_key_version(
     request: SwitchVersionRequest,
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    切换密钥版本
-    """
+    """切换密钥版本"""
     db = SessionLocal()
     try:
-        config = db.query(KeyRotationConfig).first()
-        if request.target_version == "v2" and (not config or not config.v2_key):
-            raise HTTPException(status_code=400, detail="V2 密钥未生成，请先点击「生成新密钥」按钮")
-        
         service = KeyRotationService(db, operator_id=current_user.id)
         success = service.switch_version(request.target_version)
         
         if not success:
-            raise HTTPException(status_code=400, detail="切换版本失败")
+            raise HTTPException(status_code=400, detail=f"切换到 {request.target_version} 失败，密钥可能不存在")
         
         return {
             "success": True,
-            "message": f"密钥版本切换到 {request.target_version}",
-            "warning": "请重启服务使配置生效。重启后，新加密的数据将使用新密钥。",
-            "note": "旧版本加密的数据仍可自动解密"
+            "message": f"已切换到 {request.target_version}",
+            "note": "新加密的数据将使用新密钥，旧密钥加密的数据仍可自动解密"
         }
+    finally:
+        db.close()
+
+
+@router.post("/generate-key", response_model=GenerateKeyResponse)
+async def generate_new_key(
+    current_user: User = Depends(get_super_admin)
+):
+    """生成新的密钥版本"""
+    db = SessionLocal()
+    try:
+        service = KeyRotationService(db, operator_id=current_user.id)
+        new_key = service.generate_new_key()
+        
+        logger.info(f"用户 {current_user.username} 生成了新密钥: {new_key.key_id}")
+        
+        return GenerateKeyResponse(
+            success=True,
+            new_version=new_key.key_id,
+            key_preview=new_key.key_value[:4] + "***" + new_key.key_value[-4:]
+        )
     finally:
         db.close()
 
@@ -377,9 +347,7 @@ async def get_rotation_history(
     page_size: int = Query(default=20, ge=1, le=100),
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    获取轮换历史记录
-    """
+    """获取轮换历史记录"""
     db = SessionLocal()
     try:
         service = KeyRotationService(db)
@@ -398,71 +366,47 @@ async def get_rotation_history(
         db.close()
 
 
-@router.post("/auto-rotate", response_model=dict)
-async def trigger_auto_rotation(
+@router.post("/full-rotation", response_model=FullRotationResponse)
+async def full_rotation(
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    手动触发自动轮换
-    """
+    """一键完成轮换：生成密钥 -> 迁移数据 -> 切换版本"""
     db = SessionLocal()
     try:
         service = KeyRotationService(db, operator_id=current_user.id)
-        config = service.get_config()
+        result = service.full_rotation()
         
-        # 如果没有 v2_key，自动生成
-        if not config.v2_key:
-            logger.info("自动生成 V2 密钥...")
-            config.v2_key = secrets.token_hex(16)  # 生成32字符密钥
-            db.commit()
-        
-        # 执行迁移
-        migration_result = service.execute_migration()
-        
-        # 如果配置了自动切换，则切换版本
-        if config.auto_switch and migration_result["success"]:
-            current_ver = settings.security.AES_CURRENT_VERSION
-            target_ver = "v2" if current_ver == "v1" else "v1"
-            service.switch_version(target_ver)
-        
-        # 更新配置中的轮换时间
-        config.last_rotation_at = db.query(KeyRotationConfig).first().last_rotation_at
-        db.commit()
-        
-        return {
-            "success": migration_result["success"],
-            "message": "自动轮换执行完成",
-            "migrated": migration_result["total_migrated"],
-            "failed": migration_result["total_failed"]
-        }
+        return FullRotationResponse(
+            success=result["migration_result"]["success"] if result["migration_result"] else True,
+            new_key_version=result["new_key_version"],
+            migration_result=result["migration_result"],
+            auto_switched=result["auto_switched"]
+        )
     finally:
         db.close()
 
 
-@router.post("/generate-v2-key", response_model=dict)
-async def generate_v2_key(
+@router.post("/auto-rotate")
+async def trigger_auto_rotation(
     current_user: User = Depends(get_super_admin)
 ):
-    """
-    生成新的 V2 密钥
-    """
+    """触发自动轮换"""
     db = SessionLocal()
     try:
         service = KeyRotationService(db, operator_id=current_user.id)
         config = service.get_config()
         
-        # 生成安全的随机密钥（32字符）
-        new_key = secrets.token_hex(16)
-        config.v2_key = new_key
-        db.commit()
+        if not config.enabled:
+            raise HTTPException(status_code=400, detail="自动轮换未启用")
         
-        logger.info(f"用户 {current_user.username} 生成了新的 V2 密钥")
+        result = service.full_rotation()
         
         return {
-            "success": True,
-            "message": "V2 密钥已生成",
-            "key_preview": new_key[:4] + "***" + new_key[-4:],
-            "warning": "请尽快完成数据迁移并切换版本"
+            "success": result["migration_result"]["success"] if result["migration_result"] else True,
+            "message": "自动轮换执行完成",
+            "new_key_version": result["new_key_version"],
+            "migrated": result["migration_result"].get("total_migrated", 0),
+            "failed": result["migration_result"].get("total_failed", 0)
         }
     finally:
         db.close()

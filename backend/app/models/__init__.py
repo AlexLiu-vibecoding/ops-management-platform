@@ -28,7 +28,7 @@ from app.models.instances import (
 from app.models.sql_performance import SQLPerformanceRecord, SQLPerformanceComparison
 
 # 导入密钥轮换模型
-from app.models.key_rotation import KeyRotationLog, KeyRotationConfig
+from app.models.key_rotation import KeyRotationLog, KeyRotationConfig, KeyRotationKey
 
 
 def get_local_timezone():
