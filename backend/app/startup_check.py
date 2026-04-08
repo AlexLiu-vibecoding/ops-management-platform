@@ -167,6 +167,66 @@ class StartupCheck:
             self.errors.append(f"模块检查失败: {e}")
             return False
     
+    def check_security_keys(self) -> bool:
+        """检查安全密钥配置"""
+        try:
+            from app.config import settings
+            
+            # 检查 JWT 密钥
+            if hasattr(settings, 'SECRET_KEY') and settings.SECRET_KEY:
+                if settings.SECRET_KEY.startswith('dev-'):
+                    self.warnings.append("JWT 密钥使用开发默认值，建议在生产环境设置 SECRET_KEY")
+                else:
+                    self.passed.append("JWT 密钥: 已配置")
+            else:
+                self.warnings.append("JWT 密钥未配置，使用默认值")
+            
+            # 检查 AES 密钥
+            if hasattr(settings, 'AES_KEY') and settings.AES_KEY:
+                if settings.AES_KEY.startswith('dev-'):
+                    self.warnings.append("AES 密钥使用开发默认值，建议在生产环境设置 AES_KEY")
+                else:
+                    self.passed.append("AES 密钥: 已配置")
+            else:
+                self.warnings.append("AES 密钥未配置，使用默认值")
+            
+            return True
+        except Exception as e:
+            self.warnings.append(f"安全密钥检查跳过: {e}")
+            return True
+    
+    def check_key_rotation_system(self) -> bool:
+        """检查密钥轮换系统"""
+        try:
+            from app.database import SessionLocal
+            from app.models.key_rotation import KeyRotationKey, JWTRotationKey, KeyRotationConfig, JWTRotationConfig
+            
+            db = SessionLocal()
+            
+            # 检查 AES 密钥轮换
+            aes_keys = db.query(KeyRotationKey).all()
+            aes_config = db.query(KeyRotationConfig).first()
+            if aes_keys:
+                current_aes = aes_config.current_key_id if aes_config else None
+                self.passed.append(f"AES 密钥轮换: {len(aes_keys)} 个版本，当前 {current_aes}")
+            else:
+                self.warnings.append("AES 密钥轮换: 尚未初始化")
+            
+            # 检查 JWT 密钥轮换
+            jwt_keys = db.query(JWTRotationKey).all()
+            jwt_config = db.query(JWTRotationConfig).first()
+            if jwt_keys:
+                current_jwt = jwt_config.current_key_id if jwt_config else None
+                self.passed.append(f"JWT 密钥轮换: {len(jwt_keys)} 个版本，当前 {current_jwt}")
+            else:
+                self.warnings.append("JWT 密钥轮换: 尚未初始化")
+            
+            db.close()
+            return True
+        except Exception as e:
+            self.warnings.append(f"密钥轮换系统检查跳过: {e}")
+            return True
+    
     def run_all_checks(self) -> tuple[bool, list[str], list[str], list[str]]:
         """运行所有检查"""
         print("\n" + "=" * 60)
@@ -182,6 +242,8 @@ class StartupCheck:
             ("Redis 配置", self.check_redis_config),
             ("前端构建", self.check_frontend_build),
             ("模块导入", self.check_imports),
+            ("安全密钥", self.check_security_keys),
+            ("密钥轮换系统", self.check_key_rotation_system),
         ]
         
         for name, check_func in checks:
