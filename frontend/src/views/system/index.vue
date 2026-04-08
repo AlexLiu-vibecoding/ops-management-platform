@@ -1238,7 +1238,7 @@ onUnmounted(() => {
     .version-cell {
       display: flex;
       align-items: center;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       gap: 4px;
     }
     
