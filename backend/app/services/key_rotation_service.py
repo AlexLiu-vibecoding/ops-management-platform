@@ -183,6 +183,18 @@ class KeyRotationService:
         total_migrated = 0
         total_failed = 0
         
+        # 获取 v2_key（优先使用数据库中的，如果没有则使用环境变量）
+        config = self.get_config()
+        v2_key = config.v2_key or settings.security.AES_KEY_V2
+        
+        if not v2_key:
+            return {
+                "success": False,
+                "results": [{"error": "V2 密钥未配置"}],
+                "total_migrated": 0,
+                "total_failed": 0
+            }
+        
         tables_fields = [
             ("rdb_instances", "password_encrypted"),
             ("redis_instances", "password_encrypted"),
@@ -222,9 +234,9 @@ class KeyRotationService:
                     old_value = row[1]
                     
                     try:
-                        # 解密并重新加密
+                        # 解密并重新加密（使用 v2_key）
                         plaintext = AESCipher.decrypt(old_value)
-                        new_value = AESCipher().encrypt(plaintext)
+                        new_value = AESCipher(v2_key).encrypt(plaintext)
                         
                         # 更新数据库
                         update_query = f"""

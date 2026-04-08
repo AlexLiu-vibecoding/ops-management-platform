@@ -4,6 +4,8 @@
 提供 AES 密钥轮换、数据迁移和自动轮换配置功能
 """
 
+import os
+import secrets
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -11,6 +13,7 @@ from pydantic import BaseModel, Field
 
 from app.deps import get_current_user, get_super_admin
 from app.models import User
+from app.models.key_rotation import KeyRotationConfig
 from app.database import SessionLocal
 from app.config import settings
 from app.services.key_rotation_service import KeyRotationService
@@ -27,7 +30,6 @@ class KeyVersionInfo(BaseModel):
     current_version: str
     v1_configured: bool
     v2_configured: bool
-    v1_key_preview: str
     v2_key_preview: str
 
 
@@ -59,6 +61,8 @@ class RotationConfig(BaseModel):
     schedule_day: int
     schedule_time: str
     current_key_id: str
+    v2_key: Optional[str] = None
+    has_v2_key: bool = False
     auto_switch: bool
     last_rotation_at: Optional[str] = None
     next_rotation_at: Optional[str] = None
@@ -147,20 +151,22 @@ async def get_key_rotation_status(
     """
     获取密钥轮换状态
     """
-    can_rotate = settings.security.has_aes_key_v2()
-    
     db = SessionLocal()
     try:
+        # 检查数据库中的 v2_key
+        config = db.query(KeyRotationConfig).first()
+        has_v2_key = bool(config and config.v2_key)
+        
         service = KeyRotationService(db)
         stats = service.get_statistics()
         
         return KeyRotationStatus(
-            can_rotate=can_rotate,
-            reason=None if can_rotate else "AES_KEY_V2 未配置，无法进行密钥轮换",
+            can_rotate=has_v2_key,
+            reason=None if has_v2_key else "V2 密钥未生成，请点击「生成新密钥」按钮",
             migration_needed=stats["needs_migration"] > 0,
             unrotated_count=stats["needs_migration"],
             v1_configured=bool(settings.security.AES_KEY),
-            v2_configured=bool(settings.security.AES_KEY_V2),
+            v2_configured=has_v2_key,
             current_version=settings.security.AES_CURRENT_VERSION
         )
     finally:
@@ -174,16 +180,19 @@ async def get_key_versions(
     """
     获取密钥版本信息
     """
-    v1_key = settings.security.AES_KEY or ""
-    v2_key = settings.security.AES_KEY_V2 or ""
-    
-    return KeyVersionInfo(
-        current_version=settings.security.AES_CURRENT_VERSION,
-        v1_configured=bool(v1_key),
-        v2_configured=bool(v2_key),
-        v1_key_preview=v1_key[:4] + "***" if v1_key else "",
-        v2_key_preview=v2_key[:4] + "***" if v2_key else ""
-    )
+    db = SessionLocal()
+    try:
+        config = db.query(KeyRotationConfig).first()
+        v2_key = config.v2_key if config else None
+        
+        return KeyVersionInfo(
+            current_version=settings.security.AES_CURRENT_VERSION,
+            v1_configured=bool(settings.security.AES_KEY),
+            v2_configured=bool(v2_key),
+            v2_key_preview=v2_key[:4] + "***" if v2_key else ""
+        )
+    finally:
+        db.close()
 
 
 @router.get("/statistics", response_model=EncryptionStatistics)
@@ -276,11 +285,12 @@ async def get_migration_preview(
     """
     预览数据迁移
     """
-    if not settings.security.has_aes_key_v2():
-        raise HTTPException(status_code=400, detail="AES_KEY_V2 未配置，无法预览迁移")
-    
     db = SessionLocal()
     try:
+        config = db.query(KeyRotationConfig).first()
+        if not config or not config.v2_key:
+            raise HTTPException(status_code=400, detail="V2 密钥未生成，请先点击「生成新密钥」按钮")
+        
         service = KeyRotationService(db, operator_id=current_user.id)
         preview_tables = service.preview_migration()
         
@@ -305,11 +315,12 @@ async def execute_migration(
     """
     执行数据迁移
     """
-    if not settings.security.has_aes_key_v2():
-        raise HTTPException(status_code=400, detail="AES_KEY_V2 未配置，无法执行迁移")
-    
     db = SessionLocal()
     try:
+        config = db.query(KeyRotationConfig).first()
+        if not config or not config.v2_key:
+            raise HTTPException(status_code=400, detail="V2 密钥未生成，请先点击「生成新密钥」按钮")
+        
         service = KeyRotationService(db, operator_id=current_user.id)
         result = service.execute_migration(batch_size=batch_size)
         
@@ -332,11 +343,12 @@ async def switch_key_version(
     """
     切换密钥版本
     """
-    if request.target_version == "v2" and not settings.security.has_aes_key_v2():
-        raise HTTPException(status_code=400, detail="AES_KEY_V2 未配置，无法切换到 v2")
-    
     db = SessionLocal()
     try:
+        config = db.query(KeyRotationConfig).first()
+        if request.target_version == "v2" and (not config or not config.v2_key):
+            raise HTTPException(status_code=400, detail="V2 密钥未生成，请先点击「生成新密钥」按钮")
+        
         service = KeyRotationService(db, operator_id=current_user.id)
         success = service.switch_version(request.target_version)
         
@@ -385,15 +397,18 @@ async def trigger_auto_rotation(
     current_user: User = Depends(get_super_admin)
 ):
     """
-    手动触发自动轮换（用于测试）
+    手动触发自动轮换
     """
     db = SessionLocal()
     try:
         service = KeyRotationService(db, operator_id=current_user.id)
         config = service.get_config()
         
-        if not config.enabled:
-            raise HTTPException(status_code=400, detail="自动轮换未启用")
+        # 如果没有 v2_key，自动生成
+        if not config.v2_key:
+            logger.info("自动生成 V2 密钥...")
+            config.v2_key = secrets.token_hex(16)  # 生成32字符密钥
+            db.commit()
         
         # 执行迁移
         migration_result = service.execute_migration()
@@ -413,6 +428,35 @@ async def trigger_auto_rotation(
             "message": "自动轮换执行完成",
             "migrated": migration_result["total_migrated"],
             "failed": migration_result["total_failed"]
+        }
+    finally:
+        db.close()
+
+
+@router.post("/generate-v2-key", response_model=dict)
+async def generate_v2_key(
+    current_user: User = Depends(get_super_admin)
+):
+    """
+    生成新的 V2 密钥
+    """
+    db = SessionLocal()
+    try:
+        service = KeyRotationService(db, operator_id=current_user.id)
+        config = service.get_config()
+        
+        # 生成安全的随机密钥（32字符）
+        new_key = secrets.token_hex(16)
+        config.v2_key = new_key
+        db.commit()
+        
+        logger.info(f"用户 {current_user.username} 生成了新的 V2 密钥")
+        
+        return {
+            "success": True,
+            "message": "V2 密钥已生成",
+            "key_preview": new_key[:4] + "***" + new_key[-4:],
+            "warning": "请尽快完成数据迁移并切换版本"
         }
     finally:
         db.close()

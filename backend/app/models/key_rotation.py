@@ -53,6 +53,7 @@ class KeyRotationConfig(Base):
     schedule_day = Column(Integer, default=1, comment="执行日(周几/每月几号)")
     schedule_time = Column(String(10), default="02:00", comment="执行时间")
     current_key_id = Column(String(10), default="v1", comment="当前密钥版本")
+    v2_key = Column(String(64), nullable=True, comment="V2 密钥（自动生成的下一版本密钥）")
     auto_switch = Column(Boolean, default=False, comment="迁移后自动切换版本")
     last_rotation_at = Column(DateTime, nullable=True, comment="上次轮换时间")
     next_rotation_at = Column(DateTime, nullable=True, comment="下次轮换时间")
@@ -66,6 +67,8 @@ class KeyRotationConfig(Base):
             "schedule_day": self.schedule_day,
             "schedule_time": self.schedule_time,
             "current_key_id": self.current_key_id,
+            "v2_key": self.v2_key,
+            "has_v2_key": bool(self.v2_key),
             "auto_switch": self.auto_switch,
             "last_rotation_at": self.last_rotation_at.isoformat() if self.last_rotation_at else None,
             "next_rotation_at": self.next_rotation_at.isoformat() if self.next_rotation_at else None

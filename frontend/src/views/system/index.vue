@@ -538,15 +538,20 @@
               <el-button type="primary" @click="loadRotationData" :loading="rotationLoading">
                 <el-icon><Refresh /></el-icon> 刷新
               </el-button>
-              <el-button type="danger" @click="handleFullRotation" :disabled="!rotationStatus.can_rotate || !migrationPreview.length" :loading="fullRotating">
-                <el-icon><RefreshLeft /></el-icon> 一键轮换
+              <el-button v-if="!rotationConfig.has_v2_key" type="danger" @click="handleGenerateKey" :loading="generatingKey">
+                <el-icon><Key /></el-icon> 生成新密钥
               </el-button>
-              <el-button type="warning" @click="handleMigrate" :disabled="!rotationStatus.can_rotate || !migrationPreview.length" :loading="migrating">
-                <el-icon><Upload /></el-icon> 执行迁移
-              </el-button>
-              <el-button type="success" @click="handleSwitchVersion" :disabled="!rotationStatus.can_rotate" :loading="switching">
-                <el-icon><Switch /></el-icon> 切换版本
-              </el-button>
+              <template v-else>
+                <el-button type="info" @click="handleFullRotation" :disabled="!migrationPreview.length" :loading="fullRotating">
+                  <el-icon><RefreshLeft /></el-icon> 一键轮换
+                </el-button>
+                <el-button type="warning" @click="handleMigrate" :disabled="!migrationPreview.length" :loading="migrating">
+                  <el-icon><Upload /></el-icon> 执行迁移
+                </el-button>
+                <el-button type="success" @click="handleSwitchVersion" :loading="switching">
+                  <el-icon><Switch /></el-icon> 切换到 V2
+                </el-button>
+              </template>
             </div>
 
             <!-- 历史记录 -->
@@ -802,6 +807,7 @@ const rotationLoading = ref(false)
 const migrating = ref(false)
 const switching = ref(false)
 const fullRotating = ref(false)
+const generatingKey = ref(false)
 const historyLoading = ref(false)
 
 const loadRotationStatus = async () => {
@@ -820,7 +826,8 @@ const loadRotationStatus = async () => {
       schedule_day: config.schedule_day,
       schedule_time: config.schedule_time,
       schedule_quarter_month: config.schedule_quarter_month || 1,
-      auto_switch: config.auto_switch
+      auto_switch: config.auto_switch,
+      has_v2_key: config.has_v2_key || !!config.v2_key
     }
     rotationTime.value = config.schedule_time
   } catch (error) {
@@ -940,6 +947,29 @@ const handleFullRotation = async () => {
     }
   } finally {
     fullRotating.value = false
+  }
+}
+
+const handleGenerateKey = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要生成新的 V2 密钥吗？\n\n生成后，您可以使用一键轮换功能完成数据迁移和版本切换。',
+      '生成新密钥',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
+    )
+    generatingKey.value = true
+    const result = await rotationApi.generateV2Key()
+    ElMessage.success(result.message)
+    if (result.warning) {
+      ElMessage.warning(result.warning)
+    }
+    await loadRotationData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '生成密钥失败')
+    }
+  } finally {
+    generatingKey.value = false
   }
 }
 

@@ -77,3 +77,10 @@ export function getRotationHistory(page = 1, pageSize = 20) {
 export function triggerAutoRotation() {
   return request.post('/key-rotation/auto-rotate')
 }
+
+/**
+ * 生成新的 V2 密钥
+ */
+export function generateV2Key() {
+  return request.post('/key-rotation/generate-v2-key')
+}
