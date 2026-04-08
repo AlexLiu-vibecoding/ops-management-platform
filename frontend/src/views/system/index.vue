@@ -378,7 +378,10 @@
             <el-descriptions-item label="AES 密钥">
               <div class="secret-value">
                 <code>{{ securityConfig.aes_key }}</code>
-                <el-tag :type="securityConfig.aes_configured ? 'success' : 'warning'" size="small" style="margin-left: 10px;">
+                <el-tag v-if="overviewData.current_version" type="success" size="small" style="margin-left: 10px;">
+                  {{ overviewData.current_version.toUpperCase() }}
+                </el-tag>
+                <el-tag :type="securityConfig.aes_configured ? 'success' : 'warning'" size="small" style="margin-left: 5px;">
                   {{ securityConfig.aes_configured ? '已自定义' : '使用默认值' }}
                 </el-tag>
               </div>
