@@ -289,7 +289,13 @@ async def get_migration_preview(
     try:
         config = db.query(KeyRotationConfig).first()
         if not config or not config.v2_key:
-            raise HTTPException(status_code=400, detail="V2 密钥未生成，请先点击「生成新密钥」按钮")
+            # V2 密钥不存在时返回空数据（而不是报错）
+            return MigrationPreviewResponse(
+                can_migrate=False,
+                preview_tables=[],
+                total_records=0,
+                total_needs_migration=0
+            )
         
         service = KeyRotationService(db, operator_id=current_user.id)
         preview_tables = service.preview_migration()
