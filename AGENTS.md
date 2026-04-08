@@ -1146,6 +1146,7 @@ class ScriptExecutor(ABC):
 | Helm Chart | `release/helm/opscenter/` |
 | 部署文档 | `release/docs/KUBERNETES_DEPLOYMENT.md` |
 | 迁移指南 | `release/docs/MIGRATION_GUIDE.md` |
+| 密钥轮换 | `backend/app/api/key_rotation.py`, `backend/app/migrations/migrate_aes_key.py` |
 
 ### 常用命令
 
@@ -1180,13 +1181,14 @@ helm install opscenter ./helm/opscenter --namespace opscenter --create-namespace
 
 ---
 
-*文档版本：v7.0*
-*最后更新：2026-04-05*
+*文档版本：v8.0*
+*最后更新：2026-04-08*
 
 ### 版本历史
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
+| v8.0 | 2026-04-08 | 新增密钥轮换机制，支持 AES 密钥版本管理和数据迁移 |
 | v7.0 | 2026-04-05 | 新增架构设计与优化章节，分析开闭原则并提供适配器模式优化方案 |
 | v6.0 | 2026-04-02 | 新增云原生部署章节，移除内置数据库，使用 AWS 托管服务 |
 | v5.0 | 2026-04-02 | 新增 AI 助手工作指南，总结常见错误模式 |
@@ -1194,3 +1196,95 @@ helm install opscenter ./helm/opscenter --namespace opscenter --create-namespace
 | v3.0 | 2026-04 | 新增通知系统重构案例 |
 | v2.0 | 2026-04 | 新增验收模板，完善 Checklist |
 | v1.0 | 2026-03 | 初始版本 |
+
+---
+
+## 十三、密钥轮换机制
+
+> **⚠️ 重要**: 为防止密钥变更导致数据无法解密，实现了一套完整的密钥轮换机制。
+
+### 13.1 概述
+
+系统使用 AES-256-CBC 加密敏感数据，为防止密钥变更导致数据丢失，实现了密钥轮换机制。
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      AES 加密数据存储                                │
+├─────────────────────────────────────────────────────────────────────┤
+│  表名              │ 字段                  │ 用途                    │
+├───────────────────┼──────────────────────┼─────────────────────────┤
+│ rdb_instances     │ password_encrypted   │ 数据库连接密码           │
+│ redis_instances   │ password_encrypted   │ Redis 连接密码          │
+│ ai_models         │ api_key_encrypted    │ AI API 密钥             │
+│ aws_credentials   │ aws_secret_access_key│ AWS 访问密钥 (加密存储) │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 13.2 加密数据格式
+
+```
+v{version}$base64(iv + ciphertext)
+
+示例：
+- v1$xxxxxx  → 使用 V1 密钥加密
+- v2$xxxxxx  → 使用 V2 密钥加密
+- xxxxxx     → 无前缀（旧格式，自动使用 V1 密钥解密）
+```
+
+### 13.3 配置项
+
+| 环境变量 | 说明 | 必填 |
+|----------|------|------|
+| `AES_KEY` | V1 密钥（32字符） | 是 |
+| `AES_KEY_V2` | V2 密钥（密钥轮换用，32字符） | 否 |
+| `AES_CURRENT_VERSION` | 当前使用版本（v1 或 v2） | 否，默认 v1 |
+
+### 13.4 密钥轮换流程
+
+```
+1. 配置新密钥
+   export AES_KEY_V2="新的32位密钥"
+   export AES_CURRENT_VERSION="v2"
+
+2. 预览迁移
+   GET /api/v1/key-rotation/migration-preview
+   或
+   python -m app.migrations.migrate_aes_key --dry-run
+
+3. 执行迁移
+   POST /api/v1/key-rotation/migrate
+   或
+   python -m app.migrations.migrate_aes_key
+
+4. 切换版本（可选）
+   POST /api/v1/key-rotation/switch-version?target_version=v2
+   然后重启服务
+```
+
+### 13.5 API 端点
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/key-rotation/status` | 获取轮换状态 |
+| GET | `/api/v1/key-rotation/versions` | 获取密钥版本信息 |
+| GET | `/api/v1/key-rotation/migration-preview` | 预览迁移 |
+| POST | `/api/v1/key-rotation/migrate` | 执行迁移 |
+| POST | `/api/v1/key-rotation/switch-version` | 切换版本 |
+
+### 13.6 向后兼容
+
+- ✅ 旧格式（无前缀）可自动解密
+- ✅ V1 密钥数据可解密
+- ✅ 迁移过程不中断服务
+- ✅ 新密钥加密的数据自动使用新版本前缀
+
+### 13.7 注意事项
+
+```
+⚠️ 重要提醒：
+
+1. 密钥变更前必须执行迁移
+2. 迁移前建议备份数据库
+3. 切换版本后旧版本密钥仍可用于解密
+4. 生产环境建议使用 KMS 管理密钥
+```

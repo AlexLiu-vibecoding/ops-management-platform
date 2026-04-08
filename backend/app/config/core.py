@@ -231,6 +231,14 @@ class SecuritySettings(BaseSettings):
         default=None,
         description="AES 加密密钥（必须32字符）"
     )
+    AES_KEY_V2: Optional[str] = Field(
+        default=None,
+        description="AES 加密密钥 V2（密钥轮换用，必须32字符）"
+    )
+    AES_CURRENT_VERSION: str = Field(
+        default="v1",
+        description="当前使用的 AES 密钥版本（v1 或 v2）"
+    )
     
     # 密码哈希配置
     PASSWORD_SALT: Optional[str] = Field(
@@ -251,6 +259,14 @@ class SecuritySettings(BaseSettings):
         """验证 AES 密钥长度"""
         if v is not None and len(v) != 32:
             raise ValueError("AES_KEY 必须是 32 个字符")
+        return v
+    
+    @field_validator("AES_KEY_V2")
+    @classmethod
+    def validate_aes_key_v2(cls, v: Optional[str]) -> Optional[str]:
+        """验证 AES V2 密钥长度"""
+        if v is not None and len(v) != 32:
+            raise ValueError("AES_KEY_V2 必须是 32 个字符")
         return v
     
     def get_jwt_secret_key(self) -> str:
@@ -277,13 +293,17 @@ class SecuritySettings(BaseSettings):
     
     def get_aes_key(self) -> str:
         """
-        获取 AES 密钥
+        获取当前版本的 AES 密钥
         
         Returns:
             32字符的 AES 密钥
         """
         import logging
         logger = logging.getLogger(__name__)
+        
+        # 根据当前版本选择密钥
+        if self.AES_CURRENT_VERSION == "v2" and self.AES_KEY_V2:
+            return self.AES_KEY_V2
         
         if self.AES_KEY:
             return self.AES_KEY
@@ -294,6 +314,35 @@ class SecuritySettings(BaseSettings):
             "生产环境请设置 AES_KEY 环境变量（32字符）！"
         )
         return "dev-aes-key-32-characters-please!"
+    
+    def get_aes_key_by_version(self, version: str) -> Optional[str]:
+        """
+        根据版本获取 AES 密钥
+        
+        Args:
+            version: 密钥版本（v1 或 v2）
+        
+        Returns:
+            对应版本的密钥，如果不存在返回 None
+        """
+        if version == "v2":
+            return self.AES_KEY_V2
+        return self.AES_KEY
+    
+    def get_latest_aes_key(self) -> str:
+        """
+        获取最新的 AES 密钥（用于加密）
+        
+        Returns:
+            最新版本的密钥
+        """
+        if self.AES_KEY_V2:
+            return self.AES_KEY_V2
+        return self.get_aes_key()
+    
+    def has_aes_key_v2(self) -> bool:
+        """检查是否配置了 V2 密钥"""
+        return bool(self.AES_KEY_V2)
     
     def get_password_salt(self) -> str:
         """
@@ -488,6 +537,16 @@ class Settings(BaseSettings):
     def AES_KEY(self) -> str:
         """兼容旧代码"""
         return self.security.get_aes_key()
+    
+    @property
+    def AES_KEY_V2(self) -> Optional[str]:
+        """AES V2 密钥"""
+        return self.security.AES_KEY_V2
+    
+    @property
+    def AES_CURRENT_VERSION(self) -> str:
+        """当前 AES 密钥版本"""
+        return self.security.AES_CURRENT_VERSION
     
     @property
     def PASSWORD_SALT(self) -> str:

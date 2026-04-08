@@ -96,19 +96,43 @@ def decode_access_token(token: str) -> Optional[dict[str, Any]]:
 
 
 class AESCipher:
-    """AES加密解密工具类"""
+    """
+    AES加密解密工具类（支持密钥轮换）
     
-    def __init__(self, key: Optional[str] = None):
+    加密数据格式：
+    - v1$base64(iv+ciphertext): 使用 v1 密钥加密
+    - v2$base64(iv+ciphertext): 使用 v2 密钥加密
+    - base64(iv+ciphertext): 无版本前缀（旧格式，使用 v1 密钥解密）
+    """
+    
+    # 无版本前缀的旧格式
+    LEGACY_PREFIX = "legacy$"
+    
+    def __init__(self, key: Optional[str] = None, version: str = "v1"):
         """
         初始化AES加密器
         
         Args:
             key: 加密密钥（必须为32字节）
+            version: 密钥版本（v1 或 v2）
         """
         self.key = (key or settings.AES_KEY).encode('utf-8')
         if len(self.key) != 32:
-            # 如果密钥长度不是32字节，进行填充或截断
             self.key = self.key.ljust(32, b'0')[:32]
+        self.version = version
+    
+    def _get_key_for_version(self, version: str) -> bytes:
+        """获取指定版本的密钥"""
+        if version == "v2":
+            key = settings.security.get_aes_key_by_version("v2")
+        else:
+            key = settings.security.get_aes_key_by_version("v1")
+        
+        if key:
+            return key.encode('utf-8')
+        
+        # 如果指定版本没有密钥，回退到当前密钥
+        return settings.AES_KEY.encode('utf-8')
     
     def encrypt(self, plaintext: str) -> str:
         """
@@ -118,8 +142,15 @@ class AESCipher:
             plaintext: 明文
         
         Returns:
-            加密后的Base64字符串
+            加密后的字符串，格式：v{version}$base64(iv+ciphertext)
         """
+        # 使用最新密钥版本
+        version = settings.security.AES_CURRENT_VERSION
+        if version == "v2" and settings.security.AES_KEY_V2:
+            key = settings.security.AES_KEY_V2.encode('utf-8')
+        else:
+            key = self.key
+        
         # 生成随机IV
         iv = os.urandom(16)
         
@@ -129,19 +160,21 @@ class AESCipher:
         padded_plaintext = plaintext_bytes + bytes([padding_length] * padding_length)
         
         # 加密
-        cipher = Cipher(algorithms.AES(self.key), modes.CBC(iv), backend=default_backend())
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
         encryptor = cipher.encryptor()
         ciphertext = encryptor.update(padded_plaintext) + encryptor.finalize()
         
-        # 返回IV + 密文的Base64编码
-        return base64.b64encode(iv + ciphertext).decode('utf-8')
+        # 返回版本前缀 + Base64编码
+        encoded = base64.b64encode(iv + ciphertext).decode('utf-8')
+        return f"v{version[1]}${encoded}"
     
-    def decrypt(self, encrypted_text: str) -> str:
+    @classmethod
+    def decrypt(cls, encrypted_text: str) -> str:
         """
-        AES解密
+        解密（自动检测版本）
         
         Args:
-            encrypted_text: 加密后的Base64字符串
+            encrypted_text: 加密后的字符串
         
         Returns:
             解密后的明文
@@ -149,12 +182,35 @@ class AESCipher:
         if not encrypted_text:
             raise ValueError("加密文本不能为空")
         
+        # 检测版本前缀
+        version = "v1"
+        data = encrypted_text
+        
+        if encrypted_text.startswith("v1$"):
+            version = "v1"
+            data = encrypted_text[3:]
+        elif encrypted_text.startswith("v2$"):
+            version = "v2"
+            data = encrypted_text[3:]
+        elif encrypted_text.startswith(cls.LEGACY_PREFIX):
+            # 旧格式，无版本前缀
+            data = encrypted_text[len(cls.LEGACY_PREFIX):]
+        
+        # 获取对应版本的密钥
+        if version == "v2" and settings.security.AES_KEY_V2:
+            key = settings.security.AES_KEY_V2.encode('utf-8')
+        else:
+            key = settings.AES_KEY.encode('utf-8')
+        
+        if len(key) != 32:
+            key = key.ljust(32, b'0')[:32]
+        
         try:
             # Base64解码
-            encrypted_data = base64.b64decode(encrypted_text)
+            encrypted_data = base64.b64decode(data)
             
-            # 检查数据长度是否足够
-            if len(encrypted_data) < 17:  # 至少需要 16 字节 IV + 1 字节密文
+            # 检查数据长度
+            if len(encrypted_data) < 17:
                 raise ValueError(f"加密数据长度不足: {len(encrypted_data)} 字节")
             
             # 提取IV和密文
@@ -162,7 +218,7 @@ class AESCipher:
             ciphertext = encrypted_data[16:]
             
             # 解密
-            cipher = Cipher(algorithms.AES(self.key), modes.CBC(iv), backend=default_backend())
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
             decryptor = cipher.decryptor()
             padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
             
@@ -172,7 +228,65 @@ class AESCipher:
             
             return plaintext.decode('utf-8')
         except Exception as e:
-            raise ValueError(f"解密失败: {str(e)}") from None
+            logger.error(f"解密失败 (version={version}): {e}")
+            raise ValueError(f"解密失败: {e}")
+    
+    @staticmethod
+    def detect_version(encrypted_text: str) -> str:
+        """
+        检测加密数据的密钥版本
+        
+        Args:
+            encrypted_text: 加密后的字符串
+        
+        Returns:
+            版本标识：v1, v2, 或 legacy
+        """
+        if encrypted_text.startswith("v1$"):
+            return "v1"
+        elif encrypted_text.startswith("v2$"):
+            return "v2"
+        elif encrypted_text.startswith(AESCipher.LEGACY_PREFIX):
+            return "legacy"
+        else:
+            # 无前缀的旧格式
+            return "legacy"
+    
+    @staticmethod
+    def needs_migration(encrypted_text: str) -> bool:
+        """
+        检查数据是否需要迁移到新密钥
+        
+        Args:
+            encrypted_text: 加密后的字符串
+        
+        Returns:
+            True 如果数据需要迁移到当前版本
+        """
+        current_version = settings.security.AES_CURRENT_VERSION
+        data_version = AESCipher.detect_version(encrypted_text)
+        
+        # 转换为统一格式比较
+        data_version_normalized = data_version if data_version != "legacy" else "v1"
+        
+        return data_version_normalized != current_version
+    
+    @staticmethod
+    def re_encrypt(encrypted_text: str) -> str:
+        """
+        使用当前密钥重新加密数据
+        
+        Args:
+            encrypted_text: 旧加密数据
+        
+        Returns:
+            新加密数据
+        """
+        # 先解密
+        plaintext = AESCipher.decrypt(encrypted_text)
+        # 再用新密钥加密
+        cipher = AESCipher()
+        return cipher.encrypt(plaintext)
 
 
 # 创建全局AES加密实例
