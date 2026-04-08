@@ -170,26 +170,35 @@ class StartupCheck:
     def check_security_keys(self) -> bool:
         """检查安全密钥配置"""
         try:
-            from app.config import settings
+            from app.database import SessionLocal
+            from app.models.key_rotation import KeyRotationKey, JWTRotationKey, KeyRotationConfig, JWTRotationConfig
+            
+            db = SessionLocal()
             
             # 检查 JWT 密钥
-            if hasattr(settings, 'SECRET_KEY') and settings.SECRET_KEY:
-                if settings.SECRET_KEY.startswith('dev-'):
-                    self.warnings.append("JWT 密钥使用开发默认值，建议在生产环境设置 SECRET_KEY")
-                else:
-                    self.passed.append("JWT 密钥: 已配置")
+            jwt_keys = db.query(JWTRotationKey).all()
+            jwt_versions = [k.key_id for k in jwt_keys]
+            jwt_has_multiple = len(jwt_keys) > 1 or (len(jwt_keys) == 1 and jwt_keys[0].key_id != 'v1')
+            
+            if jwt_has_multiple:
+                self.passed.append(f"JWT 密钥: 轮换系统已配置 {len(jwt_keys)} 个版本")
+            elif len(jwt_keys) == 1 and jwt_keys[0].key_value.startswith('dev-'):
+                self.warnings.append("JWT 密钥使用开发默认值，建议执行密钥轮换")
             else:
-                self.warnings.append("JWT 密钥未配置，使用默认值")
+                self.passed.append("JWT 密钥: 已配置")
             
             # 检查 AES 密钥
-            if hasattr(settings, 'AES_KEY') and settings.AES_KEY:
-                if settings.AES_KEY.startswith('dev-'):
-                    self.warnings.append("AES 密钥使用开发默认值，建议在生产环境设置 AES_KEY")
-                else:
-                    self.passed.append("AES 密钥: 已配置")
-            else:
-                self.warnings.append("AES 密钥未配置，使用默认值")
+            aes_keys = db.query(KeyRotationKey).all()
+            aes_has_multiple = len(aes_keys) > 1 or (len(aes_keys) == 1 and aes_keys[0].key_id != 'v1')
             
+            if aes_has_multiple:
+                self.passed.append(f"AES 密钥: 轮换系统已配置 {len(aes_keys)} 个版本")
+            elif len(aes_keys) == 1 and aes_keys[0].key_value.startswith('dev-'):
+                self.warnings.append("AES 密钥使用开发默认值，建议执行密钥轮换")
+            else:
+                self.passed.append("AES 密钥: 已配置")
+            
+            db.close()
             return True
         except Exception as e:
             self.warnings.append(f"安全密钥检查跳过: {e}")
