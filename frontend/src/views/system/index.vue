@@ -393,15 +393,15 @@
 
           <!-- 密钥轮换区块 -->
           <el-divider content-position="left">
-            <el-icon><Key /></el-icon> 密钥轮换管理
+            <el-icon><Key /></el-icon> AES 密钥轮换
           </el-divider>
           
           <div class="key-rotation-section" v-loading="rotationLoading">
-            <!-- 版本密钥列表 -->
+            <!-- AES 版本密钥列表 -->
             <el-card shadow="never" style="margin-bottom: 20px;">
               <template #header>
                 <div class="card-header">
-                  <span>密钥版本</span>
+                  <span>AES 密钥版本</span>
                   <el-button type="primary" size="small" @click="handleGenerateKey" :loading="generatingKey">
                     <el-icon><Plus /></el-icon> 生成新版本
                   </el-button>
@@ -509,39 +509,9 @@
             <el-icon><Key /></el-icon> JWT 密钥轮换
           </el-divider>
           
-          <div class="jwt-rotation-section" v-loading="jwtRotationLoading">
-            <el-row :gutter="16" class="jwt-stats-row">
-              <el-col :span="8">
-                <div class="jwt-stat-card">
-                  <div class="stat-icon version"><el-icon><Key /></el-icon></div>
-                  <div class="stat-info">
-                    <div class="stat-label">当前版本</div>
-                    <div class="stat-value">{{ jwtRotationData.current_version?.toUpperCase() || '-' }}</div>
-                  </div>
-                </div>
-              </el-col>
-              <el-col :span="8">
-                <div class="jwt-stat-card">
-                  <div class="stat-icon total"><el-icon><Document /></el-icon></div>
-                  <div class="stat-info">
-                    <div class="stat-label">密钥版本数</div>
-                    <div class="stat-value">{{ jwtRotationData.total_keys || 0 }}</div>
-                  </div>
-                </div>
-              </el-col>
-              <el-col :span="8">
-                <div class="jwt-stat-card">
-                  <div class="stat-icon time"><el-icon><Timer /></el-icon></div>
-                  <div class="stat-info">
-                    <div class="stat-label">上次轮换</div>
-                    <div class="stat-value small">{{ jwtRotationData.last_rotation_at ? formatTime(jwtRotationData.last_rotation_at) : '从未' }}</div>
-                  </div>
-                </div>
-              </el-col>
-            </el-row>
-
+          <div class="key-rotation-section" v-loading="jwtRotationLoading">
             <!-- JWT 密钥版本列表 -->
-            <el-card shadow="never" style="margin-top: 16px;">
+            <el-card shadow="never" style="margin-bottom: 20px;">
               <template #header>
                 <div class="card-header">
                   <span>JWT 密钥版本</span>
@@ -1263,59 +1233,6 @@ onUnmounted(() => {
       gap: 12px;
       margin-bottom: 20px;
       justify-content: center;
-    }
-  }
-
-  // JWT 密钥轮换区块
-  .jwt-rotation-section {
-    margin-top: 20px;
-
-    .jwt-stats-row {
-      margin-bottom: 16px;
-    }
-
-    .jwt-stat-card {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 16px;
-      background: #f5f7fa;
-      border-radius: 8px;
-
-      .stat-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 20px;
-        color: white;
-
-        &.version { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
-        &.total { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
-        &.time { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
-      }
-
-      .stat-info {
-        flex: 1;
-
-        .stat-label {
-          font-size: 12px;
-          color: #909399;
-          margin-bottom: 4px;
-        }
-
-        .stat-value {
-          font-size: 20px;
-          font-weight: 600;
-          color: #303133;
-
-          &.small {
-            font-size: 14px;
-          }
-        }
-      }
     }
   }
 
