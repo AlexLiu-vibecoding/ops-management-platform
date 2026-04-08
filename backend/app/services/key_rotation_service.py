@@ -547,6 +547,18 @@ class KeyRotationService:
         current_key = self.get_active_key()
         old_version = current_key.key_id if current_key else None
         
+        # 如果切换到不同版本，先执行迁移
+        total_migrated = 0
+        total_failed = 0
+        error_msg = None
+        if old_version and old_version != target_version:
+            logger.info(f"切换前先迁移数据: {old_version} -> {target_version}")
+            migration_result = self.migrate_to_key(target_key.key_id)
+            total_migrated = migration_result.get("total_migrated", 0)
+            total_failed = migration_result.get("total_failed", 0)
+            if total_failed > 0:
+                error_msg = f"迁移失败 {total_failed} 条"
+        
         # 标记所有密钥为非活跃
         self.db.query(KeyRotationKey).update({KeyRotationKey.is_active: False})
         
@@ -563,12 +575,13 @@ class KeyRotationService:
         # 记录日志
         self.add_log(
             action="switch",
-            status="success",
+            status="success" if total_failed == 0 else "partial",
             from_version=old_version,
             to_version=target_version,
-            total_records=0,
-            migrated_records=0,
-            failed_records=0
+            total_records=total_migrated + total_failed,
+            migrated_records=total_migrated,
+            failed_records=total_failed,
+            error_message=error_msg
         )
         
         logger.info(f"切换密钥版本: {old_version} -> {target_version}")
