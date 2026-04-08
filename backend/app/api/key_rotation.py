@@ -410,3 +410,45 @@ async def trigger_auto_rotation(
         }
     finally:
         db.close()
+
+
+@router.delete("/keys/{key_id}")
+async def delete_key_version(
+    key_id: str,
+    current_user: User = Depends(get_super_admin)
+):
+    """删除密钥版本（不能删除当前激活版本）"""
+    db = SessionLocal()
+    try:
+        from app.services.key_rotation_service import KeyRotationService
+        service = KeyRotationService(db, operator_id=current_user.id)
+        
+        # 获取要删除的密钥
+        key = service.get_key_by_id(key_id)
+        if not key:
+            raise HTTPException(status_code=404, detail="密钥版本不存在")
+        
+        # 不能删除当前激活版本
+        if key.is_active:
+            raise HTTPException(status_code=400, detail="不能删除当前使用的密钥版本")
+        
+        # 删除密钥
+        db.delete(key)
+        db.commit()
+        
+        # 记录日志
+        service.add_log(
+            action="delete",
+            status="success",
+            from_version=key_id,
+            to_version=None
+        )
+        
+        return {"success": True, "message": f"密钥版本 {key_id.upper()} 已删除"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
+    finally:
+        db.close()

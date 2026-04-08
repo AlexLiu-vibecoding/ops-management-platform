@@ -88,3 +88,10 @@ export function fullRotation() {
 export function triggerAutoRotation() {
   return request.post('/key-rotation/auto-rotate')
 }
+
+/**
+ * 删除密钥版本
+ */
+export function deleteKeyVersion(keyId) {
+  return request.delete(`/key-rotation/keys/${keyId}`)
+}

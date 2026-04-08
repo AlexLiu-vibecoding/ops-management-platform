@@ -407,7 +407,7 @@
                   </el-button>
                 </div>
               </template>
-              <el-table :data="keyVersions" size="small" border>
+              <el-table :data="displayKeyVersions" size="small" border>
                 <el-table-column prop="key_id" label="版本" width="100" align="center">
                   <template #default="{ row }">
                     <div class="version-cell">
@@ -428,7 +428,7 @@
                     {{ formatTime(row.created_at) }}
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="120" align="center">
+                <el-table-column label="操作" width="180" align="center">
                   <template #default="{ row }">
                     <el-button 
                       v-if="!row.is_active" 
@@ -436,7 +436,15 @@
                       size="small" 
                       @click="handleSwitchVersion(row.key_id)"
                       :loading="switching">
-                      切换到此版本
+                      切换
+                    </el-button>
+                    <el-button 
+                      v-if="!row.is_active" 
+                      type="danger" 
+                      size="small" 
+                      @click="handleDeleteKey(row.key_id)"
+                      :loading="deletingKey === row.key_id">
+                      删除
                     </el-button>
                     <span v-else class="text-muted">当前版本</span>
                   </template>
@@ -554,6 +562,12 @@ const schedulerJobs = ref([])
 const schedulerLoading = ref(false)
 const runningJobs = computed(() => schedulerOverview.value.running_jobs || 0)
 let schedulerTimer = null
+
+// 密钥版本显示（倒序，最多10个）
+const displayKeyVersions = computed(() => {
+  return [...keyVersions.value].sort((a, b) => b.id - a.id).slice(0, 10)
+})
+const deletingKey = ref(null)
 
 const fetchSchedulerOverview = async () => {
   schedulerLoading.value = true
@@ -851,13 +865,33 @@ const handleGenerateKey = async () => {
   }
 }
 
+const handleDeleteKey = async (keyId) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除密钥版本 ${keyId.toUpperCase()} 吗？\n\n删除后无法恢复，请谨慎操作。`,
+      '确认删除',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'danger' }
+    )
+    deletingKey.value = keyId
+    await rotationApi.deleteKeyVersion(keyId)
+    ElMessage.success(`密钥版本 ${keyId.toUpperCase()} 已删除`)
+    await loadRotationStatus()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '删除失败')
+    }
+  } finally {
+    deletingKey.value = null
+  }
+}
+
 const getActionType = (action) => {
-  const map = { preview: 'info', migrate: 'warning', switch: 'success' }
+  const map = { preview: 'info', migrate: 'warning', switch: 'success', delete: 'danger' }
   return map[action] || 'info'
 }
 
 const getActionLabel = (action) => {
-  const map = { preview: '预览', migrate: '迁移', switch: '切换' }
+  const map = { preview: '预览', migrate: '迁移', switch: '切换', delete: '删除' }
   return map[action] || action
 }
 
