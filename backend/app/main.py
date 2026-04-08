@@ -33,6 +33,7 @@ from app.api import scheduled_inspection, alert_rules, change_windows, scheduler
 from app.api import notification_channels, notification_rules, ai_models, sql_performance
 from app.api import notification_plugins
 from app.api import key_rotation
+from app.api import jwt_rotation
 
 # 配置安全日志（统一配置，敏感信息脱敏）
 from app.utils.log_filter import SensitiveDataFilter
@@ -344,6 +345,7 @@ app.include_router(notification_plugins.router, prefix="/api/v1")  # 通知插�
 app.include_router(ai_models.router, prefix="/api/v1")  # AI 模型配置管理
 app.include_router(sql_performance.router, prefix="/api/v1")  # SQL 性能对比
 app.include_router(key_rotation.router, prefix="/api/v1")  # 密钥轮换管理
+app.include_router(jwt_rotation.router, prefix="/api/v1")  # JWT轮换管理
 
 
 # 健康检查

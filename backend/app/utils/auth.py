@@ -53,6 +53,80 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password + settings.PASSWORD_SALT, hashed_password)
 
 
+def _get_current_jwt_key() -> tuple:
+    """
+    获取当前 JWT 密钥
+    
+    Returns:
+        tuple: (version_str, key_str)
+    """
+    try:
+        from app.database import SessionLocal
+        from app.models.key_rotation import JWTRotationKey, JWTRotationConfig
+        
+        db = SessionLocal()
+        try:
+            config = db.query(JWTRotationConfig).first()
+            if config and config.current_key_id:
+                key_record = db.query(JWTRotationKey).filter(
+                    JWTRotationKey.key_id == config.current_key_id
+                ).first()
+                if key_record and key_record.key_value:
+                    return config.current_key_id, key_record.key_value
+        finally:
+            db.close()
+    except Exception:
+        pass
+    
+    # 回退到 settings
+    return "v1", settings.SECRET_KEY
+
+
+def _get_all_jwt_keys() -> list:
+    """
+    获取所有 JWT 密钥（用于验证）
+    
+    Returns:
+        list: 所有密钥的列表，当前密钥优先
+    """
+    keys = []
+    try:
+        from app.database import SessionLocal
+        from app.models.key_rotation import JWTRotationKey, JWTRotationConfig
+        
+        db = SessionLocal()
+        try:
+            # 先获取当前密钥
+            current_key = None
+            config = db.query(JWTRotationConfig).first()
+            if config and config.current_key_id:
+                key_record = db.query(JWTRotationKey).filter(
+                    JWTRotationKey.key_id == config.current_key_id
+                ).first()
+                if key_record and key_record.key_value:
+                    current_key = (config.current_key_id, key_record.key_value)
+            
+            # 获取所有密钥
+            all_keys = db.query(JWTRotationKey).all()
+            for k in all_keys:
+                keys.append((k.key_id, k.key_value))
+            
+            # 如果没有配置，添加默认密钥
+            if not keys:
+                keys.append(("v1", settings.SECRET_KEY))
+            
+            # 确保当前密钥在最前面
+            if current_key and current_key in keys:
+                keys.remove(current_key)
+                keys.insert(0, current_key)
+        finally:
+            db.close()
+    except Exception:
+        keys.append(("v1", settings.SECRET_KEY))
+    
+    return keys
+
+
 def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
     """
     创建JWT访问令牌
@@ -74,13 +148,16 @@ def create_access_token(data: dict[str, Any], expires_delta: Optional[timedelta]
         expire = datetime.now(UTC) + timedelta(hours=settings.ACCESS_TOKEN_EXPIRE_HOURS)
     
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    
+    # 使用当前 JWT 密钥
+    _, current_key = _get_current_jwt_key()
+    encoded_jwt = jwt.encode(to_encode, current_key, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 
 def decode_access_token(token: str) -> Optional[dict[str, Any]]:
     """
-    解码JWT访问令牌
+    解码JWT访问令牌（支持多密钥验证）
     
     Args:
         token: JWT令牌
@@ -88,11 +165,15 @@ def decode_access_token(token: str) -> Optional[dict[str, Any]]:
     Returns:
         解码后的数据，如果无效则返回None
     """
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        return payload
-    except JWTError:
-        return None
+    # 尝试用所有密钥验证
+    for version, key in _get_all_jwt_keys():
+        try:
+            payload = jwt.decode(token, key, algorithms=[settings.ALGORITHM])
+            return payload
+        except JWTError:
+            continue
+    
+    return None
 
 
 class AESCipher:

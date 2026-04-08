@@ -90,3 +90,43 @@ class KeyRotationConfig(Base):
             "last_rotation_at": self.last_rotation_at.isoformat() if self.last_rotation_at else None,
             "next_rotation_at": self.next_rotation_at.isoformat() if self.next_rotation_at else None
         }
+
+
+class JWTRotationKey(Base):
+    """JWT密钥轮换（存储所有版本的JWT密钥）"""
+    __tablename__ = "jwt_rotation_keys"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    key_id = Column(String(10), unique=True, nullable=False, comment="版本号: v1, v2, v3...")
+    key_value = Column(String(128), nullable=False, comment="JWT密钥值")
+    is_active = Column(Boolean, default=False, comment="是否正在使用")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=True, comment="创建人")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "key_id": self.key_id,
+            "key_value_preview": self.key_value[:4] + "***" + self.key_value[-4:] if self.key_value else "",
+            "is_active": self.is_active,
+            "created_at": self.created_at.isoformat() if self.created_at else None
+        }
+
+
+class JWTRotationConfig(Base):
+    """JWT轮换配置"""
+    __tablename__ = "jwt_rotation_config"
+
+    id = Column(Integer, primary_key=True, default=1)
+    enabled = Column(Boolean, default=True, comment="是否启用")
+    current_key_id = Column(String(10), default="v1", comment="当前JWT密钥版本")
+    last_rotation_at = Column(DateTime, nullable=True, comment="上次轮换时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "enabled": self.enabled,
+            "current_key_id": self.current_key_id,
+            "last_rotation_at": self.last_rotation_at.isoformat() if self.last_rotation_at else None
+        }
