@@ -507,6 +507,13 @@ class KeyRotationService:
                     "errors": [str(e)]
                 })
         
+        # 汇总所有错误
+        all_errors = []
+        for r in results:
+            if r.get("errors"):
+                all_errors.extend(r["errors"][:3])  # 每个表最多取3条
+        error_message = "; ".join(all_errors[:10]) if all_errors else None
+        
         # 记录日志
         self.add_log(
             action="migrate",
@@ -515,7 +522,8 @@ class KeyRotationService:
             to_version=next_key.key_id,
             total_records=total_migrated + total_failed,
             migrated_records=total_migrated,
-            failed_records=total_failed
+            failed_records=total_failed,
+            error_message=error_message
         )
         
         return {

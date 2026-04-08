@@ -474,12 +474,20 @@
                   <el-tag size="small" :type="getActionType(row.action)">{{ getActionLabel(row.action) }}</el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="status" label="状态" width="70">
+              <el-table-column prop="status" label="状态" width="80">
                 <template #default="{ row }">
-                  <el-tag size="small" :type="row.status === 'success' ? 'success' : 'danger'">{{ row.status === 'success' ? '成功' : '失败' }}</el-tag>
+                  <el-tag size="small" :type="row.status === 'success' ? 'success' : row.status === 'partial' ? 'warning' : 'danger'">
+                    {{ row.status === 'success' ? '成功' : row.status === 'partial' ? '部分' : '失败' }}
+                  </el-tag>
                 </template>
               </el-table-column>
               <el-table-column prop="migrated_records" label="迁移数" width="80" align="center" />
+              <el-table-column prop="error_message" label="错误原因" min-width="200" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span v-if="row.error_message" class="text-danger">{{ row.error_message }}</span>
+                  <span v-else class="text-muted">-</span>
+                </template>
+              </el-table-column>
               <el-table-column prop="created_at" label="时间" width="160">
                 <template #default="{ row }">
                   {{ formatTime(row.created_at) }}
@@ -1040,6 +1048,7 @@ onUnmounted(() => {
   .job-name { display: flex; flex-direction: column; .job-desc { font-size: 12px; color: #909399; margin-top: 2px; } }
   .trigger-info { display: flex; flex-direction: column; gap: 4px; .trigger-config { font-size: 12px; color: #909399; } }
   .text-muted { color: #c0c4cc; }
+  .text-danger { color: #f56c6c; font-size: 12px; }
 }
 
 // 强制覆盖 Element Plus 表格截断样式
