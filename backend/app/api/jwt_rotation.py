@@ -30,6 +30,7 @@ class JWTRotationStatus(BaseModel):
     total_keys: int
     keys: List[KeyVersionInfo]
     last_rotation_at: Optional[str] = None
+    history: List[dict] = []
 
 
 class GenerateKeyRequest(BaseModel):

@@ -158,11 +158,12 @@ class JWTRotationService:
         current_version = config.current_key_id or "v1"
         
         # 获取 JWT 操作历史
-        history = self.db.query(KeyRotationLog).filter(
+        history_query = self.db.query(KeyRotationLog).filter(
             KeyRotationLog.key_type == 'JWT'
-        ).order_by(KeyRotationLog.created_at.desc()).limit(20).all()
+        ).order_by(KeyRotationLog.created_at.desc()).limit(20)
+        history = history_query.all()
         
-        return {
+        result = {
             "enabled": config.enabled,
             "current_version": current_version,
             "total_keys": len(all_keys),
@@ -170,6 +171,8 @@ class JWTRotationService:
             "last_rotation_at": config.last_rotation_at.isoformat() if config.last_rotation_at else None,
             "history": [h.to_dict() for h in history]
         }
+        
+        return result
     
     def full_rotation(self) -> dict:
         """一键轮换：生成新密钥并切换"""

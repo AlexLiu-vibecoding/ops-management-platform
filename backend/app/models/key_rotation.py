@@ -51,6 +51,7 @@ class KeyRotationLog(Base):
     def to_dict(self):
         return {
             "id": self.id,
+            "key_type": self.key_type,
             "action": self.action,
             "from_version": self.from_version,
             "to_version": self.to_version,
