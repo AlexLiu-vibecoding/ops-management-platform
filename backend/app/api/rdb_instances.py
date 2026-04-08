@@ -262,7 +262,7 @@ async def check_rdb_instance_status(
         instance.host,
         instance.port,
         instance.username or "",
-        instance.password or ""
+        instance.password_encrypted or ""
     )
     return InstanceTestResult(**result)
 
