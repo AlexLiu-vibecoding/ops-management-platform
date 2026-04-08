@@ -108,6 +108,39 @@ class AESCipher:
     # 无版本前缀的旧格式
     LEGACY_PREFIX = "legacy$"
     
+    @staticmethod
+    def _get_current_version_and_key() -> tuple:
+        """
+        从数据库获取当前版本和密钥
+        
+        Returns:
+            tuple: (version_str, key_str) - key 会被截断到 32 字节
+        """
+        try:
+            from app.database import SessionLocal
+            from app.models.key_rotation import KeyRotationKey, KeyRotationConfig
+            
+            db = SessionLocal()
+            try:
+                config = db.query(KeyRotationConfig).first()
+                if config and config.current_key_id:
+                    key_record = db.query(KeyRotationKey).filter(
+                        KeyRotationKey.key_id == config.current_key_id
+                    ).first()
+                    if key_record and key_record.key_value:
+                        # 确保密钥长度为 32 字节
+                        key = key_record.key_value[:32].ljust(32, '0')
+                        return config.current_key_id, key
+            finally:
+                db.close()
+        except Exception:
+            pass
+        
+        # 回退到 settings
+        key = settings.security.get_aes_key()
+        key = key[:32].ljust(32, '0')  # 确保 32 字节
+        return "v1", key
+    
     def __init__(self, key: Optional[str] = None, version: str = "v1"):
         """
         初始化AES加密器
@@ -144,12 +177,10 @@ class AESCipher:
         Returns:
             加密后的字符串，格式：v{version}$base64(iv+ciphertext)
         """
-        # 使用最新密钥版本
-        version = settings.security.AES_CURRENT_VERSION
-        if version == "v2" and settings.security.AES_KEY_V2:
-            key = settings.security.AES_KEY_V2.encode('utf-8')
-        else:
-            key = self.key
+        # 从数据库获取当前版本和密钥
+        current_version, current_key = self._get_current_version_and_key()
+        version = current_version
+        key = current_key.encode('utf-8')
         
         # 生成随机IV
         iv = os.urandom(16)
