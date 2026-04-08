@@ -242,6 +242,31 @@ async def test_rdb_instance_connection(
     return InstanceTestResult(**result)
 
 
+@router.post("/{instance_id}/check", response_model=InstanceTestResult)
+async def check_rdb_instance_status(
+    instance_id: int,
+    current_user: User = Depends(get_operator),
+    db: Session = Depends(get_db)
+):
+    """检查 RDB 实例连接状态"""
+    service = RDBInstanceService(db)
+    instance = service.get(instance_id)
+    if not instance:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="实例不存在"
+        )
+    
+    result = await test_rdb_connection(
+        instance.db_type.value if hasattr(instance.db_type, 'value') else str(instance.db_type),
+        instance.host,
+        instance.port,
+        instance.username or "",
+        instance.password or ""
+    )
+    return InstanceTestResult(**result)
+
+
 @router.post("", response_model=RDBInstanceResponse)
 async def create_rdb_instance(
     instance_data: RDBInstanceCreate,
