@@ -503,6 +503,105 @@
               </el-table-column>
             </el-table>
           </div>
+
+          <!-- JWT 密钥轮换区块 -->
+          <el-divider content-position="left">
+            <el-icon><Key /></el-icon> JWT 密钥轮换
+          </el-divider>
+          
+          <div class="jwt-rotation-section" v-loading="jwtRotationLoading">
+            <el-row :gutter="16" class="jwt-stats-row">
+              <el-col :span="8">
+                <div class="jwt-stat-card">
+                  <div class="stat-icon version"><el-icon><Key /></el-icon></div>
+                  <div class="stat-info">
+                    <div class="stat-label">当前版本</div>
+                    <div class="stat-value">{{ jwtRotationData.current_version?.toUpperCase() || '-' }}</div>
+                  </div>
+                </div>
+              </el-col>
+              <el-col :span="8">
+                <div class="jwt-stat-card">
+                  <div class="stat-icon total"><el-icon><Document /></el-icon></div>
+                  <div class="stat-info">
+                    <div class="stat-label">密钥版本数</div>
+                    <div class="stat-value">{{ jwtRotationData.total_keys || 0 }}</div>
+                  </div>
+                </div>
+              </el-col>
+              <el-col :span="8">
+                <div class="jwt-stat-card">
+                  <div class="stat-icon time"><el-icon><Timer /></el-icon></div>
+                  <div class="stat-info">
+                    <div class="stat-label">上次轮换</div>
+                    <div class="stat-value small">{{ jwtRotationData.last_rotation_at ? formatTime(jwtRotationData.last_rotation_at) : '从未' }}</div>
+                  </div>
+                </div>
+              </el-col>
+            </el-row>
+
+            <!-- JWT 密钥版本列表 -->
+            <el-card shadow="never" style="margin-top: 16px;">
+              <template #header>
+                <div class="card-header">
+                  <span>JWT 密钥版本</span>
+                  <el-space>
+                    <el-button type="primary" size="small" @click="handleJwtGenerateKey" :loading="jwtGenerating">
+                      <el-icon><Plus /></el-icon> 生成新密钥
+                    </el-button>
+                    <el-button type="warning" size="small" @click="handleJwtFullRotation" :loading="jwtRotationLoading">
+                      <el-icon><Refresh /></el-icon> 一键轮换
+                    </el-button>
+                  </el-space>
+                </div>
+              </template>
+              <el-table :data="jwtRotationData.keys || []" size="small" border>
+                <el-table-column prop="key_id" label="版本" width="100" align="center">
+                  <template #default="{ row }">
+                    <el-tag :type="row.key_id === jwtRotationData.current_version ? 'success' : 'info'" size="small">
+                      {{ row.key_id.toUpperCase() }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="key_value_preview" label="密钥预览">
+                  <template #default="{ row }">
+                    <code>{{ row.key_value_preview }}</code>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="is_active" label="当前版本" width="100" align="center">
+                  <template #default="{ row }">
+                    <el-tag v-if="row.key_id === jwtRotationData.current_version" type="success">当前</el-tag>
+                    <el-tag v-else type="info">-</el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column prop="created_at" label="创建时间" width="160">
+                  <template #default="{ row }">
+                    {{ formatTime(row.created_at) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="操作" width="120" align="center">
+                  <template #default="{ row }">
+                    <el-button 
+                      v-if="row.key_id !== jwtRotationData.current_version"
+                      type="primary" 
+                      size="small" 
+                      link
+                      @click="handleJwtSwitchVersion(row.key_id)"
+                      :loading="jwtSwitching">
+                      切换
+                    </el-button>
+                    <span v-else class="text-muted">-</span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </el-card>
+
+            <el-alert type="info" :closable="false" show-icon style="margin-top: 16px;">
+              <template #title>
+                JWT 密钥用于签发用户访问令牌。切换版本后，旧密钥签发的令牌在过期前仍可验证。
+              </template>
+            </el-alert>
+          </div>
         </el-card>
       </el-tab-pane>
 
@@ -530,6 +629,7 @@ import {
 } from '@element-plus/icons-vue'
 import { getAwsRegionsGrouped } from '@/api/awsRegions'
 import * as rotationApi from '@/api/keyRotation'
+import * as jwtRotationApi from '@/api/jwtRotation'
 import dayjs from 'dayjs'
 import PluginsView from './plugins.vue'
 import router from '@/router'
@@ -746,6 +846,17 @@ const switching = ref(false)
 const generatingKey = ref(false)
 const historyLoading = ref(false)
 
+// ==================== JWT 密钥轮换 ====================
+const jwtRotationData = ref({
+  current_version: '',
+  total_keys: 0,
+  last_rotation_at: null,
+  keys: []
+})
+const jwtRotationLoading = ref(false)
+const jwtSwitching = ref(false)
+const jwtGenerating = ref(false)
+
 const loadRotationStatus = async () => {
   rotationLoading.value = true
   try {
@@ -799,6 +910,79 @@ const loadRotationData = async () => {
     console.log('密钥轮换数据加载完成', results)
   } catch (error) {
     console.error('加载密钥轮换数据失败:', error)
+  }
+}
+
+// JWT 密钥轮换
+const loadJwtRotationStatus = async () => {
+  jwtRotationLoading.value = true
+  try {
+    const data = await jwtRotationApi.getJwtRotationStatus()
+    jwtRotationData.value = data
+  } catch (error) {
+    console.error('加载 JWT 轮换状态失败:', error)
+  } finally {
+    jwtRotationLoading.value = false
+  }
+}
+
+const handleJwtGenerateKey = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要生成新的 JWT 密钥吗？\n\n生成后，新登录用户将使用新密钥签发令牌。',
+      '生成 JWT 密钥',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
+    )
+    jwtGenerating.value = true
+    const result = await jwtRotationApi.generateJwtKey()
+    ElMessage.success(`新 JWT 密钥已生成`)
+    await loadJwtRotationStatus()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '生成失败')
+    }
+  } finally {
+    jwtGenerating.value = false
+  }
+}
+
+const handleJwtSwitchVersion = async (targetVersion) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定切换到 ${targetVersion.toUpperCase()} 版本吗？\n\n新登录用户将使用新密钥签发令牌。`,
+      '确认切换',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
+    )
+    jwtSwitching.value = true
+    const result = await jwtRotationApi.switchJwtVersion(targetVersion)
+    ElMessage.success(result.message)
+    await loadJwtRotationStatus()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('切换失败')
+    }
+  } finally {
+    jwtSwitching.value = false
+  }
+}
+
+const handleJwtFullRotation = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定执行一键轮换吗？\n\n将生成新密钥并自动切换。',
+      '一键轮换',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    jwtRotationLoading.value = true
+    const result = await jwtRotationApi.fullJwtRotation()
+    ElMessage.success(`一键轮换完成，新版本: ${result.new_version}`)
+    await loadJwtRotationStatus()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '轮换失败')
+    }
+  } finally {
+    jwtRotationLoading.value = false
   }
 }
 
@@ -916,6 +1100,8 @@ onMounted(() => {
   fetchAwsRegions()
   // 加载密钥轮换数据
   loadRotationData()
+  // 加载 JWT 轮换状态
+  loadJwtRotationStatus()
   // 每30秒刷新调度器状态
   schedulerTimer = setInterval(fetchSchedulerOverview, 30000)
 })
@@ -1079,6 +1265,60 @@ onUnmounted(() => {
       justify-content: center;
     }
   }
+
+  // JWT 密钥轮换区块
+  .jwt-rotation-section {
+    margin-top: 20px;
+
+    .jwt-stats-row {
+      margin-bottom: 16px;
+    }
+
+    .jwt-stat-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: #f5f7fa;
+      border-radius: 8px;
+
+      .stat-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        color: white;
+
+        &.version { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        &.total { background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); }
+        &.time { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+      }
+
+      .stat-info {
+        flex: 1;
+
+        .stat-label {
+          font-size: 12px;
+          color: #909399;
+          margin-bottom: 4px;
+        }
+
+        .stat-value {
+          font-size: 20px;
+          font-weight: 600;
+          color: #303133;
+
+          &.small {
+            font-size: 14px;
+          }
+        }
+      }
+    }
+  }
+
   .job-name { display: flex; flex-direction: column; .job-desc { font-size: 12px; color: #909399; margin-top: 2px; } }
   .trigger-info { display: flex; flex-direction: column; gap: 4px; .trigger-config { font-size: 12px; color: #909399; } }
   .text-muted { color: #c0c4cc; }
