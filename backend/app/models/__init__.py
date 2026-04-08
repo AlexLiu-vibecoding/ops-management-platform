@@ -27,6 +27,9 @@ from app.models.instances import (
 # 导入 SQL 性能对比模型
 from app.models.sql_performance import SQLPerformanceRecord, SQLPerformanceComparison
 
+# 导入密钥轮换模型
+from app.models.key_rotation import KeyRotationLog, KeyRotationConfig
+
 
 def get_local_timezone():
     """获取服务器本地时区"""
@@ -128,6 +131,7 @@ class User(Base):
     user_environments = relationship("UserEnvironment", back_populates="user")
     approval_requests = relationship("ApprovalRecord", back_populates="requester", foreign_keys="ApprovalRecord.requester_id")
     approval_actions = relationship("ApprovalRecord", back_populates="approver", foreign_keys="ApprovalRecord.approver_id")
+    key_rotation_logs = relationship("KeyRotationLog", back_populates="operator")
 
 
 class Environment(Base):

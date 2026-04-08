@@ -50,6 +50,9 @@ class TaskScheduler:
         
         # 启动性能指标采集任务
         self._start_performance_collector()
+        
+        # 启动密钥轮换任务
+        self._start_key_rotation_scheduler()
     
     def stop(self):
         """停止调度器"""
@@ -81,6 +84,139 @@ class TaskScheduler:
             logger.info("RDS 性能指标采集任务已停止")
         except JobLookupError:
             pass
+    
+    def _start_key_rotation_scheduler(self):
+        """启动密钥轮换定时任务"""
+        try:
+            from app.models import KeyRotationConfig
+            
+            db = SessionLocal()
+            try:
+                config = db.query(KeyRotationConfig).first()
+                
+                if config and config.enabled:
+                    self._schedule_key_rotation(config)
+                    logger.info(f"密钥轮换任务已启动 (周期: {config.schedule_type}, 时间: {config.schedule_time})")
+                else:
+                    logger.info("密钥轮换任务未启用")
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"启动密钥轮换任务失败: {e}")
+    
+    def _schedule_key_rotation(self, config):
+        """根据配置安排密钥轮换任务"""
+        from app.models import KeyRotationConfig
+        
+        # 移除旧任务
+        try:
+            self.scheduler.remove_job("key_rotation")
+        except JobLookupError:
+            pass
+        
+        # 解析执行时间
+        time_parts = config.schedule_time.split(':')
+        hour = int(time_parts[0]) if len(time_parts) > 0 else 2
+        minute = int(time_parts[1]) if len(time_parts) > 1 else 0
+        
+        # 根据周期类型设置触发器
+        if config.schedule_type == "weekly":
+            # 每周执行
+            trigger = CronTrigger(
+                day_of_week=config.schedule_day,
+                hour=hour,
+                minute=minute
+            )
+        elif config.schedule_type == "monthly":
+            # 每月执行
+            trigger = CronTrigger(
+                day=config.schedule_day,
+                hour=hour,
+                minute=minute
+            )
+        else:
+            # 每季度执行 (每3个月)
+            # 简化处理：使用每月执行，但在业务逻辑中判断
+            trigger = CronTrigger(
+                day=config.schedule_day,
+                hour=hour,
+                minute=minute
+            )
+        
+        self.scheduler.add_job(
+            self._execute_key_rotation,
+            trigger=trigger,
+            id="key_rotation",
+            replace_existing=True
+        )
+    
+    async def _execute_key_rotation(self):
+        """执行密钥轮换任务"""
+        from app.models import KeyRotationConfig
+        from app.services.key_rotation_service import KeyRotationService
+        
+        logger.info("开始执行密钥轮换任务")
+        
+        db = SessionLocal()
+        try:
+            # 获取配置
+            config = db.query(KeyRotationConfig).first()
+            if not config or not config.enabled:
+                logger.info("密钥轮换任务已禁用，跳过执行")
+                return
+            
+            # 检查是否到达执行时间（季度检查）
+            now = datetime.now()
+            if config.schedule_type == "quarterly":
+                # 只在 1, 4, 7, 10 月执行
+                if now.month not in [1, 4, 7, 10]:
+                    logger.info(f"当前月份 {now.month} 不在季度执行月份中，跳过")
+                    return
+            
+            service = KeyRotationService(db)
+            
+            # 执行迁移
+            result = service.execute_migration()
+            
+            # 如果配置了自动切换
+            if config.auto_switch and result["success"]:
+                current_version = config.current_key_id
+                target_version = "v2" if current_version == "v1" else "v1"
+                service.switch_version(target_version)
+            
+            # 更新配置
+            config.last_rotation_at = datetime.now()
+            config.next_rotation_at = service.calculate_next_rotation()
+            db.commit()
+            
+            logger.info(f"密钥轮换任务执行完成: 迁移 {result['total_migrated']} 条, 失败 {result['total_failed']} 条")
+            
+        except Exception as e:
+            logger.error(f"密钥轮换任务执行失败: {e}")
+        finally:
+            db.close()
+    
+    def reload_key_rotation_task(self):
+        """重新加载密钥轮换任务（配置变更后调用）"""
+        from app.models import KeyRotationConfig
+        
+        db = SessionLocal()
+        try:
+            config = db.query(KeyRotationConfig).first()
+            
+            if config and config.enabled:
+                self._schedule_key_rotation(config)
+                logger.info("密钥轮换任务已重新加载")
+            else:
+                # 禁用任务
+                try:
+                    self.scheduler.remove_job("key_rotation")
+                    logger.info("密钥轮换任务已移除")
+                except JobLookupError:
+                    pass
+        finally:
+            db.close()
     
     async def _collect_rds_metrics(self):
         """采集所有 RDS 实例的性能指标"""

@@ -387,6 +387,58 @@
               <el-tag type="primary">{{ securityConfig.token_expire_hours }} 小时</el-tag>
             </el-descriptions-item>
           </el-descriptions>
+
+          <!-- 密钥轮换区块 -->
+          <el-divider content-position="left">
+            <el-icon><Key /></el-icon> 密钥轮换
+          </el-divider>
+          
+          <div class="key-rotation-section" v-loading="rotationLoading">
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <div class="rotation-stat">
+                  <div class="stat-label">当前版本</div>
+                  <div class="stat-value">
+                    <el-tag type="primary" size="large">{{ rotationStatus.current_version?.toUpperCase() || 'v1' }}</el-tag>
+                  </div>
+                </div>
+              </el-col>
+              <el-col :span="8">
+                <div class="rotation-stat">
+                  <div class="stat-label">待迁移记录</div>
+                  <div class="stat-value">
+                    <el-tag :type="rotationStatus.unrotated_count > 0 ? 'warning' : 'success'" size="large">
+                      {{ rotationStatus.unrotated_count || 0 }}
+                    </el-tag>
+                  </div>
+                </div>
+              </el-col>
+              <el-col :span="8">
+                <div class="rotation-stat">
+                  <div class="stat-label">轮换状态</div>
+                  <div class="stat-value">
+                    <el-tag :type="rotationStatus.can_rotate ? 'success' : 'info'" size="large">
+                      {{ rotationStatus.can_rotate ? '可轮换' : '未配置 V2' }}
+                    </el-tag>
+                  </div>
+                </div>
+              </el-col>
+            </el-row>
+
+            <div class="rotation-actions">
+              <el-button type="primary" @click="goToKeyRotation" plain>
+                <el-icon><Setting /></el-icon> 打开密钥轮换管理
+              </el-button>
+              <el-button 
+                v-if="rotationStatus.unrotated_count > 0 && rotationStatus.can_rotate" 
+                type="warning" 
+                @click="handleQuickMigrate"
+                :loading="migrating"
+              >
+                <el-icon><Refresh /></el-icon> 快速迁移
+              </el-button>
+            </div>
+          </div>
         </el-card>
       </el-tab-pane>
 
@@ -410,11 +462,13 @@ import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataAnalysis, Timer, Setting, Coin, Folder, Cloudy, Files, Lock, 
-  Refresh, Box 
+  Refresh, Box, Key 
 } from '@element-plus/icons-vue'
 import { getAwsRegionsGrouped } from '@/api/awsRegions'
+import * as rotationApi from '@/api/keyRotation'
 import dayjs from 'dayjs'
 import PluginsView from './plugins.vue'
+import router from '@/router'
 
 // Tab 状态
 const activeTab = ref('overview')
@@ -599,6 +653,55 @@ const securityConfig = reactive({
   jwt_configured: false, jwt_secret_key: '', aes_configured: false, aes_key: '', token_expire_hours: 24
 })
 
+// 密钥轮换状态
+const rotationStatus = ref({})
+const rotationLoading = ref(false)
+const migrating = ref(false)
+
+const loadRotationStatus = async () => {
+  rotationLoading.value = true
+  try {
+    const data = await rotationApi.getKeyRotationStatus()
+    rotationStatus.value = data
+  } catch (error) {
+    console.error('加载密钥轮换状态失败:', error)
+  } finally {
+    rotationLoading.value = false
+  }
+}
+
+const goToKeyRotation = () => {
+  router.push('/key-rotation')
+}
+
+const handleQuickMigrate = async () => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要执行数据迁移吗？这将把 ${rotationStatus.value.unrotated_count} 条记录迁移到新密钥。`,
+      '确认迁移',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    
+    migrating.value = true
+    const result = await rotationApi.executeMigration()
+    
+    if (result.success) {
+      ElMessage.success(`迁移完成！成功迁移 ${result.total_migrated} 条记录`)
+    } else {
+      ElMessage.warning(`迁移完成，但有 ${result.total_failed} 条记录失败`)
+    }
+    
+    // 刷新状态
+    await loadRotationStatus()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('迁移失败')
+    }
+  } finally {
+    migrating.value = false
+  }
+}
+
 const loadSecurityConfig = async () => {
   try {
     const data = await systemApi.getSecurityConfig()
@@ -618,6 +721,7 @@ onMounted(() => {
   loadStorageConfig()
   loadSecurityConfig()
   fetchAwsRegions()
+  loadRotationStatus()  // 加载密钥轮换状态
   // 每30秒刷新调度器状态
   schedulerTimer = setInterval(fetchSchedulerOverview, 30000)
 })
@@ -703,6 +807,40 @@ onUnmounted(() => {
   .stat-value { font-size: 20px; font-weight: 600; &.running { color: #67c23a; } &.paused { color: #e6a23c; } }
   
   .job-id { font-size: 12px; background: #f5f7fa; padding: 2px 6px; border-radius: 4px; }
+  
+  // 密钥轮换区块
+  .key-rotation-section {
+    margin-top: 20px;
+    padding: 16px;
+    background: #f5f7fa;
+    border-radius: 8px;
+    
+    .rotation-stat {
+      text-align: center;
+      padding: 16px;
+      background: white;
+      border-radius: 8px;
+      
+      .stat-label {
+        font-size: 13px;
+        color: #909399;
+        margin-bottom: 8px;
+      }
+      
+      .stat-value {
+        font-size: 24px;
+        font-weight: 600;
+      }
+    }
+    
+    .rotation-actions {
+      margin-top: 20px;
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+    }
+  }
   .job-name { display: flex; flex-direction: column; .job-desc { font-size: 12px; color: #909399; margin-top: 2px; } }
   .trigger-info { display: flex; flex-direction: column; gap: 4px; .trigger-config { font-size: 12px; color: #909399; } }
   .text-muted { color: #c0c4cc; }
