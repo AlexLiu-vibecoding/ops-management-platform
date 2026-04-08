@@ -522,6 +522,9 @@
               <el-button type="primary" @click="loadRotationData" :loading="rotationLoading">
                 <el-icon><Refresh /></el-icon> 刷新
               </el-button>
+              <el-button type="danger" @click="handleFullRotation" :disabled="!rotationStatus.can_rotate || !migrationPreview.length" :loading="fullRotating">
+                <el-icon><RefreshLeft /></el-icon> 一键轮换
+              </el-button>
               <el-button type="warning" @click="handleMigrate" :disabled="!rotationStatus.can_rotate || !migrationPreview.length" :loading="migrating">
                 <el-icon><Upload /></el-icon> 执行迁移
               </el-button>
@@ -574,7 +577,7 @@ import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   DataAnalysis, Timer, Setting, Coin, Folder, Cloudy, Files, Lock, 
-  Refresh, Box, Key 
+  Refresh, RefreshLeft, Box, Key 
 } from '@element-plus/icons-vue'
 import { getAwsRegionsGrouped } from '@/api/awsRegions'
 import * as rotationApi from '@/api/keyRotation'
@@ -782,6 +785,7 @@ const rotationHistory = ref([])
 const rotationLoading = ref(false)
 const migrating = ref(false)
 const switching = ref(false)
+const fullRotating = ref(false)
 const historyLoading = ref(false)
 
 const loadRotationStatus = async () => {
@@ -896,6 +900,30 @@ const handleSwitchVersion = async () => {
     }
   } finally {
     switching.value = false
+  }
+}
+
+const handleFullRotation = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '一键轮换将执行以下操作：\n\n1. 执行数据迁移（将所有加密数据迁移到新密钥）\n2. 自动切换到新密钥版本\n\n确定要执行吗？',
+      '确认一键轮换',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    fullRotating.value = true
+    const result = await rotationApi.triggerAutoRotation()
+    if (result.success) {
+      ElMessage.success(`一键轮换完成！成功迁移 ${result.migrated} 条记录`)
+    } else {
+      ElMessage.warning(`一键轮换完成，但有 ${result.failed} 条记录失败`)
+    }
+    await loadRotationData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '一键轮换失败')
+    }
+  } finally {
+    fullRotating.value = false
   }
 }
 
