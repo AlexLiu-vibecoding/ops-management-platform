@@ -405,9 +405,14 @@
               <template #header>
                 <div class="card-header">
                   <span>AES 密钥版本</span>
-                  <el-button type="primary" size="small" @click="handleGenerateKey" :loading="generatingKey">
-                    <el-icon><Plus /></el-icon> 生成新版本
-                  </el-button>
+                  <el-space>
+                    <el-button type="primary" size="small" @click="handleGenerateKey" :loading="generatingKey">
+                      <el-icon><Plus /></el-icon> 生成新版本
+                    </el-button>
+                    <el-button type="warning" size="small" @click="handleFullRotation" :loading="fullRotationLoading">
+                      <el-icon><Refresh /></el-icon> 一键轮换
+                    </el-button>
+                  </el-space>
                 </div>
               </template>
               <el-table :data="displayKeyVersions" size="small" border>
@@ -821,6 +826,7 @@ const rotationHistory = ref([])
 const rotationLoading = ref(false)
 const switching = ref(false)
 const generatingKey = ref(false)
+const fullRotationLoading = ref(false)
 const historyLoading = ref(false)
 
 // ==================== JWT 密钥轮换 ====================
@@ -1044,6 +1050,26 @@ const handleGenerateKey = async () => {
     }
   } finally {
     generatingKey.value = false
+  }
+}
+
+const handleFullRotation = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定执行一键轮换吗？\n\n将生成新密钥并自动切换版本。',
+      '一键轮换',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    fullRotationLoading.value = true
+    const result = await rotationApi.fullRotation()
+    ElMessage.success(`一键轮换完成，新版本: ${result.new_version}`)
+    await loadRotationData()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '轮换失败')
+    }
+  } finally {
+    fullRotationLoading.value = false
   }
 }
 
