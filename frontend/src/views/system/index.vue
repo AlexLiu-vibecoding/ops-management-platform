@@ -370,7 +370,10 @@
             <el-descriptions-item label="JWT 密钥">
               <div class="secret-value">
                 <code>{{ securityConfig.jwt_secret_key }}</code>
-                <el-tag :type="securityConfig.jwt_configured ? 'success' : 'warning'" size="small" style="margin-left: 10px;">
+                <el-tag v-if="jwtRotationData.current_version" type="success" size="small" style="margin-left: 10px;">
+                  {{ jwtRotationData.current_version.toUpperCase() }}
+                </el-tag>
+                <el-tag :type="securityConfig.jwt_configured ? 'success' : 'warning'" size="small" style="margin-left: 5px;">
                   {{ securityConfig.jwt_configured ? '已自定义' : '使用默认值' }}
                 </el-tag>
               </div>
