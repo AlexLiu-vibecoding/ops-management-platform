@@ -569,6 +569,13 @@ async def get_security_config(
 
 # ==================== 系统概览 ====================
 
+class SchedulerInfo(BaseModel):
+    """调度器信息"""
+    name: str
+    description: str
+    running: bool
+
+
 class SystemOverview(BaseModel):
     """系统概览"""
     version: str
@@ -577,6 +584,7 @@ class SystemOverview(BaseModel):
     storage_type: str
     redis_enabled: bool
     scheduler_running: bool
+    schedulers: List[SchedulerInfo]
 
 
 @router.get("/overview", response_model=SystemOverview)
@@ -593,12 +601,28 @@ async def get_system_overview(
     storage_settings = get_effective_storage_settings()
     
     # 检查调度器状态
-    scheduler_running = False
+    schedulers = []
     try:
         from app.services.scheduler import approval_scheduler
-        scheduler_running = approval_scheduler.running
+        from app.services.task_scheduler import task_scheduler
+        
+        schedulers = [
+            SchedulerInfo(
+                name="approval_scheduler",
+                description="审批调度器：执行定时审批工单、清理过期文件、刷新AI模型列表等系统维护任务",
+                running=approval_scheduler.running
+            ),
+            SchedulerInfo(
+                name="task_scheduler",
+                description="任务调度器：执行用户创建的定时脚本任务和性能数据采集",
+                running=task_scheduler.running
+            )
+        ]
     except Exception:
         pass
+    
+    # 主调度器状态（approval_scheduler）
+    scheduler_running = any(s.running for s in schedulers) if schedulers else False
     
     return SystemOverview(
         version=app_settings.APP_VERSION,
@@ -606,5 +630,6 @@ async def get_system_overview(
         database_type="postgresql" if "postgresql" in app_settings.DATABASE_URL else "mysql",
         storage_type=storage_settings.TYPE,
         redis_enabled=bool(app_settings.REDIS_HOST),
-        scheduler_running=scheduler_running
+        scheduler_running=scheduler_running,
+        schedulers=schedulers
     )

@@ -35,6 +35,11 @@ class TaskScheduler:
     def __init__(self):
         self.scheduler: Optional[AsyncIOScheduler] = None
     
+    @property
+    def running(self) -> bool:
+        """检查调度器是否正在运行"""
+        return self.scheduler is not None and self.scheduler.running
+    
     def start(self):
         """启动调度器"""
         if self.scheduler is not None:
