@@ -547,7 +547,7 @@ class MenuConfigResponse(BaseModel):
     is_enabled: bool
     permission: Optional[str]
     meta: Optional[dict[str, Any]]
-    created_at: datetime
+    created_at: Optional[datetime] = None
     children: Optional[list['MenuConfigResponse']] = None
 
 
