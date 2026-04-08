@@ -466,16 +466,6 @@
               </el-col>
             </el-row>
 
-            <!-- 操作按钮 -->
-            <div class="rotation-actions">
-              <el-button type="primary" @click="loadRotationData" :loading="rotationLoading">
-                <el-icon><Refresh /></el-icon> 刷新
-              </el-button>
-              <el-button type="success" @click="handleFullRotation" :loading="fullRotating">
-                <el-icon><RefreshLeft /></el-icon> 一键轮换
-              </el-button>
-            </div>
-
             <!-- 历史记录 -->
             <el-divider content-position="left">操作历史</el-divider>
             <el-table :data="rotationHistory" size="small" border v-loading="historyLoading">
@@ -732,7 +722,6 @@ const rotationHistory = ref([])
 const rotationLoading = ref(false)
 const switching = ref(false)
 const generatingKey = ref(false)
-const fullRotating = ref(false)
 const historyLoading = ref(false)
 
 const loadRotationStatus = async () => {
@@ -831,30 +820,6 @@ const handleSwitchVersion = async (targetVersion) => {
     }
   } finally {
     switching.value = false
-  }
-}
-
-const handleFullRotation = async () => {
-  try {
-    await ElMessageBox.confirm(
-      '一键轮换将执行以下操作：\n\n1. 生成新的密钥版本\n2. 执行数据迁移\n3. 自动切换到新密钥版本\n\n确定要执行吗？',
-      '确认一键轮换',
-      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
-    )
-    fullRotating.value = true
-    const result = await rotationApi.fullRotation()
-    if (result.success) {
-      ElMessage.success(`一键轮换完成！新版本: ${result.new_key_version.toUpperCase()}`)
-    } else {
-      ElMessage.warning(`一键轮换完成，但迁移有失败`)
-    }
-    await loadRotationData()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '一键轮换失败')
-    }
-  } finally {
-    fullRotating.value = false
   }
 }
 
