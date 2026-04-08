@@ -446,7 +446,7 @@
 
             <!-- 统计信息 -->
             <el-row :gutter="20" class="rotation-stats">
-              <el-col :span="8">
+              <el-col :span="12">
                 <div class="rotation-stat-card">
                   <div class="stat-icon current"><el-icon><Key /></el-icon></div>
                   <div class="stat-info">
@@ -455,58 +455,24 @@
                   </div>
                 </div>
               </el-col>
-              <el-col :span="8">
+              <el-col :span="12">
                 <div class="rotation-stat-card">
                   <div class="stat-icon total"><el-icon><Document /></el-icon></div>
                   <div class="stat-info">
-                    <div class="stat-label">加密记录总数</div>
-                    <div class="stat-value">{{ overviewData.total_records || 0 }}</div>
-                  </div>
-                </div>
-              </el-col>
-              <el-col :span="8">
-                <div class="rotation-stat-card">
-                  <div class="stat-icon pending"><el-icon><Warning /></el-icon></div>
-                  <div class="stat-info">
-                    <div class="stat-label">待迁移记录</div>
-                    <div class="stat-value">{{ migrationPreview?.total_pending || 0 }}</div>
+                    <div class="stat-label">版本总数</div>
+                    <div class="stat-value">{{ overviewData.total_keys || 0 }}</div>
                   </div>
                 </div>
               </el-col>
             </el-row>
-
-            <!-- 迁移预览 -->
-            <el-divider content-position="left">数据迁移预览</el-divider>
-            <el-table :data="migrationPreview?.preview || []" size="small" border class="migration-table">
-              <el-table-column prop="description" label="数据项" />
-              <el-table-column prop="total" label="总数" width="80" align="center" />
-              <el-table-column prop="pending" label="待迁移" width="80" align="center">
-                <template #default="{ row }">
-                  <el-tag type="warning" size="small">{{ row.pending }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="migrated" label="已迁移" width="80" align="center">
-                <template #default="{ row }">
-                  <el-tag type="success" size="small">{{ row.migrated }}</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="target_version" label="目标版本" width="100" align="center">
-                <template #default="{ row }">
-                  <el-tag size="small">{{ row.target_version?.toUpperCase() || '-' }}</el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
 
             <!-- 操作按钮 -->
             <div class="rotation-actions">
               <el-button type="primary" @click="loadRotationData" :loading="rotationLoading">
                 <el-icon><Refresh /></el-icon> 刷新
               </el-button>
-              <el-button type="info" @click="handleFullRotation" :disabled="!migrationPreview?.total_pending" :loading="fullRotating">
+              <el-button type="success" @click="handleFullRotation" :loading="fullRotating">
                 <el-icon><RefreshLeft /></el-icon> 一键轮换
-              </el-button>
-              <el-button type="warning" @click="handleMigrate" :disabled="!migrationPreview?.total_pending" :loading="migrating">
-                <el-icon><Upload /></el-icon> 执行迁移
               </el-button>
             </div>
 
@@ -762,13 +728,11 @@ const rotationConfig = ref({
 })
 const rotationTime = ref('02:00')
 const keyVersions = ref([])  // 所有密钥版本
-const migrationPreview = ref({ preview: [], total_pending: 0 })  // 迁移预览
 const rotationHistory = ref([])
 const rotationLoading = ref(false)
-const migrating = ref(false)
 const switching = ref(false)
-const fullRotating = ref(false)
 const generatingKey = ref(false)
+const fullRotating = ref(false)
 const historyLoading = ref(false)
 
 const loadRotationStatus = async () => {
@@ -802,15 +766,6 @@ const loadRotationStatus = async () => {
   }
 }
 
-const loadMigrationPreview = async () => {
-  try {
-    const result = await rotationApi.getMigrationPreview()
-    migrationPreview.value = result
-  } catch (error) {
-    console.error('加载迁移预览失败:', error)
-  }
-}
-
 const loadRotationHistory = async () => {
   historyLoading.value = true
   try {
@@ -828,7 +783,6 @@ const loadRotationData = async () => {
   try {
     const results = await Promise.all([
       loadRotationStatus(),
-      loadMigrationPreview(),
       loadRotationHistory()
     ])
     console.log('密钥轮换数据加载完成', results)
@@ -901,30 +855,6 @@ const handleFullRotation = async () => {
     }
   } finally {
     fullRotating.value = false
-  }
-}
-
-const handleMigrate = async () => {
-  try {
-    await ElMessageBox.confirm(
-      '确定要执行数据迁移吗？\n\n这将把所有加密数据迁移到最新的密钥版本。',
-      '确认迁移',
-      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
-    )
-    migrating.value = true
-    const result = await rotationApi.executeMigration()
-    if (result.success) {
-      ElMessage.success(`迁移完成！成功迁移 ${result.total_migrated} 条记录`)
-    } else {
-      ElMessage.warning(`迁移完成，但有 ${result.total_failed} 条记录失败`)
-    }
-    await loadRotationData()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '迁移失败')
-    }
-  } finally {
-    migrating.value = false
   }
 }
 
