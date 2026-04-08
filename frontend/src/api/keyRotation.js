@@ -50,7 +50,7 @@ export function executeMigration(batchSize = 100) {
  */
 export function switchKeyVersion(targetVersion) {
   console.log('API 调用: switchKeyVersion', targetVersion)
-  return request.post('/key-rotation/switch-version', { target_version })
+  return request.post('/key-rotation/switch-version', { target_version: targetVersion })
     .then(res => {
       console.log('API 返回数据:', res)
       return res

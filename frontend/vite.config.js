@@ -38,7 +38,15 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    emptyDirBeforeWrite: true
+    emptyDirBeforeWrite: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // 合并所有 index- 开头的 chunk 到一个文件中
+          'index': ['./src/views/system/index.vue', './src/api/keyRotation.js']
+        }
+      }
+    }
   },
   base: '/'
 })
