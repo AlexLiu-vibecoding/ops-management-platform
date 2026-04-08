@@ -37,3 +37,10 @@ export function switchJwtVersion(targetVersion) {
 export function fullJwtRotation() {
   return request.post('/jwt-rotation/full-rotation')
 }
+
+/**
+ * 删除 JWT 密钥版本
+ */
+export function deleteJwtKey(keyId) {
+  return request.delete(`/jwt-rotation/keys/${keyId}`)
+}

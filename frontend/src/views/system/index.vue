@@ -552,7 +552,7 @@
                     {{ formatTime(row.created_at) }}
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="120" align="center">
+                <el-table-column label="操作" width="150" align="center">
                   <template #default="{ row }">
                     <el-button 
                       v-if="row.key_id !== jwtRotationData.current_version"
@@ -562,6 +562,15 @@
                       @click="handleJwtSwitchVersion(row.key_id)"
                       :loading="jwtSwitching">
                       切换
+                    </el-button>
+                    <el-button 
+                      v-if="row.key_id !== jwtRotationData.current_version"
+                      type="danger" 
+                      size="small" 
+                      link
+                      @click="handleJwtDeleteKey(row.key_id)"
+                      :loading="jwtDeleting === row.key_id">
+                      删除
                     </el-button>
                     <span v-else class="text-muted">-</span>
                   </template>
@@ -829,6 +838,7 @@ const jwtRotationData = ref({
 const jwtRotationLoading = ref(false)
 const jwtSwitching = ref(false)
 const jwtGenerating = ref(false)
+const jwtDeleting = ref(null)
 
 const loadRotationStatus = async () => {
   rotationLoading.value = true
@@ -956,6 +966,26 @@ const handleJwtFullRotation = async () => {
     }
   } finally {
     jwtRotationLoading.value = false
+  }
+}
+
+const handleJwtDeleteKey = async (keyId) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除密钥版本 ${keyId.toUpperCase()} 吗？\n\n删除后无法恢复，请谨慎操作。`,
+      '确认删除',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'danger' }
+    )
+    jwtDeleting.value = keyId
+    await jwtRotationApi.deleteJwtKey(keyId)
+    ElMessage.success(`密钥版本 ${keyId.toUpperCase()} 已删除`)
+    await loadJwtRotationStatus()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.response?.data?.detail || '删除失败')
+    }
+  } finally {
+    jwtDeleting.value = null
   }
 }
 
