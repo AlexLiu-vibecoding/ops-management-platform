@@ -376,6 +376,8 @@
                 <el-tag :type="isJwtKeyCustomized ? 'success' : 'warning'" size="small" style="margin-left: 5px;">
                   {{ isJwtKeyCustomized ? '已自定义' : '使用默认值' }}
                 </el-tag>
+                <el-divider direction="vertical" style="margin: 0 10px;" />
+                <span class="text-muted" style="font-size: 12px;">Token 有效期: {{ securityConfig.token_expire_hours }} 小时</span>
               </div>
             </el-descriptions-item>
             <el-descriptions-item label="AES 密钥">
@@ -388,9 +390,6 @@
                   {{ securityConfig.aes_configured ? '已自定义' : '使用默认值' }}
                 </el-tag>
               </div>
-            </el-descriptions-item>
-            <el-descriptions-item label="Token 有效期">
-              <el-tag type="primary">{{ securityConfig.token_expire_hours }} 小时</el-tag>
             </el-descriptions-item>
           </el-descriptions>
 
