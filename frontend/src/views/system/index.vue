@@ -394,6 +394,22 @@
           </el-divider>
           
           <div class="key-rotation-section" v-loading="rotationLoading">
+            <!-- 提示信息 -->
+            <el-alert
+              v-if="!rotationStatus.can_rotate"
+              type="warning"
+              :closable="false"
+              show-icon
+              style="margin-bottom: 20px;">
+              <template #title>
+                <span>密钥轮换功能未启用 - 请配置 <code>AES_KEY_V2</code> 环境变量（32字符）</span>
+              </template>
+              <template #default>
+                当前只有 V1 密钥配置，V2 密钥未配置。要使用密钥轮换功能，请先配置 V2 密钥。
+                配置后需要重启服务使配置生效。
+              </template>
+            </el-alert>
+
             <!-- 统计卡片 -->
             <el-row :gutter="20" class="rotation-stats">
               <el-col :span="6">
