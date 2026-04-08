@@ -851,12 +851,17 @@ const handleSwitchVersion = async (targetVersion) => {
       { confirmButtonText: '确定', cancelButtonText: '取消', type: 'info' }
     )
     switching.value = true
-    await rotationApi.switchKeyVersion(targetVersion)
+    console.log('开始切换到版本:', targetVersion)
+    const result = await rotationApi.switchKeyVersion(targetVersion)
+    console.log('切换结果:', result)
     ElMessage.success(`已切换到 ${targetVersion.toUpperCase()} 版本`)
     await loadRotationData()
   } catch (error) {
+    console.error('切换失败:', error)
+    console.error('错误详情:', error.response?.data)
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.detail || '切换失败')
+      const detail = error.response?.data?.detail || error.response?.data?.message || '切换失败'
+      ElMessage.error(detail)
     }
   } finally {
     switching.value = false
