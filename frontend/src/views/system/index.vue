@@ -369,12 +369,12 @@
           <el-descriptions :column="1" border>
             <el-descriptions-item label="JWT 密钥">
               <div class="secret-value">
-                <code>{{ securityConfig.jwt_secret_key }}</code>
+                <code>{{ getJwtCurrentKeyPreview() }}</code>
                 <el-tag v-if="jwtRotationData.current_version" type="success" size="small" style="margin-left: 10px;">
                   {{ jwtRotationData.current_version.toUpperCase() }}
                 </el-tag>
-                <el-tag :type="securityConfig.jwt_configured ? 'success' : 'warning'" size="small" style="margin-left: 5px;">
-                  {{ securityConfig.jwt_configured ? '已自定义' : '使用默认值' }}
+                <el-tag :type="isJwtKeyCustomized ? 'success' : 'warning'" size="small" style="margin-left: 5px;">
+                  {{ isJwtKeyCustomized ? '已自定义' : '使用默认值' }}
                 </el-tag>
               </div>
             </el-descriptions-item>
@@ -1112,6 +1112,19 @@ const loadSecurityConfig = async () => {
 
 // ==================== 工具函数 ====================
 const formatTime = (time) => time ? dayjs(time).format('YYYY-MM-DD HH:mm:ss') : '-'
+
+// JWT 密钥辅助函数
+const getJwtCurrentKeyPreview = () => {
+  const keys = jwtRotationData.value.keys || []
+  const currentKey = keys.find(k => k.key_id === jwtRotationData.value.current_version)
+  return currentKey?.key_value_preview || '***'
+}
+
+const isJwtKeyCustomized = computed(() => {
+  // 如果有多个密钥版本，说明已经过轮换，算是已自定义
+  const keys = jwtRotationData.value.keys || []
+  return keys.length > 1 || jwtRotationData.value.current_version !== 'v1'
+})
 
 onMounted(() => {
   loadOverview()
