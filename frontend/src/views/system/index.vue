@@ -455,13 +455,42 @@
               </el-row>
               <el-row :gutter="20">
                 <el-col :span="12">
-                  <el-form-item :label="rotationConfig.schedule_type === 'weekly' ? '执行星期' : '执行日期'">
-                    <el-input-number v-model="rotationConfig.schedule_day" :min="1" :max="rotationConfig.schedule_type === 'weekly' ? 7 : 31" @change="handleConfigChange" style="width: 100%" />
+                  <!-- 每周：选择星期 -->
+                  <el-form-item v-if="rotationConfig.schedule_type === 'weekly'" label="执行星期">
+                    <el-select v-model="rotationConfig.schedule_day" @change="handleConfigChange" style="width: 100%">
+                      <el-option label="周一" :value="1" />
+                      <el-option label="周二" :value="2" />
+                      <el-option label="周三" :value="3" />
+                      <el-option label="周四" :value="4" />
+                      <el-option label="周五" :value="5" />
+                      <el-option label="周六" :value="6" />
+                      <el-option label="周日" :value="7" />
+                    </el-select>
+                  </el-form-item>
+                  <!-- 每月：选择日期 -->
+                  <el-form-item v-else-if="rotationConfig.schedule_type === 'monthly'" label="执行日期">
+                    <el-select v-model="rotationConfig.schedule_day" @change="handleConfigChange" style="width: 100%">
+                      <el-option v-for="d in 28" :key="d" :label="`每月${d}日`" :value="d" />
+                    </el-select>
+                  </el-form-item>
+                  <!-- 每季度：选择月份和日期 -->
+                  <el-form-item v-else label="执行月份">
+                    <el-select v-model="rotationConfig.schedule_quarter_month" @change="handleConfigChange" style="width: 100%">
+                      <el-option label="1月" :value="1" />
+                      <el-option label="4月" :value="4" />
+                      <el-option label="7月" :value="7" />
+                      <el-option label="10月" :value="10" />
+                    </el-select>
                   </el-form-item>
                 </el-col>
                 <el-col :span="12">
-                  <el-form-item label="执行时间">
-                    <el-time-picker v-model="rotationTime" format="HH:mm" value-format="HH:mm" @change="handleConfigChange" style="width: 100%" />
+                  <el-form-item :label="rotationConfig.schedule_type === 'quarterly' ? '执行日期' : '执行时间'">
+                    <!-- 每季度：选择日期 -->
+                    <el-select v-if="rotationConfig.schedule_type === 'quarterly'" v-model="rotationConfig.schedule_day" @change="handleConfigChange" style="width: 100%">
+                      <el-option v-for="d in 28" :key="d" :label="`${d}日`" :value="d" />
+                    </el-select>
+                    <!-- 其他：选择时间 -->
+                    <el-time-picker v-else v-model="rotationTime" format="HH:mm" value-format="HH:mm" @change="handleConfigChange" style="width: 100%" />
                   </el-form-item>
                 </el-col>
               </el-row>
@@ -744,6 +773,7 @@ const rotationConfig = ref({
   schedule_type: 'monthly',
   schedule_day: 1,
   schedule_time: '02:00',
+  schedule_quarter_month: 1,
   auto_switch: false
 })
 const rotationTime = ref('02:00')
@@ -769,6 +799,7 @@ const loadRotationStatus = async () => {
       schedule_type: config.schedule_type,
       schedule_day: config.schedule_day,
       schedule_time: config.schedule_time,
+      schedule_quarter_month: config.schedule_quarter_month || 1,
       auto_switch: config.auto_switch
     }
     rotationTime.value = config.schedule_time
