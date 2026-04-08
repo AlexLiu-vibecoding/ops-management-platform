@@ -25,10 +25,15 @@
                 {{ overview.redis_enabled ? '已启用' : '未启用' }}
               </el-tag>
             </el-descriptions-item>
-            <el-descriptions-item label="调度器">
-              <el-tag :type="overview.scheduler_running ? 'success' : 'danger'">
-                {{ overview.scheduler_running ? '运行中' : '已停止' }}
-              </el-tag>
+            <el-descriptions-item label="调度器" :span="2">
+              <div class="scheduler-status-list">
+                <div v-for="s in overview.schedulers" :key="s.name" class="scheduler-status-item">
+                  <span class="scheduler-name">{{ s.name }}</span>
+                  <el-tag :type="s.running ? 'success' : 'danger'" size="small">
+                    {{ s.running ? '运行中' : '已停止' }}
+                  </el-tag>
+                </div>
+              </div>
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
@@ -615,7 +620,8 @@ const overview = reactive({
   database_type: '-',
   storage_type: '-',
   redis_enabled: false,
-  scheduler_running: false
+  scheduler_running: false,
+  schedulers: []
 })
 
 const loadOverview = async () => {
@@ -1180,6 +1186,23 @@ onUnmounted(() => {
   }
 
   .overview-card { max-width: 800px; }
+
+  .scheduler-status-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    
+    .scheduler-status-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      
+      .scheduler-name {
+        font-weight: 500;
+        min-width: 120px;
+      }
+    }
+  }
 
   .db-type-cell {
     display: flex;
