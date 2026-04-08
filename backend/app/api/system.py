@@ -518,14 +518,37 @@ async def get_security_config(
     安全配置只能查看，不能通过 API 修改
     """
     from app.config import settings as app_settings
+    from app.database import SessionLocal
+    from app.models.key_rotation import KeyRotationKey, KeyRotationConfig
     
     # 检查是否使用自定义密钥
     jwt_secret = os.getenv("JWT_SECRET_KEY", app_settings.JWT_SECRET_KEY)
-    aes_key = os.getenv("AES_KEY", app_settings.AES_KEY)
     password_salt = os.getenv("PASSWORD_SALT", app_settings.PASSWORD_SALT)
     
     jwt_custom = os.getenv("JWT_SECRET_KEY") is not None
-    aes_custom = os.getenv("AES_KEY") is not None
+    
+    # 获取当前使用的 AES 密钥（优先从密钥轮换系统获取）
+    db = SessionLocal()
+    try:
+        config = db.query(KeyRotationConfig).first()
+        if config and config.current_key_id:
+            # 从密钥轮换系统获取当前密钥
+            current_key = db.query(KeyRotationKey).filter(
+                KeyRotationKey.key_id == config.current_key_id
+            ).first()
+            if current_key:
+                aes_key = current_key.key_value
+                aes_custom = True  # 使用密钥轮换系统时视为已配置
+            else:
+                # 回退到环境变量
+                aes_key = os.getenv("AES_KEY", app_settings.AES_KEY)
+                aes_custom = os.getenv("AES_KEY") is not None
+        else:
+            # 没有配置，回退到环境变量
+            aes_key = os.getenv("AES_KEY", app_settings.AES_KEY)
+            aes_custom = os.getenv("AES_KEY") is not None
+    finally:
+        db.close()
     
     return SecurityConfigResponse(
         jwt_configured=jwt_custom,

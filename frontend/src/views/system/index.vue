@@ -405,15 +405,17 @@
                 </div>
               </template>
               <el-table :data="keyVersions" size="small" border>
-                <el-table-column prop="key_id" label="版本" width="80" align="center">
+                <el-table-column prop="key_id" label="版本" width="100" align="center">
                   <template #default="{ row }">
-                    <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
-                      {{ row.key_id.toUpperCase() }}
-                      <el-tag v-if="row.is_active" type="success" size="small" style="margin-left: 4px;">使用中</el-tag>
-                    </el-tag>
+                    <div class="version-cell">
+                      <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                        {{ row.key_id.toUpperCase() }}
+                      </el-tag>
+                      <el-tag v-if="row.is_active" type="success" size="small" style="margin-left: 4px; white-space: nowrap;">使用中</el-tag>
+                    </div>
                   </template>
                 </el-table-column>
-                <el-table-column prop="key_value_preview" label="密钥预览">
+                <el-table-column prop="key_value_preview" label="密钥预览" min-width="150">
                   <template #default="{ row }">
                     <code>{{ row.key_value_preview }}</code>
                   </template>
@@ -1080,6 +1082,13 @@ onUnmounted(() => {
           color: #303133;
         }
       }
+    }
+    
+    .version-cell {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
     }
     
     .rotation-form {
