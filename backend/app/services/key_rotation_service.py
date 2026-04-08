@@ -401,9 +401,9 @@ class KeyRotationService:
         
         return results
 
-    def execute_migration(self, batch_size: int = 100) -> Dict[str, Any]:
+    def execute_migration(self, batch_size: int = 100, target_key: Optional[KeyRotationKey] = None) -> Dict[str, Any]:
         """执行数据迁移"""
-        next_key = self.get_next_key_for_migration()
+        next_key = target_key or self.get_next_key_for_migration()
         
         if not next_key:
             return {
@@ -547,13 +547,13 @@ class KeyRotationService:
         current_key = self.get_active_key()
         old_version = current_key.key_id if current_key else None
         
-        # 如果切换到不同版本，先执行迁移
+        # 如果切换到不同版本，先执行迁移到目标版本
         total_migrated = 0
         total_failed = 0
         error_msg = None
         if old_version and old_version != target_version:
             logger.info(f"切换前先迁移数据: {old_version} -> {target_version}")
-            migration_result = self.migrate_to_key(target_key.key_id)
+            migration_result = self.execute_migration(batch_size=100, target_key=target_key)
             total_migrated = migration_result.get("total_migrated", 0)
             total_failed = migration_result.get("total_failed", 0)
             if total_failed > 0:
