@@ -220,13 +220,6 @@ const routes = [
         component: () => import('@/views/system/ai-models.vue'),
         meta: { title: 'AI 模型配置', icon: 'MagicStick', roles: ['super_admin'] }
       },
-      // 系统管理 - 密钥轮换
-      {
-        path: 'key-rotation',
-        name: 'KeyRotation',
-        component: () => import('@/views/system/key-rotation.vue'),
-        meta: { title: '密钥轮换', icon: 'Key', roles: ['super_admin'] }
-      },
       // 通知管理
       {
         path: 'notification',
