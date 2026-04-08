@@ -257,11 +257,11 @@ class AESCipher:
         except Exception as e:
             logger.debug(f"从数据库读取密钥失败: {e}")
         
-        # 回退到环境变量
+        # 回退到 settings 的 get_aes_key 方法（会自动回退到默认值）
         if version == "v2" and settings.security.AES_KEY_V2:
             return settings.security.AES_KEY_V2.encode('utf-8')
         else:
-            return settings.AES_KEY.encode('utf-8')
+            return settings.security.get_aes_key().encode('utf-8')
     
     @staticmethod
     def detect_version(encrypted_text: str) -> str:

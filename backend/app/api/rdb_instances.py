@@ -13,7 +13,7 @@ import logging
 from app.database import get_db
 from app.models import RDBInstance, InstanceGroup, Environment, MonitorSwitch, MonitorType, RDBType, GlobalConfig
 from app.services.instance_service import RDBInstanceService
-from app.utils.auth import encrypt_instance_password
+from app.utils.auth import encrypt_instance_password, decrypt_instance_password
 from app.utils.db_helpers import test_mysql_connection, test_postgresql_connection
 from app.deps import get_operator, get_current_user, require_permission
 from app.models import User
@@ -257,12 +257,21 @@ async def check_rdb_instance_status(
             detail="实例不存在"
         )
     
+    # 解密密码
+    decrypted_password = ""
+    if instance.password_encrypted:
+        try:
+            decrypted_password = decrypt_instance_password(instance.password_encrypted)
+        except Exception as e:
+            logger.warning(f"密码解密失败: {e}")
+            decrypted_password = ""
+    
     result = await test_rdb_connection(
         instance.db_type.value if hasattr(instance.db_type, 'value') else str(instance.db_type),
         instance.host,
         instance.port,
         instance.username or "",
-        instance.password_encrypted or ""
+        decrypted_password
     )
     return InstanceTestResult(**result)
 
