@@ -411,7 +411,7 @@
                 </div>
               </template>
               <el-table :data="displayKeyVersions" size="small" border>
-                <el-table-column prop="key_id" label="版本" width="100" align="center">
+                <el-table-column prop="key_id" label="版本" width="150" align="center">
                   <template #default="{ row }">
                     <div class="version-cell">
                       <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
@@ -529,7 +529,7 @@
                 </div>
               </template>
               <el-table :data="jwtRotationData.keys || []" size="small" border>
-                <el-table-column prop="key_id" label="版本" width="120" align="center">
+                <el-table-column prop="key_id" label="版本" width="150" align="center">
                   <template #default="{ row }">
                     <div class="version-cell">
                       <el-tag :type="row.key_id === jwtRotationData.current_version ? 'success' : 'info'" size="small">
