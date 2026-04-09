@@ -237,5 +237,164 @@
 
 ---
 
-*文档版本：v1.0*
+## 七、部署架构（详细版）
+
+> ⚠️ 详细文档见 `release/docs/KUBERNETES_DEPLOYMENT.md`
+
+### 7.1 生产环境架构
+
+```
+Kubernetes Cluster
+├── Namespace: opscenter
+│   ├── Deployment: opscenter-backend (3 replicas)
+│   ├── Deployment: opscenter-frontend (2 replicas)
+│   ├── Service: opscenter-backend-service
+│   ├── Service: opscenter-frontend-service
+│   ├── HPA: opscenter-backend-hpa
+│   ├── HPA: opscenter-frontend-hpa
+│   └── Ingress: opscenter-ingress
+│
+└── External (AWS)
+    ├── Amazon RDS PostgreSQL (Multi-AZ) - 必需
+    └── Amazon ElastiCache Redis (Replication) - 可选
+```
+
+### 7.2 部署文件
+
+| 文件 | 说明 |
+|------|------|
+| `release/k8s/00-namespace.yaml` | 命名空间配置 |
+| `release/k8s/01-configmap.yaml` | 应用配置（AWS RDS/ElastiCache endpoint） |
+| `release/k8s/02-secret.yaml` | 敏感配置（数据库密码） |
+| `release/k8s/03-backend-deployment.yaml` | 后端部署配置 |
+| `release/k8s/04-backend-service.yaml` | 后端服务 + HPA + PDB |
+| `release/k8s/05-frontend-deployment.yaml` | 前端部署配置 |
+| `release/k8s/06-frontend-service.yaml` | 前端服务 + Ingress |
+| `release/helm/opscenter/` | Helm Chart |
+
+### 7.3 部署命令
+
+```bash
+# 进入 release 目录
+cd release
+
+# 使用部署脚本
+./deploy-k8s.sh
+
+# 查看状态
+kubectl get pods -n opscenter
+
+# 重启
+kubectl rollout restart deployment/opscenter-backend -n opscenter
+```
+
+---
+
+## 八、密钥轮换机制
+
+> ⚠️ 详细实现见 `backend/app/api/key_rotation.py`
+
+### 8.1 概述
+
+系统使用 AES-256-CBC 加密敏感数据，支持**动态多版本**密钥轮换。
+
+### 8.2 加密字段
+
+| 表名 | 字段 | 用途 |
+|------|------|------|
+| `rdb_instances` | password_encrypted | 数据库密码 |
+| `redis_instances` | password_encrypted | Redis 密码 |
+| `ai_models` | api_key_encrypted | AI API 密钥 |
+| `aws_credentials` | aws_secret_access_key | AWS 访问密钥 |
+
+### 8.3 加密数据格式
+
+```
+v{version}$base64(iv + ciphertext)
+
+示例：
+- v1$xxxxxx  → V1 密钥加密
+- v2$xxxxxx  → V2 密钥加密
+- xxxxxx     → 旧格式（无前缀）
+```
+
+### 8.4 轮换流程
+
+```
+一键轮换（推荐）：
+1. 点击「一键轮换」
+2. 自动生成新密钥版本
+3. 执行数据迁移
+4. 自动切换到新密钥版本
+```
+
+### 8.5 API 端点
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/key-rotation/overview` | 密钥轮换概览 |
+| GET | `/api/v1/key-rotation/versions` | 密钥版本列表 |
+| POST | `/api/v1/key-rotation/full-rotation` | 一键轮换 |
+| POST | `/api/v1/key-rotation/migrate` | 执行迁移 |
+
+### 8.6 密钥读取优先级
+
+```
+1. 优先从 key_rotation_keys 表读取对应版本的密钥
+2. 如果表中没有，回退到环境变量 AES_KEY / AES_KEY_V2
+```
+
+---
+
+## 九、架构设计分析
+
+> ⚠️ 以下是理论分析，暂未实施，仅供架构优化参考
+
+### 9.1 开闭原则评估
+
+| 模块 | 符合程度 | 说明 |
+|------|----------|------|
+| **数据库连接管理** | ⚠️ 部分符合 | MySQL/PostgreSQL/Redis 没有统一接口 |
+| **通知渠道** | ⚠️ 基本符合 | 有统一模型，但发送逻辑没有适配器抽象 |
+| **权限管理** | ✅ 符合 | RBAC 模型，权限配置在数据库 |
+| **菜单系统** | ✅ 符合 | 数据库驱动，新增菜单无需改代码 |
+| **实例管理** | ⚠️ 部分符合 | RDB 和 Redis 分开管理 |
+
+### 9.2 可优化方向
+
+| 优先级 | 优化项 | 说明 |
+|--------|--------|------|
+| P1 | 数据源适配器模式 | 统一 MySQL/PostgreSQL/Redis/MongoDB 接口 |
+| P1 | 通知渠道适配器模式 | 统一钉钉/企微/飞书/邮件发送逻辑 |
+| P2 | 监控指标收集抽象 | MetricsCollector 接口 |
+| P2 | 脚本执行器抽象 | ScriptExecutor 接口 |
+
+### 9.3 适配器模式示例
+
+```python
+# 工厂模式（开闭原则核心）
+class DataSourceAdapterFactory:
+    _adapters = {
+        "mysql": MySQLAdapter,
+        "postgresql": PostgreSQLAdapter,
+        "redis": RedisAdapter,
+    }
+    
+    @classmethod
+    def create(cls, adapter_type: str, config: Dict) -> DataSourceAdapter:
+        adapter_class = cls._adapters.get(adapter_type)
+        if not adapter_class:
+            raise ValueError(f"Unsupported adapter type: {adapter_type}")
+        return adapter_class(config)
+    
+    @classmethod
+    def register(cls, adapter_type: str, adapter_class: type):
+        """对扩展开放：新增适配器只需注册"""
+        cls._adapters[adapter_type] = adapter_class
+```
+
+---
+
+*文档版本：v1.1*
 *最后更新：2026-04-09*
+*AGENTS.md 精简版已将核心内容提取至此*
