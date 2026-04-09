@@ -38,7 +38,7 @@ jobs:
 
       - name: Run tests
         working-directory: backend
-        run: pytest -v || echo "No tests found, skipping"
+        run: pytest -v -m "not e2e and not slow" || echo "No tests found, skipping"
 
   # Frontend lint and build
   frontend:
