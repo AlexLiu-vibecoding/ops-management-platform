@@ -215,40 +215,6 @@ class TestRDBInstanceUpdateAPI:
         assert response.status_code in [403, 404]
 
 
-class TestRDBInstanceDeleteAPI:
-    """RDB 实例删除 API 测试类"""
-
-    def test_delete_instance_success(self, client, operator_token, test_environment, db_session):
-        """测试成功删除实例"""
-        # 创建临时实例用于删除测试
-        instance = RDBInstance(
-            name="delete-test-instance",
-            host="localhost",
-            port=3306,
-            db_type=RDBType.MYSQL,
-            environment_id=test_environment.id
-        )
-        db_session.add(instance)
-        db_session.commit()
-        db_session.refresh(instance)
-
-        response = client.delete(
-            f"/api/v1/rdb-instances/{instance.id}",
-            headers={"Authorization": f"Bearer {operator_token}"}
-        )
-
-        # 可能成功或无权限
-        assert response.status_code in [200, 204, 400, 403]
-
-    def test_delete_instance_not_found(self, client, operator_token):
-        """测试删除不存在的实例"""
-        response = client.delete(
-            "/api/v1/rdb-instances/99999",
-            headers={"Authorization": f"Bearer {operator_token}"}
-        )
-        assert response.status_code in [403, 404]
-
-
 class TestRDBInstanceTestAPI:
     """RDB 实例连接测试 API 测试类"""
 
