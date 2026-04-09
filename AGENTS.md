@@ -753,6 +753,172 @@ const res = await request.get('/notification/channels')
 - 重构时要保留数据迁移能力
 - 新旧系统并存期间要做好兼容处理
 
+### 案例4: 新增页面常见问题清单 (2026-04)
+
+> ⚠️ **重要**: 以下是我在开发新页面时经常犯的错误，务必逐项检查！
+
+#### 问题1: API 调用路径重复前缀
+
+```javascript
+// ❌ 错误：baseURL 已包含 /api/v1，又拼接了一次
+const res = await request.get('/api/v1/xxx')
+
+// ✅ 正确：直接写路径
+const res = await request.get('/xxx')
+```
+
+#### 问题2: 404 处理不当
+
+```javascript
+// ❌ 错误：404 也弹出错误提示
+} catch (error) {
+  ElMessage.error(error.response?.data?.detail || '操作失败')
+}
+
+// ✅ 正确：404 显示空数据，不弹错误
+} catch (error) {
+  if (error.response?.status === 404) {
+    dataList.value = []
+  } else {
+    ElMessage.error(error.response?.data?.detail || '操作失败')
+  }
+}
+```
+
+#### 问题3: 空值解包错误
+
+```javascript
+// ❌ 错误：id 为 null 时调用 toString() 报错
+const key = channel.id.toString()
+
+// ✅ 正确：使用 String() 转换
+const key = String(channel.id)
+```
+
+#### 问题4: 忘记导入必要模块
+
+```javascript
+// ❌ 错误：使用了 ElMessage 但忘记导入
+const loading = ref(false)
+
+// ✅ 正确：完整导入
+import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import request from '@/api/index'
+```
+
+#### 问题5: 响应数据字段不匹配
+
+```javascript
+// ❌ 错误：假设返回字段与后端不一致
+dataList.value = await request.get('/xxx')
+// 后端返回 { items: [...] } 但前端用 res 直接赋值
+
+// ✅ 正确：先检查响应结构
+const res = await request.get('/xxx')
+dataList.value = res.items || []
+```
+
+#### 问题6: 状态初始化遗漏
+
+```javascript
+// ❌ 错误：直接使用变量而不初始化
+const loading = ref()
+const dataList = []
+
+// ✅ 正确：显式初始化
+const loading = ref(false)
+const dataList = ref([])
+```
+
+#### 问题7: 缺少生命周期钩子
+
+```javascript
+// ❌ 错误：fetchData 定义了但没有调用
+const fetchData = async () => { ... }
+
+// ✅ 正确：在 onMounted 中调用
+onMounted(() => fetchData())
+```
+
+#### 问题8: 权限控制遗漏
+
+```javascript
+// ❌ 错误：新增页面忘记配置权限
+// 只配置了路由和菜单，但没设置 permission 字段
+
+// ✅ 正确：新增页面必须配置
+// 1. 数据库 menu_configs 表添加记录，设置 permission 字段
+// 2. permissions 表添加对应权限码
+// 3. role_permissions 表绑定角色和权限
+```
+
+#### 问题9: 忘记新增 API 封装
+
+```javascript
+// ❌ 错误：直接在组件里写 fetch
+const res = await fetch('/api/v1/xxx')
+
+// ✅ 正确：先在 api/ 目录封装
+// frontend/src/api/xxx.js
+export default {
+  list: () => request.get('/xxx'),
+  create: (data) => request.post('/xxx', data)
+}
+```
+
+#### 问题10: 编辑弹窗没有回显数据
+
+```javascript
+// ❌ 错误：打开弹窗时没有填充表单
+const handleEdit = (row) => {
+  dialogVisible.value = true
+  // 缺少: formData.value = { ...row }
+}
+
+// ✅ 正确：深拷贝数据用于编辑
+const handleEdit = (row) => {
+  dialogVisible.value = true
+  formData.value = { ...row }
+}
+```
+
+#### 新增页面 Checklist（强制执行）
+
+```
+□ 路由配置
+  □ router/index.js 添加路由
+  □ 路由 path 与后端 API 路径对应
+
+□ API 封装
+  □ frontend/src/api/xxx.js 封装
+  □ 不重复 /api/v1 前缀
+
+□ 数据初始化
+  □ ref() 显式初始化
+  □ 404 处理
+
+□ 页面结构
+  □ onMounted 调用 fetchData
+  □ loading 状态
+  □ 空数据展示
+
+□ 权限配置（缺一不可）
+  □ menu_configs 表配置
+  □ permissions 表配置
+  □ role_permissions 绑定
+
+□ 表单功能
+  □ 新建/编辑回显
+  □ 表单验证
+  □ 提交后刷新列表
+```
+
+**关键教训**:
+- 新增页面至少 10 个容易出错的地方，每一步都要仔细检查
+- 先复制粘贴现有页面的代码，再逐项修改
+- 改完一定要在浏览器测试，不要只靠代码审查
+
 ---
 
 ## 十一、架构设计与优化
