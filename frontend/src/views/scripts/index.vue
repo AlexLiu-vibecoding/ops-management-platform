@@ -166,7 +166,7 @@
               v-for="channel in notificationChannels"
               :key="channel.id"
               :label="channel.name"
-              :value="channel.id.toString()"
+              :value="String(channel.id)"
             />
           </el-select>
           <div class="hint">执行完成后向选中的通道发送通知</div>
