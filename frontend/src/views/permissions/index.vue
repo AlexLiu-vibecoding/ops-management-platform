@@ -97,14 +97,20 @@
                     @check="handlePermissionCheck"
                   >
                     <template #default="{ node, data }">
-                      <div class="tree-node">
+                      <div class="tree-node" :class="{ 'is-module': !data.module || data.module === 'other' }">
                         <span class="node-name">{{ data.name }}</span>
-                        <el-tag v-if="data.module" size="small" type="info" class="node-module">
-                          {{ getModuleName(data.module) }}
-                        </el-tag>
-                        <el-tag v-if="data.category" size="small" :type="getCategoryType(data.category)">
-                          {{ getCategoryName(data.category) }}
-                        </el-tag>
+                        <!-- 权限节点显示标签 -->
+                        <template v-if="data.module && data.module !== 'other'">
+                          <el-tag v-if="data.category === 'menu'" size="small" type="primary" class="node-module">
+                            菜单
+                          </el-tag>
+                          <el-tag v-else-if="data.category === 'button'" size="small" type="success" class="node-module">
+                            按钮
+                          </el-tag>
+                          <el-tag v-else size="small" type="info" class="node-module">
+                            {{ getModuleName(data.module) }}
+                          </el-tag>
+                        </template>
                       </div>
                     </template>
                   </el-tree>
@@ -287,6 +293,21 @@ const moduleNames = {
   key_rotation: '密钥轮换'
 }
 
+// 模块图标映射
+const moduleIcons = {
+  instance: '📦',
+  environment: '🌍',
+  approval: '📋',
+  monitor: '📊',
+  script: '📜',
+  system: '⚙️',
+  notification: '🔔',
+  audit: '📝',
+  scheduled_task: '⏰',
+  ai: '🤖',
+  key_rotation: '🔐'
+}
+
 const getModuleName = (module) => moduleNames[module] || module
 
 // 类别映射
@@ -377,12 +398,39 @@ const fetchEnvironments = async () => {
   }
 }
 
-// 获取权限树
+// 获取权限树（按模块分组）
 const fetchPermissions = async () => {
   try {
     const data = await request.get('/permissions')
-    permissionTree.value = data.items || []
-    expandedKeys.value = permissionTree.value.map(item => item.id)
+    const permissions = data.items || []
+    
+    // 按模块分组
+    const moduleMap = {}
+    permissions.forEach(perm => {
+      const module = perm.module || 'other'
+      if (!moduleMap[module]) {
+        moduleMap[module] = []
+      }
+      moduleMap[module].push(perm)
+    })
+    
+    // 转换为树形结构
+    const moduleOrder = [
+      'instance', 'environment', 'approval', 'monitor', 
+      'notification', 'script', 'scheduler', 'system', 'key_rotation', 'other'
+    ]
+    
+    permissionTree.value = moduleOrder
+      .filter(m => moduleMap[m])
+      .map(module => ({
+        id: `module_${module}`,
+        name: `${moduleIcons[module] || '📁'} ${moduleNames[module] || module} (${moduleMap[module].length})`,
+        module,
+        children: moduleMap[module]
+      }))
+    
+    // 默认展开前3个模块
+    expandedKeys.value = permissionTree.value.slice(0, 3).map(item => item.id)
   } catch (error) {
     console.error('获取权限树失败:', error)
   }
@@ -750,6 +798,30 @@ onMounted(() => {
       .node-module {
         margin-left: 8px;
       }
+      
+      // 模块节点样式
+      &.is-module {
+        .node-name {
+          font-size: 15px;
+          font-weight: 600;
+          color: var(--el-color-primary);
+        }
+      }
+    }
+    
+    // el-tree 自定义样式
+    :deep(.el-tree-node__content) {
+      height: 32px;
+      border-radius: 4px;
+      margin-bottom: 2px;
+      
+      &:hover {
+        background-color: var(--el-fill-color-light);
+      }
+    }
+    
+    :deep(.el-tree-node__children) {
+      padding-left: 20px;
     }
   }
   
