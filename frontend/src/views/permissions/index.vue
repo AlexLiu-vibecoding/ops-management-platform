@@ -283,7 +283,8 @@ const moduleNames = {
   notification: '通知管理',
   audit: '审计管理',
   scheduled_task: '定时任务',
-  ai: 'AI配置'
+  ai: 'AI配置',
+  key_rotation: '密钥轮换'
 }
 
 const getModuleName = (module) => moduleNames[module] || module
