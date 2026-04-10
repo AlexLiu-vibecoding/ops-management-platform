@@ -3,9 +3,9 @@ name = "MySQL管理平台"
 requires = ["nodejs-24", "python-311"]
 
 [dev]
-build = ["bash", "-c", "echo '=== Installing Python dependencies ===' && python -m pip install -r backend/requirements.txt && echo '=== Installing Node dependencies ===' && cd frontend && pnpm install"]
-run = ["bash", "-c", "echo '=== Starting MySQL Platform ===' && python -m pip install -r backend/requirements.txt && cd backend && uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload"]
+build = ["bash", "-c", "echo '=== Installing Python dependencies ===' && /workspace/projects/venv/bin/pip install -r backend/requirements.txt -q && echo '=== Installing Node dependencies ===' && cd frontend && pnpm install"]
+run = ["bash", "-c", "echo '=== Starting MySQL Platform ===' && /workspace/projects/venv/bin/pip install -r backend/requirements.txt -q 2>/dev/null; cd backend && /workspace/projects/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 5000 --reload"]
 
 [deploy]
-build = ["bash", "-c", "echo '=== Installing Python dependencies ===' && python -m pip install -r backend/requirements.txt && echo '=== Installing Node dependencies ===' && cd frontend && pnpm install && echo '=== Building frontend ===' && pnpm build"]
-run = ["bash", "-c", "echo '=== Starting MySQL Platform ===' && python -m pip install -r backend/requirements.txt && cd backend && uvicorn app.main:app --host 0.0.0.0 --port 5000"]
+build = ["bash", "-c", "echo '=== Installing Python dependencies ===' && /workspace/projects/venv/bin/pip install -r backend/requirements.txt -q && echo '=== Installing Node dependencies ===' && cd frontend && pnpm install && echo '=== Building frontend ===' && pnpm build"]
+run = ["bash", "-c", "echo '=== Starting MySQL Platform ===' && /workspace/projects/venv/bin/pip install -r backend/requirements.txt -q 2>/dev/null; cd backend && /workspace/projects/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 5000"]
