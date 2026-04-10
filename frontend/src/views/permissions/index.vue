@@ -477,7 +477,8 @@ const handlePermissionCheck = async () => {
   
   const checkedIds = treeRef.value.getCheckedKeys()
   const halfCheckedIds = treeRef.value.getHalfCheckedKeys()
-  const allIds = [...checkedIds, ...halfCheckedIds]
+  // 只保留数字 ID，过滤掉模块分组节点的 ID（如 module_instance）
+  const allIds = [...checkedIds, ...halfCheckedIds].filter(id => typeof id === 'number')
   
   try {
     await request.put(`/permissions/roles/${selectedRole.value}/permissions`, {
