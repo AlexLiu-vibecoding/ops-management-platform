@@ -254,6 +254,8 @@ SQL_FILE_SIZE_THRESHOLD=10000
 │   │   ├── database.py        # 数据库连接
 │   │   └── main.py            # FastAPI 入口
 │   └── requirements.txt
+│   └── requirements.in
+│   └── requirements.lock.txt
 │
 ├── frontend/                   # 前端代码
 │   ├── src/
@@ -336,6 +338,47 @@ docker-compose logs -f        # 查看日志
 docker-compose restart        # 重启服务
 docker-compose ps             # 查看状态
 ```
+
+---
+
+## 📦 依赖管理
+
+### 依赖文件说明
+
+| 文件 | 说明 |
+|------|------|
+| `requirements.in` | 顶层依赖定义（灵活版本约束） |
+| `requirements.lock.txt` | pip freeze 锁定的完整依赖树 |
+| `scripts/update_deps.sh` | 依赖更新脚本 |
+
+### 安装依赖
+
+依赖安装由 Coze CLI 自动处理，首次运行时会自动创建虚拟环境并安装依赖。
+
+### 更新依赖
+
+```bash
+# 快速方式（pip freeze）
+./scripts/update_deps.sh
+
+# 使用 pip-compile（需要网络稳定，生成更精确的锁定文件）
+./scripts/update_deps.sh --pip-compile
+```
+
+### 依赖结构
+
+```
+requirements.in          # 你编辑的顶层依赖（如 fastapi>=0.100）
+        ↓ pip-compile
+requirements.lock.txt    # 锁定的完整依赖树（含传递依赖）
+        ↓ pip install
+venv/                    # 虚拟环境
+```
+
+### 添加新依赖
+
+1. 编辑 `backend/requirements.in`，添加新的顶层依赖
+2. 运行 `./scripts/update_deps.sh` 更新锁定文件
 
 ---
 
