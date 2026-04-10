@@ -1,328 +1,363 @@
--- 初始化数据库脚本
--- 创建数据库
-CREATE DATABASE IF NOT EXISTS mysql_platform 
-CHARACTER SET utf8mb4 
-COLLATE utf8mb4_unicode_ci;
+-- ============================================================
+-- 运维管理平台 - MySQL 数据库初始化脚本
+-- 支持 MySQL 5.7 / 8.0
+-- ============================================================
 
-USE mysql_platform;
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
--- 用户表
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    real_name VARCHAR(50),
-    email VARCHAR(100) UNIQUE,
-    phone VARCHAR(20),
-    role ENUM('super_admin', 'approval_admin', 'operator', 'readonly') DEFAULT 'readonly',
-    status BOOLEAN DEFAULT TRUE,
-    failed_login_count INT DEFAULT 0,
-    locked_until DATETIME,
-    last_login_time DATETIME,
-    last_login_ip VARCHAR(50),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    INDEX idx_username (username),
-    INDEX idx_email (email)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+-- ----------------------------
+-- 1. 用户表
+-- ----------------------------
+DROP TABLE IF EXISTS `users`;
+CREATE TABLE `users` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `username` VARCHAR(50) NOT NULL,
+  `password_hash` VARCHAR(255) NOT NULL,
+  `real_name` VARCHAR(50),
+  `email` VARCHAR(100),
+  `phone` VARCHAR(20),
+  `role` VARCHAR(20) NOT NULL,
+  `status` TINYINT(1) NOT NULL DEFAULT 1,
+  `failed_login_count` INT DEFAULT 0,
+  `locked_until` DATETIME,
+  `last_login_time` DATETIME,
+  `last_login_ip` VARCHAR(50),
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_username` (`username`),
+  UNIQUE KEY `uk_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 环境表
-CREATE TABLE IF NOT EXISTS environments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50) NOT NULL UNIQUE,
-    code VARCHAR(20) NOT NULL UNIQUE,
-    color VARCHAR(10) DEFAULT '#52C41A',
-    description VARCHAR(200),
-    require_approval BOOLEAN DEFAULT TRUE,
-    status BOOLEAN DEFAULT TRUE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='环境表';
+INSERT INTO `users` VALUES (1, 'admin', '$2b$12$oc/HyoBC/llyXzJFPuzGL.CwDuEWbEqcwc15idKSpMgZXKjf1vjLW', '超级管理员', 'admin@example.com', '18151519662', 'SUPER_ADMIN', True, 0, NULL, NULL, NULL, NOW(), NOW());
+INSERT INTO `users` VALUES (2, 'zhangsan', '$2b$12$x8wBCzzfvW2GexZjOz5Nk.bbHW8C6NoHwkk4gUwQu9OZig88Xo9Uy', '张三', 'zhangsan@example.com', '13800138000', 'READONLY', True, 0, NULL, NULL, NULL, NOW(), NOW());
+INSERT INTO `users` VALUES (3, 'test_operator2', '$2b$12$kKxZh3hiGDSKVawC4qsHDO0oUSmae15sNUiYFzha1v6Rk7KPuO08C', '测试运维2', 'test_operator2@example.com', '13800138002', 'OPERATOR', True, 0, NULL, NULL, NULL, NOW(), NOW());
+INSERT INTO `users` VALUES (6, 'test_dev', '$2b$12$p.dKSF1w9mLTyYOOrERzku56tEh2NTUnkxzm6J1z3DWj2hytxw86K', '测试开发', 'dev@example.com', '', 'DEVELOPER', True, 0, NULL, NULL, NULL, NOW(), NOW());
+INSERT INTO `users` VALUES (10, 'approver1', '$2b$12$PT.wj0g3ipdO.CIIuCiVvu42BK9TaJgIm7CFsYNNCgfYcZYPgoyJ2', '审批人1', 'approver1@example.com', '', 'APPROVAL_ADMIN', True, 0, NULL, NULL, NULL, NOW(), NOW());
 
--- 用户-环境关联表
-CREATE TABLE IF NOT EXISTS user_environments (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    environment_id INT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (environment_id) REFERENCES environments(id) ON DELETE CASCADE,
-    UNIQUE KEY uk_user_env (user_id, environment_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户-环境关联表';
+-- ----------------------------
+-- 2. 环境表
+-- ----------------------------
+DROP TABLE IF EXISTS `environments`;
+CREATE TABLE `environments` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(50) NOT NULL,
+  `code` VARCHAR(20) NOT NULL,
+  `color` VARCHAR(10) DEFAULT '#52C41A',
+  `description` VARCHAR(200),
+  `require_approval` TINYINT(1) DEFAULT 0,
+  `status` TINYINT(1) DEFAULT 1,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 实例分组表
-CREATE TABLE IF NOT EXISTS instance_groups (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    description VARCHAR(200),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='实例分组表';
+INSERT INTO `environments` VALUES (1, '开发环境', 'development', '#52C41A', '', False, True, NOW(), NOW());
+INSERT INTO `environments` VALUES (2, '测试环境', 'testing', '#1890FF', '', False, True, NOW(), NOW());
+INSERT INTO `environments` VALUES (4, '生产环境', 'production', '#FF4D4F', '', True, True, NOW(), NOW());
 
--- 实例表
-CREATE TABLE IF NOT EXISTS instances (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    host VARCHAR(100) NOT NULL,
-    port INT DEFAULT 3306,
-    username VARCHAR(50) NOT NULL,
-    password_encrypted VARCHAR(255) NOT NULL,
-    environment_id INT,
-    group_id INT,
-    description VARCHAR(200),
-    status BOOLEAN DEFAULT TRUE,
-    last_check_time DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (environment_id) REFERENCES environments(id) ON DELETE SET NULL,
-    FOREIGN KEY (group_id) REFERENCES instance_groups(id) ON DELETE SET NULL,
-    INDEX idx_name (name),
-    INDEX idx_environment (environment_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='MySQL实例表';
+-- ----------------------------
+-- 3. 权限表
+-- ----------------------------
+DROP TABLE IF EXISTS `permissions`;
+CREATE TABLE `permissions` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `code` VARCHAR(100) NOT NULL,
+  `name` VARCHAR(50) NOT NULL,
+  `category` VARCHAR(20),
+  `module` VARCHAR(50),
+  `description` VARCHAR(200),
+  `parent_id` INT,
+  `sort_order` INT DEFAULT 0,
+  `is_enabled` TINYINT(1) DEFAULT 1,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 监控类型枚举值注释
--- slow_query: 慢查询监控
--- cpu_sql: 高CPU SQL监控
--- performance: 性能监控
--- inspection: 实例巡检
+INSERT INTO `permissions` VALUES (1, 'instance:view', '查看实例', 'menu', 'instance', '查看实例列表和详情', NULL, 100, True, NOW());
+INSERT INTO `permissions` VALUES (2, 'instance:create', '创建实例', 'button', 'instance', '创建新实例', NULL, 101, True, NOW());
+INSERT INTO `permissions` VALUES (3, 'instance:update', '编辑实例', 'button', 'instance', '编辑实例信息', NULL, 102, True, NOW());
+INSERT INTO `permissions` VALUES (4, 'instance:delete', '删除实例', 'button', 'instance', '删除单个实例', NULL, 103, True, NOW());
+INSERT INTO `permissions` VALUES (5, 'instance:test', '测试连接', 'button', 'instance', '测试实例连接', NULL, 104, True, NOW());
+INSERT INTO `permissions` VALUES (6, 'instance:batch_delete', '批量删除', 'button', 'instance', '批量删除实例', NULL, 105, True, NOW());
+INSERT INTO `permissions` VALUES (7, 'instance:batch_enable', '批量启用', 'button', 'instance', '批量启用实例', NULL, 106, True, NOW());
+INSERT INTO `permissions` VALUES (8, 'instance:batch_disable', '批量禁用', 'button', 'instance', '批量禁用实例', NULL, 107, True, NOW());
+INSERT INTO `permissions` VALUES (9, 'environment:view', '查看环境', 'menu', 'environment', '查看环境列表', NULL, 200, True, NOW());
+INSERT INTO `permissions` VALUES (10, 'environment:create', '创建环境', 'button', 'environment', '创建新环境', NULL, 201, True, NOW());
+INSERT INTO `permissions` VALUES (11, 'environment:update', '编辑环境', 'button', 'environment', '编辑环境信息', NULL, 202, True, NOW());
+INSERT INTO `permissions` VALUES (12, 'environment:delete', '删除环境', 'button', 'environment', '删除环境', NULL, 203, True, NOW());
+INSERT INTO `permissions` VALUES (13, 'environment:batch_delete', '批量删除环境', 'button', 'environment', '批量删除环境', NULL, 204, True, NOW());
+INSERT INTO `permissions` VALUES (14, 'approval:view', '查看变更', 'menu', 'approval', '查看变更列表', NULL, 300, True, NOW());
+INSERT INTO `permissions` VALUES (15, 'approval:create', '创建变更', 'button', 'approval', '创建变更申请', NULL, 301, True, NOW());
+INSERT INTO `permissions` VALUES (16, 'approval:approve', '审批变更', 'button', 'approval', '审批变更请求', NULL, 302, True, NOW());
+INSERT INTO `permissions` VALUES (17, 'approval:execute', '执行变更', 'button', 'approval', '执行SQL变更', NULL, 303, True, NOW());
+INSERT INTO `permissions` VALUES (18, 'approval:revoke', '撤回变更', 'button', 'approval', '撤回变更申请', NULL, 304, True, NOW());
+INSERT INTO `permissions` VALUES (19, 'approval:delete', '删除变更', 'button', 'approval', '删除变更记录', NULL, 305, True, NOW());
+INSERT INTO `permissions` VALUES (20, 'approval:batch_approve', '批量审批', 'button', 'approval', '批量审批通过', NULL, 306, True, NOW());
+INSERT INTO `permissions` VALUES (21, 'approval:batch_reject', '批量拒绝', 'button', 'approval', '批量审批拒绝', NULL, 307, True, NOW());
+INSERT INTO `permissions` VALUES (22, 'approval:batch_delete', '批量删除', 'button', 'approval', '批量删除变更', NULL, 308, True, NOW());
+INSERT INTO `permissions` VALUES (23, 'monitor:view', '查看监控', 'menu', 'monitor', '查看监控数据', NULL, 400, True, NOW());
+INSERT INTO `permissions` VALUES (24, 'monitor:config', '配置监控', 'button', 'monitor', '配置监控参数', NULL, 401, True, NOW());
+INSERT INTO `permissions` VALUES (25, 'script:view', '查看脚本', 'menu', 'script', '查看脚本列表', NULL, 600, True, NOW());
+INSERT INTO `permissions` VALUES (26, 'script:create', '创建脚本', 'button', 'script', '创建新脚本', NULL, 601, True, NOW());
+INSERT INTO `permissions` VALUES (27, 'script:execute', '执行脚本', 'button', 'script', '执行脚本', NULL, 602, True, NOW());
+INSERT INTO `permissions` VALUES (28, 'script:delete', '删除脚本', 'button', 'script', '删除脚本', NULL, 603, True, NOW());
+INSERT INTO `permissions` VALUES (29, 'system:user_manage', '用户管理', 'menu', 'system', '管理用户账号', NULL, 800, True, NOW());
+INSERT INTO `permissions` VALUES (30, 'system:role_manage', '角色管理', 'button', 'system', '管理角色权限', NULL, 801, True, NOW());
+INSERT INTO `permissions` VALUES (31, 'system:config', '系统配置', 'button', 'system', '修改系统配置', NULL, 802, True, NOW());
+INSERT INTO `permissions` VALUES (32, 'system:audit_log', '审计日志', 'menu', 'system', '查看审计日志', NULL, 803, True, NOW());
+INSERT INTO `permissions` VALUES (33, 'scheduler:view', '查看调度任务', 'button', 'scheduler', '查看调度任务列表和详情', NULL, 700, True, NOW());
+INSERT INTO `permissions` VALUES (34, 'scheduler:manage', '管理调度任务', 'button', 'scheduler', '创建、编辑、删除调度任务', NULL, 701, True, NOW());
+INSERT INTO `permissions` VALUES (35, 'notification:view', '查看通知管理', 'menu', 'notification', '访问通知管理菜单', NULL, 500, True, NOW());
+INSERT INTO `permissions` VALUES (36, 'notification:channel_manage', '管理通知通道', 'button', 'notification', '创建、编辑、删除、测试通知通道', NULL, 501, True, NOW());
+INSERT INTO `permissions` VALUES (37, 'notification:binding_manage', '管理通知绑定', 'button', 'notification', '配置通知通道与业务场景的绑定关系', NULL, 502, True, NOW());
+INSERT INTO `permissions` VALUES (38, 'notification:template_manage', '管理通知模板', 'button', 'notification', '创建、编辑、删除通知模板', NULL, 503, True, NOW());
+INSERT INTO `permissions` VALUES (39, 'notification:silence_manage', '管理静默规则', 'button', 'notification', '创建、编辑、删除通道静默规则', NULL, 504, True, NOW());
+INSERT INTO `permissions` VALUES (48, 'key_rotation:view', '查看密钥轮换', 'menu', 'key_rotation', '', NULL, 900, True, NOW());
+INSERT INTO `permissions` VALUES (49, 'key_rotation:config', '配置密钥轮换', 'button', 'key_rotation', '', NULL, 901, True, NOW());
+INSERT INTO `permissions` VALUES (51, 'key_rotation:switch', '切换密钥版本', 'button', 'key_rotation', '', NULL, 903, True, NOW());
+INSERT INTO `permissions` VALUES (52, 'key_rotation:migrate', '执行密钥迁移', 'button', 'key_rotation', '执行密钥数据迁移', NULL, 902, True, NOW());
 
--- 监控开关表
-CREATE TABLE IF NOT EXISTS monitor_switches (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    instance_id INT NOT NULL,
-    monitor_type ENUM('slow_query', 'cpu_sql', 'performance', 'inspection') NOT NULL,
-    enabled BOOLEAN DEFAULT TRUE,
-    config JSON,
-    configured_by INT,
-    configured_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE CASCADE,
-    FOREIGN KEY (configured_by) REFERENCES users(id) ON DELETE SET NULL,
-    UNIQUE KEY uk_instance_monitor (instance_id, monitor_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='监控开关表';
+-- ----------------------------
+-- 4. 角色权限关联表
+-- ----------------------------
+DROP TABLE IF EXISTS `role_permissions`;
+CREATE TABLE `role_permissions` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `role` VARCHAR(20) NOT NULL,
+  `permission_id` INT NOT NULL,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_role_permission` (`role`, `permission_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 全局配置表
-CREATE TABLE IF NOT EXISTS global_configs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    config_key VARCHAR(100) NOT NULL UNIQUE,
-    config_value VARCHAR(500) NOT NULL,
-    description VARCHAR(200),
-    updated_by INT,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (updated_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_key (config_key)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='全局配置表';
+INSERT INTO `role_permissions` VALUES (67, 'developer', 1, NOW());
+INSERT INTO `role_permissions` VALUES (68, 'developer', 5, NOW());
+INSERT INTO `role_permissions` VALUES (69, 'developer', 9, NOW());
+INSERT INTO `role_permissions` VALUES (70, 'developer', 14, NOW());
+INSERT INTO `role_permissions` VALUES (71, 'developer', 15, NOW());
+INSERT INTO `role_permissions` VALUES (72, 'developer', 18, NOW());
+INSERT INTO `role_permissions` VALUES (73, 'developer', 23, NOW());
+INSERT INTO `role_permissions` VALUES (74, 'developer', 25, NOW());
+INSERT INTO `role_permissions` VALUES (206, 'developer', 33, NOW());
+INSERT INTO `role_permissions` VALUES (411, 'super_admin', 1, NOW());
+INSERT INTO `role_permissions` VALUES (412, 'super_admin', 33, NOW());
+INSERT INTO `role_permissions` VALUES (413, 'super_admin', 2, NOW());
+INSERT INTO `role_permissions` VALUES (414, 'super_admin', 34, NOW());
+INSERT INTO `role_permissions` VALUES (415, 'super_admin', 3, NOW());
+INSERT INTO `role_permissions` VALUES (416, 'super_admin', 4, NOW());
+INSERT INTO `role_permissions` VALUES (417, 'super_admin', 5, NOW());
+INSERT INTO `role_permissions` VALUES (418, 'super_admin', 6, NOW());
+INSERT INTO `role_permissions` VALUES (419, 'super_admin', 7, NOW());
+INSERT INTO `role_permissions` VALUES (420, 'super_admin', 8, NOW());
+INSERT INTO `role_permissions` VALUES (421, 'super_admin', 9, NOW());
+INSERT INTO `role_permissions` VALUES (422, 'super_admin', 10, NOW());
+INSERT INTO `role_permissions` VALUES (423, 'super_admin', 11, NOW());
+INSERT INTO `role_permissions` VALUES (424, 'super_admin', 12, NOW());
+INSERT INTO `role_permissions` VALUES (425, 'super_admin', 13, NOW());
+INSERT INTO `role_permissions` VALUES (426, 'super_admin', 14, NOW());
+INSERT INTO `role_permissions` VALUES (427, 'super_admin', 15, NOW());
+INSERT INTO `role_permissions` VALUES (428, 'super_admin', 16, NOW());
+INSERT INTO `role_permissions` VALUES (429, 'super_admin', 17, NOW());
+INSERT INTO `role_permissions` VALUES (430, 'super_admin', 18, NOW());
+INSERT INTO `role_permissions` VALUES (431, 'super_admin', 19, NOW());
+INSERT INTO `role_permissions` VALUES (432, 'super_admin', 20, NOW());
+INSERT INTO `role_permissions` VALUES (433, 'super_admin', 21, NOW());
+INSERT INTO `role_permissions` VALUES (434, 'super_admin', 22, NOW());
+INSERT INTO `role_permissions` VALUES (435, 'super_admin', 23, NOW());
+INSERT INTO `role_permissions` VALUES (436, 'super_admin', 24, NOW());
+INSERT INTO `role_permissions` VALUES (437, 'super_admin', 25, NOW());
+INSERT INTO `role_permissions` VALUES (438, 'super_admin', 26, NOW());
+INSERT INTO `role_permissions` VALUES (439, 'super_admin', 27, NOW());
+INSERT INTO `role_permissions` VALUES (440, 'super_admin', 28, NOW());
+INSERT INTO `role_permissions` VALUES (441, 'super_admin', 29, NOW());
+INSERT INTO `role_permissions` VALUES (442, 'super_admin', 30, NOW());
+INSERT INTO `role_permissions` VALUES (443, 'super_admin', 31, NOW());
+INSERT INTO `role_permissions` VALUES (444, 'super_admin', 32, NOW());
+INSERT INTO `role_permissions` VALUES (445, 'super_admin', 35, NOW());
+INSERT INTO `role_permissions` VALUES (446, 'super_admin', 37, NOW());
+INSERT INTO `role_permissions` VALUES (447, 'super_admin', 36, NOW());
+INSERT INTO `role_permissions` VALUES (449, 'super_admin', 39, NOW());
+INSERT INTO `role_permissions` VALUES (450, 'super_admin', 38, NOW());
+INSERT INTO `role_permissions` VALUES (457, 'developer', 35, NOW());
+INSERT INTO `role_permissions` VALUES (461, 'developer', 36, NOW());
+INSERT INTO `role_permissions` VALUES (463, 'developer', 38, NOW());
+INSERT INTO `role_permissions` VALUES (471, 'developer', 39, NOW());
+INSERT INTO `role_permissions` VALUES (473, 'developer', 37, NOW());
+INSERT INTO `role_permissions` VALUES (476, 'super_admin', 48, NOW());
+INSERT INTO `role_permissions` VALUES (477, 'super_admin', 49, NOW());
+INSERT INTO `role_permissions` VALUES (479, 'super_admin', 51, NOW());
+INSERT INTO `role_permissions` VALUES (503, 'readonly', 1, NOW());
+INSERT INTO `role_permissions` VALUES (504, 'readonly', 33, NOW());
+INSERT INTO `role_permissions` VALUES (505, 'readonly', 9, NOW());
+INSERT INTO `role_permissions` VALUES (506, 'readonly', 14, NOW());
+INSERT INTO `role_permissions` VALUES (507, 'readonly', 23, NOW());
+INSERT INTO `role_permissions` VALUES (508, 'readonly', 25, NOW());
+INSERT INTO `role_permissions` VALUES (509, 'readonly', 35, NOW());
+INSERT INTO `role_permissions` VALUES (510, 'readonly', 36, NOW());
+INSERT INTO `role_permissions` VALUES (511, 'readonly', 37, NOW());
+INSERT INTO `role_permissions` VALUES (512, 'readonly', 38, NOW());
+INSERT INTO `role_permissions` VALUES (513, 'readonly', 39, NOW());
+INSERT INTO `role_permissions` VALUES (598, 'operator', 1, NOW());
+INSERT INTO `role_permissions` VALUES (599, 'operator', 2, NOW());
+INSERT INTO `role_permissions` VALUES (600, 'operator', 3, NOW());
+INSERT INTO `role_permissions` VALUES (601, 'operator', 5, NOW());
+INSERT INTO `role_permissions` VALUES (602, 'operator', 9, NOW());
+INSERT INTO `role_permissions` VALUES (603, 'operator', 14, NOW());
+INSERT INTO `role_permissions` VALUES (604, 'operator', 15, NOW());
+INSERT INTO `role_permissions` VALUES (605, 'operator', 17, NOW());
+INSERT INTO `role_permissions` VALUES (606, 'operator', 18, NOW());
+INSERT INTO `role_permissions` VALUES (607, 'operator', 23, NOW());
+INSERT INTO `role_permissions` VALUES (608, 'operator', 35, NOW());
+INSERT INTO `role_permissions` VALUES (609, 'operator', 36, NOW());
+INSERT INTO `role_permissions` VALUES (610, 'operator', 37, NOW());
+INSERT INTO `role_permissions` VALUES (611, 'operator', 38, NOW());
+INSERT INTO `role_permissions` VALUES (612, 'operator', 39, NOW());
+INSERT INTO `role_permissions` VALUES (613, 'operator', 25, NOW());
+INSERT INTO `role_permissions` VALUES (614, 'operator', 27, NOW());
+INSERT INTO `role_permissions` VALUES (615, 'operator', 33, NOW());
+INSERT INTO `role_permissions` VALUES (616, 'operator', 34, NOW());
+INSERT INTO `role_permissions` VALUES (689, 'approval_admin', 1, NOW());
+INSERT INTO `role_permissions` VALUES (690, 'approval_admin', 2, NOW());
+INSERT INTO `role_permissions` VALUES (691, 'approval_admin', 3, NOW());
+INSERT INTO `role_permissions` VALUES (692, 'approval_admin', 5, NOW());
+INSERT INTO `role_permissions` VALUES (693, 'approval_admin', 9, NOW());
+INSERT INTO `role_permissions` VALUES (694, 'approval_admin', 14, NOW());
+INSERT INTO `role_permissions` VALUES (695, 'approval_admin', 15, NOW());
+INSERT INTO `role_permissions` VALUES (696, 'approval_admin', 16, NOW());
+INSERT INTO `role_permissions` VALUES (697, 'approval_admin', 17, NOW());
+INSERT INTO `role_permissions` VALUES (698, 'approval_admin', 18, NOW());
+INSERT INTO `role_permissions` VALUES (699, 'approval_admin', 19, NOW());
+INSERT INTO `role_permissions` VALUES (700, 'approval_admin', 20, NOW());
+INSERT INTO `role_permissions` VALUES (701, 'approval_admin', 21, NOW());
+INSERT INTO `role_permissions` VALUES (702, 'approval_admin', 22, NOW());
+INSERT INTO `role_permissions` VALUES (703, 'approval_admin', 23, NOW());
+INSERT INTO `role_permissions` VALUES (704, 'approval_admin', 24, NOW());
+INSERT INTO `role_permissions` VALUES (705, 'approval_admin', 35, NOW());
+INSERT INTO `role_permissions` VALUES (706, 'approval_admin', 36, NOW());
+INSERT INTO `role_permissions` VALUES (707, 'approval_admin', 37, NOW());
+INSERT INTO `role_permissions` VALUES (708, 'approval_admin', 38, NOW());
+INSERT INTO `role_permissions` VALUES (709, 'approval_admin', 39, NOW());
+INSERT INTO `role_permissions` VALUES (710, 'approval_admin', 25, NOW());
+INSERT INTO `role_permissions` VALUES (711, 'approval_admin', 26, NOW());
+INSERT INTO `role_permissions` VALUES (712, 'approval_admin', 27, NOW());
+INSERT INTO `role_permissions` VALUES (713, 'approval_admin', 28, NOW());
+INSERT INTO `role_permissions` VALUES (714, 'approval_admin', 33, NOW());
+INSERT INTO `role_permissions` VALUES (715, 'approval_admin', 34, NOW());
+INSERT INTO `role_permissions` VALUES (716, 'approval_admin', 32, NOW());
 
--- 钉钉通道表
-CREATE TABLE IF NOT EXISTS dingtalk_channels (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    webhook_encrypted VARCHAR(500) NOT NULL,
-    description VARCHAR(200),
-    is_enabled BOOLEAN DEFAULT TRUE,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='钉钉通道表';
+-- ----------------------------
+-- 5. 角色环境关联表
+-- ----------------------------
+DROP TABLE IF EXISTS `role_environments`;
+CREATE TABLE `role_environments` (
+      `id` INT NOT NULL AUTO_INCREMENT,
+      `role` VARCHAR(20) NOT NULL,
+      `environment_id` INT NOT NULL,
+      PRIMARY KEY (`id`),
+      UNIQUE KEY `uk_role_env` (`role`, `environment_id`)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 通知绑定表
-CREATE TABLE IF NOT EXISTS notification_bindings (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    channel_id INT NOT NULL,
-    notification_type VARCHAR(50) NOT NULL COMMENT 'approval/alert/operation',
-    environment_id INT,
-    instance_id INT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (channel_id) REFERENCES dingtalk_channels(id) ON DELETE CASCADE,
-    FOREIGN KEY (environment_id) REFERENCES environments(id) ON DELETE CASCADE,
-    FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知绑定表';
+INSERT INTO `role_environments` VALUES (12, 'developer', 1);
+INSERT INTO `role_environments` VALUES (13, 'developer', 2);
+INSERT INTO `role_environments` VALUES (43, 'super_admin', 2);
+INSERT INTO `role_environments` VALUES (44, 'super_admin', 4);
+INSERT INTO `role_environments` VALUES (45, 'super_admin', 1);
+INSERT INTO `role_environments` VALUES (48, 'approval_admin', 2);
+INSERT INTO `role_environments` VALUES (49, 'approval_admin', 4);
+INSERT INTO `role_environments` VALUES (50, 'approval_admin', 1);
+INSERT INTO `role_environments` VALUES (55, 'operator', 1);
+INSERT INTO `role_environments` VALUES (56, 'operator', 2);
+INSERT INTO `role_environments` VALUES (57, 'readonly', 2);
+INSERT INTO `role_environments` VALUES (58, 'readonly', 1);
 
--- 审批记录表
-CREATE TABLE IF NOT EXISTS approval_records (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(200) NOT NULL,
-    change_type VARCHAR(50) NOT NULL COMMENT 'DDL/DML/OPERATION/CUSTOM',
-    instance_id INT,
-    database_name VARCHAR(100),
-    sql_content TEXT NOT NULL,
-    sql_risk_level VARCHAR(20) COMMENT 'low/medium/high/critical',
-    environment_id INT,
-    requester_id INT NOT NULL,
-    status ENUM('pending', 'approved', 'rejected', 'executed', 'failed') DEFAULT 'pending',
-    approver_id INT,
-    approve_time DATETIME,
-    approve_comment VARCHAR(500),
-    execute_time DATETIME,
-    execute_result TEXT,
-    scheduled_time DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE SET NULL,
-    FOREIGN KEY (environment_id) REFERENCES environments(id) ON DELETE SET NULL,
-    FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (approver_id) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_status (status),
-    INDEX idx_requester (requester_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审批记录表';
+-- ----------------------------
+-- 6. 菜单配置表
+-- ----------------------------
+DROP TABLE IF EXISTS `menu_configs`;
+CREATE TABLE `menu_configs` (
+  `id` INT NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(50) NOT NULL,
+  `path` VARCHAR(200) NOT NULL,
+  `icon` VARCHAR(50),
+  `permission` VARCHAR(100),
+  `parent_id` INT,
+  `sort_order` INT DEFAULT 0,
+  `is_enabled` TINYINT(1) DEFAULT 1,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 性能监控数据表
-CREATE TABLE IF NOT EXISTS performance_metrics (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    instance_id INT NOT NULL,
-    collect_time DATETIME NOT NULL,
-    cpu_usage FLOAT,
-    memory_usage FLOAT,
-    disk_io_read FLOAT,
-    disk_io_write FLOAT,
-    connections INT,
-    qps FLOAT,
-    tps FLOAT,
-    lock_wait_count INT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE CASCADE,
-    INDEX idx_instance_time (instance_id, collect_time)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='性能监控数据表';
+INSERT INTO `menu_configs` VALUES (1, '仪表盘', '/dashboard', 'DataAnalysis', '', NULL, 1, True);
+INSERT INTO `menu_configs` VALUES (2, '资源管理', 'None', 'Coin', '', NULL, 10, True);
+INSERT INTO `menu_configs` VALUES (3, 'SQL工具', 'None', 'Document', '', NULL, 20, True);
+INSERT INTO `menu_configs` VALUES (4, '变更管理', '/change', 'Stamp', '', NULL, 30, True);
+INSERT INTO `menu_configs` VALUES (5, '监控中心', '/monitor', 'Monitor', '', NULL, 40, True);
+INSERT INTO `menu_configs` VALUES (6, '自动化', 'None', 'Promotion', '', NULL, 50, True);
+INSERT INTO `menu_configs` VALUES (7, '系统管理', 'None', 'Setting', '', NULL, 100, True);
+INSERT INTO `menu_configs` VALUES (19, 'Redis变更', '/change/redis-requests', 'Key', '', 4, 2, True);
+INSERT INTO `menu_configs` VALUES (21, '实例管理', '/instances', 'Grid', 'instance:view', 2, 11, True);
+INSERT INTO `menu_configs` VALUES (22, '环境管理', '/environments', 'Collection', 'environment:view', 2, 12, True);
+INSERT INTO `menu_configs` VALUES (31, 'SQL编辑器', '/sql-editor', 'Edit', '', 3, 21, True);
+INSERT INTO `menu_configs` VALUES (32, 'SQL优化器', '/sql-optimizer', 'MagicStick', '', 3, 22, True);
+INSERT INTO `menu_configs` VALUES (41, 'DB变更', '/change/requests', 'Coin', 'approval:view', 4, 1, True);
+INSERT INTO `menu_configs` VALUES (51, '性能监控', '/monitor/performance', 'TrendCharts', 'monitor:view', 5, 1, True);
+INSERT INTO `menu_configs` VALUES (52, '慢查询监控', '/monitor/slow-query', 'Timer', 'monitor:view', 5, 2, True);
+INSERT INTO `menu_configs` VALUES (53, '监控配置', '/monitor/settings', 'Setting', 'monitor:config', 5, 9, True);
+INSERT INTO `menu_configs` VALUES (61, '脚本管理', '/scripts', 'DocumentCopy', 'script:view', 6, 51, True);
+INSERT INTO `menu_configs` VALUES (62, '定时任务', '/scheduled-tasks', 'AlarmClock', 'scheduler:view', 6, 52, True);
+INSERT INTO `menu_configs` VALUES (71, '用户管理', '/users', 'User', 'system:user_manage', 7, 101, True);
+INSERT INTO `menu_configs` VALUES (73, '菜单配置', '/menu-config', 'Menu', 'system:role_manage', 7, 102, True);
+INSERT INTO `menu_configs` VALUES (75, '审计日志', '/audit', 'Tickets', 'system:audit_log', 7, 103, True);
+INSERT INTO `menu_configs` VALUES (76, '系统设置', '/system', 'Tools', 'system:config', 7, 104, True);
+INSERT INTO `menu_configs` VALUES (77, '权限管理', '/permissions', 'Lock', 'system:role_manage', 7, 105, True);
+INSERT INTO `menu_configs` VALUES (83, '变更窗口', '/change/windows', 'Clock', '', 4, 3, True);
+INSERT INTO `menu_configs` VALUES (85, '告警中心', '/monitor/alerts', 'Bell', 'monitor:view', 5, 3, True);
+INSERT INTO `menu_configs` VALUES (86, '主从复制', '/monitor/replication', 'Connection', 'monitor:view', 5, 4, True);
+INSERT INTO `menu_configs` VALUES (87, '事务与锁', '/monitor/locks', 'Lock', 'monitor:view', 5, 5, True);
+INSERT INTO `menu_configs` VALUES (88, '巡检报告', '/monitor/inspection', 'DocumentChecked', 'monitor:view', 5, 6, True);
+INSERT INTO `menu_configs` VALUES (89, '定时巡检', '/monitor/scheduled-inspection', 'AlarmClock', 'monitor:view', 5, 7, True);
+INSERT INTO `menu_configs` VALUES (91, '通知管理', '/notification', 'Bell', 'notification:view', NULL, 60, True);
+INSERT INTO `menu_configs` VALUES (93, '通道管理', '/notification/channels', 'Connection', '', 91, 62, True);
+INSERT INTO `menu_configs` VALUES (94, '通知历史', '/notification/logs', 'List', '', 91, 63, True);
+INSERT INTO `menu_configs` VALUES (95, '通知模板', '/notification/templates', 'Document', '', 91, 64, True);
+INSERT INTO `menu_configs` VALUES (96, 'AI 模型配置', '/ai-models', 'MagicStick', '', 7, 15, True);
+INSERT INTO `menu_configs` VALUES (97, 'SQL性能对比', '/monitor/sql-performance', 'DataLine', '', 5, 90, True);
 
--- 慢查询记录表
-CREATE TABLE IF NOT EXISTS slow_queries (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    instance_id INT NOT NULL,
-    database_name VARCHAR(100),
-    sql_fingerprint VARCHAR(500) NOT NULL,
-    sql_sample TEXT,
-    query_time FLOAT,
-    lock_time FLOAT,
-    rows_sent INT,
-    rows_examined INT,
-    execution_count INT DEFAULT 1,
-    first_seen DATETIME,
-    last_seen DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE CASCADE,
-    INDEX idx_instance (instance_id),
-    INDEX idx_fingerprint (sql_fingerprint(255))
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='慢查询记录表';
+-- ----------------------------
+-- 7-71. 其他业务表
+-- 说明：以下表由 SQLAlchemy 模型自动创建，
+--       运行 `python -c "from app.models import *; from app.database import engine, Base; Base.metadata.create_all(bind=engine)"`
+-- ----------------------------
+-- rdb_instances
+-- redis_instances
+-- instance_groups
+-- scripts
+-- scheduled_tasks
+-- script_executions
+-- approval_flows
+-- approval_records
+-- audit_logs
+-- login_logs
+-- notification_channels
+-- notification_templates
+-- notification_bindings
+-- alert_rules
+-- alert_records
+-- alert_silence_rules
+-- monitor_switches
+-- key_rotation_config
+-- key_rotation_keys
+-- key_rotation_logs
+-- jwt_rotation_config
+-- jwt_rotation_keys
+-- ai_model_configs
+-- ai_scene_configs
+-- ai_available_models
+-- ai_call_logs
+-- system_configs
+-- global_configs
 
--- 高CPU SQL记录表
-CREATE TABLE IF NOT EXISTS high_cpu_sqls (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    instance_id INT NOT NULL,
-    process_id INT,
-    sql_content TEXT,
-    cpu_usage FLOAT,
-    execution_time FLOAT,
-    status VARCHAR(20) COMMENT 'running/killed',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='高CPU SQL记录表';
-
--- 操作快照表
-CREATE TABLE IF NOT EXISTS operation_snapshots (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    instance_id INT NOT NULL,
-    database_name VARCHAR(100),
-    table_name VARCHAR(100),
-    operation_type VARCHAR(20) COMMENT 'UPDATE/DELETE',
-    original_sql TEXT,
-    snapshot_data TEXT COMMENT '加密存储',
-    row_count INT,
-    approval_id INT,
-    status VARCHAR(20) DEFAULT 'active' COMMENT 'active/used/expired',
-    expire_at DATETIME,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE CASCADE,
-    FOREIGN KEY (approval_id) REFERENCES approval_records(id) ON DELETE SET NULL,
-    INDEX idx_instance (instance_id),
-    INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='操作快照表';
-
--- 审计日志表
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    username VARCHAR(50),
-    instance_id INT,
-    instance_name VARCHAR(100),
-    environment_id INT,
-    environment_name VARCHAR(50),
-    operation_type VARCHAR(50) NOT NULL,
-    operation_detail TEXT,
-    request_ip VARCHAR(50),
-    request_method VARCHAR(10),
-    request_path VARCHAR(200),
-    request_params TEXT,
-    response_code INT,
-    response_message VARCHAR(500),
-    execution_time FLOAT COMMENT '毫秒',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_user (user_id),
-    INDEX idx_instance (instance_id),
-    INDEX idx_time (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审计日志表';
-
--- 登录日志表
-CREATE TABLE IF NOT EXISTS login_logs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    username VARCHAR(50),
-    login_ip VARCHAR(50),
-    login_device VARCHAR(200),
-    login_status VARCHAR(20) COMMENT 'success/failed',
-    failure_reason VARCHAR(200),
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_user (user_id),
-    INDEX idx_time (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='登录日志表';
-
--- 巡检报告表
-CREATE TABLE IF NOT EXISTS inspection_reports (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    instance_id INT NOT NULL,
-    report_type VARCHAR(20) DEFAULT 'daily' COMMENT 'daily/weekly/monthly',
-    status VARCHAR(20) DEFAULT 'pending' COMMENT 'pending/completed/failed',
-    summary JSON,
-    details JSON,
-    risk_count_high INT DEFAULT 0,
-    risk_count_medium INT DEFAULT 0,
-    risk_count_low INT DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='巡检报告表';
-
--- 索引分析表
-CREATE TABLE IF NOT EXISTS index_analyses (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    instance_id INT NOT NULL,
-    database_name VARCHAR(100),
-    table_name VARCHAR(100),
-    index_name VARCHAR(100),
-    index_type VARCHAR(50),
-    columns VARCHAR(500),
-    issue_type VARCHAR(50) COMMENT 'redundant/unused/missing',
-    risk_level VARCHAR(20) COMMENT 'high/medium/low',
-    suggestion TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (instance_id) REFERENCES instances(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='索引分析表';
-
--- 插入默认环境数据
-INSERT INTO environments (name, code, color, description, require_approval) VALUES
-('开发环境', 'development', '#52C41A', '开发测试使用', FALSE),
-('测试环境', 'testing', '#1890FF', '集成测试环境', FALSE),
-('预发环境', 'staging', '#FA8C16', '预发布环境', TRUE),
-('生产环境', 'production', '#FF4D4F', '生产环境', TRUE);
-
--- 插入默认全局配置
-INSERT INTO global_configs (config_key, config_value, description) VALUES
-('monitor_slow_query_enabled', 'true', '慢查询监控全局开关'),
-('monitor_cpu_sql_enabled', 'true', '高CPU SQL监控全局开关'),
-('monitor_performance_enabled', 'true', '性能监控全局开关'),
-('monitor_inspection_enabled', 'true', '实例巡检全局开关'),
-('monitor_collect_interval', '10', '性能监控采集间隔(秒)'),
-('slow_query_threshold', '1.0', '慢查询阈值(秒)'),
-('cpu_threshold', '80.0', 'CPU使用率告警阈值(%)'),
-('memory_threshold', '80.0', '内存使用率告警阈值(%)'),
-('performance_data_retention_days', '30', '性能数据保留天数'),
-('snapshot_retention_days', '7', '快照保留天数');
+SET FOREIGN_KEY_CHECKS = 1;
