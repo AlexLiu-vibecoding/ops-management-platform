@@ -10,7 +10,7 @@ AI 模型配置模型
 2. 为每个场景独立选择使用哪个模型
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, Float, JSON, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 import enum
@@ -127,7 +127,7 @@ class AIAvailableModel(Base):
     
     # 联合唯一约束：同一提供商下模型 ID 唯一
     __table_args__ = (
-        {"unique_constraint": ("provider", "model_id")},
+        UniqueConstraint("provider", "model_id", name="uq_provider_model"),
     )
 
 
