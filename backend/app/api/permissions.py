@@ -97,13 +97,27 @@ async def get_permissions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """获取权限列表（树形结构）"""
+    """获取权限列表（树形结构），含关联菜单信息"""
     # 检查权限
     if current_user.role not in ["super_admin"]:
         raise HTTPException(status_code=403, detail="无权限访问")
     
     service = PermissionService(db)
     permissions = service.get_permissions(module=module, category=category)
+    
+    # 查询权限码→菜单的映射关系
+    from app.models import MenuConfig as MenuConfigModel
+    menu_perms = db.query(MenuConfigModel).filter(
+        MenuConfigModel.permission.isnot(None),
+        MenuConfigModel.is_enabled == True
+    ).all()
+    
+    # 构建 permission_code → [menu_names] 映射
+    perm_menu_map: dict[str, list[str]] = {}
+    for m in menu_perms:
+        if m.permission not in perm_menu_map:
+            perm_menu_map[m.permission] = []
+        perm_menu_map[m.permission].append(m.name)
     
     # 构建树形结构
     def build_tree(items, parent_id=None):
@@ -121,6 +135,7 @@ async def get_permissions(
                     "sort_order": item.sort_order,
                     "is_enabled": item.is_enabled,
                     "created_at": item.created_at.isoformat() if item.created_at else None,
+                    "linked_menus": perm_menu_map.get(item.code, []),
                     "children": build_tree(items, item.id)
                 }
                 result.append(node)
@@ -704,4 +719,65 @@ async def change_user_role(
     return {
         "success": True,
         "message": f"用户角色已从 {old_role} 改为 {role}"
+    }
+
+
+# ==================== 菜单预览 API ====================
+
+@router.get("/menu-preview/{role}")
+async def get_menu_preview(
+    role: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    预览指定角色能看到的导航菜单
+    
+    用于权限管理页面的"所见即所得"预览功能，
+    根据角色当前绑定的权限码，实时计算可见的菜单树。
+    """
+    if current_user.role not in ["super_admin"]:
+        raise HTTPException(status_code=403, detail="无权限访问")
+    
+    from app.models import MenuConfig
+    from app.api.menu import build_menu_tree, filter_menu_by_role
+    
+    # 获取所有启用的菜单
+    menus = db.query(MenuConfig).filter(
+        MenuConfig.is_visible == True,
+        MenuConfig.is_enabled == True
+    ).order_by(MenuConfig.sort_order).all()
+    
+    # 获取角色权限
+    service = PermissionService(db)
+    role_value = role
+    user_permissions = service.get_role_permissions(role_value)
+    
+    # 构建菜单树
+    menu_tree = build_menu_tree(menus)
+    
+    # 根据权限过滤
+    role_enum = UserRole(role_value) if role_value in [e.value for e in UserRole] else role_value
+    filtered_menus = filter_menu_by_role(menu_tree, role_enum, user_permissions)
+    
+    # 转换为前端需要的格式
+    def to_menu_item(menus: list) -> list:
+        result = []
+        for menu in menus:
+            item = {
+                "id": menu["id"],
+                "name": menu["name"],
+                "path": menu.get("path") or "",
+                "icon": menu.get("icon"),
+            }
+            if menu.get("children"):
+                item["children"] = to_menu_item(menu["children"])
+            result.append(item)
+        return result
+    
+    return {
+        "role": role,
+        "menus": to_menu_item(filtered_menus),
+        "permission_count": len(user_permissions),
+        "menu_count": sum(1 for m in menus if m.permission and m.permission in user_permissions)
     }

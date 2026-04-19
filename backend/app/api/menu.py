@@ -59,6 +59,7 @@ def filter_menu_by_role(menus: list[dict[str, Any]], user_role: UserRole, user_p
     过滤规则：
     1. 如果菜单配置了 permission 字段，检查用户是否有该权限
     2. 如果没有配置 permission，所有登录用户都能访问
+    3. 父级菜单如果没有 permission 且所有子菜单都被过滤掉，则隐藏该父级
     
     Args:
         menus: 菜单列表
@@ -83,6 +84,12 @@ def filter_menu_by_role(menus: list[dict[str, Any]], user_role: UserRole, user_p
         # 递归处理子菜单
         if menu.get("children"):
             menu["children"] = filter_menu_by_role(menu["children"], user_role, user_permissions)
+        
+        # 父级菜单：没有 permission 且没有可见子菜单时隐藏
+        has_path = bool(menu.get("path"))
+        has_visible_children = bool(menu.get("children"))
+        if not has_path and not has_visible_children and not menu.get("permission"):
+            continue
         
         result.append(menu)
     

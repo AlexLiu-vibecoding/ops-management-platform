@@ -45,7 +45,7 @@
             </div>
           </template>
           
-          <el-tabs v-model="activeTab" class="detail-tabs">
+          <el-tabs v-model="activeTab" class="detail-tabs" @tab-change="handleTabChange">
             <!-- 环境权限 Tab -->
             <el-tab-pane label="环境权限" name="environments">
               <div class="tab-content">
@@ -99,6 +99,19 @@
                     <template #default="{ node, data }">
                       <div class="tree-node" :class="{ 'is-module': !data.module || data.module === 'other' }">
                         <span class="node-name">{{ data.name }}</span>
+                        <!-- 关联菜单标签 -->
+                        <template v-if="data.linked_menus && data.linked_menus.length > 0">
+                          <el-tag 
+                            v-for="menuName in data.linked_menus" 
+                            :key="menuName"
+                            size="small" 
+                            type="warning" 
+                            class="node-module"
+                            effect="plain"
+                          >
+                            📋 {{ menuName }}
+                          </el-tag>
+                        </template>
                         <!-- 权限节点显示标签 -->
                         <template v-if="data.module && data.module !== 'other'">
                           <el-tag v-if="data.category === 'menu'" size="small" type="primary" class="node-module">
@@ -152,6 +165,66 @@
                     </template>
                   </el-table-column>
                 </el-table>
+              </div>
+            </el-tab-pane>
+            
+            <!-- 菜单预览 Tab -->
+            <el-tab-pane label="菜单预览" name="menu-preview">
+              <div class="tab-content">
+                <div class="section-header">
+                  <span class="section-title">导航栏预览</span>
+                  <span class="section-tip">此角色用户登录后看到的导航菜单</span>
+                  <div class="section-actions">
+                    <el-button size="small" @click="fetchMenuPreview" :loading="menuPreviewLoading">
+                      <el-icon><Refresh /></el-icon>
+                      刷新预览
+                    </el-button>
+                  </div>
+                </div>
+                
+                <div class="menu-preview-container" v-loading="menuPreviewLoading">
+                  <div v-if="menuPreview.length === 0" class="empty-tip">
+                    该角色暂无可见菜单
+                  </div>
+                  <div v-else class="nav-sidebar">
+                    <div class="nav-brand">
+                      <el-icon size="20"><DataAnalysis /></el-icon>
+                      <span class="brand-text">OpsCenter</span>
+                    </div>
+                    <div class="nav-menu-list">
+                      <template v-for="menu in menuPreview" :key="menu.id">
+                        <!-- 有子菜单的项 -->
+                        <div v-if="menu.children && menu.children.length > 0" class="nav-group">
+                          <div class="nav-group-title">
+                            <el-icon size="16"><component :is="getIconComponent(menu.icon)" /></el-icon>
+                            <span>{{ menu.name }}</span>
+                          </div>
+                          <div 
+                            v-for="child in menu.children" 
+                            :key="child.id" 
+                            class="nav-item"
+                          >
+                            <el-icon size="14"><component :is="getIconComponent(child.icon)" /></el-icon>
+                            <span>{{ child.name }}</span>
+                          </div>
+                        </div>
+                        <!-- 无子菜单的项 -->
+                        <div v-else class="nav-item top-level">
+                          <el-icon size="16"><component :is="getIconComponent(menu.icon)" /></el-icon>
+                          <span>{{ menu.name }}</span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="preview-stats">
+                  <el-descriptions :column="3" border size="small">
+                    <el-descriptions-item label="权限数量">{{ menuPreviewStats.permissionCount }}</el-descriptions-item>
+                    <el-descriptions-item label="可见菜单项">{{ menuPreviewStats.menuCount }}</el-descriptions-item>
+                    <el-descriptions-item label="顶级分组">{{ menuPreviewStats.topLevelCount }}</el-descriptions-item>
+                  </el-descriptions>
+                </div>
               </div>
             </el-tab-pane>
           </el-tabs>
@@ -232,7 +305,7 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import request from '@/api/index'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Select, Plus } from '@element-plus/icons-vue'
+import { Select, Plus, Refresh, DataAnalysis, Grid, Collection, Edit, MagicStick, Coin, Key, Clock, TrendCharts, Timer, Bell, Connection, Lock, DocumentChecked, AlarmClock, Setting, DocumentCopy, User, Tickets, Tools, Monitor, Stamp, Document, Folder, DataLine, List, Menu, Promotion } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import TableActions from '@/components/TableActions.vue'
 
@@ -278,6 +351,15 @@ const selectedUserIds = ref([])
 const userListLoading = ref(false)
 const addUserLoading = ref(false)
 
+// 菜单预览
+const menuPreview = ref([])
+const menuPreviewLoading = ref(false)
+const menuPreviewStats = ref({
+  permissionCount: 0,
+  menuCount: 0,
+  topLevelCount: 0
+})
+
 // 模块名称映射
 const moduleNames = {
   instance: '实例管理',
@@ -309,6 +391,16 @@ const moduleIcons = {
 }
 
 const getModuleName = (module) => moduleNames[module] || module
+
+// 图标名称 → 组件映射
+const iconMap = {
+  DataAnalysis, Grid, Collection, Edit, MagicStick, Coin, Key, Clock,
+  TrendCharts, Timer, Bell, Connection, Lock, DocumentChecked, AlarmClock,
+  Setting, DocumentCopy, User, Tickets, Tools, Monitor, Stamp, Document, Folder,
+  DataLine, List, Menu, Promotion
+}
+
+const getIconComponent = (iconName) => iconMap[iconName] || Folder
 
 // 类别映射
 const categoryMap = {
@@ -440,6 +532,7 @@ const fetchPermissions = async () => {
 const selectRole = (role) => {
   selectedRole.value = role
   fetchRoleDetail(role)
+  fetchMenuPreview()
 }
 
 // 切换环境选择
@@ -487,6 +580,10 @@ const handlePermissionCheck = async () => {
     })
     ElMessage.success('功能权限已保存')
     fetchRoles() // 刷新角色列表
+    // 如果当前在菜单预览 tab，自动刷新预览
+    if (activeTab.value === 'menu-preview') {
+      fetchMenuPreview()
+    }
   } catch (error) {
     console.error('保存功能权限失败:', error)
     ElMessage.error('保存功能权限失败')
@@ -593,6 +690,33 @@ const handleRemoveUser = async (user) => {
       console.error('移除用户失败:', error)
       ElMessage.error('移除用户失败')
     }
+  }
+}
+
+// Tab 切换
+const handleTabChange = (tab) => {
+  if (tab === 'menu-preview') {
+    fetchMenuPreview()
+  }
+}
+
+// 获取菜单预览
+const fetchMenuPreview = async () => {
+  if (!selectedRole.value) return
+  menuPreviewLoading.value = true
+  try {
+    const data = await request.get(`/permissions/menu-preview/${selectedRole.value}`)
+    menuPreview.value = data.menus || []
+    menuPreviewStats.value = {
+      permissionCount: data.permission_count || 0,
+      menuCount: data.menu_count || 0,
+      topLevelCount: (data.menus || []).length
+    }
+  } catch (error) {
+    console.error('获取菜单预览失败:', error)
+    ElMessage.error('获取菜单预览失败')
+  } finally {
+    menuPreviewLoading.value = false
   }
 }
 
@@ -895,6 +1019,90 @@ onMounted(() => {
         }
       }
     }
+  }
+  
+  // 菜单预览样式
+  .menu-preview-container {
+    margin-bottom: 16px;
+  }
+  
+  .nav-sidebar {
+    background: var(--el-bg-color);
+    border: 1px solid var(--el-border-color-lighter);
+    border-radius: 8px;
+    padding: 12px 0;
+    max-width: 280px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px 16px;
+      border-bottom: 1px solid var(--el-border-color-lighter);
+      margin-bottom: 8px;
+      color: var(--el-color-primary);
+      
+      .brand-text {
+        font-size: 16px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+      }
+    }
+    
+    .nav-menu-list {
+      padding: 4px 0;
+    }
+    
+    .nav-group {
+      margin-bottom: 4px;
+      
+      .nav-group-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 20px;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--el-text-color-secondary);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+    }
+    
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 20px 9px 36px;
+      font-size: 14px;
+      color: var(--el-text-color-primary);
+      cursor: default;
+      transition: background-color 0.2s;
+      border-radius: 0;
+      
+      &.top-level {
+        padding-left: 20px;
+      }
+      
+      &:hover {
+        background-color: var(--el-fill-color-light);
+      }
+      
+      .el-icon {
+        color: var(--el-text-color-secondary);
+        flex-shrink: 0;
+      }
+    }
+  }
+  
+  .preview-stats {
+    margin-top: 16px;
+  }
+  
+  // 关联菜单标签样式
+  .node-module {
+    margin-left: 4px;
   }
 }
 </style>
