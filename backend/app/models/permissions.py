@@ -140,6 +140,10 @@ class PermissionCode:
     # 调度器管理
     SCHEDULER_VIEW = "scheduler:view"
     SCHEDULER_MANAGE = "scheduler:manage"
+    
+    # AI 模型管理
+    AI_MODEL_VIEW = "ai:model_view"
+    AI_MODEL_MANAGE = "ai:model_manage"
 
 
 # ==================== 默认角色权限配置 ====================
@@ -194,6 +198,9 @@ DEFAULT_ROLE_PERMISSIONS = {
         # 调度器管理
         PermissionCode.SCHEDULER_VIEW,
         PermissionCode.SCHEDULER_MANAGE,
+        # AI 模型管理
+        PermissionCode.AI_MODEL_VIEW,
+        PermissionCode.AI_MODEL_MANAGE,
     ],
     "approval_admin": [
         # 实例管理 - 查看、测试

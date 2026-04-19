@@ -120,6 +120,8 @@ INSERT INTO `permissions` VALUES (48, 'key_rotation:view', '查看密钥轮换',
 INSERT INTO `permissions` VALUES (49, 'key_rotation:config', '配置密钥轮换', 'button', 'key_rotation', '', NULL, 901, True, NOW());
 INSERT INTO `permissions` VALUES (51, 'key_rotation:switch', '切换密钥版本', 'button', 'key_rotation', '', NULL, 903, True, NOW());
 INSERT INTO `permissions` VALUES (52, 'key_rotation:migrate', '执行密钥迁移', 'button', 'key_rotation', '执行密钥数据迁移', NULL, 902, True, NOW());
+INSERT INTO `permissions` VALUES (53, 'ai:model_view', '查看 AI 模型', 'menu', 'ai', '查看 AI 模型配置列表', NULL, 1000, True, NOW());
+INSERT INTO `permissions` VALUES (54, 'ai:model_manage', '管理 AI 模型', 'button', 'ai', '创建、编辑、删除 AI 模型配置', NULL, 1001, True, NOW());
 
 -- ----------------------------
 -- 4. 角色权限关联表
@@ -190,6 +192,8 @@ INSERT INTO `role_permissions` VALUES (473, 'developer', 37, NOW());
 INSERT INTO `role_permissions` VALUES (476, 'super_admin', 48, NOW());
 INSERT INTO `role_permissions` VALUES (477, 'super_admin', 49, NOW());
 INSERT INTO `role_permissions` VALUES (479, 'super_admin', 51, NOW());
+INSERT INTO `role_permissions` VALUES (800, 'super_admin', 53, NOW());
+INSERT INTO `role_permissions` VALUES (801, 'super_admin', 54, NOW());
 INSERT INTO `role_permissions` VALUES (503, 'readonly', 1, NOW());
 INSERT INTO `role_permissions` VALUES (504, 'readonly', 33, NOW());
 INSERT INTO `role_permissions` VALUES (505, 'readonly', 9, NOW());
@@ -323,7 +327,7 @@ INSERT INTO `menu_configs` VALUES (91, '通知管理', '/notification', 'Bell', 
 INSERT INTO `menu_configs` VALUES (93, '通道管理', '/notification/channels', 'Connection', '', 91, 62, True);
 INSERT INTO `menu_configs` VALUES (94, '通知历史', '/notification/logs', 'List', '', 91, 63, True);
 INSERT INTO `menu_configs` VALUES (95, '通知模板', '/notification/templates', 'Document', '', 91, 64, True);
-INSERT INTO `menu_configs` VALUES (96, 'AI 模型配置', '/ai-models', 'MagicStick', '', 7, 15, True);
+INSERT INTO `menu_configs` VALUES (96, 'AI 模型配置', '/ai-models', 'MagicStick', 'ai:model_view', 7, 15, True);
 INSERT INTO `menu_configs` VALUES (97, 'SQL性能对比', '/monitor/sql-performance', 'DataLine', '', 5, 90, True);
 
 -- ----------------------------
