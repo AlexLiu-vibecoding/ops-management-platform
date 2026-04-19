@@ -305,7 +305,7 @@ INSERT INTO `menu_configs` VALUES (4, '变更管理', '/change', 'Stamp', '', NU
 INSERT INTO `menu_configs` VALUES (5, '监控中心', '/monitor', 'Monitor', '', NULL, 40, True);
 INSERT INTO `menu_configs` VALUES (6, '自动化', 'None', 'Promotion', '', NULL, 50, True);
 INSERT INTO `menu_configs` VALUES (7, '系统管理', 'None', 'Setting', '', NULL, 100, True);
-INSERT INTO `menu_configs` VALUES (19, 'Redis变更', '/change/redis-requests', 'Key', '', 4, 2, True);
+INSERT INTO `menu_configs` VALUES (19, 'Redis变更', '/change/redis-requests', 'Key', 'approval:view', 4, 2, True);
 INSERT INTO `menu_configs` VALUES (21, '实例管理', '/instances', 'Grid', 'instance:view', 2, 11, True);
 INSERT INTO `menu_configs` VALUES (22, '环境管理', '/environments', 'Collection', 'environment:view', 2, 12, True);
 INSERT INTO `menu_configs` VALUES (31, 'SQL编辑器', '/sql-editor', 'Edit', '', 3, 21, True);
@@ -321,7 +321,7 @@ INSERT INTO `menu_configs` VALUES (73, '菜单配置', '/menu-config', 'Menu', '
 INSERT INTO `menu_configs` VALUES (75, '审计日志', '/audit', 'Tickets', 'system:audit_log', 7, 103, True);
 INSERT INTO `menu_configs` VALUES (76, '系统设置', '/system', 'Tools', 'system:config', 7, 104, True);
 INSERT INTO `menu_configs` VALUES (77, '权限管理', '/permissions', 'Lock', 'system:role_manage', 7, 105, True);
-INSERT INTO `menu_configs` VALUES (83, '变更窗口', '/change/windows', 'Clock', '', 4, 3, True);
+INSERT INTO `menu_configs` VALUES (83, '变更窗口', '/change/windows', 'Clock', 'approval:view', 4, 3, True);
 INSERT INTO `menu_configs` VALUES (85, '告警中心', '/monitor/alerts', 'Bell', 'monitor:view', 5, 3, True);
 INSERT INTO `menu_configs` VALUES (86, '主从复制', '/monitor/replication', 'Connection', 'monitor:view', 5, 4, True);
 INSERT INTO `menu_configs` VALUES (87, '事务与锁', '/monitor/locks', 'Lock', 'monitor:view', 5, 5, True);
@@ -332,7 +332,7 @@ INSERT INTO `menu_configs` VALUES (93, '通道管理', '/notification/channels',
 INSERT INTO `menu_configs` VALUES (94, '通知历史', '/notification/logs', 'List', '', 91, 63, True);
 INSERT INTO `menu_configs` VALUES (95, '通知模板', '/notification/templates', 'Document', '', 91, 64, True);
 INSERT INTO `menu_configs` VALUES (96, 'AI 模型配置', '/ai-models', 'MagicStick', 'ai:model_view', 7, 15, True);
-INSERT INTO `menu_configs` VALUES (97, 'SQL性能对比', '/monitor/sql-performance', 'DataLine', '', 5, 90, True);
+INSERT INTO `menu_configs` VALUES (97, 'SQL性能对比', '/monitor/sql-performance', 'DataLine', 'monitor:view', 5, 90, True);
 
 -- ----------------------------
 -- 7-71. 其他业务表
