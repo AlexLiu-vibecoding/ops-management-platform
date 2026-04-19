@@ -183,49 +183,49 @@ const routes = [
         path: 'users',
         name: 'Users',
         component: () => import('@/views/users/index.vue'),
-        meta: { title: '用户管理', icon: 'User', roles: ['super_admin'] }
+        meta: { title: '用户管理', icon: 'User' }
       },
       // 系统管理 - 权限管理
       {
         path: 'permissions',
         name: 'Permissions',
         component: () => import('@/views/permissions/index.vue'),
-        meta: { title: '权限管理', icon: 'Lock', roles: ['super_admin'] }
+        meta: { title: '权限管理', icon: 'Lock' }
       },
       // 系统管理 - 菜单配置
       {
         path: 'menu-config',
         name: 'MenuConfig',
         component: () => import('@/views/menu-config/index.vue'),
-        meta: { title: '菜单配置', icon: 'Menu', roles: ['super_admin'] }
+        meta: { title: '菜单配置', icon: 'Menu' }
       },
       // 系统管理 - 审计日志
       {
         path: 'audit',
         name: 'Audit',
         component: () => import('@/views/audit/index.vue'),
-        meta: { title: '审计日志', icon: 'Tickets', roles: ['super_admin'] }
+        meta: { title: '审计日志', icon: 'Tickets' }
       },
       // 系统管理 - 系统设置
       {
         path: 'system',
         name: 'SystemSettings',
         component: () => import('@/views/system/index.vue'),
-        meta: { title: '系统设置', icon: 'Tools', roles: ['super_admin'] }
+        meta: { title: '系统设置', icon: 'Tools' }
       },
       // 系统管理 - AI 模型配置
       {
         path: 'ai-models',
         name: 'AIModels',
         component: () => import('@/views/system/ai-models.vue'),
-        meta: { title: 'AI 模型配置', icon: 'MagicStick', roles: ['super_admin'] }
+        meta: { title: 'AI 模型配置', icon: 'MagicStick' }
       },
       // 通知管理
       {
         path: 'notification',
         name: 'Notification',
         redirect: '/notification/channels',
-        meta: { title: '通知管理', icon: 'Bell', roles: ['super_admin', 'approval_admin'] },
+        meta: { title: '通知管理', icon: 'Bell' },
         children: [
           {
             path: 'channels',
