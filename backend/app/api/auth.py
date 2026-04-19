@@ -15,7 +15,7 @@ from app.schemas import (
 from app.utils.auth import (
     hash_password, verify_password, create_access_token
 )
-from app.deps import get_current_user, get_super_admin
+from app.deps import get_current_user, require_permission
 from app.config import settings
 import httpx
 
@@ -261,7 +261,7 @@ async def check_registration_status(
 @router.get("/registrations", response_model=list[RegistrationResponse])
 async def list_registrations(
     status_filter: RegistrationStatus = None,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """
@@ -297,7 +297,7 @@ async def list_registrations(
 async def review_registration(
     registration_id: int,
     action_data: RegistrationAction,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """

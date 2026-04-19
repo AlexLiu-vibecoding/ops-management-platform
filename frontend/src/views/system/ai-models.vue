@@ -63,7 +63,7 @@
 
       <el-tab-pane label="模型底座" name="models">
         <div class="toolbar">
-          <el-button type="primary" @click="handleAdd" v-if="isAdmin">
+          <el-button type="primary" @click="handleAdd" v-if="canManage">
             <el-icon><Plus /></el-icon>新增模型
           </el-button>
           <el-button @click="fetchList">
@@ -92,7 +92,7 @@
             <template #default="{ row }">
               <el-switch
                 v-model="row.is_enabled"
-                :disabled="!isAdmin"
+                :disabled="!canManage"
                 @change="toggleEnabled(row)"
               />
             </template>
@@ -102,7 +102,7 @@
               <div class="action-btns">
                 <el-button type="primary" text size="small" @click="handleEdit(row)">编辑</el-button>
                 <el-button type="success" text size="small" @click="handleTest(row)">测试</el-button>
-                <el-button v-if="isAdmin" type="danger" text size="small" @click="handleDelete(row)">删除</el-button>
+                <el-button v-if="canManage" type="danger" text size="small" @click="handleDelete(row)">删除</el-button>
               </div>
             </template>
           </el-table-column>
@@ -337,7 +337,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 
 const userStore = useUserStore()
-const isAdmin = computed(() => userStore.isAdmin)
+const canManage = computed(() => userStore.hasPermission('ai:model_manage'))
 
 const activeTab = ref('scenes')
 

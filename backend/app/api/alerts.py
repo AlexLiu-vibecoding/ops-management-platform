@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from app.database import get_db
 from app.models import AlertRecord, RDBInstance, RedisInstance, User
 from app.schemas import MessageResponse
-from app.deps import get_current_user, get_super_admin
+from app.deps import get_current_user, require_permission
 
 router = APIRouter(prefix="/alerts", tags=["告警中心"])
 
@@ -371,7 +371,7 @@ async def get_alert_statuses():
 @router.post("/{alert_id}/send-notification", response_model=MessageResponse)
 async def send_alert_notification(
     alert_id: int,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("alert:rule_manage")),
     db: Session = Depends(get_db)
 ):
     """手动发送告警通知"""

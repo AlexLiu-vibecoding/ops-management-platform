@@ -15,7 +15,7 @@ from app.models import RDBInstance, InstanceGroup, Environment, MonitorSwitch, M
 from app.services.instance_service import RDBInstanceService
 from app.utils.auth import encrypt_instance_password, decrypt_instance_password
 from app.utils.db_helpers import test_mysql_connection, test_postgresql_connection
-from app.deps import get_operator, get_current_user, require_permission
+from app.deps import get_current_user, require_permission
 from app.models import User
 from app.utils.aws_rds_collector import parse_aws_region_from_host, is_rds_endpoint
 
@@ -228,7 +228,7 @@ async def get_rdb_instance(
 @router.post("/test", response_model=InstanceTestResult)
 async def test_rdb_instance_connection(
     instance_data: RDBInstanceCreate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:test")),
     db: Session = Depends(get_db)
 ):
     """测试 RDB 实例连接"""
@@ -245,7 +245,7 @@ async def test_rdb_instance_connection(
 @router.post("/{instance_id}/check", response_model=InstanceTestResult)
 async def check_rdb_instance_status(
     instance_id: int,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:test")),
     db: Session = Depends(get_db)
 ):
     """检查 RDB 实例连接状态"""
@@ -433,7 +433,7 @@ async def update_rdb_instance(
 
 @router.post("/sync-aws-regions")
 async def sync_aws_regions(
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("environment:update")),
     db: Session = Depends(get_db)
 ):
     """

@@ -14,7 +14,7 @@ from app.database import get_db
 from app.models import RedisInstance, InstanceGroup, RedisMode, RedisSlowLog, RedisMemoryStats, Environment, GlobalConfig
 from app.services.instance_service import RedisInstanceService
 from app.utils.auth import encrypt_instance_password
-from app.deps import get_operator, get_current_user, require_permission
+from app.deps import get_current_user, require_permission
 from app.models import User
 
 router = APIRouter(prefix="/redis-instances", tags=["Redis实例管理"])
@@ -320,7 +320,7 @@ async def get_redis_instance(
 @router.post("/test", response_model=InstanceTestResult)
 async def test_redis_instance_connection(
     instance_data: RedisInstanceCreate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:test")),
     db: Session = Depends(get_db)
 ):
     """测试 Redis 实例连接"""

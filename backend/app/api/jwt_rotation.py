@@ -9,7 +9,7 @@ from typing import Optional, List
 
 from app.database import get_db, SessionLocal
 from app.models import User
-from app.deps import get_current_user, get_super_admin
+from app.deps import get_current_user, require_permission
 from app.services.jwt_rotation_service import JWTRotationService
 
 router = APIRouter(prefix="/jwt-rotation", tags=["JWT轮换"])
@@ -78,7 +78,7 @@ async def get_jwt_versions(
 @router.post("/generate-key", response_model=GenerateKeyResponse)
 async def generate_jwt_key(
     request: GenerateKeyRequest,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("jwt:manage")),
     db: Session = Depends(get_db)
 ):
     """生成新的 JWT 密钥"""
@@ -98,7 +98,7 @@ async def generate_jwt_key(
 @router.post("/switch-version", response_model=MessageResponse)
 async def switch_jwt_version(
     request: SwitchVersionRequest,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("jwt:manage")),
     db: Session = Depends(get_db)
 ):
     """切换 JWT 密钥版本"""
@@ -120,7 +120,7 @@ async def switch_jwt_version(
 
 @router.post("/full-rotation", response_model=GenerateKeyResponse)
 async def full_jwt_rotation(
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("jwt:manage")),
     db: Session = Depends(get_db)
 ):
     """一键轮换 JWT 密钥（生成新密钥并切换）"""
@@ -137,7 +137,7 @@ async def full_jwt_rotation(
 @router.delete("/keys/{key_id}", response_model=MessageResponse)
 async def delete_jwt_key(
     key_id: str,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("jwt:manage")),
     db: Session = Depends(get_db)
 ):
     """删除指定的 JWT 密钥版本"""

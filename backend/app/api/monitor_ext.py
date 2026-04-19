@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from app.database import get_db
 from app.models import ReplicationStatus, LockWait, LongTransaction, RDBInstance, RedisInstance, User
 from app.schemas import MessageResponse
-from app.deps import get_current_user, get_super_admin
+from app.deps import get_current_user, require_permission
 from app.services.db_connection import db_manager
 
 router = APIRouter(prefix="/monitor-ext", tags=["监控扩展"])
@@ -457,7 +457,7 @@ async def check_long_transactions(
 async def kill_transaction(
     trx_id: int,
     instance_id: int = Query(..., description="实例ID"),
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("monitor:config")),
     db: Session = Depends(get_db)
 ):
     """Kill长事务"""

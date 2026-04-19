@@ -29,7 +29,7 @@
               <span>环境列表</span>
               <el-tag type="info" size="small" style="margin-left: 8px;">{{ environments.length }} 个环境</el-tag>
             </div>
-            <el-button type="primary" @click="handleAddEnv" v-if="isAdmin">
+            <el-button type="primary" @click="handleAddEnv" v-if="canManageEnv">
               <el-icon><Plus /></el-icon>
               添加环境
             </el-button>
@@ -80,7 +80,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="description" label="描述" min-width="100" />
-          <el-table-column label="操作" min-width="100" v-if="isAdmin" fixed="right" align="center">
+          <el-table-column label="操作" min-width="100" v-if="canManageEnv" fixed="right" align="center">
             <template #default="{ row }">
               <TableActions :row="row" :actions="envActions" @edit="handleEditEnv" @delete="handleDeleteEnv" />
             </template>
@@ -98,7 +98,7 @@
               <span>AWS 区域列表</span>
               <el-tag type="success" size="small" style="margin-left: 8px;">启用 {{ enabledRegionCount }} / {{ regions.length }}</el-tag>
             </div>
-            <el-button type="primary" @click="handleAddRegion" v-if="isAdmin">
+            <el-button type="primary" @click="handleAddRegion" v-if="canManageRegion">
               <el-icon><Plus /></el-icon>
               添加区域
             </el-button>
@@ -131,7 +131,7 @@
               <el-switch 
                 :model-value="row.is_enabled" 
                 @change="handleToggleRegionEnabled(row, $event)"
-                :disabled="!isAdmin"
+                :disabled="!canManageRegion"
               />
             </template>
           </el-table-column>
@@ -141,7 +141,7 @@
               <span v-else style="color: #999;">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" min-width="100" v-if="isAdmin" fixed="right" align="center">
+          <el-table-column label="操作" min-width="100" v-if="canManageRegion" fixed="right" align="center">
             <template #default="{ row }">
               <TableActions :row="row" :actions="regionActions" @edit="handleEditRegion" @delete="handleDeleteRegion" />
             </template>
@@ -269,7 +269,8 @@ import { getAwsRegionsGrouped } from '@/api/awsRegions'
 import TableActions from '@/components/TableActions.vue'
 
 const userStore = useUserStore()
-const isAdmin = computed(() => userStore.isAdmin)
+const canManageEnv = computed(() => userStore.hasPermission('environment:create'))
+const canManageRegion = computed(() => userStore.hasPermission('environment:update'))
 
 // Tab 状态
 const activeTab = ref('environments')

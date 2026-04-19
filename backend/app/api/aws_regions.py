@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.models import AWSRegion
-from app.deps import get_current_user, get_super_admin
+from app.deps import get_current_user, require_permission
 from app.models import User
 
 router = APIRouter(prefix="/aws-regions", tags=["AWS区域配置"])
@@ -110,7 +110,7 @@ async def get_aws_regions_grouped(
 async def update_aws_region(
     region_id: int,
     data: AWSRegionUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("environment:update")),
     db: Session = Depends(get_db)
 ):
     """
@@ -137,7 +137,7 @@ async def update_aws_region(
 @router.post("", response_model=AWSRegionResponse)
 async def create_aws_region(
     data: AWSRegionCreate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("environment:update")),
     db: Session = Depends(get_db)
 ):
     """
@@ -167,7 +167,7 @@ async def create_aws_region(
 @router.delete("/{region_id}")
 async def delete_aws_region(
     region_id: int,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("environment:update")),
     db: Session = Depends(get_db)
 ):
     """

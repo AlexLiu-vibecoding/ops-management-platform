@@ -11,12 +11,12 @@
                 v-model="slowQueryConfig.enabled"
                 active-text="启用"
                 inactive-text="禁用"
-                :disabled="!isAdmin"
+                :disabled="!canConfig"
               />
             </div>
           </template>
           
-          <el-form :model="slowQueryConfig" label-width="160px" :disabled="!slowQueryConfig.enabled || !isAdmin">
+          <el-form :model="slowQueryConfig" label-width="160px" :disabled="!slowQueryConfig.enabled || !canConfig">
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="慢查询阈值">
@@ -90,7 +90,7 @@
               </el-col>
             </el-row>
             
-            <el-form-item v-if="isAdmin">
+            <el-form-item v-if="canConfig">
               <el-button type="primary" @click="saveSlowQueryConfig" :loading="saving">
                 保存配置
               </el-button>
@@ -124,12 +124,12 @@
                 v-model="highCpuConfig.enabled"
                 active-text="启用"
                 inactive-text="禁用"
-                :disabled="!isAdmin"
+                :disabled="!canConfig"
               />
             </div>
           </template>
           
-          <el-form :model="highCpuConfig" label-width="160px" :disabled="!highCpuConfig.enabled || !isAdmin">
+          <el-form :model="highCpuConfig" label-width="160px" :disabled="!highCpuConfig.enabled || !canConfig">
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="CPU告警阈值">
@@ -219,7 +219,7 @@
               </el-row>
             </template>
             
-            <el-form-item v-if="isAdmin">
+            <el-form-item v-if="canConfig">
               <el-button type="primary" @click="saveHighCpuConfig" :loading="saving">
                 保存配置
               </el-button>
@@ -265,7 +265,7 @@
             <el-form-item>
               <el-button type="primary" @click="loadAlertRules">搜索</el-button>
               <el-button @click="resetAlertQuery">重置</el-button>
-              <el-button type="success" @click="handleAddRule" v-if="isAdmin">
+              <el-button type="success" @click="handleAddRule" v-if="canConfig">
                 <el-icon><Plus /></el-icon>
                 新增规则
               </el-button>
@@ -340,7 +340,7 @@
                 <span class="switch-label">{{ getMonitorTypeLabel(type) }}</span>
                 <el-switch
                   v-model="globalSwitches[type]"
-                  :disabled="!isAdmin"
+                  :disabled="!canConfig"
                   @change="handleGlobalSwitchChange(type, $event)"
                 />
               </div>
@@ -449,7 +449,7 @@ import request from '@/api/index'
 import TableActions from '@/components/TableActions.vue'
 
 const userStore = useUserStore()
-const isAdmin = computed(() => userStore.isAdmin)
+const canConfig = computed(() => userStore.hasPermission('monitor:config'))
 
 const activeTab = ref('slowQuery')
 const saving = ref(false)
@@ -545,9 +545,9 @@ const ruleActions = computed(() => [
     label: (row) => row.is_enabled ? '禁用' : '启用',
     event: 'toggle',
     primary: false,
-    visible: () => isAdmin.value
+    visible: () => canConfig.value
   },
-  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false, visible: () => isAdmin.value }
+  { key: 'delete', label: '删除', event: 'delete', danger: true, primary: false, visible: () => canConfig.value }
 ])
 
 // 规则表单

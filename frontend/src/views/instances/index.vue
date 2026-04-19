@@ -28,7 +28,7 @@
         </el-form-item>
       </el-form>
       
-      <el-button type="primary" @click="handleAdd" v-if="canOperate">
+      <el-button type="primary" @click="handleAdd" v-if="canCreateInstance">
         <el-icon><Plus /></el-icon>
         添加实例
       </el-button>
@@ -312,11 +312,9 @@ import { isRdsEndpoint, parseAwsRegion } from '@/constants/aws'
 const router = useRouter()
 const userStore = useUserStore()
 
-// 操作权限：管理员和运维人员可以操作
-const canOperate = computed(() => {
-  const role = userStore.user?.role
-  return ['super_admin', 'approval_admin', 'operator'].includes(role)
-})
+// 操作权限：基于权限码
+const canCreateInstance = computed(() => userStore.hasPermission('instance:create'))
+const canOperate = computed(() => userStore.canOperate)
 
 // 实例操作配置
 const instanceActions = computed(() => [

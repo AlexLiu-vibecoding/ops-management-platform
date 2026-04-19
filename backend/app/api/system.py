@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.deps import get_super_admin
+from app.deps import require_permission
 from app.models import User, GlobalConfig
 from app.database import get_db
 from app.config import settings as app_settings
@@ -69,7 +69,7 @@ DEFAULT_DB_CONFIGS = [
 
 @router.get("/database-config", response_model=DatabaseConfigResponse)
 async def get_database_config(
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:config")),
     db: Session = Depends(get_db)
 ):
     """
@@ -107,7 +107,7 @@ async def get_database_config(
 async def update_database_config(
     db_type: str,
     request: DatabaseConfigUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:config")),
     db: Session = Depends(get_db)
 ):
     """
@@ -194,7 +194,7 @@ class StorageTestResponse(BaseModel):
 
 @router.get("/storage-config", response_model=StorageConfigResponse)
 async def get_storage_config(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("system:config"))
 ):
     """
     获取存储配置
@@ -226,7 +226,7 @@ async def get_storage_config(
 @router.put("/storage-config")
 async def update_storage_config(
     request: StorageConfigUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:config")),
     db: Session = Depends(get_db)
 ):
     """
@@ -323,7 +323,7 @@ async def update_storage_config(
 @router.post("/storage-config/test", response_model=StorageTestResponse)
 async def test_storage_config(
     request: StorageConfigUpdate,
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("system:config"))
 ):
     """
     测试存储配置连接
@@ -410,7 +410,7 @@ class AwsConnectionTestResponse(BaseModel):
 @router.post("/test-aws-connection", response_model=AwsConnectionTestResponse)
 async def test_aws_connection(
     request: AwsConnectionTestRequest,
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("system:config"))
 ):
     """
     测试 AWS S3 存储连接
@@ -510,7 +510,7 @@ class SecurityConfigResponse(BaseModel):
 
 @router.get("/security-config", response_model=SecurityConfigResponse)
 async def get_security_config(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("system:config"))
 ):
     """
     获取安全配置（只读）
@@ -589,7 +589,7 @@ class SystemOverview(BaseModel):
 
 @router.get("/overview", response_model=SystemOverview)
 async def get_system_overview(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("system:config"))
 ):
     """
     获取系统概览

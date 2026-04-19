@@ -17,7 +17,7 @@ from app.database import get_db
 from app.models import NotificationBinding, User, ScheduledTask
 from app.models.notification_new import NotificationChannel
 from app.schemas import MessageResponse
-from app.deps import get_super_admin, get_current_user
+from app.deps import require_permission, get_current_user
 
 router = APIRouter(prefix="/notification", tags=["通知管理"])
 
@@ -142,7 +142,7 @@ async def list_bindings(
 @router.post("/bindings", response_model=MessageResponse)
 async def create_binding(
     data: BindingCreate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("notification:binding_manage")),
     db: Session = Depends(get_db)
 ):
     """创建通知绑定"""
@@ -181,7 +181,7 @@ async def create_binding(
 @router.delete("/bindings/{binding_id}", response_model=MessageResponse)
 async def delete_binding(
     binding_id: int,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("notification:binding_manage")),
     db: Session = Depends(get_db)
 ):
     """删除通知绑定"""

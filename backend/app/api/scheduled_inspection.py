@@ -15,7 +15,7 @@ from app.models import (
     Environment, User
 )
 from app.schemas import MessageResponse
-from app.deps import get_current_user, get_operator
+from app.deps import get_current_user, require_permission
 from app.services.inspection_service import InspectionService
 
 router = APIRouter(prefix="/scheduled-inspections", tags=["定时巡检"])
@@ -119,7 +119,7 @@ async def list_scheduled_inspections(
 @router.post("", response_model=MessageResponse)
 async def create_scheduled_inspection(
     data: ScheduledInspectionCreate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("inspection:manage")),
     db: Session = Depends(get_db)
 ):
     """创建定时巡检任务"""
@@ -209,7 +209,7 @@ async def get_scheduled_inspection(
 async def update_scheduled_inspection(
     task_id: int,
     data: ScheduledInspectionUpdate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("inspection:manage")),
     db: Session = Depends(get_db)
 ):
     """更新定时巡检任务"""
@@ -256,7 +256,7 @@ async def update_scheduled_inspection(
 @router.delete("/{task_id}", response_model=MessageResponse)
 async def delete_scheduled_inspection(
     task_id: int,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("inspection:manage")),
     db: Session = Depends(get_db)
 ):
     """删除定时巡检任务"""
@@ -272,7 +272,7 @@ async def delete_scheduled_inspection(
 @router.post("/{task_id}/toggle", response_model=MessageResponse)
 async def toggle_scheduled_inspection(
     task_id: int,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("inspection:manage")),
     db: Session = Depends(get_db)
 ):
     """启用/禁用定时巡检任务"""

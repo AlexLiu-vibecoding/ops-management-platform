@@ -11,7 +11,7 @@ from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.deps import get_current_user, get_super_admin
+from app.deps import get_current_user, require_permission
 from app.models import User
 from app.models.key_rotation import KeyRotationConfig, KeyRotationKey
 from app.database import SessionLocal
@@ -152,7 +152,7 @@ class FullRotationResponse(BaseModel):
 
 @router.get("/overview")
 async def get_key_rotation_overview(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:view"))
 ):
     """获取密钥轮换概览"""
     db = SessionLocal()
@@ -165,7 +165,7 @@ async def get_key_rotation_overview(
 
 @router.get("/status", response_model=KeyRotationStatus)
 async def get_key_rotation_status(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:view"))
 ):
     """获取密钥轮换状态"""
     db = SessionLocal()
@@ -179,7 +179,7 @@ async def get_key_rotation_status(
 
 @router.get("/versions", response_model=KeyVersionInfo)
 async def get_key_versions(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:view"))
 ):
     """获取所有密钥版本"""
     db = SessionLocal()
@@ -199,7 +199,7 @@ async def get_key_versions(
 
 @router.get("/config", response_model=RotationConfig)
 async def get_rotation_config(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:view"))
 ):
     """获取轮换配置"""
     db = SessionLocal()
@@ -219,7 +219,7 @@ async def get_rotation_config(
 @router.put("/config", response_model=RotationConfig)
 async def update_rotation_config(
     config_update: RotationConfigUpdate,
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:config"))
 ):
     """更新轮换配置"""
     db = SessionLocal()
@@ -251,7 +251,7 @@ async def update_rotation_config(
 
 @router.get("/migration-preview", response_model=MigrationPreviewResponse)
 async def get_migration_preview(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:view"))
 ):
     """预览数据迁移"""
     db = SessionLocal()
@@ -277,7 +277,7 @@ async def get_migration_preview(
 @router.post("/migrate", response_model=MigrationResponse)
 async def execute_migration(
     batch_size: int = Query(default=100, ge=1, le=1000),
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:migrate"))
 ):
     """执行数据迁移"""
     db = SessionLocal()
@@ -300,7 +300,7 @@ async def execute_migration(
 @router.post("/switch-version")
 async def switch_key_version(
     request: SwitchVersionRequest,
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:switch"))
 ):
     """切换密钥版本"""
     db = SessionLocal()
@@ -322,7 +322,7 @@ async def switch_key_version(
 
 @router.post("/generate-key", response_model=GenerateKeyResponse)
 async def generate_new_key(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:config"))
 ):
     """生成新的密钥版本"""
     db = SessionLocal()
@@ -345,7 +345,7 @@ async def generate_new_key(
 async def get_rotation_history(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=100),
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:view"))
 ):
     """获取轮换历史记录"""
     db = SessionLocal()
@@ -368,7 +368,7 @@ async def get_rotation_history(
 
 @router.post("/full-rotation", response_model=FullRotationResponse)
 async def full_rotation(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:migrate"))
 ):
     """一键完成轮换：生成密钥 -> 迁移数据 -> 切换版本"""
     db = SessionLocal()
@@ -388,7 +388,7 @@ async def full_rotation(
 
 @router.post("/auto-rotate")
 async def trigger_auto_rotation(
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:config"))
 ):
     """触发自动轮换"""
     db = SessionLocal()
@@ -415,7 +415,7 @@ async def trigger_auto_rotation(
 @router.delete("/keys/{key_id}")
 async def delete_key_version(
     key_id: str,
-    current_user: User = Depends(get_super_admin)
+    current_user: User = Depends(require_permission("key_rotation:config"))
 ):
     """删除密钥版本（不能删除当前激活版本）"""
     db = SessionLocal()

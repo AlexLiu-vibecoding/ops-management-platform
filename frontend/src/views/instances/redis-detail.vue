@@ -83,7 +83,7 @@
                 <el-button @click="handleScanKeys">搜索</el-button>
               </template>
             </el-input>
-            <el-button type="primary" @click="showAddKeyDialog = true" v-if="canOperate">
+            <el-button type="primary" @click="showAddKeyDialog = true" v-if="canManageRedis">
               <el-icon><Plus /></el-icon>
               添加键
             </el-button>
@@ -109,8 +109,8 @@
               <template #default="{ row }">
                 <div class="table-operations">
                   <el-button link type="primary" size="small" @click.stop="viewKeyDetail(row)">查看</el-button>
-                  <el-button link type="warning" size="small" @click.stop="editTTL(row)" v-if="canOperate">TTL</el-button>
-                  <el-button link type="danger" size="small" @click.stop="deleteKey(row)" v-if="canOperate">删除</el-button>
+                  <el-button link type="warning" size="small" @click.stop="editTTL(row)" v-if="canManageRedis">TTL</el-button>
+                  <el-button link type="danger" size="small" @click.stop="deleteKey(row)" v-if="canManageRedis">删除</el-button>
                 </div>
               </template>
             </el-table-column>
@@ -280,8 +280,8 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-// 操作权限：管理员和运维人员可以操作
-const canOperate = computed(() => userStore.canOperate)
+// 操作权限：基于权限码
+const canManageRedis = computed(() => userStore.hasPermission('instance:redis_manage'))
 
 const instanceId = computed(() => route.params.id)
 const instance = ref(null)

@@ -510,13 +510,6 @@ async def create_script(
     db: Session = Depends(get_db)
 ):
     """创建脚本"""
-    # 检查权限：只有运维和管理员可以创建脚本
-    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.APPROVAL_ADMIN, UserRole.OPERATOR]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No permission to create script"
-        )
-    
     try:
         script_type = ScriptType(script_data.script_type)
     except ValueError:

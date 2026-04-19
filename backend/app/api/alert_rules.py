@@ -12,7 +12,7 @@ from app.models import (
     AlertAggregation
 )
 from app.schemas import MessageResponse
-from app.deps import get_super_admin
+from app.deps import require_permission
 
 
 router = APIRouter(prefix="/alert-rules", tags=["告警规则"])
@@ -203,7 +203,7 @@ async def get_alert_rule(
 async def create_alert_rule(
     data: AlertRuleCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """创建告警规则"""
     existing = db.query(AlertRule).filter(AlertRule.name == data.name).first()
@@ -223,7 +223,7 @@ async def update_alert_rule(
     rule_id: int,
     data: AlertRuleUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """更新告警规则"""
     rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
@@ -246,7 +246,7 @@ async def update_alert_rule(
 async def delete_alert_rule(
     rule_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """删除告警规则"""
     rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
@@ -262,7 +262,7 @@ async def delete_alert_rule(
 async def toggle_alert_rule(
     rule_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """启用/禁用告警规则"""
     rule = db.query(AlertRule).filter(AlertRule.id == rule_id).first()
@@ -408,7 +408,7 @@ async def list_aggregation_rules(
 async def create_aggregation_rule(
     data: AlertAggregationRuleCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """创建聚合规则"""
     existing = db.query(AlertAggregationRule).filter(AlertAggregationRule.name == data.name).first()
@@ -430,7 +430,7 @@ async def update_aggregation_rule(
     rule_id: int,
     data: AlertAggregationRuleUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """更新聚合规则"""
     rule = db.query(AlertAggregationRule).filter(AlertAggregationRule.id == rule_id).first()
@@ -459,7 +459,7 @@ async def update_aggregation_rule(
 async def delete_aggregation_rule(
     rule_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """删除聚合规则"""
     rule = db.query(AlertAggregationRule).filter(AlertAggregationRule.id == rule_id).first()
@@ -525,7 +525,7 @@ async def list_silence_rules(
 async def create_silence_rule(
     data: AlertSilenceRuleCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """创建静默规则"""
     existing = db.query(AlertSilenceRule).filter(AlertSilenceRule.name == data.name).first()
@@ -547,7 +547,7 @@ async def update_silence_rule(
     rule_id: int,
     data: AlertSilenceRuleUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """更新静默规则"""
     rule = db.query(AlertSilenceRule).filter(AlertSilenceRule.id == rule_id).first()
@@ -576,7 +576,7 @@ async def update_silence_rule(
 async def delete_silence_rule(
     rule_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """删除静默规则"""
     rule = db.query(AlertSilenceRule).filter(AlertSilenceRule.id == rule_id).first()
@@ -644,7 +644,7 @@ async def list_escalation_rules(
 async def create_escalation_rule(
     data: AlertEscalationRuleCreate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """创建升级规则"""
     existing = db.query(AlertEscalationRule).filter(AlertEscalationRule.name == data.name).first()
@@ -666,7 +666,7 @@ async def update_escalation_rule(
     rule_id: int,
     data: AlertEscalationRuleUpdate,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """更新升级规则"""
     rule = db.query(AlertEscalationRule).filter(AlertEscalationRule.id == rule_id).first()
@@ -695,7 +695,7 @@ async def update_escalation_rule(
 async def delete_escalation_rule(
     rule_id: int,
     db: Session = Depends(get_db),
-    current_user = Depends(get_super_admin)
+    current_user = Depends(require_permission("alert:rule_manage"))
 ):
     """删除升级规则"""
     rule = db.query(AlertEscalationRule).filter(AlertEscalationRule.id == rule_id).first()

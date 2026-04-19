@@ -48,7 +48,7 @@
               <template #default="{ row }">
                 <el-switch
                   v-model="row.enabled"
-                  :disabled="!isAdmin"
+                  :disabled="!canEdit"
                   @change="handleSwitchChange(row)"
                 />
               </template>
@@ -139,7 +139,7 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const isAdmin = computed(() => userStore.isAdmin)
+const canEdit = computed(() => userStore.hasPermission('instance:update'))
 const canOperate = computed(() => userStore.canOperate)
 
 const instance = ref(null)

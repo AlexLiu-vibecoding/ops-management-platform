@@ -16,7 +16,7 @@ from app.schemas import (
     MonitorSwitchUpdate, MonitorSwitchResponse,
     GlobalMonitorSwitchUpdate, MessageResponse
 )
-from app.deps import get_super_admin, get_current_user, require_permission
+from app.deps import require_permission, get_current_user
 
 router = APIRouter(prefix="/monitor", tags=["监控配置"])
 
@@ -102,7 +102,7 @@ async def get_global_monitor_switches(
 @router.put("/switches/global", response_model=MessageResponse)
 async def update_global_monitor_switch(
     switch_data: GlobalMonitorSwitchUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("monitor:config")),
     db: Session = Depends(get_db)
 ):
     """更新全局监控开关（仅超级管理员）"""
@@ -175,7 +175,7 @@ async def update_instance_monitor_switch(
     instance_id: int,
     monitor_type: MonitorType,
     switch_data: MonitorSwitchUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("monitor:config")),
     db: Session = Depends(get_db)
 ):
     """更新实例级监控开关（仅超级管理员）"""
@@ -254,7 +254,7 @@ async def get_monitor_config(
 @router.put("/config", response_model=MessageResponse)
 async def update_monitor_config(
     config_data: dict,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("monitor:config")),
     db: Session = Depends(get_db)
 ):
     """更新监控配置（仅超级管理员）"""
@@ -303,7 +303,7 @@ async def get_alert_rules(
 @router.put("/alert-rules", response_model=MessageResponse)
 async def update_alert_rules(
     rules: list[dict],
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("monitor:config")),
     db: Session = Depends(get_db)
 ):
     """更新告警规则（仅超级管理员）"""
@@ -367,7 +367,7 @@ async def get_slow_query_config(
 @router.put("/slow-query/config", response_model=MessageResponse)
 async def update_slow_query_config(
     config: SlowQueryConfig,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("monitor:config")),
     db: Session = Depends(get_db)
 ):
     """更新慢查询监控配置（仅超级管理员）"""
@@ -472,7 +472,7 @@ async def get_high_cpu_config(
 @router.put("/high-cpu/config", response_model=MessageResponse)
 async def update_high_cpu_config(
     config: HighCPUSQLConfig,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("monitor:config")),
     db: Session = Depends(get_db)
 ):
     """更新高CPU SQL监控配置（仅超级管理员）"""
@@ -665,7 +665,7 @@ async def get_alert_rules_detail(
 @router.put("/alert-rules/detail", response_model=MessageResponse)
 async def update_alert_rules_detail(
     rules: list[AlertRuleConfig],
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("monitor:config")),
     db: Session = Depends(get_db)
 ):
     """更新告警规则详细配置（仅超级管理员）"""

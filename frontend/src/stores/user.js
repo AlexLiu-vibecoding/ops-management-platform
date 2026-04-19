@@ -60,6 +60,7 @@ export const useUserStore = defineStore('user', () => {
     return !isTokenExpired(token.value)
   })
   
+  /** @deprecated 组件中请使用 hasPermission() 替代，isAdmin 仅作为内部快捷判断 */
   const isAdmin = computed(() => user.value?.role === 'super_admin')
   
   // 操作权限：超级管理员、审批管理员、运维人员可以操作实例
@@ -73,6 +74,13 @@ export const useUserStore = defineStore('user', () => {
     const role = user.value?.role
     return ['super_admin', 'approval_admin'].includes(role)
   })
+  
+  /** 基于权限码判断能否创建实例 */
+  const canCreateInstance = computed(() => hasPermission('instance:create'))
+  /** 基于权限码判断能否管理Redis */
+  const canManageRedis = computed(() => hasPermission('instance:redis_manage'))
+  /** 基于权限码判断能否审批变更 */
+  const canApproveChange = computed(() => hasPermission('approval:approve'))
   
   // 检查是否有某个权限
   const hasPermission = (permissionCode) => {
@@ -156,6 +164,9 @@ export const useUserStore = defineStore('user', () => {
     isAdmin,
     canOperate,
     canApprove,
+    canCreateInstance,
+    canManageRedis,
+    canApproveChange,
     hasPermission,
     hasEnvironmentAccess,
     login,

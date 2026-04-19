@@ -14,7 +14,7 @@ from app.schemas import (
     MenuConfigCreate, MenuConfigUpdate, MenuConfigResponse,
     MenuItemResponse, MessageResponse
 )
-from app.deps import get_super_admin, get_current_user
+from app.deps import require_permission, get_current_user
 from app.services.permission_service import PermissionService
 
 router = APIRouter(prefix="/menu", tags=["Menu Config"])
@@ -98,7 +98,7 @@ def filter_menu_by_role(menus: list[dict[str, Any]], user_role: UserRole, user_p
 
 @router.get("/list", response_model=list[MenuConfigResponse])
 async def get_menu_list(
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:role_manage")),
     db: Session = Depends(get_db)
 ):
     """获取完整菜单列表（管理员用）"""
@@ -148,7 +148,7 @@ async def get_user_menu(
 @router.post("", response_model=MenuConfigResponse)
 async def create_menu(
     menu_data: MenuConfigCreate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:role_manage")),
     db: Session = Depends(get_db)
 ):
     """创建菜单配置"""
@@ -184,7 +184,7 @@ async def create_menu(
 async def update_menu(
     menu_id: int,
     menu_data: MenuConfigUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:role_manage")),
     db: Session = Depends(get_db)
 ):
     """更新菜单配置"""
@@ -224,7 +224,7 @@ async def update_menu(
 @router.delete("/{menu_id}", response_model=MessageResponse)
 async def delete_menu(
     menu_id: int,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:role_manage")),
     db: Session = Depends(get_db)
 ):
     """删除菜单配置"""

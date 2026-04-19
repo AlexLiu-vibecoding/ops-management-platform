@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserUpdate, UserResponse, MessageResponse
-from app.deps import get_super_admin, get_current_user, require_permission
+from app.deps import require_permission, get_current_user
 from app.services import UserService
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
@@ -52,7 +52,7 @@ async def get_user(
 @router.post("", response_model=UserResponse)
 async def create_user(
     user_data: UserCreate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """创建用户（仅超级管理员）"""
@@ -72,7 +72,7 @@ async def create_user(
 async def update_user(
     user_id: int,
     user_data: UserUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """更新用户（仅超级管理员）"""
@@ -91,7 +91,7 @@ async def update_user(
 @router.delete("/{user_id}", response_model=MessageResponse)
 async def delete_user(
     user_id: int,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """删除用户（仅超级管理员）"""
@@ -104,7 +104,7 @@ async def delete_user(
 async def reset_user_password(
     user_id: int,
     new_password: str,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """重置用户密码（仅超级管理员）"""
@@ -121,7 +121,7 @@ async def reset_user_password(
 @router.get("/{user_id}/environments")
 async def get_user_environments(
     user_id: int,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """
@@ -138,7 +138,7 @@ async def get_user_environments(
 async def bind_user_environments(
     user_id: int,
     environment_ids: list[int],
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """

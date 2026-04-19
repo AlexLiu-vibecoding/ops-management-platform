@@ -252,7 +252,7 @@ const currentUserId = computed(() => userStore.user?.id)
 const userRole = computed(() => userStore.user?.role)
 
 // 是否有审批权限
-const canApprove = computed(() => ['super_admin', 'approval_admin'].includes(userRole.value))
+const canApprove = computed(() => userStore.hasPermission('approval:approve'))
 
 // 获取 Redis 变更操作配置
 const getRedisActions = (row) => {

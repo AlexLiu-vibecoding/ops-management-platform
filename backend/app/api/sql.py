@@ -16,7 +16,7 @@ from app.schemas import (
     SQLExecuteRequest, SQLExecuteResponse, MessageResponse
 )
 from app.utils.auth import decrypt_instance_password, encrypt_instance_password
-from app.deps import get_operator, get_current_user
+from app.deps import require_permission, get_current_user
 
 router = APIRouter(prefix="/sql", tags=["SQL执行"])
 
@@ -126,7 +126,7 @@ def get_db_connection(instance: RDBInstance, database: str = None):
 @router.post("/execute", response_model=SQLExecuteResponse)
 async def execute_sql(
     request: SQLExecuteRequest,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("sql:execute")),
     db: Session = Depends(get_db)
 ):
     """执行SQL"""

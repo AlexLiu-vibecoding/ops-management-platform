@@ -16,7 +16,7 @@ from app.models import (
     ReplicationStatus, LongTransaction, LockWait
 )
 from app.schemas import MessageResponse
-from app.deps import get_current_user, get_super_admin
+from app.deps import get_current_user, require_permission
 from app.services.db_connection import db_manager
 
 router = APIRouter(prefix="/inspection", tags=["巡检报告"])
@@ -116,7 +116,7 @@ async def list_metrics(
 @router.post("/metrics", response_model=MessageResponse)
 async def create_metric(
     data: InspectMetricCreate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("inspection:manage")),
     db: Session = Depends(get_db)
 ):
     """创建巡检指标"""
@@ -146,7 +146,7 @@ async def create_metric(
 async def update_metric(
     metric_id: int,
     data: InspectMetricUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("inspection:manage")),
     db: Session = Depends(get_db)
 ):
     """更新巡检指标"""
@@ -178,7 +178,7 @@ async def update_metric(
 @router.delete("/metrics/{metric_id}", response_model=MessageResponse)
 async def delete_metric(
     metric_id: int,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("inspection:manage")),
     db: Session = Depends(get_db)
 ):
     """删除巡检指标"""

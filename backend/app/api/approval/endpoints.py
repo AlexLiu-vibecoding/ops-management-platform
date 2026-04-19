@@ -18,7 +18,7 @@ from app.schemas import (
     ApprovalCreate, ApprovalAction, ApprovalResponse,
     MessageResponse
 )
-from app.deps import get_approval_admin, get_current_user, require_permission
+from app.deps import get_current_user, require_permission
 from app.services.notification import notification_service
 from app.services.scheduler import approval_scheduler
 from app.services.rollback_generator import rollback_generator
@@ -342,7 +342,7 @@ async def create_approval(
 async def approve_or_reject(
     approval_id: int,
     action: ApprovalAction,
-    current_user: User = Depends(get_approval_admin),
+    current_user: User = Depends(require_permission("approval:approve")),
     db: Session = Depends(get_db)
 ):
     """审批或拒绝"""
@@ -413,7 +413,7 @@ async def approve_or_reject(
 @router.post("/{approval_id}/execute", response_model=MessageResponse)
 async def execute_approval(
     approval_id: int,
-    current_user: User = Depends(get_approval_admin),
+    current_user: User = Depends(require_permission("approval:execute")),
     db: Session = Depends(get_db)
 ):
     """手动执行审批"""

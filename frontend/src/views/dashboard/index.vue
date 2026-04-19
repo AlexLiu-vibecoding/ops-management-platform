@@ -411,7 +411,7 @@ const refreshTodoItems = async () => {
   
   try {
     // 获取待审批的变更（仅审批人可见）
-    if (['super_admin', 'approval_admin'].includes(userStore.user?.role)) {
+    if (userStore.hasPermission('approval:approve')) {
       const pendingApprovals = await dashboardApi.getPendingApprovals()
       pendingApprovals.forEach(approval => {
         items.push({

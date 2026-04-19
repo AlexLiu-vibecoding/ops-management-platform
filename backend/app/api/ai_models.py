@@ -15,7 +15,7 @@ import time
 import logging
 
 from app.database import get_db
-from app.deps import get_current_user, get_super_admin
+from app.deps import get_current_user, require_permission
 from app.models import User
 from app.models.ai_model import (
     AIModelConfig, AISceneConfig, AICallLog,
@@ -212,7 +212,7 @@ async def get_templates(current_user: User = Depends(get_current_user)):
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_ai_model(
     data: AIModelConfigCreate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("ai:model_manage")),
     db: Session = Depends(get_db)
 ):
     """创建 AI 模型配置（仅超级管理员）"""
@@ -254,7 +254,7 @@ async def create_ai_model(
 async def update_ai_model(
     model_id: int,
     data: AIModelConfigUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("ai:model_manage")),
     db: Session = Depends(get_db)
 ):
     """更新 AI 模型配置（仅超级管理员）"""
@@ -288,7 +288,7 @@ async def update_ai_model(
 @router.delete("/{model_id}")
 async def delete_ai_model(
     model_id: int,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("ai:model_manage")),
     db: Session = Depends(get_db)
 ):
     """删除 AI 模型配置（仅超级管理员）"""
@@ -317,7 +317,7 @@ async def delete_ai_model(
 async def test_ai_model(
     model_id: int,
     data: AIModelTestRequest,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("ai:model_manage")),
     db: Session = Depends(get_db)
 ):
     """测试 AI 模型连接（仅超级管理员）"""
@@ -564,7 +564,7 @@ async def get_scene_config(
 async def update_scene_config(
     scene: str,
     data: AISceneConfigUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("ai:model_manage")),
     db: Session = Depends(get_db)
 ):
     """更新场景配置（仅超级管理员）"""
@@ -697,7 +697,7 @@ async def list_available_models(
 
 @router.post("/available-models/refresh")
 async def refresh_available_models(
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("ai:model_manage")),
     db: Session = Depends(get_db)
 ):
     """

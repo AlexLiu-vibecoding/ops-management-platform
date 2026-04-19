@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.database import get_db
-from app.deps import get_current_user, get_operator
+from app.deps import get_current_user, require_permission
 from app.models import User
 from app.schemas import (
     CollectionTaskCreate, CollectionTaskUpdate,
@@ -88,7 +88,7 @@ def list_collection_tasks(
 def create_collection_task(
     task_data: CollectionTaskCreate,
     db=Depends(get_db),
-    current_user: User = Depends(get_operator)
+    current_user: User = Depends(require_permission("sql_optimizer:manage"))
 ):
     """创建采集任务"""
     service = SQLOptimizationService(db)
@@ -155,7 +155,7 @@ def update_collection_task(
     task_id: int,
     task_data: CollectionTaskUpdate,
     db=Depends(get_db),
-    current_user: User = Depends(get_operator)
+    current_user: User = Depends(require_permission("sql_optimizer:manage"))
 ):
     """更新采集任务"""
     service = SQLOptimizationService(db)
@@ -187,7 +187,7 @@ def update_collection_task(
 def delete_collection_task(
     task_id: int,
     db=Depends(get_db),
-    current_user: User = Depends(get_operator)
+    current_user: User = Depends(require_permission("sql_optimizer:manage"))
 ):
     """删除采集任务"""
     service = SQLOptimizationService(db)
@@ -203,7 +203,7 @@ def delete_collection_task(
 def run_collection_task(
     task_id: int,
     db=Depends(get_db),
-    current_user: User = Depends(get_operator)
+    current_user: User = Depends(require_permission("sql_optimizer:manage"))
 ):
     """手动触发采集"""
     service = SQLOptimizationService(db)
@@ -321,7 +321,7 @@ def get_suggestion(
 def adopt_suggestion(
     suggestion_id: int,
     db=Depends(get_db),
-    current_user: User = Depends(get_operator)
+    current_user: User = Depends(require_permission("sql_optimizer:manage"))
 ):
     """采用建议，创建变更申请"""
     service = SQLOptimizationService(db)
@@ -353,7 +353,7 @@ def reject_suggestion(
     suggestion_id: int,
     request: RejectSuggestionRequest,
     db=Depends(get_db),
-    current_user: User = Depends(get_operator)
+    current_user: User = Depends(require_permission("sql_optimizer:manage"))
 ):
     """拒绝建议"""
     service = SQLOptimizationService(db)
@@ -403,7 +403,7 @@ def reject_suggestion(
 def verify_suggestion(
     suggestion_id: int,
     db=Depends(get_db),
-    current_user: User = Depends(get_operator)
+    current_user: User = Depends(require_permission("sql_optimizer:manage"))
 ):
     """验证优化效果"""
     service = SQLOptimizationService(db)
@@ -658,7 +658,7 @@ def analyze_slow_log_file(
 def delete_slow_log_file(
     file_id: int,
     db=Depends(get_db),
-    current_user: User = Depends(get_operator)
+    current_user: User = Depends(require_permission("sql_optimizer:manage"))
 ):
     """删除慢日志文件"""
     service = SQLOptimizationService(db)

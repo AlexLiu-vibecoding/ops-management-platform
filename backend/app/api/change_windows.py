@@ -13,7 +13,7 @@ from app.models import (
     ChangeWindow, Environment, User
 )
 from app.schemas import MessageResponse
-from app.deps import get_current_user, get_operator, require_permission
+from app.deps import get_current_user, require_permission
 
 router = APIRouter(prefix="/change-windows", tags=["变更时间窗口"])
 
@@ -112,7 +112,7 @@ async def list_change_windows(
 @router.post("", response_model=MessageResponse)
 async def create_change_window(
     data: ChangeWindowCreate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("approval:change_window")),
     db: Session = Depends(get_db)
 ):
     """创建变更时间窗口"""
@@ -220,7 +220,7 @@ async def get_change_window(
 async def update_change_window(
     window_id: int,
     data: ChangeWindowUpdate,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("approval:change_window")),
     db: Session = Depends(get_db)
 ):
     """更新变更时间窗口"""
@@ -283,7 +283,7 @@ async def update_change_window(
 @router.delete("/{window_id}", response_model=MessageResponse)
 async def delete_change_window(
     window_id: int,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("approval:change_window")),
     db: Session = Depends(get_db)
 ):
     """删除变更时间窗口"""
@@ -299,7 +299,7 @@ async def delete_change_window(
 @router.post("/{window_id}/toggle", response_model=MessageResponse)
 async def toggle_change_window(
     window_id: int,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("approval:change_window")),
     db: Session = Depends(get_db)
 ):
     """启用/禁用变更时间窗口"""

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.models import Environment
 from app.schemas import EnvironmentCreate, EnvironmentUpdate, EnvironmentResponse, MessageResponse
-from app.deps import get_super_admin, get_current_user
+from app.deps import require_permission, get_current_user
 from app.models import User
 from app.services.permission_service import PermissionService
 
@@ -36,10 +36,10 @@ class AwsConfigTestResponse(BaseModel):
 async def test_environment_aws(
     env_id: int,
     request: AwsConfigTest,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("environment:update")),
     db: Session = Depends(get_db)
 ):
-    """测试环境的 AWS 连接（仅超级管理员）"""
+    """测试环境的 AWS 连接"""
     import boto3
     from botocore.exceptions import ClientError, NoCredentialsError, EndpointConnectionError
     
@@ -123,10 +123,10 @@ async def get_environment(
 @router.post("", response_model=EnvironmentResponse)
 async def create_environment(
     env_data: EnvironmentCreate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("environment:create")),
     db: Session = Depends(get_db)
 ):
-    """创建环境（仅超级管理员）"""
+    """创建环境"""
     # 检查功能权限
     permission_service = PermissionService(db)
     permission_service.check_permission(current_user, "environment:create")
@@ -169,10 +169,10 @@ async def create_environment(
 async def update_environment(
     env_id: int,
     env_data: EnvironmentUpdate,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("environment:update")),
     db: Session = Depends(get_db)
 ):
-    """更新环境（仅超级管理员）"""
+    """更新环境"""
     # 检查功能权限
     permission_service = PermissionService(db)
     permission_service.check_permission(current_user, "environment:update")
@@ -210,10 +210,10 @@ async def update_environment(
 @router.delete("/{env_id}", response_model=MessageResponse)
 async def delete_environment(
     env_id: int,
-    current_user: User = Depends(get_super_admin),
+    current_user: User = Depends(require_permission("environment:delete")),
     db: Session = Depends(get_db)
 ):
-    """删除环境（仅超级管理员）"""
+    """删除环境"""
     # 检查功能权限
     permission_service = PermissionService(db)
     permission_service.check_permission(current_user, "environment:delete")
