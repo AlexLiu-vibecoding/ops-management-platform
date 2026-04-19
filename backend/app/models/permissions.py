@@ -233,6 +233,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         # 调度器管理
         PermissionCode.SCHEDULER_VIEW,
         PermissionCode.SCHEDULER_MANAGE,
+        # AI 模型管理 - 查看
+        PermissionCode.AI_MODEL_VIEW,
     ],
     "operator": [
         # 实例管理 - 查看、创建、编辑、测试
@@ -255,6 +257,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.NOTIFICATION_VIEW,
         # 调度器管理 - 查看
         PermissionCode.SCHEDULER_VIEW,
+        # AI 模型管理 - 查看
+        PermissionCode.AI_MODEL_VIEW,
     ],
     "developer": [
         # 实例管理 - 仅查看
@@ -274,6 +278,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.NOTIFICATION_VIEW,
         # 调度器管理 - 查看
         PermissionCode.SCHEDULER_VIEW,
+        # AI 模型管理 - 查看
+        PermissionCode.AI_MODEL_VIEW,
     ],
     "readonly": [
         # 实例管理 - 仅查看
@@ -286,7 +292,11 @@ DEFAULT_ROLE_PERMISSIONS = {
         PermissionCode.MONITOR_VIEW,
         # 脚本管理 - 仅查看
         PermissionCode.SCRIPT_VIEW,
+        # 通知管理 - 仅查看
+        PermissionCode.NOTIFICATION_VIEW,
         # 调度器管理 - 仅查看
         PermissionCode.SCHEDULER_VIEW,
+        # AI 模型管理 - 查看
+        PermissionCode.AI_MODEL_VIEW,
     ]
 }

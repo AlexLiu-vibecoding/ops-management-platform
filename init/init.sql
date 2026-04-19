@@ -252,6 +252,10 @@ INSERT INTO `role_permissions` VALUES (713, 'approval_admin', 28, NOW());
 INSERT INTO `role_permissions` VALUES (714, 'approval_admin', 33, NOW());
 INSERT INTO `role_permissions` VALUES (715, 'approval_admin', 34, NOW());
 INSERT INTO `role_permissions` VALUES (716, 'approval_admin', 32, NOW());
+INSERT INTO `role_permissions` VALUES (802, 'approval_admin', 53, NOW());
+INSERT INTO `role_permissions` VALUES (803, 'operator', 53, NOW());
+INSERT INTO `role_permissions` VALUES (804, 'developer', 53, NOW());
+INSERT INTO `role_permissions` VALUES (805, 'readonly', 53, NOW());
 
 -- ----------------------------
 -- 5. 角色环境关联表
