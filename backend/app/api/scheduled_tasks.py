@@ -18,7 +18,7 @@ from app.models import (
     User, UserRole
 )
 from app.schemas import MessageResponse
-from app.deps import get_current_user
+from app.deps import get_current_user, require_permission
 from app.services.task_scheduler import task_scheduler
 
 logger = logging.getLogger(__name__)
@@ -68,28 +68,21 @@ class ScheduledTaskUpdate(BaseModel):
 async def list_scheduled_tasks(
     skip: int = 0,
     limit: int = 20,
-    status: Optional[str] = None,
+    status_filter: Optional[str] = None,
     script_id: Optional[int] = None,
     search: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("scheduler:view")),
     db: Session = Depends(get_db)
 ):
     """获取定时任务列表"""
-    # 只有管理员和运维可以查看定时任务
-    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.APPROVAL_ADMIN, UserRole.OPERATOR]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No permission to view scheduled tasks"
-        )
-    
     query = db.query(ScheduledTask)
     
     # 非管理员只能看到自己创建的
     if current_user.role != UserRole.SUPER_ADMIN:
         query = query.filter(ScheduledTask.created_by == current_user.id)
     
-    if status:
-        query = query.filter(ScheduledTask.status == status)
+    if status_filter:
+        query = query.filter(ScheduledTask.status == status_filter)
     
     if script_id:
         query = query.filter(ScheduledTask.script_id == script_id)
@@ -125,17 +118,10 @@ async def list_scheduled_tasks(
 @router.post("", response_model=MessageResponse)
 async def create_scheduled_task(
     task_data: ScheduledTaskCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("scheduler:manage")),
     db: Session = Depends(get_db)
 ):
     """创建定时任务"""
-    # 检查权限
-    if current_user.role not in [UserRole.SUPER_ADMIN, UserRole.APPROVAL_ADMIN, UserRole.OPERATOR]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No permission to create scheduled tasks"
-        )
-    
     # 检查脚本是否存在
     script = db.query(Script).filter(Script.id == task_data.script_id).first()
     if not script:
