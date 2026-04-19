@@ -34,26 +34,26 @@ const routes = [
         path: 'instances',
         name: 'Instances',
         component: () => import('@/views/instances/index.vue'),
-        meta: { title: '实例管理', icon: 'Server', roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '实例管理', icon: 'Server' }
       },
       {
         path: 'instances/:id',
         name: 'InstanceDetail',
         component: () => import('@/views/instances/detail.vue'),
-        meta: { title: '实例详情', hidden: true, roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '实例详情', hidden: true }
       },
       {
         path: 'redis/:id',
         name: 'RedisDetail',
         component: () => import('@/views/instances/redis-detail.vue'),
-        meta: { title: 'Redis详情', hidden: true, roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: 'Redis详情', hidden: true }
       },
       // 数据管理 - 环境管理
       {
         path: 'environments',
         name: 'Environments',
         component: () => import('@/views/environments/index.vue'),
-        meta: { title: '环境管理', icon: 'Collection', roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '环境管理', icon: 'Collection' }
       },
       
       // SQL工具 - SQL编辑器
@@ -168,14 +168,14 @@ const routes = [
         path: 'scripts',
         name: 'Scripts',
         component: () => import('@/views/scripts/index.vue'),
-        meta: { title: '脚本管理', icon: 'DocumentCopy', roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '脚本管理', icon: 'DocumentCopy' }
       },
       // 自动化 - 定时任务
       {
         path: 'scheduled-tasks',
         name: 'ScheduledTasks',
         component: () => import('@/views/scheduled-tasks/index.vue'),
-        meta: { title: '定时任务', icon: 'AlarmClock', roles: ['super_admin', 'approval_admin', 'operator'] }
+        meta: { title: '定时任务', icon: 'AlarmClock' }
       },
       
       // 系统管理 - 用户管理（含注册审批）
