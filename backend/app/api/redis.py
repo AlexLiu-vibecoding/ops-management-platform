@@ -9,7 +9,7 @@ from app.models import RDBInstance, RedisInstance
 from app.schemas import MessageResponse
 from app.utils.auth import decrypt_instance_password
 from app.utils.redis_operations import RedisInstanceClient
-from app.deps import get_current_user, get_operator
+from app.deps import get_current_user, get_operator, require_permission
 from app.models import User
 from pydantic import BaseModel
 
@@ -174,7 +174,7 @@ async def get_key_detail(
 async def set_key_value(
     instance_id: int,
     data: KeyValueSet,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:redis_manage")),
     db: Session = Depends(get_db)
 ):
     """设置键值"""
@@ -203,7 +203,7 @@ async def set_key_value(
 async def delete_key(
     instance_id: int,
     key: str,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:redis_manage")),
     db: Session = Depends(get_db)
 ):
     """删除键"""
@@ -232,7 +232,7 @@ async def delete_key(
 async def rename_key(
     instance_id: int,
     data: KeyRename,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:redis_manage")),
     db: Session = Depends(get_db)
 ):
     """重命名键"""
@@ -261,7 +261,7 @@ async def rename_key(
 async def set_key_ttl(
     instance_id: int,
     data: KeyTTL,
-    current_user: User = Depends(get_operator),
+    current_user: User = Depends(require_permission("instance:redis_manage")),
     db: Session = Depends(get_db)
 ):
     """设置键过期时间"""

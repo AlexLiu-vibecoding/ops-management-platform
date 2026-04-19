@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import AuditLog, User
 from app.schemas import AuditLogResponse, PaginatedResponse
-from app.deps import get_current_user
+from app.deps import get_current_user, require_permission
 
 router = APIRouter(prefix="/audit", tags=["审计日志"])
 
@@ -62,7 +62,7 @@ async def list_audit_logs(
     end_time: Optional[datetime] = None,
     page: int = 1,
     page_size: int = 20,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("system:audit_log")),
     db: Session = Depends(get_db)
 ):
     """获取审计日志列表"""

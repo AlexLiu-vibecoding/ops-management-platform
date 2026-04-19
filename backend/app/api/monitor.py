@@ -16,7 +16,7 @@ from app.schemas import (
     MonitorSwitchUpdate, MonitorSwitchResponse,
     GlobalMonitorSwitchUpdate, MessageResponse
 )
-from app.deps import get_super_admin, get_current_user
+from app.deps import get_super_admin, get_current_user, require_permission
 
 router = APIRouter(prefix="/monitor", tags=["监控配置"])
 
@@ -213,7 +213,7 @@ async def update_instance_monitor_switch(
 
 @router.get("/config", response_model=dict)
 async def get_monitor_config(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("monitor:config")),
     db: Session = Depends(get_db)
 ):
     """获取监控配置"""

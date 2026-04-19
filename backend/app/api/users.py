@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User
 from app.schemas import UserCreate, UserUpdate, UserResponse, MessageResponse
-from app.deps import get_super_admin, get_current_user
+from app.deps import get_super_admin, get_current_user, require_permission
 from app.services import UserService
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/users", tags=["用户管理"])
 async def list_users(
     skip: int = 0,
     limit: int = 20,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """获取用户列表（需要权限）"""
@@ -35,7 +35,7 @@ async def list_users(
 @router.get("/{user_id}", response_model=UserResponse)
 async def get_user(
     user_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("system:user_manage")),
     db: Session = Depends(get_db)
 ):
     """获取用户详情"""

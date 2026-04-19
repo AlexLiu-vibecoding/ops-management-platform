@@ -13,7 +13,7 @@ from app.models import (
     ChangeWindow, Environment, User
 )
 from app.schemas import MessageResponse
-from app.deps import get_current_user, get_operator
+from app.deps import get_current_user, get_operator, require_permission
 
 router = APIRouter(prefix="/change-windows", tags=["变更时间窗口"])
 
@@ -65,7 +65,7 @@ async def list_change_windows(
     search: Optional[str] = None,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_permission("approval:change_window")),
     db: Session = Depends(get_db)
 ):
     """获取变更时间窗口列表"""
